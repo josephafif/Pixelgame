@@ -18,6 +18,9 @@ export class Hud {
       xpFill: $('#xp-fill'),
       essence: $('#res-essence'),
       scrap: $('#res-scrap'),
+      wood: $('#res-wood'),
+      stone: $('#res-stone'),
+      buildBtn: $('#btn-build'),
       weapon: $('#hud-weapon'),
       campBtn: $('#btn-base'),
       boss: $('#boss-bar'),
@@ -42,6 +45,11 @@ export class Hud {
     game.on('levelup', ({ level }) => this.toast(`Level ${level}! You feel stronger.`, 'level'));
     game.on('death', () => this.el.death.removeAttribute('hidden'));
     game.on('respawn', () => this.el.death.setAttribute('hidden', ''));
+    game.on('build', ({ active }) => {
+      this.el.attack.classList.toggle('build', active);
+      this.el.attack.setAttribute('aria-label', active ? 'Place' : 'Attack');
+      this.el.buildBtn?.classList.toggle('on', active);
+    });
     this.setWeapon(game.weapon?.dna ?? null);
   }
 
@@ -59,7 +67,7 @@ export class Hud {
     if (!dna) return;
     const color = this.game.data.byId.rarities.get(dna.rarity)?.color;
     el.append(
-      h('div.slot.framed', { style: { '--rarity': color } }, weaponIconEl(dna, 32)),
+      h(`div.slot.framed.r-${dna.rarity}`, { style: { '--rarity': color } }, weaponIconEl(dna, 32)),
       h('span.name', { style: { color } }, dna.name.text));
     el.title = `${dna.name.text} — ${dna.identity}`;
     this.el.ability.toggleAttribute('hidden', !dna.ability);
@@ -68,6 +76,7 @@ export class Hud {
 
   setHint(label) {
     const { hint, attack } = this.el;
+    if (this.game.build.active) label = null;
     if (label) {
       hint.textContent = this.game.input.mode === 'keyboard' ? `E / Space — ${label}` : label;
       hint.removeAttribute('hidden');
@@ -90,6 +99,9 @@ export class Hud {
     e.xpFill.style.width = `${Math.min(100, (100 * s.xp) / s.xpNext)}%`;
     e.essence.textContent = s.essence;
     e.scrap.textContent = s.scrap;
+    if (e.wood) e.wood.textContent = s.wood;
+    if (e.stone) e.stone.textContent = s.stone;
+    e.buildBtn?.toggleAttribute('hidden', !s.nearCamp && !s.building);
     e.campBtn?.classList.toggle('alert', Boolean(s.campAlert));
     const sprintOn = this.game.save.settings.sprintMode === 'hold' ? s.sprinting : this.game.input.sprintToggle;
     e.sprint.classList.toggle('on', sprintOn);

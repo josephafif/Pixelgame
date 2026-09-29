@@ -5,6 +5,29 @@
 
 const HOUR_MS = 3600 * 1000;
 
+/** Resources a building level can cost, in display order. */
+export const COST_KEYS = ['scrap', 'essence', 'wood', 'stone'];
+
+/** True when `resources` covers every entry of `cost`. */
+export function canAfford(resources, cost) {
+  return COST_KEYS.every((k) => (resources[k] ?? 0) >= (cost[k] ?? 0));
+}
+
+/** Subtracts `cost` from `resources` (call canAfford first). */
+export function pay(resources, cost) {
+  for (const k of COST_KEYS) if (cost[k]) resources[k] = (resources[k] ?? 0) - cost[k];
+}
+
+/** Human readable shortfalls, e.g. ["Needs 12 more wood"]. */
+export function shortfalls(resources, cost) {
+  const out = [];
+  for (const k of COST_KEYS) {
+    const missing = (cost[k] ?? 0) - (resources[k] ?? 0);
+    if (missing > 0) out.push(`Needs ${missing} more ${k}`);
+  }
+  return out;
+}
+
 export function buildingDefs(data) {
   return data.base.buildings;
 }
@@ -37,8 +60,7 @@ export function upgradeBlockers(data, save, id) {
   const out = [];
   if (save.player.level < next.playerLevel) out.push(`Requires level ${next.playerLevel}`);
   if (next.boss && !Object.keys(save.bosses?.defeated ?? {}).length) out.push('Defeat a boss first');
-  if (save.resources.scrap < next.scrap) out.push(`Needs ${next.scrap - save.resources.scrap} more scrap`);
-  if (save.resources.essence < next.essence) out.push(`Needs ${next.essence - save.resources.essence} more essence`);
+  out.push(...shortfalls(save.resources, next));
   return out;
 }
 
@@ -109,8 +131,7 @@ export function upgradeBuilding(data, save, id, now = Date.now()) {
     if (buildingLevel(data, save, 'well') > 0) collectWell(data, save, now);
     else save.base.wellAt = now;
   }
-  save.resources.scrap -= next.scrap;
-  save.resources.essence -= next.essence;
+  pay(save.resources, next);
   save.base.buildings[id] = next.level;
   syncInventoryCaps(data, save);
   return next.level;
@@ -122,6 +143,11 @@ export function researchCost(data, save, component) {
   return Math.ceil(component.research * (1 - Math.min(60, pct) / 100));
 }
 
+function catalystForForge(data, level) {
+  const best = data.catalysts.filter((c) => c.requiresForge && c.requiresForge <= level).pop();
+  return best ? best.name : null;
+}
+
 /** Human readable bonus of a building at a given level. */
 export function describeBonus(data, id, level) {
   const def = buildingDef(data, id);
@@ -130,14 +156,16 @@ export function describeBonus(data, id, level) {
   const n = bonusLevels(def, level);
   const p = def.perLevel ?? {};
   switch (id) {
-    case 'hearth':
-      return n > 0 ? `Rest to heal · +${p.maxHpPct * n}% max Health` : 'Rest to heal';
+    case 'hearth': {
+      const area = data.building ? `camp area ${data.building.radius + data.building.radiusPerHearth * level} tiles` : null;
+      return [n > 0 ? `+${p.maxHpPct * n}% max Health` : 'Rest to heal', area].filter(Boolean).join(' · ');
+    }
     case 'forge':
       return [
         'Crafting',
         n > 0 ? `-${p.craftDiscountPct * n}% cost` : null,
         n > 0 ? `+${p.craftLevel * n} item level` : null,
-        level >= 2 ? `${['', '', 'Azure', 'Violet', 'Golden', 'Golden'][level]} catalyst` : null,
+        catalystForForge(data, level),
       ].filter(Boolean).join(' · ');
     case 'vault':
       return `+${p.storage * n} storage · +${p.bag * n} bag slots`;

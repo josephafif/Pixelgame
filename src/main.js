@@ -15,7 +15,8 @@ import { Audio } from './audio/audio.js';
 import { Game } from './game/game.js';
 import { Hud } from './ui/hud.js';
 import { Panels } from './ui/panels.js';
-import { initModals, openModal, closeModal } from './ui/modal.js';
+import { initModals, openModal, closeModal, isModalOpen, isModalLocked } from './ui/modal.js';
+import { hardenBrowser, trapBackNavigation } from './pwa/harden.js';
 import { showDiscovery } from './ui/discovery.js';
 import { h, $ } from './ui/dom.js';
 import { hydrateIcons } from './ui/icons.js';
@@ -193,8 +194,30 @@ class App {
     });
     this.game.start();
     this.panels.prefetch();
+    trapBackNavigation({
+      playing: () => this.started,
+      back: () => this.#onBack(),
+    });
     if (this.isNewGame || !this.save.flags.tutorialSeen) this.#tutorial();
     else await this.game.ensureStarterWeapon();
+  }
+
+  /** Phone back button: close what's open, else open the menu; leave from the menu. */
+  #onBack() {
+    if (isModalOpen()) {
+      if (this.panels.open === 'menu') {
+        this.game.saveNow();
+        return 'leave';
+      }
+      if (!isModalLocked()) closeModal();
+      return 'handled';
+    }
+    if (this.game.build.active) {
+      this.game.toggleBuildMode(false);
+      return 'handled';
+    }
+    this.panels.show('menu');
+    return 'handled';
   }
 
   #tutorial() {
@@ -207,7 +230,8 @@ class App {
         touch ? h('li', 'The sword button attacks — and uses chests, shrines and buildings when you stand next to them.') : h('li', 'Click, Space or J to attack. E or Space to use chests, shrines and buildings.'),
         touch ? h('li', 'The boot toggles sprint (no stamina — sprint forever).') : h('li', 'Shift to sprint (no stamina — sprint forever).'),
         touch ? h('li', 'The star appears when your weapon grants an ability.') : h('li', 'Q or right-click casts your weapon\'s ability, when it has one.'),
-        h('li', 'Your camp is at the centre of the world. Upgrade its buildings with scrap and essence.'),
+        h('li', 'Your camp is at the centre of the world. Build a Forge, forge a pickaxe, and gather wood and stone to upgrade your camp and raise walls and turrets (G / hammer button).'),
+        h('li', 'Enemies only notice you when you get close. Rarer weapons shine brighter on the ground.'),
         h('li', 'Follow the arrow at the top-left to find the bosses.')),
       h('button.btn-primary', {
         autofocus: true,
@@ -402,6 +426,10 @@ class App {
 const app = new App();
 // Module scripts run after the document is parsed, so the DOM is ready here.
 hydrateIcons();
+hardenBrowser({
+  playing: () => app.started && !isModalOpen(),
+  save: () => app.game?.saveNow().then((ok) => ok && app.game.toast('Game saved')),
+});
 $('#update-now')?.addEventListener('click', () => app.applyUpdate());
 $('#update-later')?.addEventListener('click', () => app.laterUpdate());
 app.boot().catch((err) => {

@@ -10,6 +10,7 @@ import { icon } from './icons.js';
 import { openModal, closeModal, isModalOpen, isModalLocked } from './modal.js';
 import { isCraftingUnlocked } from '../weapons/crafting.js';
 import { buildingLevel } from '../game/base.js';
+import { BuildBar } from './build.js';
 
 const loaders = {
   inventory: () => import('./inventory.js'),
@@ -24,6 +25,7 @@ const DOCK = {
   'btn-forge': 'crafting',
   'btn-research': 'research',
   'btn-base': 'base',
+  'btn-build': 'build',
   'btn-menu': 'menu',
 };
 
@@ -34,8 +36,14 @@ export class Panels {
     this.open = null;
     game.on('ui', (cmd) => this.command(cmd));
     for (const [id, name] of Object.entries(DOCK)) {
-      document.getElementById(id)?.addEventListener('click', () => this.command(name));
+      const btn = document.getElementById(id);
+      btn?.addEventListener('click', () => {
+        // Don't keep focus: Space/Enter must go to the game, not re-click this.
+        btn.blur();
+        this.command(name);
+      });
     }
+    this.buildBar = new BuildBar(game);
   }
 
   prefetch() {
@@ -51,6 +59,16 @@ export class Panels {
       return;
     }
     if (name === 'map') return;
+    if (name === 'build') {
+      if (isModalOpen()) closeModal(true);
+      this.game.toggleBuildMode();
+      return;
+    }
+    // Esc leaves build mode before it opens the menu.
+    if (name === 'menu' && this.game.build.active && !isModalOpen()) {
+      this.game.toggleBuildMode(false);
+      return;
+    }
     // Pressing the same key again closes the panel.
     if (isModalOpen() && this.open === name && !Object.keys(arg).length) {
       closeModal();

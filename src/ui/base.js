@@ -3,7 +3,7 @@
 // and the Essence Well / Waystone are used from here too.
 
 import { h, pixelCanvas } from './dom.js';
-import { icon, costChip } from './icons.js';
+import { icon, costChips } from './icons.js';
 import { openModal, replaceModalBody, closeModal } from './modal.js';
 import { buildingSprite } from '../render/buildings.js';
 import {
@@ -88,7 +88,7 @@ export function open(game, app, { focus = null } = {}) {
     const max = maxLevel(def);
     const next = nextLevelInfo(data, save, def.id);
     const blockers = upgradeBlockers(data, save, def.id);
-    const hardBlockers = next ? blockers.filter((b) => !/more (scrap|essence)$/.test(b)) : [];
+    const hardBlockers = next ? blockers.filter((b) => !/^Needs \d+ more /.test(b)) : [];
     const canUpgrade = next && blockers.length === 0;
     const art = pixelCanvas(buildingSprite(def.id, level));
     art.style.width = '64px';
@@ -109,8 +109,7 @@ export function open(game, app, { focus = null } = {}) {
     next ? h('div.next', icon('up', 16), ' ', level === 0 ? 'Build: ' : 'Next: ', describeBonus(data, def.id, next.level)) : null,
     hardBlockers.length ? h('div.req', icon('lock', 16), ' ', hardBlockers.join(' · ')) : null,
     h('div.row',
-      next ? costChip('scrap', next.scrap, save.resources.scrap) : null,
-      next && next.essence ? costChip('essence', next.essence, save.resources.essence) : null,
+      next ? costChips(next, save.resources) : null,
       next
         ? h(`button${canUpgrade ? '.btn-primary' : ''}`, {
           disabled: !canUpgrade,
@@ -130,9 +129,16 @@ export function open(game, app, { focus = null } = {}) {
       h('div.base-head',
         h('span.rank', `Camp rank ${campRank(data, save)} / ${maxRank}`),
         h('span.spacer'),
-        h('span.cost', icon('scrap', 20), String(save.resources.scrap)),
-        h('span.cost', icon('essence', 20), String(save.resources.essence))),
-      h('p.small.muted', 'Upgrade buildings with scrap and essence from your adventures. Walk up to a building in camp to use it.'),
+        ['scrap', 'essence', 'wood', 'stone'].map((k) => h('span.cost', { title: k }, icon(k, 20), String(save.resources[k] ?? 0)))),
+      h('div.row.base-actions',
+        h('button.btn-primary', {
+          onclick: () => {
+            closeModal();
+            game.toggleBuildMode(true);
+          },
+        }, icon('hammer', 20), 'Build walls & turrets'),
+        h('span.small.muted', 'Camp area grows with every Hearth upgrade. Chop trees and break rocks with a pickaxe (Forge) for wood and stone.')),
+      h('p.small.muted', 'Upgrade buildings with scrap, essence, wood and stone. Walk up to a building in camp to use it.'),
       h('div.base-grid', defs.map(card)));
   }
 

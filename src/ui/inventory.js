@@ -151,7 +151,7 @@ export function open(game, app, arg = {}) {
       const fav = i.favorites.includes(dna.id);
       return h('button.slot', {
         style: { '--rarity': r.color },
-        class: [dna.id === selected ? 'selected' : null, equipped ? 'equipped' : null].filter(Boolean).join(' ') || null,
+        class: [`r-${dna.rarity}`, dna.id === selected ? 'selected' : null, equipped ? 'equipped' : null].filter(Boolean).join(' '),
         'data-id': dna.id,
         'aria-label': `${dna.name.text}, ${summaryLine(data, dna)}${equipped ? ', equipped' : ''}${fav ? ', favorite' : ''}${isNew ? ', new' : ''}`,
         title: dna.name.text,

@@ -63,7 +63,14 @@ html, body {
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
+  /* A game, not a document: no selection, callouts or double-tap zoom. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
 }
+input, textarea, select { user-select: text; -webkit-user-select: text; }
+img, canvas { -webkit-user-drag: none; }
 
 button, select, input { font: inherit; color: inherit; }
 .pixel, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
@@ -232,6 +239,9 @@ body:not([data-input="keyboard"]) .dock .key { display: none; }
 .res-row .res { display: inline-flex; align-items: center; gap: 4px; }
 .res-row .res.essence b { color: var(--essence); }
 .res-row .res.scrap b { color: var(--scrap); }
+.res-row .res.wood b { color: #e8c890; }
+.res-row .res.stone b { color: #c8ccd8; }
+.dock button.on { border-image-source: var(--frame-chip-on); }
 .net { font-size: 12px; color: var(--good); text-shadow: 0 1px 0 var(--ink); }
 body.offline .net { color: #ffb070; }
 .fps { position: absolute; bottom: calc(6px + var(--safe-b)); right: calc(8px + var(--safe-r)); font-size: 12px; color: var(--muted); }
@@ -267,6 +277,7 @@ body:has(#overlay-root .backdrop) .toasts { top: calc(6px + var(--safe-t)); }
 .toast.out { opacity: 0; transform: translateY(-8px); }
 .toast-warn { color: #ffc890; }
 .toast-legendary { color: #ffe0a0; text-shadow: 0 0 8px rgba(255, 176, 32, 0.6); }
+.toast-epic { color: #e4c4ff; text-shadow: 0 0 8px rgba(179, 92, 255, 0.6); }
 .toast-component { color: #bff4ff; }
 .toast-boss { color: #ffc0b0; }
 .toast-level { color: #b8ffb8; }
@@ -279,6 +290,62 @@ body:has(#overlay-root .backdrop) .toasts { top: calc(6px + var(--safe-t)); }
 .death h2 { font-size: 48px; margin: 0; color: #ff8a96; }
 
 /* ---------- Touch controls ---------- */
+
+/* Build mode bar */
+.build-bar {
+  position: absolute; left: 50%; bottom: calc(34px + var(--safe-b)); transform: translateX(-50%); z-index: 3;
+  width: min(760px, calc(100vw - 16px)); padding: 6px 8px; pointer-events: auto;
+  display: flex; flex-direction: column; gap: 4px;
+  border: 6px solid transparent; border-image: var(--frame-plate) 3 fill / 6px / 0 stretch;
+}
+body[data-input="touch"] .build-bar { top: calc(158px + var(--safe-t)); bottom: auto; }
+.build-list { display: flex; gap: 4px; overflow-x: auto; overscroll-behavior: contain; padding-bottom: 2px; touch-action: pan-x; }
+.bitem {
+  position: relative; flex: none; flex-direction: column; gap: 1px; width: 84px; min-height: 0; padding: 2px 2px 4px;
+  border-image-source: var(--frame-chip); font-size: 12px; line-height: 1.1; color: var(--muted);
+}
+.bitem.on { border-image-source: var(--frame-chip-on); color: var(--gold); }
+.bitem.locked { opacity: 0.5; }
+.bitem .art { position: relative; display: grid; place-items: center; height: 48px; }
+.bitem .art .lock { position: absolute; right: 4px; bottom: 0; }
+.bitem .name { font-weight: 700; text-align: center; }
+.bitem .bcost { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
+.bitem .bcost .cost { font-size: 11px; padding: 0 3px; gap: 1px; border-width: 3px; border-image-width: 3px; }
+.bitem .bcost .cost .icon { width: 12px; height: 12px; }
+.bitem .num { position: absolute; top: 2px; left: 4px; font-size: 11px; color: var(--muted); }
+.bitem.remove .art { height: 48px; }
+.build-foot { display: flex; align-items: center; gap: 8px; }
+.build-foot .status { flex: 1; font-size: 13px; color: var(--muted); min-height: 1.2em; }
+.build-foot .status.bad { color: #ffb070; }
+.build-foot .done { min-height: 36px; padding: 2px 18px; }
+@media (max-width: 640px) {
+  .build-bar { padding: 4px 6px; }
+  .bitem { width: 76px; font-size: 11px; }
+  .bitem .art { height: 36px; }
+  .bitem .art canvas { width: 24px !important; height: 36px !important; }
+  .bitem .bcost .cost { font-size: 10px; padding: 0 2px; }
+  .bitem .bcost .cost .icon { width: 10px; height: 10px; }
+  .build-foot .status { font-size: 12px; }
+}
+@media (max-height: 520px) {
+  body[data-input="touch"] .build-bar { top: calc(8px + var(--safe-t)); left: auto; right: calc(8px + var(--safe-r)); transform: none; width: min(460px, 60vw); }
+}
+
+/* Forge tools tab */
+.tool-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.tool-card { display: flex; gap: 10px; padding: 8px 10px; align-items: flex-start; }
+.tool-card.owned { filter: saturate(0.8); }
+.tool-card h3 { margin: 0; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+.tool-card .badge { margin: 0; }
+.tool-card p { margin: 2px 0; }
+.tool-card .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.tool-card .req { font-size: 13px; color: #ffb070; }
+.tool-art {
+  flex: none; width: 64px; height: 64px; display: grid; place-items: center;
+  border: 6px solid transparent; border-image: var(--frame-slot) 3 fill / 6px / 0 stretch;
+}
+.base-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
+.base-actions .small { flex: 1 1 260px; }
 
 .joystick, .action-buttons, .key-hints { display: none; }
 body[data-input="touch"] .joystick, body[data-input="touch"] .action-buttons { display: flex; }
@@ -329,6 +396,10 @@ body[data-input="keyboard"] .key-hints { display: block; }
 .btn.attack.use { background: linear-gradient(#c9973f, #7a5620); }
 .btn.attack.use .use { display: grid; }
 .btn.attack.use .atk { display: none; }
+.btn.attack .bld { display: none; }
+.btn.attack.build { background: linear-gradient(#6cd66c, #2f6e2f); }
+.btn.attack.build .bld { display: grid; }
+.btn.attack.build .atk, .btn.attack.build .use { display: none; }
 .btn.sprint { right: calc(var(--btn) * 1.12); bottom: 4px; width: calc(var(--btn) * 0.72); height: calc(var(--btn) * 0.72); }
 .btn.sprint.on { background: linear-gradient(#3a8ab0, #1c4a68); }
 .btn.ability {
@@ -349,7 +420,9 @@ body[data-input="keyboard"] .key-hints { display: block; }
 }
 
 @media (max-width: 640px) {
-  .hud-player { width: min(240px, calc(100vw - 240px - var(--safe-l) - var(--safe-r))); }
+  .hud-player { width: min(240px, calc(100vw - 160px - var(--safe-l) - var(--safe-r))); }
+  .dock { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; }
+  .res-row { display: grid; grid-template-columns: auto auto; gap: 0 8px; padding: 2px 8px; font-size: 14px; }
   .dock button { min-width: 40px; min-height: 40px; }
   .dock button .icon { width: 20px; height: 20px; }
   .toast { font-size: 14px; padding: 2px 10px; }
@@ -423,7 +496,11 @@ body[data-input="keyboard"] .key-hints { display: block; }
   background-clip: padding-box;
 }
 .weapon-name { margin: 0; font-size: 24px; line-height: 1.1; color: var(--rarity); text-shadow: 0 3px 0 var(--ink); }
-.rarity { font-size: 13px; letter-spacing: 4px; color: var(--rarity); font-weight: 700; }
+.rarity {
+  display: inline-block; margin: 2px 0; padding: 1px 8px; font-size: 13px; letter-spacing: 4px; font-weight: 700;
+  color: var(--ink); background: var(--rarity); box-shadow: 0 0 0 2px var(--ink);
+}
+.weapon-card.r-legendary .card-icon { box-shadow: 0 0 18px -2px var(--rarity); }
 .subtitle { font-size: 15px; }
 .identity { font-size: 14px; color: var(--gold); }
 .dps-row { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 0 6px; font-size: 16px; font-weight: 700; }
@@ -464,6 +541,32 @@ body[data-input="keyboard"] .key-hints { display: block; }
   background: linear-gradient(transparent, var(--panel) 25%);
 }
 .discovery .actions button { flex: 1 1 140px; }
+/* Rarity theming: panel glow, light rays, ribbon, confetti. */
+.discovery { position: relative; }
+.discovery-banner, .rarity-ribbon, .discovery .weapon-card { position: relative; }
+.discovery-panel.r-uncommon { box-shadow: 0 0 30px -8px #5fd35f; }
+.discovery-panel.r-rare { box-shadow: 0 0 40px -6px #4aa3ff; }
+.discovery-panel.r-epic { box-shadow: 0 0 50px -4px #b35cff; }
+.discovery-panel.r-legendary { box-shadow: 0 0 60px 0 #ffb020; animation: panel-in 0.16s steps(3), legend-panel 1.6s ease-in-out infinite; }
+@keyframes legend-panel { 50% { box-shadow: 0 0 80px 8px #ffb020; } }
+.discovery .rays {
+  position: absolute; left: 50%; top: 150px; width: 700px; height: 700px; margin: -350px 0 0 -350px; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rarity) 30%, transparent) 0 8deg, transparent 8deg 22deg);
+  -webkit-mask: radial-gradient(circle, #000 0 25%, transparent 60%); mask: radial-gradient(circle, #000 0 25%, transparent 60%);
+  animation: rays-spin 14s linear infinite; opacity: 0.8;
+}
+.discovery.r-rare .rays { opacity: 0.45; }
+@keyframes rays-spin { to { transform: rotate(360deg); } }
+.rarity-ribbon { text-align: center; margin: -6px 0 10px; }
+.rarity-ribbon span {
+  display: inline-block; padding: 2px 18px; font-size: 18px; font-weight: 700; letter-spacing: 6px;
+  color: var(--ink); background: var(--rarity); box-shadow: 0 0 0 3px var(--ink), 0 0 16px -2px var(--rarity);
+}
+.rarity-ribbon.r-legendary span { animation: shimmer 1.2s ease-in-out infinite; }
+.rarity-ribbon.r-legendary span::before, .rarity-ribbon.r-legendary span::after { content: '★'; margin: 0 8px; }
+.confetti { position: absolute; inset: -20px 0 0; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; top: -10px; width: 5px; height: 5px; animation: confetti-fall linear infinite; }
+@keyframes confetti-fall { to { transform: translate(20px, 640px) rotate(360deg); opacity: 0.2; } }
 .discovery-banner.r-common, .discovery-banner.r-uncommon { color: var(--text); text-shadow: 0 3px 0 var(--ink); }
 .discovery-banner.r-rare { color: #9fd0ff; text-shadow: 0 3px 0 var(--ink), 0 0 16px rgba(74, 163, 255, 0.6); }
 .discovery-banner.r-epic { color: #dcb0ff; text-shadow: 0 3px 0 var(--ink), 0 0 18px rgba(179, 92, 255, 0.7); }
@@ -505,6 +608,17 @@ body[data-input="keyboard"] .key-hints { display: block; }
   background-clip: padding-box;
 }
 .slot::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--rarity); }
+/* Rarity reads at a glance: coloured inner rim, and a glow for epic+. */
+.slot.r-uncommon, .slot.r-rare, .slot.r-epic, .slot.r-legendary { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rarity) 70%, transparent); }
+.slot.r-epic { box-shadow: inset 0 0 0 2px var(--rarity), 0 0 10px -2px var(--rarity); }
+.slot.r-legendary { box-shadow: inset 0 0 0 2px var(--rarity), 0 0 14px -1px var(--rarity); animation: legend-glow 1.6s ease-in-out infinite; }
+.slot.r-legendary::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 240, 190, 0.55) 50%, transparent 65%) no-repeat;
+  background-size: 250% 100%; animation: shine 2.4s linear infinite;
+}
+@keyframes legend-glow { 50% { box-shadow: inset 0 0 0 2px var(--rarity), 0 0 22px 1px var(--rarity); } }
+@keyframes shine { from { background-position: 150% 0; } to { background-position: -150% 0; } }
 .slot.selected { outline: 3px solid var(--gold); outline-offset: 0; filter: brightness(1.2); }
 .slot.empty { cursor: default; opacity: 0.45; }
 .slot.empty::before { display: none; }

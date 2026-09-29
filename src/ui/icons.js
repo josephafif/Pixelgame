@@ -299,6 +299,83 @@ const ICONS = {
     ],
     pal: { o: O, r: '#8d8a9e', p: '#6b3fc6', w: '#cdb2ff' },
   },
+  hammer: {
+    map: [
+      '............',
+      '.oooooooooo.',
+      '.owwwwwwwwo.',
+      '.oWWWWWWWWo.',
+      '.oooobboooo.',
+      '....obbo....',
+      '....obbo....',
+      '....obbo....',
+      '....obbo....',
+      '....obbo....',
+      '....oooo....',
+      '............',
+    ],
+    pal: { o: O, w: '#d0d4e0', W: '#8d8a9e', b: '#b07a48' },
+  },
+  pickaxe: {
+    map: [
+      '..oooooooo..',
+      '.owwwwwwwwo.',
+      'owwoobboowwo',
+      'owo.obbo.owo',
+      'oo..obbo..oo',
+      '....obbo....',
+      '....obbo....',
+      '....obbo....',
+      '....obbo....',
+      '....obbo....',
+      '....oooo....',
+      '............',
+    ],
+    pal: { o: O, w: '#b8bccc', b: '#b07a48' },
+  },
+  wood: {
+    map: [
+      '............',
+      '.oooooooooo.',
+      'obbbbbbbbooo',
+      'obBBBBBBoyyo',
+      'obbbbbbboyto',
+      'oBBBBBBBoyyo',
+      'obbbbbbbbooo',
+      '.oooooooooo.',
+      '............',
+    ],
+    pal: { o: O, b: '#b07a48', B: '#8a5a33', y: '#e8c890', t: '#b07a48' },
+  },
+  stone: {
+    map: [
+      '............',
+      '....oooo....',
+      '..oowwwwoo..',
+      '.owwwwwkkko.',
+      'owwwwwkkkkko',
+      'owwwkkkkkkko',
+      'okkkkkkkkKKo',
+      '.oKKKKKKKKo.',
+      '..oooooooo..',
+    ],
+    pal: { o: O, w: '#c8ccd8', k: '#8d8a9e', K: '#5d5a6e' },
+  },
+  remove: {
+    map: [
+      '..........',
+      '.oo....oo.',
+      'orro..orro',
+      '.orroorro.',
+      '..orrrro..',
+      '..orrrro..',
+      '.orroorro.',
+      'orro..orro',
+      '.oo....oo.',
+      '..........',
+    ],
+    pal: { o: O, r: '#ff6a7a' },
+  },
 };
 
 const urlCache = new Map();
@@ -348,7 +425,16 @@ export function hydrateIcons(root = document) {
 }
 
 /** Price tag: resource icon + amount, red when the player can't afford it. */
+const RESOURCE_NAMES = { scrap: 'Scrap', essence: 'Essence', wood: 'Wood', stone: 'Stone' };
+
 export function costChip(kind, amount, have = Infinity) {
-  return h('span.cost', { class: have < amount ? 'short' : null, title: kind === 'scrap' ? 'Scrap' : 'Essence' },
+  return h('span.cost', { class: have < amount ? 'short' : null, title: RESOURCE_NAMES[kind] ?? kind },
     icon(kind, 20), String(amount));
+}
+
+/** Chips for every resource in a cost object ({ scrap, essence, wood, stone }). */
+export function costChips(cost, resources = {}) {
+  return ['scrap', 'essence', 'wood', 'stone']
+    .filter((k) => cost?.[k])
+    .map((k) => costChip(k, cost[k], resources[k] ?? 0));
 }

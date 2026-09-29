@@ -80,6 +80,9 @@ test('inventory, research, camp, forge and settings panels open', async ({ page 
   await forgeCard.locator('button:has-text("Craft")').click();
 
   await expect(page.locator('.forge-panel')).toBeVisible();
+  // No pickaxe yet: the Forge opens on Tools first.
+  await expect(page.locator('.tool-card').first()).toContainText('Iron Pickaxe');
+  await page.click('.forge-panel .tab:has-text("Weapons")');
   await page.click('.forge .tile:has-text("Sword")');
   await page.click('.forge .chip:has-text("Fire Core")');
   await expect(page.locator('.forge-preview .result')).toContainText('Fire Sword');
@@ -148,9 +151,11 @@ test('camp: buildings upgrade, the well pays out and the waystone recalls', asyn
   await startGame(page);
   await game(page, () => {
     const g = window.__pixelgame.game;
-    g.save.player.level = 10;
+    g.save.player.level = 12;
     g.save.resources.essence = 2000;
     g.save.resources.scrap = 2000;
+    g.save.resources.wood = 500;
+    g.save.resources.stone = 500;
   });
   await expect(page.locator('#btn-base')).toHaveClass(/alert/);
   await page.keyboard.press('KeyB');
@@ -167,7 +172,8 @@ test('camp: buildings upgrade, the well pays out and the waystone recalls', asyn
   });
   const essence = await game(page, () => window.__pixelgame.game.save.resources.essence);
   await page.click('.bcard[data-building="well"] button:has-text("Collect")');
-  expect(await game(page, () => window.__pixelgame.game.save.resources.essence)).toBe(essence + 16);
+  const rate = await game(page, () => window.__pixelgame.data.base.buildings.find((b) => b.id === 'well').perLevel.essencePerHour);
+  expect(await game(page, () => window.__pixelgame.game.save.resources.essence)).toBe(essence + 2 * rate);
 
   await page.click('.bcard[data-building="waystone"] button:has-text("Build")');
   await page.keyboard.press('Escape');
@@ -228,4 +234,140 @@ test('save export produces a valid file that imports back', async ({ page }) => 
     return s;
   });
   expect(JSON.parse(text).format).toBe('pixelgame-save');
+});
+
+test('gathering: forge a pickaxe, chop a tree, collect the wood', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const spot = await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.player.level = 5;
+    Object.assign(g.save.resources, { scrap: 500, essence: 500 });
+    g.upgradeBuilding('forge');
+    // Find a tree outside the camp and stand next to it.
+    const w = g.world;
+    for (let r = 12; r < 60; r++) {
+      for (let x = -r; x <= r; x++) {
+        if (w.blockAt(x, r) === 22 && w.isFree(x + 0.5, r - 0.6, 0.32)) {
+          g.enemies.length = 0;
+          g.player.x = x + 0.5;
+          g.player.y = r - 0.6;
+          g.player.facing = Math.PI / 2;
+          g.renderer.snapCamera();
+          return { x, y: r };
+        }
+      }
+    }
+    return null;
+  });
+  expect(spot).not.toBeNull();
+  await page.keyboard.press('KeyC');
+  await page.click('.tool-card:has-text("Iron Pickaxe") button:has-text("Forge")');
+  await expect(page.locator('.tool-card').first()).toContainText('Equipped');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#interact-hint')).toContainText('Chop tree');
+  await page.keyboard.down('Space');
+  await expect.poll(() => game(page, (s) => window.__pixelgame.game.world.blockAt(s.x, s.y), spot), { timeout: 8000 }).toBe(0);
+  await page.keyboard.up('Space');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.resources.wood), { timeout: 5000 }).toBeGreaterThan(0);
+  expect(await game(page, (s) => Boolean(window.__pixelgame.game.save.world.harvested[`${s.x},${s.y}`]), spot)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('building: place walls with the mouse, gates let you through, Esc leaves build mode', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    Object.assign(g.save.resources, { wood: 200, stone: 200, scrap: 200 });
+    g.player.x = 5.5;
+    g.player.y = 1.5;
+    g.renderer.snapCamera();
+  });
+  await page.waitForTimeout(300);
+  await expect(page.locator('#btn-build')).toBeVisible();
+  await page.keyboard.press('KeyG');
+  await expect(page.locator('#build-bar')).toBeVisible();
+  await expect(page.locator('#build-bar .bitem.on')).toContainText('Wooden Wall');
+  // Click on tile (8, 1) and drag to (8, 3) to build a short wall line.
+  const at = (tx, ty) => game(page, ([x, y]) => window.__pixelgame.game.renderer.worldToScreen(x + 0.5, y + 0.5), [tx, ty]);
+  const a = await at(8, 0);
+  const b = await at(8, 2);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 8 });
+  await page.mouse.up();
+  const walls = await game(page, () => window.__pixelgame.game.save.base.structures.map((s) => `${s.id}@${s.x},${s.y}`));
+  expect(walls).toEqual(['wood_wall@8,0', 'wood_wall@8,1', 'wood_wall@8,2']);
+  // Walls block enemies; a gate lets only you through.
+  await page.keyboard.press('Digit3');
+  await expect(page.locator('#build-bar .bitem.on')).toContainText('Gate');
+  const c = await at(8, 3);
+  await page.mouse.click(c.x, c.y);
+  const blocked = await game(page, () => {
+    const w = window.__pixelgame.game.world;
+    return { wall: w.blockedFor(8, 1, 'enemy'), gatePlayer: w.blockedFor(8, 3, 'player'), gateEnemy: w.blockedFor(8, 3, 'enemy') };
+  });
+  expect(blocked).toEqual({ wall: true, gatePlayer: false, gateEnemy: true });
+  // Right-click removes (with a partial refund).
+  const wood = await game(page, () => window.__pixelgame.game.save.resources.wood);
+  await page.mouse.click(a.x, a.y, { button: 'right' });
+  expect(await game(page, () => window.__pixelgame.game.world.structureAt(8, 0))).toBeNull();
+  expect(await game(page, () => window.__pixelgame.game.save.resources.wood)).toBeGreaterThan(wood);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#build-bar')).toBeHidden();
+  await expect(page.locator('.menu-panel')).toHaveCount(0);
+  // Structures survive a reload (saved to IndexedDB) and still block enemies.
+  await game(page, () => window.__pixelgame.game.saveNow());
+  await page.reload();
+  await expect(page.locator('#title-play')).toHaveText('Continue');
+  const after = await game(page, () => {
+    const g = window.__pixelgame.game;
+    return { ids: g.save.base.structures.map((s) => `${s.id}@${s.x},${s.y}`).sort(), blocks: g.world.blockedFor(8, 1, 'enemy') };
+  });
+  expect(after).toEqual({ ids: ['gate@8,3', 'wood_wall@8,1', 'wood_wall@8,2'], blocks: true });
+  expect(errors).toEqual([]);
+});
+
+test('enemies only notice you within sight range; loot never lands in water', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const result = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { spawnEnemy } = await import('/src/game/enemies.js');
+    g.enemies.length = 0;
+    g.player.x = 80;
+    g.player.y = 80;
+    const far = spawnEnemy(g, 'slime', 80 + 12, 80);
+    await new Promise((r) => setTimeout(r, 600));
+    const farAlert = far.alert;
+    const near = spawnEnemy(g, 'slime', 80 + 3, 80);
+    await new Promise((r) => setTimeout(r, 400));
+    // Loot dropped over water moves to dry land.
+    const w = g.world;
+    let water = null;
+    for (let r = 10; r < 90 && !water; r++) {
+      for (let x = -r; x <= r && !water; x++) if (w.blockAt(x, r) === 20) water = { x: x + 0.5, y: r + 0.5 };
+    }
+    const { addPickup } = await import('/src/game/loot.js');
+    addPickup(g, 'essence', water.x, water.y, { value: 1, color: '#7ae0ff' });
+    const it = g.pickups[g.pickups.length - 1];
+    return { farAlert, nearAlert: near.alert, lootOnLand: w.isFree(it.x, it.y, 0.2) };
+  });
+  expect(result).toEqual({ farAlert: false, nearAlert: true, lootOnLand: true });
+  expect(errors).toEqual([]);
+});
+
+test('browser safety: no context menu, no text selection, Ctrl+S saves the game', async ({ page }) => {
+  await startGame(page);
+  const blocked = await page.evaluate(() => {
+    const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    document.querySelector('#game').dispatchEvent(ev);
+    const ev2 = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    document.querySelector('#btn-inventory').dispatchEvent(ev2);
+    return [ev.defaultPrevented, ev2.defaultPrevented, getComputedStyle(document.body).userSelect];
+  });
+  expect(blocked).toEqual([true, true, 'none']);
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('.toast', { hasText: 'Game saved' })).toBeVisible();
 });

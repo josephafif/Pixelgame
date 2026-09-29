@@ -5,16 +5,19 @@
 // optional extras, and a live preview of the weapon on the anvil.
 
 import { h, pixelCanvas } from './dom.js';
-import { icon, costChip } from './icons.js';
+import { icon, costChip, costChips } from './icons.js';
 import { openModal, replaceModalBody } from './modal.js';
 import { craftingOptions, validateCraft, craftCost } from '../weapons/crafting.js';
 import { generateVisual } from '../weapons/visuals.js';
 import { weaponIcon } from '../render/weapon-sprite.js';
 import { createRng, hashString } from '../core/rng.js';
 import { buildingLevel } from '../game/base.js';
+import { pickaxeDefs, pickaxeBlockers } from '../game/gathering.js';
+import { pickaxeSprite } from '../render/structures.js';
 
-// Last choice, remembered for the next visit (per session).
+// Last choice and tab, remembered for the next visit (per session).
 let lastChoice = null;
+let lastTab = 'weapons';
 
 /** A stand-in DNA with just enough to draw the weapon's look. */
 function previewDna(data, archetypeId, materialId, elementId, rarityId) {
@@ -42,8 +45,9 @@ function swatch(color) {
   return h('span.swatch', { style: { background: color } });
 }
 
-export function open(game, app) {
+export function open(game, app, arg = {}) {
   const { data, save } = game;
+  let tab = arg.tab ?? (save.tools?.pickaxe ? lastTab : 'tools');
   const opts = craftingOptions(data, save);
   const coreElement = (id) => opts.cores.find((c) => c.id === id)?.element ?? 'physical';
 
@@ -221,13 +225,56 @@ export function open(game, app) {
     }
   }
 
+  function tools() {
+    const owned = save.tools?.pickaxe ?? 0;
+    return h('div.tools',
+      h('p.small.muted', 'Pickaxes chop trees and break rocks for wood and stone, which you need to build walls, turrets and camp upgrades.'),
+      h('div.tool-list', pickaxeDefs(data).map((def) => {
+        const have = def.tier <= owned;
+        const blockers = have ? [] : pickaxeBlockers(data, save, def);
+        const hard = blockers.filter((b) => !/^Needs \d+ more /.test(b));
+        const art = pixelCanvas(pickaxeSprite(def.color));
+        art.style.width = '48px';
+        art.style.height = '56px';
+        return h('article.tool-card.framed', { class: have ? 'owned' : null },
+          h('div.tool-art', art),
+          h('div.tool-info',
+            h('h3', def.name, have ? h('span.badge', def.tier === owned ? 'Equipped' : 'Owned') : null),
+            h('p.small', def.desc),
+            h('p.small.muted', `Speed ×${def.power}`),
+            have ? null : h('div.row',
+              costChips(def.cost, save.resources),
+              hard.length ? h('span.req', icon('lock', 16), ' ', hard[0]) : null,
+              h('button.btn-primary', {
+                disabled: blockers.length > 0,
+                onclick: () => {
+                  if (game.forgePickaxe(def.tier)) rerender();
+                },
+              }, icon('anvil', 20), 'Forge'))));
+      })));
+  }
+
+  function tabs() {
+    const pick = (id) => () => {
+      tab = id;
+      lastTab = id;
+      rerender();
+    };
+    return h('div.tabs', { role: 'tablist' },
+      h('button.tab', { role: 'tab', class: tab === 'weapons' ? 'active' : null, 'aria-selected': String(tab === 'weapons'), onclick: pick('weapons') },
+        icon('sword', 20), 'Weapons'),
+      h('button.tab', { role: 'tab', class: tab === 'tools' ? 'active' : null, 'aria-selected': String(tab === 'tools'), onclick: pick('tools') },
+        icon('pickaxe', 20), 'Tools', save.tools?.pickaxe ? null : h('span.dot')));
+  }
+
   function build() {
+    if (tab === 'tools') return h('div', tabs(), tools());
     if (!opts.blueprints.length) {
-      return h('div.empty-state', icon('anvil', 48), h('p', 'Research a weapon blueprint to start forging.'));
+      return h('div', tabs(), h('div.empty-state', icon('anvil', 48), h('p', 'Research a weapon blueprint to start forging.')));
     }
     const errors = validateCraft(data, save, choice);
     const cost = craftCost(data, choice, save);
-    return h('div.forge',
+    return h('div', tabs(), h('div.forge',
       h('div.forge-steps',
         typeStep(),
         materialStep(),
@@ -235,7 +282,7 @@ export function open(game, app) {
         qualityStep(),
         extras()),
       preview(errors, cost),
-      forgeBar(errors, cost));
+      forgeBar(errors, cost)));
   }
 
   openModal({ title: 'Forge', icon: 'anvil', body: build(), className: 'wide forge-panel' });

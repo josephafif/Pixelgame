@@ -64,11 +64,14 @@
         <button id="btn-forge" aria-label="Forge"><i data-icon="anvil"></i><span class="key">C</span></button>
         <button id="btn-research" aria-label="Research"><i data-icon="book"></i><span class="key">R</span></button>
         <button id="btn-base" aria-label="Camp"><i data-icon="home"></i><span class="key">B</span></button>
+        <button id="btn-build" aria-label="Build" hidden><i data-icon="hammer"></i><span class="key">G</span></button>
         <button id="btn-menu" aria-label="Menu"><i data-icon="gear"></i><span class="key">Esc</span></button>
       </div>
       <div class="res-row plate">
         <span class="res essence" title="Essence"><i data-icon="essence" data-size="20"></i><b id="res-essence">0</b></span>
         <span class="res scrap" title="Scrap"><i data-icon="scrap" data-size="20"></i><b id="res-scrap">0</b></span>
+        <span class="res wood" title="Wood"><i data-icon="wood" data-size="20"></i><b id="res-wood">0</b></span>
+        <span class="res stone" title="Stone"><i data-icon="stone" data-size="20"></i><b id="res-stone">0</b></span>
       </div>
       <span id="net-status" class="net">● Online</span>
     </div>
@@ -84,9 +87,10 @@
     <div class="action-buttons">
       <button id="btn-ability" class="btn ability" hidden aria-label="Ability"><span class="glyph"><i data-icon="star" data-size="36"></i></span><span class="cd"></span></button>
       <button id="btn-sprint" class="btn sprint" aria-label="Sprint" aria-pressed="false"><span class="glyph"><i data-icon="boot" data-size="36"></i></span></button>
-      <button id="btn-attack" class="btn attack" aria-label="Attack"><span class="glyph atk"><i data-icon="sword" data-size="44"></i></span><span class="glyph use"><i data-icon="hand" data-size="44"></i></span></button>
+      <button id="btn-attack" class="btn attack" aria-label="Attack"><span class="glyph atk"><i data-icon="sword" data-size="44"></i></span><span class="glyph use"><i data-icon="hand" data-size="44"></i></span><span class="glyph bld"><i data-icon="hammer" data-size="44"></i></span></button>
     </div>
-    <div class="key-hints">WASD move · Space/click attack (auto-aim) · Shift sprint · Q ability · E use · I bag · C forge · R research · B camp · Esc menu</div>
+    <div id="build-bar" class="build-bar" hidden></div>
+    <div class="key-hints">WASD move · Space/click attack (auto-aim) · Shift sprint · Q ability · E use · I bag · C forge · R research · B camp · G build · Esc menu</div>
   </div>
 
   <div id="overlay-root"></div>

@@ -50,13 +50,17 @@ export function craftingOptions(data, save) {
   };
 }
 
-/** Cost of a craft; the Forge's level discounts it when `save` is given. */
+/**
+ * Cost of a craft. With a `save`, the price grows with the player's level
+ * (income grows too) and the Forge's level discounts it.
+ */
 export function craftCost(data, choice, save = null) {
   const catalyst = data.byId.catalysts.get(choice.catalyst ?? 'none');
   const cfg = data.crafting;
-  const keep = 1 - (save ? baseBonuses(data, save).craftDiscountPct : 0) / 100;
+  const scale = save ? 1 + ((cfg.levelScalePct ?? 0) / 100) * (save.player.level - 1) : 1;
+  const keep = (1 - (save ? baseBonuses(data, save).craftDiscountPct : 0) / 100) * scale;
   return {
-    scrap: Math.ceil((cfg.scrapCost + (catalyst ? data.catalysts.indexOf(catalyst) * 10 : 0)) * keep),
+    scrap: Math.ceil((cfg.scrapCost + (catalyst?.scrap ?? 0)) * keep),
     essence: Math.ceil((cfg.essenceCost + (catalyst?.essence ?? 0) + (choice.rune ? cfg.runeCost : 0)
       + (choice.ability ? cfg.abilityCost : 0)) * keep),
   };

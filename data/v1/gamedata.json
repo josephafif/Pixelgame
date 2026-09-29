@@ -953,11 +953,11 @@
   ],
   "catalysts": [
     { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
-    { "id": "rare", "name": "Azure Catalyst", "minRarity": "rare", "maxRarity": "epic", "essence": 60, "requiresForge": 2 },
-    { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 150, "requiresForge": 3 },
-    { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 320, "requiresForge": 4, "requiresBoss": true }
+    { "id": "rare", "name": "Azure Catalyst", "minRarity": "rare", "maxRarity": "epic", "essence": 120, "scrap": 60, "requiresForge": 2 },
+    { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 350, "scrap": 150, "requiresForge": 4 },
+    { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 900, "scrap": 400, "requiresForge": 5, "requiresBoss": true }
   ],
-  "crafting": { "scrapCost": 20, "essenceCost": 15, "runeCost": 20, "abilityCost": 60 },
+  "crafting": { "scrapCost": 40, "essenceCost": 30, "runeCost": 40, "abilityCost": 150, "levelScalePct": 6 },
   "base": {
     "baseBag": 24,
     "baseStorage": 120,
@@ -970,22 +970,22 @@
         "perLevel": { "maxHpPct": 6 },
         "levels": [
           { "scrap": 0, "essence": 0, "playerLevel": 1 },
-          { "scrap": 30, "essence": 20, "playerLevel": 2 },
-          { "scrap": 60, "essence": 50, "playerLevel": 5 },
-          { "scrap": 120, "essence": 100, "playerLevel": 9 },
-          { "scrap": 220, "essence": 200, "playerLevel": 14 }
+          { "scrap": 40, "essence": 30, "wood": 20, "playerLevel": 3 },
+          { "scrap": 100, "essence": 80, "wood": 50, "stone": 40, "playerLevel": 7 },
+          { "scrap": 220, "essence": 180, "wood": 90, "stone": 100, "playerLevel": 12 },
+          { "scrap": 400, "essence": 350, "wood": 150, "stone": 200, "playerLevel": 17 }
         ]
       },
       {
         "id": "forge", "name": "Forge", "x": -3.5, "y": -1.5, "bonusFrom": 2,
-        "desc": "Craft your own weapons. Upgrades make crafting cheaper, crafted weapons stronger and unlock better catalysts.",
-        "perLevel": { "craftDiscountPct": 6, "craftLevel": 2 },
+        "desc": "Craft weapons and pickaxes. Upgrades make crafting cheaper, crafted weapons stronger and unlock better catalysts and tools.",
+        "perLevel": { "craftDiscountPct": 5, "craftLevel": 1 },
         "levels": [
-          { "scrap": 25, "essence": 15, "playerLevel": 3 },
-          { "scrap": 70, "essence": 60, "playerLevel": 6 },
-          { "scrap": 140, "essence": 130, "playerLevel": 10 },
-          { "scrap": 260, "essence": 240, "playerLevel": 14, "boss": true },
-          { "scrap": 400, "essence": 400, "playerLevel": 18 }
+          { "scrap": 40, "essence": 25, "playerLevel": 3 },
+          { "scrap": 120, "essence": 100, "wood": 30, "stone": 40, "playerLevel": 7 },
+          { "scrap": 260, "essence": 240, "wood": 60, "stone": 100, "playerLevel": 12 },
+          { "scrap": 480, "essence": 450, "wood": 100, "stone": 180, "playerLevel": 17, "boss": true },
+          { "scrap": 800, "essence": 800, "wood": 160, "stone": 300, "playerLevel": 22, "boss": true }
         ]
       },
       {
@@ -993,11 +993,11 @@
         "desc": "Your stash. Every upgrade adds storage slots and a bigger bag.",
         "perLevel": { "storage": 30, "bag": 4 },
         "levels": [
-          { "scrap": 20, "essence": 10, "playerLevel": 2 },
-          { "scrap": 50, "essence": 40, "playerLevel": 4 },
-          { "scrap": 100, "essence": 80, "playerLevel": 8 },
-          { "scrap": 180, "essence": 160, "playerLevel": 12 },
-          { "scrap": 300, "essence": 260, "playerLevel": 16 }
+          { "scrap": 40, "essence": 20, "playerLevel": 2 },
+          { "scrap": 90, "essence": 70, "wood": 30, "playerLevel": 5 },
+          { "scrap": 180, "essence": 150, "wood": 60, "stone": 50, "playerLevel": 9 },
+          { "scrap": 320, "essence": 280, "wood": 100, "stone": 120, "playerLevel": 13 },
+          { "scrap": 500, "essence": 450, "wood": 160, "stone": 220, "playerLevel": 17 }
         ]
       },
       {
@@ -1005,11 +1005,11 @@
         "desc": "Study weapon components. Every upgrade makes research cheaper.",
         "perLevel": { "researchDiscountPct": 10 },
         "levels": [
-          { "scrap": 30, "essence": 30, "playerLevel": 4 },
-          { "scrap": 70, "essence": 80, "playerLevel": 7 },
-          { "scrap": 140, "essence": 160, "playerLevel": 11 },
-          { "scrap": 240, "essence": 280, "playerLevel": 15 },
-          { "scrap": 360, "essence": 420, "playerLevel": 19 }
+          { "scrap": 50, "essence": 50, "wood": 20, "playerLevel": 4 },
+          { "scrap": 120, "essence": 140, "wood": 50, "stone": 30, "playerLevel": 8 },
+          { "scrap": 240, "essence": 280, "wood": 90, "stone": 80, "playerLevel": 12 },
+          { "scrap": 400, "essence": 450, "wood": 140, "stone": 160, "playerLevel": 16 },
+          { "scrap": 600, "essence": 700, "wood": 200, "stone": 260, "playerLevel": 20 }
         ]
       },
       {
@@ -1017,23 +1017,23 @@
         "desc": "Drill every day. Every upgrade adds Attack Power and Defense.",
         "perLevel": { "attackPower": 4, "defense": 2 },
         "levels": [
-          { "scrap": 40, "essence": 30, "playerLevel": 3 },
-          { "scrap": 90, "essence": 80, "playerLevel": 6 },
-          { "scrap": 170, "essence": 160, "playerLevel": 10 },
-          { "scrap": 280, "essence": 260, "playerLevel": 14 },
-          { "scrap": 420, "essence": 400, "playerLevel": 18 }
+          { "scrap": 60, "essence": 50, "wood": 25, "stone": 15, "playerLevel": 4 },
+          { "scrap": 150, "essence": 130, "wood": 50, "stone": 50, "playerLevel": 8 },
+          { "scrap": 280, "essence": 260, "wood": 90, "stone": 110, "playerLevel": 12 },
+          { "scrap": 460, "essence": 420, "wood": 140, "stone": 180, "playerLevel": 16 },
+          { "scrap": 700, "essence": 650, "wood": 200, "stone": 280, "playerLevel": 20 }
         ]
       },
       {
         "id": "well", "name": "Essence Well", "x": 0.5, "y": -3.5,
         "desc": "Draws essence from the ground, even while you are away. Come back and collect it.",
-        "perLevel": { "essencePerHour": 8 },
+        "perLevel": { "essencePerHour": 5 },
         "levels": [
-          { "scrap": 30, "essence": 0, "playerLevel": 2 },
-          { "scrap": 80, "essence": 40, "playerLevel": 5 },
-          { "scrap": 160, "essence": 100, "playerLevel": 9 },
-          { "scrap": 260, "essence": 180, "playerLevel": 13 },
-          { "scrap": 400, "essence": 300, "playerLevel": 17 }
+          { "scrap": 40, "essence": 10, "playerLevel": 3 },
+          { "scrap": 120, "essence": 60, "stone": 40, "playerLevel": 6 },
+          { "scrap": 240, "essence": 150, "wood": 30, "stone": 90, "playerLevel": 10 },
+          { "scrap": 380, "essence": 260, "wood": 60, "stone": 150, "playerLevel": 14 },
+          { "scrap": 560, "essence": 420, "wood": 100, "stone": 240, "playerLevel": 18 }
         ]
       },
       {
@@ -1041,10 +1041,44 @@
         "desc": "Level 1: recall to camp from anywhere. Level 2: step back through to where you left.",
         "perLevel": {},
         "levels": [
-          { "scrap": 40, "essence": 40, "playerLevel": 4 },
-          { "scrap": 150, "essence": 150, "playerLevel": 10 }
+          { "scrap": 60, "essence": 60, "stone": 40, "playerLevel": 5 },
+          { "scrap": 220, "essence": 220, "wood": 40, "stone": 120, "playerLevel": 11 }
         ]
       }
+    ]
+  },
+  "gathering": {
+    "pickaxes": [
+      { "tier": 1, "name": "Iron Pickaxe", "power": 1, "requiresForge": 1, "cost": { "scrap": 20, "essence": 10 }, "color": "#a4abb6", "desc": "Chops trees and breaks rocks." },
+      { "tier": 2, "name": "Steel Pickaxe", "power": 1.7, "requiresForge": 2, "cost": { "scrap": 90, "essence": 60, "wood": 25, "stone": 30 }, "color": "#eef1f5", "desc": "Faster, and can mine crystals." },
+      { "tier": 3, "name": "Mythril Pickaxe", "power": 2.6, "requiresForge": 4, "cost": { "scrap": 300, "essence": 250, "wood": 60, "stone": 120 }, "color": "#7ae0ff", "desc": "Cuts through anything in a few swings." }
+    ],
+    "harvest": {
+      "tree": { "name": "Tree", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 15, "chips": "#8a5a33" },
+      "pine": { "name": "Pine", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 15, "chips": "#6b4a2a" },
+      "cactus": { "name": "Cactus", "verb": "Cut", "hp": 3, "tier": 1, "drops": { "wood": [1, 3] }, "regrowMinutes": 10, "chips": "#5fb050" },
+      "rock": { "name": "Rock", "verb": "Mine", "hp": 7, "tier": 1, "drops": { "stone": [3, 5] }, "regrowMinutes": 30, "chips": "#8d8a9e" },
+      "crystal": { "name": "Crystal", "verb": "Mine", "hp": 10, "tier": 2, "drops": { "stone": [2, 3], "essence": [2, 4] }, "regrowMinutes": 45, "chips": "#cdb2ff" }
+    }
+  },
+  "building": {
+    "radius": 10,
+    "radiusPerHearth": 2,
+    "reach": 7,
+    "maxStructures": 600,
+    "refund": 0.5,
+    "repairPerSec": 0.02,
+    "structures": [
+      { "id": "wood_wall", "name": "Wooden Wall", "kind": "wall", "hp": 120, "cost": { "wood": 3 }, "desc": "Blocks enemies. Cheap and quick." },
+      { "id": "stone_wall", "name": "Stone Wall", "kind": "wall", "hp": 380, "cost": { "stone": 4, "wood": 1 }, "requires": { "hearth": 2 }, "desc": "Sturdy wall that holds much longer." },
+      { "id": "gate", "name": "Gate", "kind": "gate", "hp": 220, "cost": { "wood": 8, "scrap": 5 }, "desc": "You walk through it. Enemies can't." },
+      { "id": "arrow_turret", "name": "Arrow Turret", "kind": "turret", "hp": 220, "cost": { "wood": 15, "stone": 10, "scrap": 30 }, "requires": { "training": 1 }, "turret": { "range": 7, "interval": 1.0, "damage": 12, "speed": 14, "sprite": "arrow", "color": "#e8d8b0" }, "desc": "Shoots arrows at enemies in range." },
+      { "id": "flame_turret", "name": "Flame Turret", "kind": "turret", "hp": 320, "cost": { "stone": 30, "scrap": 60, "essence": 60 }, "requires": { "forge": 3, "training": 2 }, "turret": { "range": 5.5, "interval": 0.8, "damage": 9, "speed": 9, "sprite": "orb", "element": "fire", "status": "burn", "color": "#ff7a2a" }, "desc": "Hurls fire that sets enemies ablaze." },
+      { "id": "spikes", "name": "Spike Trap", "kind": "trap", "walkable": true, "hp": 150, "cost": { "wood": 4, "scrap": 6 }, "trap": { "damage": 10, "interval": 0.7 }, "desc": "Hurts enemies that walk over it. Safe for you." },
+      { "id": "torch", "name": "Torch", "kind": "light", "hp": 60, "cost": { "wood": 2, "stone": 1 }, "desc": "Lights up your camp." },
+      { "id": "banner", "name": "Banner", "kind": "decor", "hp": 80, "cost": { "wood": 3, "scrap": 2 }, "desc": "Shows everyone whose camp this is." },
+      { "id": "wood_floor", "name": "Wooden Floor", "kind": "floor", "walkable": true, "hp": 60, "cost": { "wood": 1 }, "desc": "Decorative planks." },
+      { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 1 }, "desc": "Decorative paving." }
     ]
   },
   "biomes": [
@@ -1057,11 +1091,11 @@
     { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06 }, "water": 0.0, "enemies": ["wisp", "bat", "brute"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" }
   ],
   "enemies": [
-    { "id": "slime", "name": "Slime", "hp": 30, "damage": 8, "speed": 1.7, "size": 0.7, "behavior": "chase", "xp": 6, "weight": 10, "color": "#6ad35a" },
-    { "id": "bat", "name": "Bat", "hp": 18, "damage": 6, "speed": 3.2, "size": 0.6, "behavior": "swoop", "xp": 6, "weight": 8, "color": "#8a6ad8" },
-    { "id": "skeleton", "name": "Skeleton", "hp": 34, "damage": 8, "speed": 1.5, "size": 0.7, "behavior": "ranged", "range": 6, "projSpeed": 6, "xp": 9, "weight": 7, "color": "#e8e4d4" },
-    { "id": "brute", "name": "Brute", "hp": 90, "damage": 16, "speed": 1.15, "size": 1.0, "behavior": "charger", "xp": 16, "weight": 4, "color": "#c07a4a" },
-    { "id": "wisp", "name": "Wisp", "hp": 24, "damage": 9, "speed": 2.2, "size": 0.6, "behavior": "caster", "range": 5, "projSpeed": 5, "xp": 10, "weight": 6, "color": "#7ad8ff", "elemental": true }
+    { "id": "slime", "name": "Slime", "hp": 30, "damage": 8, "speed": 1.7, "size": 0.7, "sight": 6, "behavior": "chase", "xp": 6, "weight": 10, "color": "#6ad35a" },
+    { "id": "bat", "name": "Bat", "hp": 18, "damage": 6, "speed": 3.2, "size": 0.6, "sight": 7, "behavior": "swoop", "xp": 6, "weight": 8, "color": "#8a6ad8" },
+    { "id": "skeleton", "name": "Skeleton", "hp": 34, "damage": 8, "speed": 1.5, "size": 0.7, "sight": 8, "behavior": "ranged", "range": 6, "projSpeed": 6, "xp": 9, "weight": 7, "color": "#e8e4d4" },
+    { "id": "brute", "name": "Brute", "hp": 90, "damage": 16, "speed": 1.15, "size": 1.0, "sight": 6.5, "behavior": "charger", "xp": 16, "weight": 4, "color": "#c07a4a" },
+    { "id": "wisp", "name": "Wisp", "hp": 24, "damage": 9, "speed": 2.2, "size": 0.6, "sight": 8, "behavior": "caster", "range": 5, "projSpeed": 5, "xp": 10, "weight": 6, "color": "#7ad8ff", "elemental": true }
   ],
   "bosses": [
     { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["ring", "charge", "slam", "summon"], "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "epic", "theme": "fire" } },

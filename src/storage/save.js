@@ -41,14 +41,15 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     player: { level: 1, xp: 0, hp: null, x: 0.5, y: 1.6, spawnX: 0.5, spawnY: 1.6, kills: 0, deaths: 0, playTime: 0 },
     inventory: { equipped: null, bag: [], storage: [], bagSize: 24, storageSize: 120, favorites: [], unseen: [] },
     codex: { weapons: {}, modifiers: [], effects: [], abilities: [] },
-    resources: { scrap: 0, essence: 0 },
+    resources: { scrap: 0, essence: 0, wood: 0, stone: 0 },
     components: {},
     bosses: { defeated: {} },
-    world: { chests: [], shrines: [] },
+    world: { chests: [], shrines: [], harvested: {} },
     abilityState: { cooldowns: {} },
     counters: { drop: 0, craft: 0 },
     settings: { ...DEFAULT_SETTINGS },
-    base: { buildings: {}, wellAt: null, recall: null },
+    base: { buildings: {}, wellAt: null, recall: null, structures: [] },
+    tools: { pickaxe: 0 },
     flags: { tutorialSeen: false, craftingAnnounced: false },
     sync: { lastSyncedRev: 0, accountId: null },
   };
@@ -86,12 +87,14 @@ function structuredCloneSafe(v) {
 export function fillDefaults(save) {
   const def = createNewSave({ worldSeed: save.worldSeed ?? 1, now: save.createdAt ?? Date.now() });
   const out = { ...def, ...save };
-  for (const key of ['player', 'inventory', 'codex', 'resources', 'bosses', 'world', 'abilityState', 'counters', 'flags', 'sync', 'base']) {
+  for (const key of ['player', 'inventory', 'codex', 'resources', 'bosses', 'world', 'abilityState', 'counters', 'flags', 'sync', 'base', 'tools']) {
     out[key] = { ...def[key], ...(save[key] ?? {}) };
   }
   out.settings = { ...DEFAULT_SETTINGS, ...(save.settings ?? {}) };
   out.components = { ...(save.components ?? {}) };
   out.base.buildings = { ...(save.base?.buildings ?? {}) };
+  out.base.structures = Array.isArray(save.base?.structures) ? save.base.structures.map((st) => ({ ...st })) : [];
+  out.world.harvested = { ...(save.world?.harvested ?? {}) };
   return out;
 }
 

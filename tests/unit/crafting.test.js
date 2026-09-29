@@ -17,7 +17,7 @@ function crafter() {
   save.components.inferno_core = { found: 1, researched: true };
   save.components.crystal_heart = { found: 1, researched: false };
   save.bosses.defeated.inferno_titan = 1;
-  save.base.buildings.forge = 3;
+  save.base.buildings.forge = 4;
   save.codex.modifiers.push('lifesteal', 'homing', 'freezing');
   save.codex.abilities.push('meteor', 'phoenix');
   return save;
@@ -32,8 +32,21 @@ test('crafting needs a Forge at the camp; better catalysts need a better Forge',
   assert.ok(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'rare' }).some((e) => e.includes('Forge level 2')));
   s.base.buildings.forge = 2;
   assert.deepEqual(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'rare' }), []);
-  s.base.buildings.forge = 3;
-  assert.ok(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'legendary' }).some((e) => e.includes('Forge level 4')));
+  s.base.buildings.forge = 4;
+  assert.ok(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'legendary' }).some((e) => e.includes('Forge level 5')));
+});
+
+test('crafting costs grow with the player level; legendary catalysts are expensive', () => {
+  const s = crafter();
+  s.base.buildings.forge = 1;
+  const choice = { archetype: 'sword', material: 'iron', catalyst: 'none' };
+  s.player.level = 1;
+  const low = craftCost(data, choice, s);
+  s.player.level = 20;
+  const high = craftCost(data, choice, s);
+  assert.ok(high.essence > low.essence * 1.8 && high.scrap > low.scrap * 1.8);
+  const golden = craftCost(data, { ...choice, catalyst: 'legendary' }, s);
+  assert.ok(golden.essence >= 900, 'a golden catalyst costs a fortune');
 });
 
 test('Forge upgrades make crafting cheaper and crafted weapons stronger', () => {
@@ -72,8 +85,9 @@ test('crafted weapons honour the chosen components', () => {
   const save = crafter();
   const choice = { archetype: 'axe', material: 'steel', core: 'inferno_core', rune: 'lifesteal', catalyst: 'epic', ability: 'phoenix' };
   assert.deepEqual(validateCraft(data, save, choice), []);
-  save.base.buildings.forge = 4;
+  save.base.buildings.forge = 5;
   assert.deepEqual(validateCraft(data, save, { ...choice, catalyst: 'legendary' }), []);
+  save.base.buildings.forge = 4;
   for (let i = 0; i < 25; i++) {
     save.counters.craft = i;
     const dna = generateWeapon(data, buildCraftRequest(data, save, choice));

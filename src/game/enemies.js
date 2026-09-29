@@ -7,7 +7,19 @@ import { enemySprites, bossSprites } from '../render/sprites.js';
 
 let nextId = 1;
 const DESPAWN_DIST = 34;
-const SAFE_CAMP_RADIUS = 11;
+// Enemies give up the chase once you are this many times their sight away.
+const LEASH = 1.8;
+const PACK_RADIUS = 4;
+
+/** Collision mode: bats and wisps fly over trees and rocks, never over water. */
+function moveMode(e) {
+  return e.kind === 'bat' || e.kind === 'wisp' ? 'fly' : 'enemy';
+}
+
+/** No spawning inside the camp's build area (plus a margin). */
+function safeRadius(game) {
+  return (game.buildRadius?.() ?? 12) + 4;
+}
 
 function scaleFor(level) {
   return { hp: 1 + 0.3 * (level - 1), dmg: 1 + 0.14 * (level - 1) };
@@ -58,6 +70,13 @@ export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite
     dead: false,
     slowMult: 1,
     scale: elite ? 1.3 : 1,
+    // Perception: idle enemies wander around home until they see you.
+    alert: false,
+    homeX: x,
+    homeY: y,
+    wanderX: x,
+    wanderY: y,
+    wanderT: Math.random() * 2,
   };
   game.enemies.push(e);
   return e;
@@ -113,15 +132,119 @@ export function spawnBoss(game, bossId, x, y) {
 function moveEnemy(game, e, dx, dy, dt) {
   const nx = e.x + dx * dt;
   const ny = e.y + dy * dt;
-  const r = Math.min(e.r, 0.45);
-  const flying = e.kind === 'bat' || e.kind === 'wisp' || e.boss;
-  if (flying) {
+  if (e.boss) {
     e.x = nx;
     e.y = ny;
     return;
   }
-  if (game.world.isFree(nx, e.y, r)) e.x = nx;
-  if (game.world.isFree(e.x, ny, r)) e.y = ny;
+  const r = Math.min(e.r, 0.45);
+  const mode = moveMode(e);
+  const world = game.world;
+  // Pushed into water or a wall somehow: step out to the nearest open spot.
+  if (!world.isFree(e.x, e.y, r, mode)) {
+    const spot = world.findFreeSpot(e.x, e.y, r, mode, null);
+    if (spot) {
+      e.x = spot.x;
+      e.y = spot.y;
+    } else {
+      e.dead = true;
+      e.vanished = true;
+    }
+    return;
+  }
+  if (world.isFree(nx, e.y, r, mode)) e.x = nx;
+  if (world.isFree(e.x, ny, r, mode)) e.y = ny;
+}
+
+/**
+ * Steering around obstacles: if the straight line is blocked, try turning
+ * a bit left or right (sticking to one side for a moment so enemies walk
+ * around a lake instead of jittering at its shore).
+ */
+function steer(game, e, nx, ny) {
+  const world = game.world;
+  const r = Math.min(e.r, 0.45);
+  const mode = moveMode(e);
+  const probe = 0.55;
+  const clear = (ax, ay) => world.isFree(e.x + ax * probe, e.y + ay * probe, r, mode);
+  if (clear(nx, ny)) {
+    e.detour = 0;
+    return { x: nx, y: ny, blocked: null };
+  }
+  const side = e.detour || (Math.random() < 0.5 ? 1 : -1);
+  for (const turn of [0.6, 1.1, 1.6, 2.2]) {
+    for (const sgn of [side, -side]) {
+      const a = Math.atan2(ny, nx) + turn * sgn;
+      const cx = Math.cos(a);
+      const cy = Math.sin(a);
+      if (clear(cx, cy)) {
+        e.detour = sgn;
+        return { x: cx, y: cy, blocked: null };
+      }
+    }
+  }
+  // Boxed in: report the structure in the way (if any) so it can be attacked.
+  const tx = Math.floor(e.x + nx * (r + 0.4));
+  const ty = Math.floor(e.y + ny * (r + 0.4));
+  return { x: 0, y: 0, blocked: world.structureAt(tx, ty) };
+}
+
+/** Updates alert state: see the player, lose them, alert the pack. */
+function perceive(game, e, d) {
+  const p = game.player;
+  const sight = e.def.sight ?? 7;
+  const provoked = (e.alertUntil ?? 0) > game.time;
+  if (p.dead) {
+    e.alert = false;
+    return;
+  }
+  if (e.alert) {
+    if (d > sight * LEASH && !provoked) {
+      e.alert = false;
+      e.homeX = e.x;
+      e.homeY = e.y;
+      e.wanderX = e.x;
+      e.wanderY = e.y;
+      game.fx.text(e.x, e.y - e.r - 0.6, '?', '#c8c8d8');
+    }
+    return;
+  }
+  if (d < sight || (provoked && d < sight * LEASH * 1.5)) {
+    e.alert = true;
+    e.siege = null;
+    game.fx.text(e.x, e.y - e.r - 0.6, '!', '#ffd24a');
+    // Friends nearby notice too.
+    for (const o of game.enemies) {
+      if (o === e || o.dead || o.alert || o.boss) continue;
+      if ((o.x - e.x) ** 2 + (o.y - e.y) ** 2 < PACK_RADIUS * PACK_RADIUS) o.alert = true;
+    }
+  }
+}
+
+/** Idle: amble around home, pausing now and then. */
+function wander(game, e, dt) {
+  e.wanderT -= dt;
+  if (e.wanderT <= 0) {
+    e.wanderT = 1.5 + Math.random() * 2.5;
+    const a = Math.random() * Math.PI * 2;
+    const dist = Math.random() < 0.3 ? 0 : 1 + Math.random() * 3;
+    e.wanderX = e.homeX + Math.cos(a) * dist;
+    e.wanderY = e.homeY + Math.sin(a) * dist;
+  }
+  const dx = e.wanderX - e.x;
+  const dy = e.wanderY - e.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 0.2) return { x: 0, y: 0 };
+  const s = steer(game, e, dx / d, dy / d);
+  const speed = e.speed * e.slowMult * 0.4;
+  return { x: s.x * speed, y: s.y * speed };
+}
+
+/** Hits a structure that stands in the way (walls, gates, turrets). */
+function attackStructure(game, e, st) {
+  if (!st || e.atkCd > 0) return;
+  e.atkCd = 1.1;
+  game.damageStructure?.(st, e.dmg);
 }
 
 function enemyShoot(game, e, angle, { speed, damage, size = 2, sprite = 'orb' }) {
@@ -143,7 +266,32 @@ function updateBehaviour(game, e, dt) {
   let vy = 0;
   e.stateT += dt;
   e.atkCd -= dt;
-  const aggro = p.dead ? 0 : d < 18;
+  perceive(game, e, d);
+  if (!e.alert && e.state !== 'charge') {
+    // Idle, or besieging the turret that shot it.
+    const st = e.siege && !e.siege.dead ? e.siege : null;
+    if (st) {
+      const sx = st.x + 0.5 - e.x;
+      const sy = st.y + 0.5 - e.y;
+      const sd = Math.hypot(sx, sy) || 1;
+      if (sd < e.r + 0.9) {
+        e.vx = e.vy = 0;
+        attackStructure(game, e, st);
+      } else {
+        const s = steer(game, e, sx / sd, sy / sd);
+        if (s.blocked) attackStructure(game, e, s.blocked);
+        e.vx = s.x * speed * 0.8;
+        e.vy = s.y * speed * 0.8;
+      }
+    } else {
+      const w = wander(game, e, dt);
+      e.vx = w.x;
+      e.vy = w.y;
+    }
+    if (Math.abs(e.vx) > 0.05) e.facing = e.vx > 0 ? 1 : -1;
+    return;
+  }
+  const aggro = !p.dead;
 
   switch (e.def.behavior) {
     case 'chase':
@@ -192,6 +340,14 @@ function updateBehaviour(game, e, dt) {
     }
     default:
       if (aggro) { vx = n.x * speed; vy = n.y * speed; }
+  }
+  // Walk around lakes, trees and walls; hack at walls when boxed in.
+  const sp = Math.hypot(vx, vy);
+  if (sp > 0.01 && e.state !== 'charge') {
+    const s = steer(game, e, vx / sp, vy / sp);
+    if (s.blocked) attackStructure(game, e, s.blocked);
+    vx = s.x * sp;
+    vy = s.y * sp;
   }
   e.vx = vx;
   e.vy = vy;
@@ -365,7 +521,16 @@ export function updateEnemies(game, dt) {
     e.kx *= damp;
     e.ky *= damp;
   }
-  // Light separation so crowds don't collapse into one sprite.
+  // Light separation so crowds don't collapse into one sprite. A push never
+  // shoves an enemy into water or a wall (that is how they used to get stuck).
+  const nudge = (e, px, py) => {
+    const nx = e.x + px;
+    const ny = e.y + py;
+    if (e.boss || game.world.isFree(nx, ny, Math.min(e.r, 0.45), moveMode(e))) {
+      e.x = nx;
+      e.y = ny;
+    }
+  };
   for (let i = 0; i < list.length; i++) {
     const a = list[i];
     if (a.dead) continue;
@@ -381,10 +546,8 @@ export function updateEnemies(game, dt) {
         const push = (rr - d) * 0.5;
         const wa = a.boss ? 0 : b.boss ? 1 : 0.5;
         const wb = 1 - wa;
-        a.x -= (dx / d) * push * wa * 2;
-        a.y -= (dy / d) * push * wa * 2;
-        b.x += (dx / d) * push * wb * 2;
-        b.y += (dy / d) * push * wb * 2;
+        nudge(a, -(dx / d) * push * wa * 2, -(dy / d) * push * wa * 2);
+        nudge(b, (dx / d) * push * wb * 2, (dy / d) * push * wb * 2);
       }
     }
   }
@@ -402,7 +565,8 @@ export function updateSpawner(game, dt) {
   game.spawnTimer -= dt;
   if (game.spawnTimer > 0) return;
   game.spawnTimer = 0.45;
-  if (Math.hypot(p.x, p.y) < SAFE_CAMP_RADIUS) return;
+  const safe = safeRadius(game);
+  if (Math.hypot(p.x, p.y) < safe - 2) return;
   const wl = game.world.worldLevel(p.x, p.y);
   const bossActive = Boolean(game.boss);
   const quality = game.quality.enemyFactor;
@@ -414,7 +578,7 @@ export function updateSpawner(game, dt) {
     const d = 12 + Math.random() * 5;
     const x = p.x + Math.cos(a) * d;
     const y = p.y + Math.sin(a) * d;
-    if (Math.hypot(x, y) < SAFE_CAMP_RADIUS || !game.world.isFree(x, y, 0.45)) continue;
+    if (Math.hypot(x, y) < safe || !game.world.isFree(x, y, 0.45, 'enemy')) continue;
     const biome = game.world.biomeAt(Math.floor(x), Math.floor(y));
     const candidates = biome.enemies.map((id) => game.data.byId.enemies.get(id)).filter(Boolean);
     let total = 0;
@@ -431,7 +595,7 @@ export function updateSpawner(game, dt) {
     for (let g = 0; g < group && alive + g < target; g++) {
       const gx = x + (Math.random() - 0.5) * 1.5;
       const gy = y + (Math.random() - 0.5) * 1.5;
-      if (!game.world.isFree(gx, gy, 0.4)) continue;
+      if (!game.world.isFree(gx, gy, 0.4, 'enemy')) continue;
       spawnEnemy(game, def.id, gx, gy, { level, element, biome, elite: Math.random() < 0.05 + level * 0.004 });
     }
     return;

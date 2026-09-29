@@ -16,12 +16,12 @@ const KEYMAP = {
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyQ: 'ability', KeyK: 'ability',
   KeyE: 'interact', KeyF: 'interact',
-  KeyI: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyB: 'base', KeyM: 'map',
+  KeyI: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyB: 'base', KeyG: 'build', KeyM: 'map',
   Escape: 'menu', KeyP: 'menu',
 };
 
 const DEADZONE = 0.18;
-const UI_ACTIONS = new Set(['inventory', 'crafting', 'research', 'base', 'menu', 'map', 'back']);
+const UI_ACTIONS = new Set(['inventory', 'crafting', 'research', 'base', 'build', 'menu', 'map', 'back']);
 
 export class Input {
   /**
@@ -58,6 +58,9 @@ export class Input {
     // UI commands (open inventory, menu, ...) are dispatched immediately so
     // they also work while the game is paused behind a panel.
     this.onUiCommand = null;
+    // Build mode claims clicks/taps on the world: { active(), down, move, up }.
+    this.worldHandler = null;
+    this.buildTouchId = null;
     this.#bind();
   }
 
@@ -161,8 +164,14 @@ export class Input {
 
   #pointerDown(e) {
     if (!this.enabled) return;
+    const world = this.worldHandler?.active() ? this.worldHandler : null;
     if (e.pointerType === 'mouse') {
       this.#setMode('keyboard');
+      if (e.button === 1) e.preventDefault(); // no middle-click autoscroll
+      if (world && (e.button === 0 || e.button === 2)) {
+        world.down(e.clientX, e.clientY, e.button);
+        return;
+      }
       if (e.button === 0) this.mouseAttack = true;
       if (e.button === 2) this.#command('ability');
       return;
@@ -178,6 +187,9 @@ export class Input {
       this.joy = { id: e.pointerId, ox, oy, x: 0, y: 0 };
       this.#updateJoystick(e.clientX, e.clientY);
       this.joyEl.classList.add('active');
+    } else if (world && this.buildTouchId === null) {
+      this.buildTouchId = e.pointerId;
+      world.down(e.clientX, e.clientY, 0);
     } else if (this.attackTouchId === null) {
       this.attackTouchId = e.pointerId;
       this.touchAttack = true;
@@ -186,11 +198,20 @@ export class Input {
 
   #pointerMove(e) {
     if (e.pointerId === this.joy.id) this.#updateJoystick(e.clientX, e.clientY);
+    else if (e.pointerType === 'mouse' || e.pointerId === this.buildTouchId) {
+      if (this.worldHandler?.active()) this.worldHandler.move(e.clientX, e.clientY, e.buttons);
+    }
   }
 
   #pointerUp(e) {
     if (e.pointerType === 'mouse') {
       if (e.button === 0) this.mouseAttack = false;
+      this.worldHandler?.up();
+      return;
+    }
+    if (e.pointerId === this.buildTouchId) {
+      this.buildTouchId = null;
+      this.worldHandler?.up();
       return;
     }
     if (e.pointerId === this.joy.id) {
@@ -254,6 +275,7 @@ export class Input {
     this.sprintHeld = false;
     this.joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
     this.attackTouchId = null;
+    this.buildTouchId = null;
     this.joyEl?.classList.remove('active');
   }
 

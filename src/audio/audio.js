@@ -139,8 +139,48 @@ export class Audio {
       case 'pickup':
         this.#tone({ wave: 'square', freq: 660, to: 990, dur: 0.07, vol: 0.1 });
         break;
-      case 'discover':
-        [523, 659, 784, 1046].forEach((f, i) => this.#tone({ wave: 'square', freq: f, dur: 0.14, vol: 0.12, delay: i * 0.09 }));
+      case 'discover': {
+        // Bigger fanfare for rarer weapons.
+        const r = opts.rarity ?? 0;
+        const notes = [[523, 659, 784], [523, 659, 784, 1046], [523, 659, 784, 1046, 1318],
+          [392, 523, 659, 784, 1046, 1318], [392, 523, 659, 784, 1046, 1318, 1568]][Math.min(4, r)];
+        notes.forEach((f, i) => this.#tone({ wave: r >= 3 ? 'triangle' : 'square', freq: f, dur: 0.16, vol: 0.12, delay: i * 0.08 }));
+        if (r >= 3) this.#tone({ wave: 'sine', freq: notes.at(-1) * 2, dur: 0.9, vol: 0.06, delay: notes.length * 0.08 });
+        if (r >= 4) this.#tone({ wave: 'sine', freq: 98, to: 65, dur: 1.2, vol: 0.22 });
+        break;
+      }
+      case 'drop': {
+        // A weapon hits the ground: rarer drops ring out.
+        const r = opts.rarity ?? 0;
+        if (r === 0) {
+          this.#tone({ wave: 'triangle', freq: 330, to: 220, dur: 0.08, vol: 0.1 });
+          break;
+        }
+        const base = [0, 440, 523, 587, 659][r];
+        for (let i = 0; i <= r; i++) {
+          this.#tone({ wave: 'sine', freq: base * (1 + i * 0.5), dur: 0.35 + r * 0.1, vol: 0.08 + r * 0.02, delay: i * 0.07 });
+        }
+        if (r >= 3) this.#tone({ wave: 'triangle', freq: base * 4, to: base * 6, dur: 0.5, vol: 0.05, delay: 0.25 });
+        if (r >= 4) this.#noiseBurst({ freq: 5000, q: 1, dur: 0.8, vol: 0.06, type: 'highpass', delay: 0.1 });
+        break;
+      }
+      case 'chop':
+        this.#noiseBurst({ freq: 700, q: 1.2, dur: 0.09, vol: 0.22 });
+        this.#tone({ wave: 'triangle', freq: 180, to: 120, dur: 0.08, vol: 0.14 });
+        break;
+      case 'mine':
+        this.#noiseBurst({ freq: 2600, q: 3, dur: 0.07, vol: 0.18 });
+        this.#tone({ wave: 'square', freq: 900, to: 700, dur: 0.05, vol: 0.06 });
+        break;
+      case 'fell':
+        this.#noiseBurst({ freq: 300, q: 0.7, dur: 0.35, vol: 0.28, type: 'lowpass' });
+        break;
+      case 'build':
+        this.#noiseBurst({ freq: 500, q: 1, dur: 0.1, vol: 0.2, type: 'lowpass' });
+        this.#tone({ wave: 'triangle', freq: 260, to: 200, dur: 0.1, vol: 0.14 });
+        break;
+      case 'break':
+        this.#noiseBurst({ freq: 900, q: 0.6, dur: 0.3, vol: 0.28 });
         break;
       case 'levelup':
         [392, 523, 659, 784, 1046].forEach((f, i) => this.#tone({ wave: 'triangle', freq: f, dur: 0.16, vol: 0.16, delay: i * 0.07 }));

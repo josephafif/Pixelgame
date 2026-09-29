@@ -34,6 +34,8 @@ npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline 
 | Sprint (ingen stamina) | Stövelknappen (växla eller håll, valbart) | Shift | LB / L3 |
 | Ability | Stjärnknappen (syns bara när vapnet har en) | Q, K eller högerklick | X |
 | Inventory / Forge / Research / Läger / Meny | Knapparna uppe till höger | I / C / R / B / Esc | Y / Start / B |
+| Byggläge (i lägret) | Hammarknappen | G (1–9 väljer, X river, Esc klar) | – |
+| Hugga / bryta (med hacka) | Svärdknappen nära träd/sten | Space / E (håll inne) | A |
 
 **Auto-aim:** vapnet siktar alltid själv. Det låser på närmaste fiende inom räckvidd (bossar
 prioriteras, och låset släpper inte i onödan). Utan fiende pekar vapnet åt det håll du går.
@@ -43,9 +45,74 @@ Joysticken skalas efter skärmstorleken och kan ställas in (storlek, fast/dynam
 layout). Spelytan har `touch-action: none`, så gester i spelet aldrig scrollar eller zoomar sidan.
 Menyer och paneler går däremot att scrolla som vanligt.
 
+**Webbläsaren håller sig ur vägen** (`src/pwa/harden.js`): ingen högerklicks- eller
+långtrycksmeny, ingen textmarkering eller bilddragning, ingen zoom med Ctrl+hjul eller nyp,
+inga Ctrl-genvägar som skriv ut/bokmärke/sök, och mittenklick/musens bakåtknapp gör inget.
+Ctrl+S sparar spelet. Mobilens bakåtknapp stänger öppen panel eller öppnar pausmenyn; tryck
+bakåt igen från pausmenyn för att lämna. Textfält (vapenkoder) fungerar som vanligt.
+
+## Ekonomi och progression
+
+Progressionen är medvetet långsammare än i första versionen:
+
+- **Essence** droppar bara ibland från vanliga fiender (40 % chans, mer från elitfiender och
+  bossar). Värdet växer långsamt med fiendens nivå.
+- **Skrotning** ger lite: från 2 scrap för ett vanligt vapen till 24 scrap och 12 essence för ett
+  legendariskt.
+- **Crafting** kostar mer och blir dyrare med din nivå (+6 % per nivå); Forge-nivåer ger rabatt.
+- **Catalysts:** Azure kräver Forge 2, Violet Forge 4 och Golden (legendariskt) Forge 5, en
+  besegrad boss och 900 essence.
+- **Byggnader** kostar också trä och sten från nivå 2, så du behöver samla material.
+
+All balans ligger i `gamedata.json` (`crafting`, `catalysts`, `base`, `building`, `gathering`)
+och i `src/game/loot.js`.
+
+## Rarity syns direkt
+
+Ett vapen på marken visar sin rarity på avstånd: vanliga glimmar, ovanliga lyser grönt,
+sällsynta (rare) skickar upp en blå ljuspelare, episka en högre lila med kretsande gnistor, och
+legendariska en hög guldpelare med roterande strålar. Rare och högre har rarity-namnet ovanför
+sig (alla har det när du står nära). Dropp låter olika per rarity, och episka och legendariska
+annonseras. När du plockar upp vapnet ringer en ring i rarity-färgen, och upptäcktsrutan får
+rarity-band, ljusstrålar och (episk+) konfetti. I inventoryt har platserna rarity-kant; episka
+lyser och legendariska glimmar.
+
+## Samla och bygga
+
+1. Bygg en **Forge** i lägret och smid en **hacka** (Forge → Tools). Det finns tre nivåer; högre
+   nivå hugger snabbare och kan bryta kristaller.
+2. Gå fram till ett träd eller en sten och tryck Use (håll inne för att fortsätta). Träd ger
+   **trä** och stenar ger **sten**. Utanför lägret växer de tillbaka efter en stund; inne i lägret
+   förblir marken röjd så att du kan bygga där.
+3. Tryck **G** (eller hammarknappen) i lägret för **byggläget**. Välj något i listan och klicka
+   eller tryck på marken. Dra för att bygga en hel rad. Högerklick eller X-verktyget river och ger
+   tillbaka halva kostnaden.
+
+| Konstruktion | Gör |
+| --- | --- |
+| Trävägg / stenvägg | Stoppar fiender och deras skott. Stenväggen håller längre (kräver Hearth 2) |
+| Grind | Du går igenom, fiender gör det inte |
+| Pilturret / eldturret | Skjuter på fiender inom räckvidd; skadan växer med din nivå och Training Grounds |
+| Spikfälla | Skadar fiender som går över den |
+| Fackla, banderoll, trägolv, stenväg | För att göra lägret till ditt |
+
+Lägrets byggyta växer med varje Hearth-uppgradering. Fiender som blockeras av en vägg hugger på
+den, och turrets som skjuter drar till sig fiender. Skadade konstruktioner lagar sig själva när
+lägret är lugnt. Logik: `src/game/construction.js` och `src/game/gathering.js`; grafik:
+`src/render/structures.js`; byggpanelen: `src/ui/build.js`.
+
+## Fiender
+
+Fiender ser dig bara inom sitt synfält (6–8 rutor beroende på typ, `sight` i datat). Annars
+strövar de runt där de föddes. När en fiende får syn på dig visas ett "!", och flocken runt den
+vaknar också. Springer du tillräckligt långt bort ger de upp ("?"). Blir en fiende träffad jagar
+den dig även på längre avstånd. Fiender går runt sjöar, träd och väggar i stället för att fastna.
+Flygande fiender kan flyga över träd men aldrig över vatten. Loot hamnar alltid på mark du kan gå
+på.
+
 ## Läger (basen)
 
-Lägret mitt i världen byggs ut med scrap och essence. Gå fram till en byggnad och tryck
+Lägret mitt i världen byggs ut med scrap, essence, trä och sten. Gå fram till en byggnad och tryck
 Use, eller öppna lägerpanelen (B / hus-knappen). Varje byggnad har nivåer med krav på spelarnivå
 (och ibland en besegrad boss), och all data ligger i `gamedata.json` → `base`.
 
@@ -200,8 +267,10 @@ src/
   core/                       deterministisk RNG, matematik
   data/                       laddning, validering, klientens kapabiliteter
   weapons/                    generator, regler, namn, visuals, DNA, crafting, worker
-  game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger
-  render/                     renderer, pixelsprites, tiles, vapensprites, byggnader, animationer
+  game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger,
+                              insamling (gathering.js), byggen (construction.js)
+  render/                     renderer, pixelsprites, tiles, vapensprites, byggnader,
+                              konstruktioner, animationer
   input/, audio/, storage/, pwa/, ui/
 scripts/                      dev-server, precache-byggare, ikongenerator
 tests/unit/, tests/e2e/
@@ -219,4 +288,6 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 - Ingen backend ingår. Synk-klienten och protokollet finns, men en server och
   kontohantering behöver byggas separat.
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
+- Fiender attackerar inte lägret på egen hand ännu. Ett naturligt nästa steg är räder mot
+  lägret (vågor av fiender) där väggar och turrets verkligen sätts på prov.
 - iOS saknar manifest-splash. Där används appens egen startskärm.

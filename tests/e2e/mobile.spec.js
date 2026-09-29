@@ -85,9 +85,32 @@ test('phone HUD: player plate and dock never overlap; forge button stays reachab
   });
   await page.tap('#btn-forge');
   await expect(page.locator('.forge-panel')).toBeVisible();
+  await page.tap('.forge-panel .tab:has-text("Weapons")');
   // The sticky bar keeps cost + Forge button on screen while picking.
   const bar = page.locator('.forge-bar .btn-primary');
   await expect(bar).toBeVisible();
   const box = await bar.boundingBox();
   expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize().height);
+});
+
+test('build mode on a phone: tap the ground to place, the attack button becomes Place', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page, { tap: true });
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    Object.assign(g.save.resources, { wood: 100 });
+    g.player.x = 5.5;
+    g.player.y = 1.5;
+    g.renderer.snapCamera();
+  });
+  await page.waitForTimeout(300);
+  await page.tap('#btn-build');
+  await expect(page.locator('#build-bar')).toBeVisible();
+  await expect(page.locator('#btn-attack')).toHaveClass(/build/);
+  const pos = await game(page, () => window.__pixelgame.game.renderer.worldToScreen(8.5, 1.5));
+  await page.touchscreen.tap(pos.x, pos.y);
+  expect(await game(page, () => window.__pixelgame.game.world.structureAt(8, 1)?.id)).toBe('wood_wall');
+  await page.tap('#build-bar .done');
+  await expect(page.locator('#build-bar')).toBeHidden();
+  expect(errors).toEqual([]);
 });

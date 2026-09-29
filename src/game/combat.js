@@ -125,6 +125,11 @@ export function dealDamage(game, e, amount, opts = {}) {
   dmg = Math.max(1, Math.round(dmg));
   e.hp -= dmg;
   e.flash = 0.08;
+  if (!e.boss) {
+    // Being hit wakes an enemy up, even from beyond its sight range.
+    e.alertUntil = game.time + 5;
+    if (opts.structure) e.siege = opts.structure;
+  }
   if (!opts.quiet) {
     const color = opts.color ?? (element !== 'physical' ? data.byId.elements.get(element)?.glow : null) ?? '#ffffff';
     game.fx.number(e.x, e.y - e.r - 0.3, dmg, { crit, color });

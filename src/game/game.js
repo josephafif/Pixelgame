@@ -24,6 +24,11 @@ import { validateCraft, buildCraftRequest, craftCost, isCraftingUnlocked } from 
 import {
   syncInventoryCaps, upgradeBuilding, upgradeBlockers, buildingLevel, buildingDef, collectWell, wellPending, researchCost,
 } from './base.js';
+import { applyStatus } from './status.js';
+import {
+  currentPickaxe, forgePickaxe, findHarvestTarget, rollDrops, regrow, REGROW_INTERVAL,
+} from './gathering.js';
+import { Construction, buildRadius, structureDef, structureDefs, structureLock } from './construction.js';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 5;
@@ -48,6 +53,7 @@ export class Game {
     this.listeners = new Map();
 
     this.world = new World(data, save.worldSeed);
+    this.world.harvested = save.world.harvested;
     this.fx = new Fx();
     this.time = 0;
     this.frame = 0;
@@ -80,12 +86,21 @@ export class Game {
     this.running = false;
 
     this.damageEnemy = (e, amount, opts) => dealDamage(this, e, amount, opts);
+    this.construction = new Construction(this);
+    // Build mode (camp construction) and gathering state.
+    this.build = {
+      active: false, selected: structureDefs(data)[0]?.id ?? null, tool: 'place',
+      ghost: null, reason: null, hover: null, hoverAt: -99, painting: false, lastTile: null,
+    };
+    this.harvestDamage = new Map();
+    this.regrowT = 1;
+    this.#bindBuildInput();
     input.onUiCommand = (cmd) => this.emit('ui', cmd);
     this.weapon = null;
     this.player = {
       x: save.player.x, y: save.player.y, r: 0.32, vx: 0, vy: 0, kx: 0, ky: 0, facing: 0,
       hp: 1, dead: false, invuln: 1, attackCd: 0, attackAnim: null, attackCount: 0, sprinting: false,
-      moving: false, walkT: 0, hurtFlash: 0, respawnT: 0, statuses: {},
+      moving: false, walkT: 0, hurtFlash: 0, respawnT: 0, statuses: {}, toolAnim: null, toolCd: 0,
     };
     syncInventoryCaps(data, save);
     this.pstats = computePlayerStats(data, save, null, []);
@@ -451,9 +466,17 @@ export class Game {
     const dna = this.discoveryQueue.shift();
     if (!dna) return;
     this.discoveryOpen = true;
+    const r = this.data.rarityIndex.get(dna.rarity) ?? 0;
+    const color = this.data.byId.rarities.get(dna.rarity)?.color ?? '#ffffff';
+    if (r >= 2) {
+      const p = this.player;
+      this.fx.add({ type: 'ring', x: p.x, y: p.y, r0: 0.3, r1: 1.5 + r * 0.6, color, dur: 0.5, fill: r >= 3 });
+      this.fx.emit('glint', p.x, p.y - 0.5, 8 + r * 6, 1.2, 3, [color, '#ffffff']);
+    }
+    if (r >= 3) this.flash(color, 0.4);
     this.pause('discovery');
-    this.audio.play('discover');
-    this.vibrate(40);
+    this.audio.play('discover', { rarity: r });
+    this.vibrate(r >= 4 ? [40, 60, 80] : 40);
     const inv = this.save.inventory;
     this.emit('discovery', {
       dna,
@@ -597,6 +620,11 @@ export class Game {
     }
   }
 
+  /** Brief full-screen colour flash (legendary drops and pickups). */
+  flash(color, dur = 0.3) {
+    this.screenFlash = { color, t: dur, dur };
+  }
+
   collect(it) {
     const r = this.save.resources;
     switch (it.kind) {
@@ -606,6 +634,11 @@ export class Game {
         break;
       case 'scrap':
         r.scrap += it.value;
+        this.audio.play('pickup', { throttle: 60 });
+        break;
+      case 'wood':
+      case 'stone':
+        r[it.kind] = (r[it.kind] ?? 0) + it.value;
         this.audio.play('pickup', { throttle: 60 });
         break;
       case 'heart':
@@ -670,12 +703,26 @@ export class Game {
         best = o;
       }
     }
+    // With a pickaxe, trees and rocks next to you can be harvested (unless
+    // you are fighting: then the attack button attacks).
+    if (!best && !this.build.active && !this.target && currentPickaxe(this.data, this.save)) {
+      const h = findHarvestTarget(this);
+      if (h) {
+        const prev = this.interactTarget;
+        return prev?.type === 'harvest' && prev.tx === h.tx && prev.ty === h.ty ? prev : h;
+      }
+    }
     return best;
   }
 
   interactLabel(o) {
     if (!o) return null;
     switch (o.type) {
+      case 'harvest': {
+        const tool = currentPickaxe(this.data, this.save);
+        const need = o.info.tier > (tool?.tier ?? 0);
+        return need ? `${o.info.name} (needs a better pickaxe)` : `${o.info.verb} ${o.info.name.toLowerCase()}`;
+      }
       case 'chest': return 'Open chest';
       case 'shrine': return 'Pray at shrine';
       case 'altar': return `Summon ${this.data.byId.bosses.get(o.bossId)?.name ?? 'boss'}`;
@@ -694,6 +741,211 @@ export class Game {
     }
   }
 
+  // --- Gathering ------------------------------------------------------------------------
+
+  /** One pickaxe swing at a tree/rock; felling it drops wood/stone. */
+  #swingPickaxe(o) {
+    const p = this.player;
+    const tool = currentPickaxe(this.data, this.save);
+    if (!tool || p.toolCd > 0 || p.dead) return;
+    if (o.info.tier > tool.tier) {
+      if (!this.warnedTier) this.toast(`You need a stronger pickaxe for ${o.info.name.toLowerCase()}s. Forge one at the Forge.`, 'warn');
+      this.warnedTier = true;
+      p.toolCd = 0.6;
+      return;
+    }
+    const angle = Math.atan2(o.y - p.y, o.x - p.x);
+    p.facing = angle;
+    p.toolAnim = { t: 0, dur: 0.32, angle };
+    p.toolCd = 0.36;
+    this.schedule(0.13, () => {
+      const key = `${o.tx},${o.ty}`;
+      if (!this.world.blockAt(o.tx, o.ty)) return;
+      const dmg = (this.harvestDamage.get(key)?.dmg ?? 0) + tool.power;
+      this.harvestDamage.set(key, { dmg, at: this.time });
+      const wood = o.info.drops.wood;
+      this.fx.emit(wood ? 'wood' : 'stone', o.x, o.y - 0.2, 5, 0.5, 2);
+      this.audio.play(wood ? 'chop' : 'mine', { throttle: 50 });
+      this.shake = Math.max(this.shake, 0.05);
+      if (dmg >= o.info.hp) this.#fell(o);
+    });
+  }
+
+  #fell(o) {
+    this.world.removeBlock(o.tx, o.ty);
+    this.harvestDamage.delete(`${o.tx},${o.ty}`);
+    const drops = rollDrops(o.info);
+    const color = { wood: '#b07a48', stone: '#b8bcc8', essence: '#7ae0ff' };
+    for (const [kind, n] of Object.entries(drops)) {
+      for (let i = 0; i < n; i++) addPickup(this, kind, o.x, o.y, { value: 1, color: color[kind] ?? '#ffffff' });
+    }
+    const label = Object.entries(drops).map(([k, n]) => `+${n} ${k}`).join(' ');
+    this.fx.text(o.x, o.y - 1, label.toUpperCase(), '#ffe890', 1.2);
+    this.fx.emit(o.info.drops.wood ? 'leaf' : 'stone', o.x, o.y - 0.3, 14, 0.9, 2.5);
+    this.audio.play('fell');
+    this.interactTarget = null;
+    this.emit('interact', { label: null });
+    this.requestSave();
+  }
+
+  forgePickaxe(tier) {
+    try {
+      const def = forgePickaxe(this.data, this.save, tier);
+      this.audio.play('levelup');
+      this.toast(`${def.name} forged! Walk up to a tree or rock and press Use.`, 'level');
+      this.emit('inventory');
+      this.emit('tools');
+      this.saveNow();
+      return def;
+    } catch (err) {
+      this.toast(err.message, 'warn');
+      return null;
+    }
+  }
+
+  // --- Construction ----------------------------------------------------------------------
+
+  buildRadius() {
+    return buildRadius(this.data, this.save);
+  }
+
+  damageStructure(st, amount) {
+    this.construction.damage(st, amount);
+  }
+
+  /** A turret's projectile reached an enemy. */
+  turretHit(proj, e) {
+    dealDamage(this, e, proj.damage, { element: proj.element, structure: proj.structure, canCrit: false });
+    if (proj.status && !e.dead) applyStatus(this, e, proj.status, proj.damage);
+  }
+
+  /** Coalesces rapid changes (placing many walls) into one save. */
+  requestSave() {
+    if (this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.saveNow();
+    }, 1500);
+  }
+
+  toggleBuildMode(on = !this.build.active) {
+    const b = this.build;
+    if (on === b.active) return;
+    if (on) {
+      const p = this.player;
+      if (p.dead) return;
+      if (Math.hypot(p.x - 0.5, p.y - 0.5) > this.buildRadius() + 6) {
+        this.toast('Go back to your camp to build.', 'warn');
+        return;
+      }
+      b.active = true;
+      b.tool = 'place';
+      if (!structureDef(this.data, b.selected)) b.selected = structureDefs(this.data)[0]?.id;
+      this.interactTarget = null;
+      this.emit('interact', { label: null });
+    } else {
+      b.active = false;
+      b.painting = false;
+      b.ghost = null;
+    }
+    this.audio.play('ui');
+    this.emit('build', { active: b.active });
+  }
+
+  selectStructure(id) {
+    const b = this.build;
+    if (id === 'remove') {
+      b.tool = b.tool === 'remove' ? 'place' : 'remove';
+    } else if (structureDef(this.data, id)) {
+      b.selected = id;
+      b.tool = 'place';
+    }
+    this.emit('build', { active: b.active });
+  }
+
+  /** Places (or removes) at a tile; returns the problem text or null. */
+  buildAt(tx, ty, tool = this.build.tool) {
+    if (tool === 'remove') {
+      const refund = this.construction.remove(tx, ty);
+      if (!refund) return 'Nothing to remove here';
+      const text = Object.entries(refund).map(([k, n]) => `+${n} ${k}`).join(' ');
+      if (text) this.fx.text(tx + 0.5, ty, text.toUpperCase(), '#c8ccd8', 1);
+      return null;
+    }
+    const res = this.construction.place(this.build.selected, tx, ty);
+    return res.ok ? null : res.reason;
+  }
+
+  buildAtGhost() {
+    const g = this.build.ghost;
+    if (!g) return;
+    const problem = this.buildAt(g.tx, g.ty);
+    if (problem) {
+      this.toast(problem, 'warn');
+      this.audio.play('hurt', { throttle: 200 });
+    }
+  }
+
+  /** Screen (CSS px) → tile under the pointer. */
+  #tileAt(cx, cy) {
+    const w = this.renderer.screenToWorld(cx, cy);
+    return { tx: Math.floor(w.x), ty: Math.floor(w.y) };
+  }
+
+  #bindBuildInput() {
+    const b = this.build;
+    this.input.worldHandler = {
+      active: () => b.active && !this.paused,
+      down: (cx, cy, button) => {
+        const { tx, ty } = this.#tileAt(cx, cy);
+        b.hover = { tx, ty };
+        b.hoverAt = this.time;
+        const tool = button === 2 ? 'remove' : b.tool;
+        const problem = this.buildAt(tx, ty, tool);
+        if (problem && tool === 'place') this.toast(problem, 'warn');
+        b.painting = tool;
+        b.lastTile = `${tx},${ty}`;
+      },
+      move: (cx, cy) => {
+        const { tx, ty } = this.#tileAt(cx, cy);
+        b.hover = { tx, ty };
+        b.hoverAt = this.time;
+        const key = `${tx},${ty}`;
+        if (b.painting && key !== b.lastTile) {
+          b.lastTile = key;
+          this.buildAt(tx, ty, b.painting);
+        }
+      },
+      up: () => {
+        b.painting = false;
+      },
+    };
+  }
+
+  /** Where a placement would go: the pointed-at tile, or the one ahead of you. */
+  #updateBuildGhost() {
+    const b = this.build;
+    const p = this.player;
+    if (p.dead || Math.hypot(p.x - 0.5, p.y - 0.5) > this.buildRadius() + 10) {
+      this.toggleBuildMode(false);
+      return;
+    }
+    let tile;
+    if (b.hover && this.time - b.hoverAt < 4) tile = b.hover;
+    else tile = { tx: Math.floor(p.x + Math.cos(p.facing) * 1.1), ty: Math.floor(p.y + Math.sin(p.facing) * 1.1) };
+    b.ghost = tile;
+    if (b.tool === 'remove') {
+      b.reason = this.construction.at(tile.tx, tile.ty) ? null : 'Nothing to remove here';
+    } else {
+      const def = structureDef(this.data, b.selected);
+      b.reason = def ? this.construction.placementProblem(def, tile.tx, tile.ty) : 'Pick something to build';
+    }
+  }
+
+  structureLock(def) {
+    return structureLock(this.data, this.save, def);
+  }
+
   // --- Base -------------------------------------------------------------------------
 
   upgradeBuilding(id) {
@@ -705,6 +957,9 @@ export class Game {
       this.fx.emit('sparkle', def.x, def.y - 0.5, 24, 1, 3);
       this.fx.add({ type: 'ring', x: def.x, y: def.y, r0: 0.3, r1: 2, color: '#ffd24a', dur: 0.4 });
       this.toast(level === 1 ? `${def.name} built!` : `${def.name} upgraded to level ${level}!`, 'level');
+      if (id === 'forge' && level === 1) {
+        this.schedule(1.5, () => this.toast('Forge a pickaxe (Forge → Tools) to gather wood and stone for building.', 'component'));
+      }
       this.emit('base');
       this.emit('inventory');
       this.saveNow();
@@ -784,6 +1039,9 @@ export class Game {
     if (!o || this.player.dead) return false;
     const pl = this.save.player;
     switch (o.type) {
+      case 'harvest':
+        this.#swingPickaxe(o);
+        return true;
       case 'chest':
         this.save.world.chests.push(o.key);
         openChestLoot(this, o);
@@ -853,10 +1111,19 @@ export class Game {
     const p = this.player;
     p.invuln = Math.max(0, p.invuln - dt);
     p.hurtFlash = Math.max(0, p.hurtFlash - dt);
+    if (this.screenFlash) {
+      this.screenFlash.t -= dt;
+      if (this.screenFlash.t <= 0) this.screenFlash = null;
+    }
     p.attackCd = Math.max(0, p.attackCd - dt);
     if (p.attackAnim) {
       p.attackAnim.t += dt;
       if (p.attackAnim.t >= p.attackAnim.dur) p.attackAnim = null;
+    }
+    p.toolCd = Math.max(0, p.toolCd - dt);
+    if (p.toolAnim) {
+      p.toolAnim.t += dt;
+      if (p.toolAnim.t >= p.toolAnim.dur) p.toolAnim = null;
     }
     if (p.dead) {
       p.respawnT -= dt;
@@ -902,7 +1169,15 @@ export class Game {
     if (!p.attackAnim) p.facing = aim;
 
     if (!sample.attack) this.suppressAttack = false;
-    if (sample.attack && !this.suppressAttack) tryAttack(this, aim);
+    if (this.build.active) {
+      this.#updateBuildGhost(sample);
+    } else if (sample.attack && this.interactTarget?.type === 'harvest') {
+      // Hold the button to keep swinging the pickaxe.
+      this.suppressAttack = true;
+      if (p.toolCd <= 0) this.#swingPickaxe(this.interactTarget);
+    } else if (sample.attack && !this.suppressAttack) {
+      tryAttack(this, aim);
+    }
 
     // Weapon ambience particles from the DNA's visual parameters.
     const part = this.weapon?.particles;
@@ -919,6 +1194,10 @@ export class Game {
 
     const sample = this.input.sample();
     for (const c of sample.commands) {
+      if (this.build.active && (c === 'interact' || c === 'interact-or-attack')) {
+        this.buildAtGhost();
+        continue;
+      }
       if (c === 'interact' || c === 'interact-or-attack') {
         if (this.interact()) this.suppressAttack = true;
         else if (c === 'interact-or-attack') tryAttack(this, this.#aim(sample));
@@ -942,6 +1221,12 @@ export class Game {
     updateAreas(this, dt);
     updateAllies(this, dt);
     updatePickups(this, dt);
+    this.construction.update(dt);
+    this.regrowT -= dt;
+    if (this.regrowT <= 0) {
+      this.regrowT = REGROW_INTERVAL;
+      regrow(this);
+    }
     this.fx.update(dt);
     this.shake = Math.max(0, this.shake - dt);
 
@@ -955,7 +1240,7 @@ export class Game {
       }
     }
 
-    const target = this.#findInteractable();
+    const target = this.build.active ? null : this.#findInteractable();
     if (target !== this.interactTarget) {
       this.interactTarget = target;
       this.emit('interact', { label: this.interactLabel(target) });
@@ -979,6 +1264,10 @@ export class Game {
       xpNext: xpToNext(this.data, pl.level),
       essence: this.save.resources.essence,
       scrap: this.save.resources.scrap,
+      wood: this.save.resources.wood ?? 0,
+      stone: this.save.resources.stone ?? 0,
+      building: this.build.active,
+      nearCamp: Math.hypot(this.player.x - 0.5, this.player.y - 0.5) <= this.buildRadius() + 6,
       ability: abilityProgress(this),
       abilityName: this.weapon?.dna.ability?.name ?? null,
       sprinting: this.player.sprinting,

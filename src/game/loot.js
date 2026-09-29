@@ -10,12 +10,18 @@ const COLLECT_RADIUS = 0.6;
 const WEAPON_PICKUP_RADIUS = 0.9;
 const MAX_PICKUPS = 120;
 
-const SALVAGE = { common: [4, 1], uncommon: [7, 3], rare: [12, 6], epic: [20, 12], legendary: [35, 25] };
+// [scrap, essence] per rarity. Salvaging is a trickle, not an income.
+const SALVAGE = { common: [2, 0], uncommon: [4, 1], rare: [8, 3], epic: [14, 6], legendary: [24, 12] };
 
 export function salvageValue(dna) {
-  const [scrap, essence] = SALVAGE[dna.rarity] ?? [4, 1];
+  const [scrap, essence] = SALVAGE[dna.rarity] ?? [2, 0];
   const lvl = dna.ctx?.lvl ?? 1;
-  return { scrap: Math.round(scrap * (1 + lvl * 0.05)), essence: Math.round(essence * (1 + lvl * 0.05)) };
+  return { scrap: Math.round(scrap * (1 + lvl * 0.03)), essence: Math.round(essence * (1 + lvl * 0.03)) };
+}
+
+/** Essence per orb grows slowly with the enemy's level. */
+function orbValue(level) {
+  return 1 + Math.floor(level / 8);
 }
 
 export function addPickup(game, kind, x, y, extra = {}) {
@@ -23,6 +29,8 @@ export function addPickup(game, kind, x, y, extra = {}) {
     const idx = game.pickups.findIndex((p) => p.kind === 'essence' || p.kind === 'scrap');
     if (idx >= 0) game.pickups.splice(idx, 1);
   }
+  // Loot must land where the player can walk (never in a lake or a rock).
+  if (!game.world.isFree(x, y, 0.3)) ({ x, y } = game.world.findFreeSpot(x, y, 0.3, 'player', { x, y }));
   const a = Math.random() * Math.PI * 2;
   game.pickups.push({
     kind, x, y, t: 0,
@@ -53,14 +61,33 @@ export function requestWeaponDrop(game, x, y, { level, source = 'drop', minRarit
   };
   game.pendingDrops += 1;
   return game.weapons.generate(request)
-    .then((dna) => {
-      addPickup(game, 'weapon', x, y, { dna, color: game.data.byId.rarities.get(dna.rarity)?.color ?? '#fff' });
-      if (game.data.rarityIndex.get(dna.rarity) >= 3) game.fx.add({ type: 'beam', x, y, color: game.data.byId.rarities.get(dna.rarity).color, dur: 2.5 });
-    })
+    .then((dna) => announceDrop(game, dna, x, y))
     .catch((err) => console.error('[loot] weapon generation failed', err))
     .finally(() => {
       game.pendingDrops -= 1;
     });
+}
+
+/**
+ * Places a weapon drop with a show that matches its rarity: it pops out and
+ * lands, rarer drops ring out, flash and (epic+) announce themselves.
+ */
+function announceDrop(game, dna, x, y) {
+  const rarity = game.data.byId.rarities.get(dna.rarity);
+  const r = game.data.rarityIndex.get(dna.rarity) ?? 0;
+  const color = rarity?.color ?? '#ffffff';
+  addPickup(game, 'weapon', x, y, { dna, color, rarity: r, z: 1.2, vz: 3.5 });
+  game.audio.play('drop', { rarity: r, throttle: 0 });
+  if (r >= 2) game.fx.add({ type: 'ring', x, y, r0: 0.2, r1: 1 + r * 0.5, color, dur: 0.45 });
+  if (r >= 3) {
+    game.fx.add({ type: 'pillar', x, y, r: 0.25 + r * 0.05, color, dur: 0.5 });
+    game.fx.emit('sparkle', x, y - 0.5, 10 + r * 6, 0.8, 3);
+    game.toast(r >= 4 ? `A LEGENDARY weapon dropped: ${dna.name.text}!` : `An epic weapon dropped nearby!`, r >= 4 ? 'legendary' : 'epic');
+  }
+  if (r >= 4) {
+    game.shake = Math.max(game.shake, 0.35);
+    game.flash?.(color, 0.35);
+  }
 }
 
 function pickComponent(game, list) {
@@ -72,9 +99,11 @@ export function onEnemyKilledLoot(game, e) {
   const luck = game.pstats.luck;
   const level = e.level;
   const biome = game.world.biomeAt(Math.floor(e.x), Math.floor(e.y));
-  const orbs = e.boss ? 20 : 1 + Math.floor(level / 3) + (e.elite ? 3 : 0);
-  for (let i = 0; i < orbs; i++) addPickup(game, 'essence', e.x, e.y, { value: e.boss ? 4 : 1, color: '#7ae0ff' });
-  if (Math.random() < (e.elite ? 0.9 : 0.22)) addPickup(game, 'scrap', e.x, e.y, { value: 1 + ((Math.random() * 2) | 0), color: '#b8bcc8' });
+  // Most kills drop nothing but XP; essence is something to go out and earn.
+  const orbs = e.boss ? 12 : e.elite ? 3 : Math.random() < 0.4 ? 1 : 0;
+  const value = orbValue(level) * (e.boss ? 2 : 1);
+  for (let i = 0; i < orbs; i++) addPickup(game, 'essence', e.x, e.y, { value, color: '#7ae0ff' });
+  if (Math.random() < (e.elite ? 0.8 : 0.15)) addPickup(game, 'scrap', e.x, e.y, { value: 1 + (e.elite ? 1 : 0), color: '#b8bcc8' });
   if (Math.random() < 0.04) addPickup(game, 'heart', e.x, e.y, { color: '#e8364a' });
 
   if (e.summoned) return;
@@ -91,7 +120,7 @@ export function onEnemyKilledLoot(game, e) {
     // A second guaranteed drop so bosses feel like a jackpot.
     requestWeaponDrop(game, e.x + 1, e.y, { level, minRarity: 'rare', elementBias: [e.element] });
     addPickup(game, 'component', e.x, e.y, { componentId: e.bossDef.drop.component, color: e.color });
-    for (let i = 0; i < 10; i++) addPickup(game, 'scrap', e.x, e.y, { value: 2, color: '#b8bcc8' });
+    for (let i = 0; i < 6; i++) addPickup(game, 'scrap', e.x, e.y, { value: 2, color: '#b8bcc8' });
     return;
   }
   const componentChance = (e.elite ? 0.08 : 0.012) + luck * 0.0004;
@@ -111,9 +140,9 @@ export function openChestLoot(game, obj) {
   const level = Math.max(game.world.worldLevel(obj.x, obj.y), game.save.player.level);
   const biome = game.world.biomeAt(Math.floor(obj.x), Math.floor(obj.y));
   requestWeaponDrop(game, obj.x, obj.y + 0.8, { level, source: 'chest', minRarity: 'uncommon', elementBias: biome.elements });
-  const essence = 4 + ((Math.random() * 6) | 0);
-  for (let i = 0; i < essence; i++) addPickup(game, 'essence', obj.x, obj.y + 0.5, { value: 2, color: '#7ae0ff' });
-  for (let i = 0; i < 3; i++) addPickup(game, 'scrap', obj.x, obj.y + 0.5, { value: 2, color: '#b8bcc8' });
+  const essence = 2 + ((Math.random() * 3) | 0);
+  for (let i = 0; i < essence; i++) addPickup(game, 'essence', obj.x, obj.y + 0.5, { value: orbValue(level), color: '#7ae0ff' });
+  for (let i = 0; i < 2; i++) addPickup(game, 'scrap', obj.x, obj.y + 0.5, { value: 1, color: '#b8bcc8' });
   if (Math.random() < 0.35 + game.pstats.luck * 0.005) {
     const id = pickComponent(game, [...biome.components, 'bp_scythe', 'bp_gun', 'bp_cannon', 'bp_chakram', 'bp_warfan', 'bp_crossbow']);
     if (id && game.data.byId.components.has(id)) addPickup(game, 'component', obj.x, obj.y + 0.5, { componentId: id, color: componentColor(game, id) });
@@ -125,8 +154,26 @@ export function updatePickups(game, dt) {
   for (let i = game.pickups.length - 1; i >= 0; i--) {
     const it = game.pickups[i];
     it.t += dt;
-    it.x += it.vx * dt;
-    it.y += it.vy * dt;
+    if (it.z) {
+      // Drops pop up and bounce once before settling.
+      it.vz -= 18 * dt;
+      it.z += it.vz * dt;
+      if (it.z <= 0) {
+        it.z = 0;
+        if (it.vz < -3) it.vz = -it.vz * 0.3;
+        else it.vz = 0;
+      }
+    }
+    if (it.vx || it.vy) {
+      const nx = it.x + it.vx * dt;
+      const ny = it.y + it.vy * dt;
+      if (game.world.isFree(nx, ny, 0.25)) {
+        it.x = nx;
+        it.y = ny;
+      } else {
+        it.vx = it.vy = 0;
+      }
+    }
     const damp = Math.exp(-6 * dt);
     it.vx *= damp;
     it.vy *= damp;

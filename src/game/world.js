@@ -27,6 +27,14 @@ const GROUND_BY_NAME = {
   voidmoss: T.VOIDMOSS,
 };
 const BLOCKER_BY_NAME = { tree: T.TREE, pine: T.PINE, rock: T.ROCK, cactus: T.CACTUS, crystal: T.CRYSTAL };
+/** Blocker tile id → name used by game data (gathering.harvest). */
+export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).map(([k, v]) => [v, k]));
+const LIQUID = new Set([T.WATER, T.LAVA]);
+
+/** Numeric key for a tile (fast Map lookups for structures). */
+export function tileKey(tx, ty) {
+  return tx * 100003 + ty;
+}
 
 // Inverse CDF of fbm() (measured), so data can say "10% water" directly.
 const QUANTILES = [
@@ -51,6 +59,10 @@ export class World {
     this.data = data;
     this.seed = seed >>> 0;
     this.chunks = new Map();
+    // Player-built structures by tileKey (filled by the build system) and
+    // harvested blockers ("x,y" → [time, tileId]) from the save.
+    this.structures = new Map();
+    this.harvested = {};
     this.biomes = data.biomes;
     this.biomeById = data.byId.biomes;
     this.q = {
@@ -144,6 +156,13 @@ export class World {
       }
     }
     const chunk = { cx, cy, ground, block, biomeIdx, objects: [], canvas: null };
+    // Trees and rocks the player has cut down stay gone (until they regrow).
+    for (let i = 0; i < block.length; i++) {
+      if (!block[i] || LIQUID.has(block[i])) continue;
+      const x = cx * CHUNK + (i % CHUNK);
+      const y = cy * CHUNK + ((i / CHUNK) | 0);
+      if (this.harvested[`${x},${y}`]) block[i] = 0;
+    }
     this.#placeObjects(chunk);
     return chunk;
   }
@@ -219,25 +238,75 @@ export class World {
     return { ground: chunk.ground[i], block: chunk.block[i], biome: this.biomes[chunk.biomeIdx[i]] };
   }
 
-  isSolid(tx, ty) {
+  /** Blocker tile id at (tx, ty), 0 when open ground. */
+  blockAt(tx, ty) {
     const cx = Math.floor(tx / CHUNK);
     const cy = Math.floor(ty / CHUNK);
     const chunk = this.getChunk(cx, cy);
-    return chunk.block[(ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK)] !== 0;
+    return chunk.block[(ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK)];
   }
 
-  /** True if a circle of radius r at (x, y) overlaps no solid tile. */
-  isFree(x, y, r) {
+  isSolid(tx, ty) {
+    return this.blockAt(tx, ty) !== 0;
+  }
+
+  structureAt(tx, ty) {
+    return this.structures.size ? this.structures.get(tileKey(tx, ty)) ?? null : null;
+  }
+
+  /**
+   * Whether a tile blocks movement. Modes: 'player' (gates open for you),
+   * 'enemy' (every solid structure blocks) and 'fly' (flies over trees and
+   * rocks, but never over water, lava or walls).
+   */
+  blockedFor(tx, ty, mode = 'player') {
+    const b = this.blockAt(tx, ty);
+    if (b && (mode !== 'fly' || LIQUID.has(b))) return true;
+    if (!this.structures.size) return false;
+    const st = this.structures.get(tileKey(tx, ty));
+    if (!st || st.def.walkable) return false;
+    return !(mode === 'player' && st.def.kind === 'gate');
+  }
+
+  /** True if a circle of radius r at (x, y) overlaps nothing that blocks `mode`. */
+  isFree(x, y, r, mode = 'player') {
     const x0 = Math.floor(x - r);
     const x1 = Math.floor(x + r);
     const y0 = Math.floor(y - r);
     const y1 = Math.floor(y + r);
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
-        if (this.isSolid(tx, ty)) return false;
+        if (this.blockedFor(tx, ty, mode)) return false;
       }
     }
     return true;
+  }
+
+  // --- Harvesting ------------------------------------------------------------------
+
+  #setBlock(tx, ty, id) {
+    const cx = Math.floor(tx / CHUNK);
+    const cy = Math.floor(ty / CHUNK);
+    const chunk = this.getChunk(cx, cy);
+    chunk.block[(ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK)] = id;
+    chunk.canvas = null; // re-render
+  }
+
+  /** Removes a tree/rock and remembers it. Returns the removed tile id. */
+  removeBlock(tx, ty, now = Date.now()) {
+    const id = this.blockAt(tx, ty);
+    if (!id || LIQUID.has(id)) return 0;
+    this.#setBlock(tx, ty, 0);
+    this.harvested[`${tx},${ty}`] = [now, id];
+    return id;
+  }
+
+  /** Puts a harvested blocker back (regrowth). */
+  restoreBlock(tx, ty) {
+    const entry = this.harvested[`${tx},${ty}`];
+    if (!entry) return;
+    delete this.harvested[`${tx},${ty}`];
+    if (this.chunks.has(`${Math.floor(tx / CHUNK)},${Math.floor(ty / CHUNK)}`)) this.#setBlock(tx, ty, entry[1]);
   }
 
   /** Objects (chests, shrines, altars, camp) in chunks around a point. */
@@ -254,16 +323,16 @@ export class World {
   }
 
   /** Finds a walkable spot near (x, y), searching outward. */
-  findFreeSpot(x, y, r = 0.4) {
-    if (this.isFree(x, y, r)) return { x, y };
+  findFreeSpot(x, y, r = 0.4, mode = 'player', fallback = { x: 0.5, y: 1.6 }) {
+    if (this.isFree(x, y, r, mode)) return { x, y };
     for (let ring = 1; ring < 12; ring++) {
       for (let i = 0; i < 8 * ring; i++) {
         const [dx, dy] = COMPASS[i % 8];
         const px = x + dx * ring + (i >> 3) * 0.3;
         const py = y + dy * ring;
-        if (this.isFree(px, py, r)) return { x: px, y: py };
+        if (this.isFree(px, py, r, mode)) return { x: px, y: py };
       }
     }
-    return { x: 0.5, y: 0.5 };
+    return fallback;
   }
 }

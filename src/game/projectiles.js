@@ -184,6 +184,14 @@ export function updateProjectiles(game, dt) {
           game.fx.emit('hit', p.x, p.y, 3, 0.2, 1.5);
           expire(game, p);
           remove = true;
+        } else if (p.owner === 'enemy') {
+          // Walls and turrets shield you from enemy shots (and take the hit).
+          const st = game.world.structureAt(tx, ty);
+          if (st && !st.def.walkable) {
+            game.damageStructure?.(st, p.damage * 0.5);
+            game.fx.emit('hit', p.x, p.y, 3, 0.2, 1.5);
+            remove = true;
+          }
         }
       }
       if (p.kind === 'boomerang' && p.age > 6) remove = true;
@@ -200,6 +208,16 @@ export function updateProjectiles(game, dt) {
               remove = true;
               break;
             }
+          }
+        }
+      } else if (p.owner === 'turret') {
+        for (const e of game.enemies) {
+          if (e.dead) continue;
+          const rr = e.r + p.r;
+          if (dist2(p.x, p.y, e.x, e.y) <= rr * rr) {
+            game.turretHit?.(p, e);
+            remove = true;
+            break;
           }
         }
       } else if (!player.dead) {

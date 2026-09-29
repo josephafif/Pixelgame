@@ -12,11 +12,10 @@ import { loadData } from './helpers.js';
 const data = loadData();
 const HOUR = 3600 * 1000;
 
-function rich(level = 20) {
+function rich(level = 25) {
   const save = createNewSave({ worldSeed: 5 });
   save.player.level = level;
-  save.resources.scrap = 100000;
-  save.resources.essence = 100000;
+  Object.assign(save.resources, { scrap: 100000, essence: 100000, wood: 100000, stone: 100000 });
   return save;
 }
 
@@ -36,11 +35,16 @@ test('upgrades check level, boss and resources, then deduct the cost', () => {
   save.player.level = 3;
   assert.ok(upgradeBlockers(data, save, 'forge').some((b) => b.includes('scrap')));
   assert.throws(() => upgradeBuilding(data, save, 'forge'), /scrap/);
-  save.resources.scrap = 30;
-  save.resources.essence = 20;
+  const cost = data.base.buildings.find((b) => b.id === 'forge').levels[0];
+  save.resources.scrap = cost.scrap + 5;
+  save.resources.essence = cost.essence + 5;
   assert.deepEqual(upgradeBlockers(data, save, 'forge'), []);
   assert.equal(upgradeBuilding(data, save, 'forge'), 1);
-  assert.deepEqual(save.resources, { scrap: 5, essence: 5 });
+  assert.deepEqual(save.resources, { scrap: 5, essence: 5, wood: 0, stone: 0 });
+  // Level 2 needs building materials too.
+  save.player.level = 20;
+  Object.assign(save.resources, { scrap: 9999, essence: 9999 });
+  assert.ok(upgradeBlockers(data, save, 'forge').some((b) => /wood|stone/.test(b)), 'wood and stone are required');
 
   const s = rich();
   for (let i = 0; i < 3; i++) upgradeBuilding(data, s, 'forge');

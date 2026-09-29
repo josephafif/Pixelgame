@@ -16,6 +16,9 @@ const PARTICLE_KINDS = {
   sparkle: { colors: ['#ffffff', '#ffe890'], rise: -0.6, life: 0.6 },
   hit: { colors: ['#ffffff', '#ffe0a0'], rise: 0, life: 0.2 },
   smoke: { colors: ['#6a6470', '#4a4450'], rise: -0.8, life: 0.9 },
+  wood: { colors: ['#b07a48', '#7a4a28', '#d8a870'], rise: 1.2, life: 0.5 },
+  stone: { colors: ['#b8bcc8', '#8d8a9e', '#5d5a6e'], rise: 1.4, life: 0.45 },
+  glint: { colors: ['#ffffff'], rise: -0.9, life: 0.8 },
 };
 
 export class Fx {
@@ -33,8 +36,9 @@ export class Fx {
     if (this.particles.length > max) this.particles.length = max;
   }
 
-  emit(kind, x, y, count = 1, spread = 0.3, speed = 1.5) {
+  emit(kind, x, y, count = 1, spread = 0.3, speed = 1.5, colors = null) {
     const k = PARTICLE_KINDS[kind] ?? PARTICLE_KINDS.hit;
+    const palette = colors ?? k.colors;
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= this.maxParticles) return;
       const p = this.free.pop() ?? {};
@@ -45,7 +49,7 @@ export class Fx {
       p.vx = Math.cos(a) * s + (k.drift ? (Math.random() - 0.5) * k.drift : 0);
       p.vy = Math.sin(a) * s + k.rise;
       p.life = p.max = k.life * (0.6 + Math.random() * 0.6);
-      p.color = k.colors[(Math.random() * k.colors.length) | 0];
+      p.color = palette[(Math.random() * palette.length) | 0];
       p.swirl = Boolean(k.swirl);
       p.jitter = k.jitter ?? 0;
       p.size = Math.random() < 0.25 ? 2 : 1;
@@ -71,6 +75,12 @@ export class Fx {
       text: heal ? `+${value}` : crit ? `${value}!` : String(value),
       color: heal ? '#6cff8a' : crit ? '#ffd24a' : color,
     });
+  }
+
+  /** Short floating label ("!", "?", "+3 WOOD"). */
+  text(x, y, text, color = '#ffffff', life = 0.8) {
+    if (this.texts.length > 60) this.texts.shift();
+    this.texts.push({ x, y, vy: -1.2, life, text, color });
   }
 
   update(dt) {

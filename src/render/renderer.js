@@ -11,6 +11,11 @@ import { weaponSprite, weaponIcon } from './weapon-sprite.js';
 import { weaponPose } from './weapon-anim.js';
 import { buildingSprite, BUILDING_W, BUILDING_H } from './buildings.js';
 import { buildingLevel, wellPending } from '../game/base.js';
+import {
+  structureSprite, isFlat, drawFlame, drawTurretHead, pickaxeSprite, STRUCT_H, LEFT, RIGHT, UP, DOWN,
+} from './structures.js';
+import { structureDef } from '../game/construction.js';
+import { currentPickaxe } from '../game/gathering.js';
 import { drawPixelText } from './font.js';
 
 const T = TILE_PX;
@@ -30,6 +35,25 @@ function glowSprite(color) {
     g.fillStyle = grad;
     g.fillRect(0, 0, 32, 32);
     glowCache.set(color, c);
+  }
+  return c;
+}
+
+// Vertical light beam: bright at the bottom, fading upwards.
+const beamCache = new Map();
+function beamSprite(color, height) {
+  const key = `${color}:${height}`;
+  let c = beamCache.get(key);
+  if (!c) {
+    c = createCanvas(1, height);
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, height, 0, 0);
+    grad.addColorStop(0, color);
+    grad.addColorStop(0.6, color);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 1, height);
+    beamCache.set(key, c);
   }
   return c;
 }
@@ -72,6 +96,14 @@ export class Renderer {
   /** Jump the camera to the player (after teleports). */
   snapCamera() {
     this.camInit = false;
+  }
+
+  /** CSS pixels → world (tile units). */
+  screenToWorld(x, y) {
+    return {
+      x: ((x * this.dpr) / this.scale + (this.cx ?? 0)) / T,
+      y: ((y * this.dpr) / this.scale + (this.cy ?? 0)) / T,
+    };
   }
 
   /** World (tile units) → CSS pixels. */
@@ -126,8 +158,11 @@ export class Renderer {
     v.fillRect(0, 0, W, H);
 
     this.#drawWorld(game, cx, cy, W, H);
+    this.#drawFlatStructures(game, W, H);
+    this.#drawHarvestTarget(game);
     this.#drawAreas(game);
     this.#drawEntities(game);
+    if (game.build.active) this.#drawBuildOverlay(game, W, H);
     this.#drawProjectiles(game);
     this.#drawShapes(game);
     this.#drawParticles(game);
@@ -136,6 +171,12 @@ export class Renderer {
     if (p.hurtFlash > 0) {
       v.fillStyle = `rgba(255,40,40,${p.hurtFlash})`;
       v.fillRect(0, 0, W, H);
+    }
+    if (game.screenFlash) {
+      v.globalAlpha = 0.35 * (game.screenFlash.t / game.screenFlash.dur);
+      v.fillStyle = game.screenFlash.color;
+      v.fillRect(0, 0, W, H);
+      v.globalAlpha = 1;
     }
 
     this.ctx.imageSmoothingEnabled = false;
@@ -299,6 +340,9 @@ export class Renderer {
     const p = game.player;
     for (const o of game.world.objectsNear(p.x, p.y, 2)) list.push({ y: o.y, kind: 'object', o });
     for (const it of game.pickups) list.push({ y: it.y, kind: 'pickup', o: it });
+    for (const st of game.save.base.structures) {
+      if (!isFlat(st.id)) list.push({ y: st.y + 0.95, kind: 'structure', o: st });
+    }
     for (const e of game.enemies) if (!e.dead) list.push({ y: e.y, kind: 'enemy', o: e });
     for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
@@ -311,6 +355,7 @@ export class Renderer {
       if (x < -48 || y < -64 || x > W + 48 || y > H + 64) continue;
       switch (d.kind) {
         case 'object': this.#drawObject(game, d.o, x, y); break;
+        case 'structure': this.#drawStructure(game, d.o); break;
         case 'pickup': this.#drawPickup(game, d.o, x, y); break;
         case 'enemy': this.#drawEnemy(game, d.o, x, y); break;
         case 'ally': this.#drawCharacter(game, d.o, x, y, true); break;
@@ -331,6 +376,154 @@ export class Renderer {
       v.fillRect(x - 1, y + 1, 3, 1);
       v.fillRect(x, y + 2, 1, 1);
     }
+  }
+
+  // --- Structures -------------------------------------------------------------------
+
+  #mask(game, st) {
+    const w = game.world;
+    const joins = (tx, ty) => {
+      const o = w.structureAt(tx, ty);
+      return o && (o.def.kind === 'wall' || o.def.kind === 'gate');
+    };
+    if (st.def.kind !== 'wall') return 0;
+    return (joins(st.x - 1, st.y) ? LEFT : 0) | (joins(st.x + 1, st.y) ? RIGHT : 0)
+      | (joins(st.x, st.y - 1) ? UP : 0) | (joins(st.x, st.y + 1) ? DOWN : 0);
+  }
+
+  #drawFlatStructures(game, W, H) {
+    const v = this.v;
+    for (const st of game.save.base.structures) {
+      if (!isFlat(st.id)) continue;
+      const x = this.#sx(st.x);
+      const y = this.#sy(st.y);
+      if (x < -16 || y < -16 || x > W || y > H) continue;
+      const up = st.id === 'spikes' && game.time - st.rt.trig < 0.35 ? 1 : 0;
+      v.drawImage(structureSprite(st.id, 0, up), x, y);
+      if (st.rt.flash > 0) this.#flashRect(x, y, 16, 16);
+    }
+  }
+
+  #flashRect(x, y, w, h) {
+    const v = this.v;
+    v.globalAlpha = 0.5;
+    v.fillStyle = '#ffffff';
+    v.fillRect(x, y, w, h);
+    v.globalAlpha = 1;
+  }
+
+  #drawStructure(game, st) {
+    const v = this.v;
+    const x = this.#sx(st.x);
+    const y = this.#sy(st.y + 1) - STRUCT_H;
+    const t = game.time;
+    const id = st.id;
+    const state = id === 'gate' && st.rt.open > 0.5 ? 1 : 0;
+    const img = structureSprite(id, this.#mask(game, st), state);
+    v.drawImage(img, x, y);
+    if (st.rt.flash > 0 && st.def.kind !== 'turret') this.#flashRect(x, y + 2, 16, STRUCT_H - 2);
+    if (id === 'arrow_turret') {
+      drawTurretHead(v, x + 8, y + 7, st.rt.aim, st.rt.flash > 0 ? 2 : 0);
+    } else if (id === 'flame_turret') {
+      drawFlame(v, x + 8, y + 7, t + st.x, st.rt.flash > 0 ? 3 : 2);
+      this.#glow(x + 8, y + 4, '#ff7a2a', 14);
+      if (Math.random() < 0.08) game.fx.emit('ember', st.x + 0.5, st.y + 0.2, 1, 0.3, 0.4);
+    } else if (id === 'torch') {
+      drawFlame(v, x + 8, y + 7, t + st.x * 3, 1);
+      this.#glow(x + 8, y + 5, '#ffb040', 22 + Math.sin(t * 9 + st.y) * 2);
+      if (Math.random() < 0.05) game.fx.emit('ember', st.x + 0.5, st.y + 0.25, 1, 0.2, 0.3);
+    }
+    if (st.hp < st.def.hp) this.#healthBar(x + 8, y - 2, 12, st.hp / st.def.hp, '#6cd66c');
+  }
+
+  #drawHarvestTarget(game) {
+    const o = game.interactTarget;
+    if (o?.type !== 'harvest') return;
+    const v = this.v;
+    const x = this.#sx(o.tx);
+    const y = this.#sy(o.ty);
+    const pulse = Math.floor(game.time * 4) % 2;
+    // Corner brackets around the tile.
+    v.fillStyle = pulse ? '#ffe890' : '#ffffff';
+    for (const [cx, cy] of [[0, 0], [15, 0], [0, 15], [15, 15]]) {
+      v.fillRect(x + cx - (cx ? 2 : 0), y + cy, 3, 1);
+      v.fillRect(x + cx, y + cy - (cy ? 2 : 0), 1, 3);
+    }
+    // Cracks grow as the tile takes damage.
+    const dmg = game.harvestDamage.get(`${o.tx},${o.ty}`)?.dmg ?? 0;
+    const k = Math.min(1, dmg / o.info.hp);
+    if (k > 0) {
+      v.strokeStyle = '#161622';
+      v.lineWidth = 1;
+      v.beginPath();
+      const n = 1 + Math.floor(k * 4);
+      for (let i = 0; i < n; i++) {
+        const a = i * 1.7 + o.tx;
+        v.moveTo(x + 8, y + 8);
+        v.lineTo(x + 8 + Math.round(Math.cos(a) * 6 * k), y + 8 + Math.round(Math.sin(a) * 6 * k));
+      }
+      v.stroke();
+    }
+  }
+
+  /** Build mode: camp border, ghost preview, reach. */
+  #drawBuildOverlay(game, W, H) {
+    const v = this.v;
+    const b = game.build;
+    const radius = game.buildRadius();
+    const inside = (tx, ty) => Math.hypot(tx, ty) <= radius;
+    const tx0 = Math.floor(this.cx / T) - 1;
+    const ty0 = Math.floor(this.cy / T) - 1;
+    const tx1 = tx0 + Math.ceil(W / T) + 2;
+    const ty1 = ty0 + Math.ceil(H / T) + 2;
+    // Dashed camp border.
+    v.fillStyle = '#ffd24a';
+    const dash = Math.floor(game.time * 8) % 4;
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        if (!inside(tx, ty)) continue;
+        const x = this.#sx(tx);
+        const y = this.#sy(ty);
+        for (let i = dash; i < 16; i += 4) {
+          if (!inside(tx, ty - 1)) v.fillRect(x + i, y, 2, 1);
+          if (!inside(tx, ty + 1)) v.fillRect(x + i, y + 15, 2, 1);
+          if (!inside(tx - 1, ty)) v.fillRect(x, y + i, 1, 2);
+          if (!inside(tx + 1, ty)) v.fillRect(x + 15, y + i, 1, 2);
+        }
+      }
+    }
+    const g = b.ghost;
+    if (!g) return;
+    const x = this.#sx(g.tx);
+    const y = this.#sy(g.ty);
+    const ok = !b.reason;
+    // Soft grid around the ghost.
+    v.globalAlpha = 0.18;
+    v.fillStyle = '#ffffff';
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (!inside(g.tx + dx, g.ty + dy)) continue;
+        v.fillRect(x + dx * 16, y + dy * 16, 16, 1);
+        v.fillRect(x + dx * 16, y + dy * 16, 1, 16);
+      }
+    }
+    v.globalAlpha = 1;
+    const color = b.tool === 'remove' ? (ok ? '#ff6a7a' : '#8a8a96') : ok ? '#6cd66c' : '#ff5050';
+    if (b.tool === 'place') {
+      const def = structureDef(game.data, b.selected);
+      if (def) {
+        v.globalAlpha = 0.55 + 0.15 * Math.sin(game.time * 6);
+        const img = structureSprite(def.id, 0, def.id === 'spikes' ? 1 : 0);
+        v.drawImage(img, x, isFlat(def.id) ? y : y + 16 - STRUCT_H);
+        v.globalAlpha = 1;
+      }
+    }
+    v.globalAlpha = 0.25;
+    v.fillStyle = color;
+    v.fillRect(x, y, 16, 16);
+    v.globalAlpha = 1;
+    v.strokeStyle = color;
+    v.strokeRect(x + 0.5, y + 0.5, 15, 15);
   }
 
   #drawObject(game, o, x, y) {
@@ -417,10 +610,7 @@ export class Renderer {
     const v = this.v;
     const bob = Math.round(Math.sin(it.t * 4 + x) * 1.5);
     if (it.kind === 'weapon') {
-      const icon = this.#icon(it.dna);
-      this.#shadow(x, y + 4, 6);
-      this.#glow(x, y - 6 + bob, it.color, 14);
-      v.drawImage(icon, x - 16, y - 22 + bob);
+      this.#drawWeaponDrop(game, it, x, y, bob);
       return;
     }
     const kind = it.kind === 'essence' ? 'essence' : it.kind;
@@ -428,6 +618,85 @@ export class Renderer {
     this.#shadow(x, y + 2, 2);
     v.drawImage(s, x - (s.width >> 1), y - s.height - 1 + bob);
     if (it.kind === 'component') this.#glow(x, y - 4 + bob, it.color, 10);
+  }
+
+  /**
+   * A weapon on the ground shows its rarity from afar: common ones just
+   * glint, uncommon ones glow, rare+ send up a light beam (taller and
+   * brighter per tier), epic+ get orbiting sparks and legendaries radiate.
+   */
+  #drawWeaponDrop(game, it, x, y, bob) {
+    const v = this.v;
+    const r = it.rarity ?? game.data.rarityIndex.get(it.dna.rarity) ?? 0;
+    const c = it.color;
+    const t = game.time;
+    const lift = Math.round((it.z ?? 0) * T);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3 + x);
+    // Ground marker.
+    if (r >= 1) {
+      v.globalAlpha = 0.35 + 0.25 * pulse;
+      v.strokeStyle = c;
+      v.beginPath();
+      v.ellipse(x, y + 3, 6 + r + pulse * 2, 3 + r * 0.4, 0, 0, TAU);
+      v.stroke();
+      v.globalAlpha = 1;
+    }
+    // Light beam.
+    if (r >= 2) {
+      // Coloured column (normal blending keeps the rarity hue true on any
+      // ground), with an additive white core.
+      const h = [0, 0, 34, 52, 80][r];
+      const w = [0, 0, 5, 7, 9][r];
+      v.globalAlpha = 0.5 + 0.2 * pulse;
+      v.drawImage(beamSprite(c, h), x - (w >> 1), y + 2 - h, w, h);
+      v.globalCompositeOperation = 'lighter';
+      v.globalAlpha = 0.8;
+      v.drawImage(beamSprite('#ffffff', h), x, y + 2 - Math.round(h * 0.85), 1, Math.round(h * 0.85));
+      v.globalAlpha = 1;
+      v.globalCompositeOperation = 'source-over';
+    }
+    // Legendary: rotating rays behind the weapon.
+    if (r >= 4 && this.game.quality.glow) {
+      v.save();
+      v.translate(x, y - 8 + bob - lift);
+      v.rotate(t * 0.8);
+      v.globalCompositeOperation = 'lighter';
+      v.globalAlpha = 0.35;
+      v.fillStyle = c;
+      for (let k = 0; k < 6; k++) {
+        v.rotate(TAU / 6);
+        v.beginPath();
+        v.moveTo(0, 0);
+        v.lineTo(18, -2);
+        v.lineTo(18, 2);
+        v.fill();
+      }
+      v.restore();
+      v.globalAlpha = 1;
+      v.globalCompositeOperation = 'source-over';
+    }
+    this.#shadow(x, y + 4, 6 - Math.min(3, lift / 6));
+    this.#glow(x, y - 6 + bob - lift, c, 10 + r * 3 + pulse * 2);
+    v.drawImage(this.#icon(it.dna), x - 16, y - 22 + bob - lift);
+    // Orbiting sparks.
+    if (r >= 3) {
+      for (let k = 0; k < r - 1; k++) {
+        const a = t * 2.4 + (k / (r - 1)) * TAU;
+        const sx = Math.round(x + Math.cos(a) * 10);
+        const sy = Math.round(y - 8 + Math.sin(a) * 4 + bob - lift);
+        v.fillStyle = k % 2 ? '#ffffff' : c;
+        v.fillRect(sx, sy, 1, 1);
+        this.#glow(sx, sy, c, 4);
+      }
+    }
+    if (r >= 2 && Math.random() < 0.04 * r) game.fx.emit('glint', it.x, it.y - 0.6, 1, 0.5, 0.6, [c, '#ffffff']);
+    // Rarity label: always for rare+, for everything when you are close.
+    const p = game.player;
+    const near = (p.x - it.x) ** 2 + (p.y - it.y) ** 2 < 25;
+    if (r >= 2 || near) {
+      const name = game.data.byId.rarities.get(it.dna.rarity)?.name ?? '';
+      drawPixelText(v, name.toUpperCase(), x, y - 32 + bob - lift - (r >= 2 ? 4 : 0), c);
+    }
   }
 
   #healthBar(x, y, w, frac, color) {
@@ -492,10 +761,34 @@ export class Renderer {
     if (isClone) v.globalAlpha = 0.65;
     else if (c.invuln > 0 && Math.floor(game.time * 20) % 2) v.globalAlpha = 0.5;
     const hand = { x: x + lx + (right ? 1 : -1), y: y - 6 - bob + ly };
+    if (!isClone && c.toolAnim) {
+      v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
+      this.#drawPickaxe(game, c, hand);
+      v.globalAlpha = 1;
+      return;
+    }
     if (behind) this.#drawHeldWeapon(game, pose, hand, isClone);
     v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
     if (!behind) this.#drawHeldWeapon(game, pose, hand, isClone);
     v.globalAlpha = 1;
+  }
+
+  /** Pickaxe swing: raised overhead, then down onto the target. */
+  #drawPickaxe(game, c, hand) {
+    const tool = currentPickaxe(game.data, game.save);
+    if (!tool) return;
+    const a = c.toolAnim;
+    const k = Math.min(1, a.t / a.dur);
+    const side = Math.cos(a.angle) >= 0 ? 1 : -1;
+    // Swing from raised back (-110°) to striking forward (+40°) relative to aim.
+    const swing = k < 0.4 ? -1.9 + k * 0.5 : -1.7 + Math.min(1, (k - 0.4) / 0.25) * 2.4;
+    const angle = a.angle + swing * side * (Math.sin(a.angle) < -0.5 ? -1 : 1);
+    const v = this.v;
+    v.save();
+    v.translate(Math.round(hand.x + Math.cos(angle) * 3), Math.round(hand.y + Math.sin(angle) * 3));
+    v.rotate(angle + Math.PI / 2);
+    v.drawImage(pickaxeSprite(tool.color), -6, -13);
+    v.restore();
   }
 
   #boomerangInFlight(game) {

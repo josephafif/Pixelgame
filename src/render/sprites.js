@@ -209,6 +209,19 @@ const MAPS = {
     '.oGGGo.',
     '..ooo..',
   ],
+  wood: [
+    '.oooooo.',
+    'obbbbbwo',
+    'oBBBBBwo',
+    '.oooooo.',
+  ],
+  stone: [
+    '..ooo..',
+    '.owwwo.',
+    'owwwkko',
+    'okkkkko',
+    '.ooooo.',
+  ],
   heart: [
     '.oo.oo.',
     'orrorro',
@@ -306,6 +319,8 @@ export function pickupSprite(kind, color) {
   return build(`pickup:${kind}:${color}`, () => {
     const pal = { o: OUTLINE, G: color, g: shadeHex(color, 0.55), w: '#ffffff', r: '#e8364a' };
     if (kind === 'scrap') pal.w = '#b8bcc8';
+    if (kind === 'wood') Object.assign(pal, { b: '#b07a48', B: '#7a4a28', w: '#e8c890' });
+    if (kind === 'stone') Object.assign(pal, { w: '#b8bcc8', k: '#7d7a8e' });
     return spriteFromMap(MAPS[kind], pal);
   });
 }
