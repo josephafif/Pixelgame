@@ -9,6 +9,7 @@ import { applyStatus, statusForElement, isChilled } from './status.js';
 import { spawnProjectile } from './projectiles.js';
 import { spawnArea } from './areas.js';
 import { killEnemy } from './enemies.js';
+import { attackDuration, impactDelay, MELEE_PATTERNS } from '../render/weapon-anim.js';
 
 const DEG = Math.PI / 180;
 // Hooks that may still run on damage caused by other hooks (depth >= 1).
@@ -71,24 +72,27 @@ export function enemiesInRadius(game, x, y, r) {
   return out;
 }
 
-/** Auto-aim for touch/gamepad: nearest enemy roughly in front, else nearest. */
-export function autoAim(game, facing) {
+/**
+ * The weapon aims itself: it locks onto the nearest enemy within reach.
+ * The current target gets a bonus so the lock doesn't flicker between two
+ * enemies at similar distance, and bosses are preferred.
+ */
+export function acquireTarget(game, current) {
   const p = game.player;
-  const reach = (game.weapon?.stats.range ?? 3) + 3;
+  const reach = Math.max(4.5, (game.weapon?.stats.range ?? 3) + 3.5);
   let best = null;
   let bestScore = Infinity;
   for (const e of game.enemies) {
     if (e.dead) continue;
-    const d = Math.sqrt(dist2(p.x, p.y, e.x, e.y));
+    const d = Math.sqrt(dist2(p.x, p.y, e.x, e.y)) - e.r;
     if (d > reach) continue;
-    const off = Math.abs(angleDiff(facing, angleTo(p.x, p.y, e.x, e.y)));
-    const score = d + off * 2.5;
+    const score = d - (e === current ? 1.2 : 0) - (e.boss ? 0.8 : 0);
     if (score < bestScore) {
       bestScore = score;
       best = e;
     }
   }
-  return best ? angleTo(p.x, p.y, best.x, best.y) : facing;
+  return best;
 }
 
 // --- Damage --------------------------------------------------------------------
@@ -129,6 +133,9 @@ export function dealDamage(game, e, amount, opts = {}) {
     game.fx.emit('hit', e.x, e.y, crit ? 6 : 3, 0.3, 3);
     game.audio.play(crit ? 'crit' : 'hit');
     if (crit) game.shake = Math.max(game.shake, 0.15);
+    // A few frames of hit-stop make melee blows feel heavy.
+    if (opts.melee) game.addHitstop?.(crit ? 0.06 : e.boss ? 0.045 : 0.03);
+    e.squash = 1;
   }
   if (opts.knockback && !e.boss) {
     const n = normalize(e.x - (opts.fromX ?? game.player.x), e.y - (opts.fromY ?? game.player.y));
@@ -212,7 +219,7 @@ function hitMeleeTargets(game, targets, damage, attack, origin) {
   const w = game.weapon;
   for (const e of targets) {
     dealDamage(game, e, damage, {
-      element: w.element, canCrit: true, depth: 0, source: 'weapon',
+      element: w.element, canCrit: true, depth: 0, source: 'weapon', melee: true,
       knockback: w.stats.knockback, fromX: origin.x, fromY: origin.y,
     });
   }
@@ -277,23 +284,24 @@ export function fireWeaponProjectiles(game, { x, y, angle, damage, echo = false 
 }
 
 /** Executes the archetype's base attack pattern. */
-export function executePattern(game, { x, y, angle, damage, echo = false }) {
+export function executePattern(game, { x, y, angle, damage, echo = false, dir = 1 }) {
   const w = game.weapon;
   const a = w.attack;
   const range = w.stats.range;
   const color = w.trail;
+  const blade = w.dna.visual.palette.blade;
   switch (a.pattern) {
     case 'swing':
       meleeArc(game, x, y, angle, range, a.arc ?? 120, damage);
-      game.fx.add({ type: 'slash', x, y, angle, arc: (a.arc ?? 120) * DEG, r: range, color, dur: 0.16, ghost: echo });
+      game.fx.add({ type: 'slash', x, y, angle, dir, arc: (a.arc ?? 120) * DEG, r: range, color, core: blade[0], dur: 0.2, ghost: echo });
       break;
     case 'lash':
       meleeArc(game, x, y, angle, range, a.arc ?? 60, damage);
-      game.fx.add({ type: 'slash', x, y, angle, arc: (a.arc ?? 60) * DEG, r: range, color, dur: 0.14, thin: true, ghost: echo });
+      game.fx.add({ type: 'whip', x, y, angle, dir, r: range, color: blade[1], tip: color, dur: 0.22, ghost: echo });
       break;
     case 'thrust':
       meleeLine(game, x, y, angle, range, a.width ?? 0.7, damage);
-      game.fx.add({ type: 'thrust', x, y, angle, r: range, color, dur: 0.12, ghost: echo });
+      game.fx.add({ type: 'thrust', x, y, angle, r: range, color, core: blade[0], dur: 0.16, ghost: echo });
       break;
     case 'slam': {
       const radius = a.radius ?? 1.6;
@@ -301,9 +309,10 @@ export function executePattern(game, { x, y, angle, damage, echo = false }) {
       const cy = y + Math.sin(angle) * range * 0.6;
       const targets = enemiesInRadius(game, cx, cy, radius);
       hitMeleeTargets(game, targets, damage, null, { x: cx, y: cy });
-      game.fx.add({ type: 'ring', x: cx, y: cy, r0: 0.3, r1: radius, color, dur: 0.25 });
-      game.fx.emit('dust', cx, cy, 8, radius);
-      game.shake = Math.max(game.shake, 0.18);
+      game.fx.add({ type: 'ring', x: cx, y: cy, r0: 0.3, r1: radius, color, dur: 0.3, fill: true });
+      game.fx.add({ type: 'cracks', x: cx, y: cy, r: radius, color: '#161622', dur: 0.6, seed: Math.random() * 1000 });
+      game.fx.emit('dust', cx, cy, 14, radius, 2.5);
+      game.shake = Math.max(game.shake, 0.28);
       break;
     }
     default:
@@ -317,20 +326,38 @@ export function tryAttack(game, angle) {
   const w = game.weapon;
   if (!w || p.attackCd > 0 || p.dead) return false;
   const aspd = w.stats.attackSpeed * game.pstats.attackSpeedMult;
+  const pattern = w.attack.pattern;
   p.attackCd = 1 / aspd;
   p.facing = angle;
-  p.attackAnim = { t: 0, dur: Math.min(0.26, 0.75 / aspd), angle, pattern: w.attack.pattern };
+  // Swings alternate sides for a combo rhythm; the weapon rests where it ended.
+  const dir = p.guard ?? 1;
+  if (pattern === 'swing' || pattern === 'lash' || pattern === 'slam') p.guard = -dir;
+  const dur = attackDuration(pattern, aspd);
+  const anim = { t: 0, dur, angle, pattern, dir };
+  p.attackAnim = anim;
   p.attackCount += 1;
+  const count = p.attackCount;
 
   let mult = 1;
   for (const h of w.hooks.attack) if (h.do === 'sprintBonus' && p.sprinting) mult *= 1 + h.pct / 100;
   for (const h of w.hooks.attack) if (h.do === 'blink') phaseStrike(game, h, angle);
   const damage = weaponDamage(game) * mult;
 
-  executePattern(game, { x: p.x, y: p.y, angle, damage });
-  for (const h of w.hooks.attack) runAttackHook(game, h, angle, damage);
-  for (const h of w.hooks.nth) if (p.attackCount % h.n === 0) runAttackHook(game, h, angle, damage);
-  game.audio.weapon(w.dna.sound);
+  // Damage lands on the animation's impact frame, re-aimed at the target if
+  // it moved during the wind-up.
+  const strike = () => {
+    if (game.weapon !== w || p.dead) return;
+    let a = angle;
+    if (game.target && !game.target.dead) a = Math.atan2(game.target.y - p.y, game.target.x - p.x);
+    anim.angle = a;
+    executePattern(game, { x: p.x, y: p.y, angle: a, damage, dir });
+    for (const h of w.hooks.attack) runAttackHook(game, h, a, damage);
+    for (const h of w.hooks.nth) if (count % h.n === 0) runAttackHook(game, h, a, damage);
+    game.audio.weapon(w.dna.sound);
+  };
+  const delay = MELEE_PATTERNS.has(pattern) ? impactDelay(pattern, dur) : 0;
+  if (delay > 0.01) game.schedule(delay, strike);
+  else strike();
   return true;
 }
 

@@ -9,7 +9,7 @@ import { World } from './world.js';
 import { Fx } from './fx.js';
 import { computePlayerStats, xpToNext } from './stats.js';
 import {
-  compileWeapon, dealDamage, hurtPlayer, healPlayer, tryAttack, autoAim, weaponDamage, explosion,
+  compileWeapon, dealDamage, hurtPlayer, healPlayer, tryAttack, acquireTarget, weaponDamage, explosion,
 } from './combat.js';
 import { spawnProjectile, updateProjectiles } from './projectiles.js';
 import { spawnArea, updateAreas, projectileSlowAt } from './areas.js';
@@ -57,6 +57,7 @@ export class Game {
     this.buffs = [];
     this.boss = null;
     this.shake = 0;
+    this.hitstop = 0;
     this.spawnTimer = 1;
     this.pendingDrops = 0;
     this.abilityReadyAt = new Map();
@@ -65,6 +66,7 @@ export class Game {
     this.pauseReasons = new Set();
     this.suppressAttack = false;
     this.interactTarget = null;
+    this.target = null;
     this.hudTimer = 0;
     this.lastAutosave = performance.now();
     this.frameMs = 16;
@@ -127,7 +129,10 @@ export class Game {
       const elapsed = Math.min(250, now - this.last);
       this.last = now;
       this.#trackPerformance(elapsed);
-      if (!this.paused) {
+      if (this.hitstop > 0 && !this.paused) {
+        // Hit-stop: freeze the simulation for a few frames on heavy hits.
+        this.hitstop -= elapsed / 1000;
+      } else if (!this.paused) {
         this.acc += elapsed / 1000;
         let steps = 0;
         while (this.acc >= STEP && steps < MAX_STEPS) {
@@ -253,6 +258,12 @@ export class Game {
 
   heal(amount) {
     healPlayer(this, amount);
+  }
+
+  addHitstop(seconds) {
+    if (this.time - (this.lastHitstopAt ?? -1) < 0.12) return;
+    this.lastHitstopAt = this.time;
+    this.hitstop = Math.max(this.hitstop ?? 0, seconds);
   }
 
   vibrate(ms) {
@@ -666,13 +677,11 @@ export class Game {
 
   // --- Simulation -------------------------------------------------------------------
 
+  /** Where the weapon points: the locked target if any, else where we walk. */
   #aim(sample) {
     const p = this.player;
-    if (sample.aimScreen) {
-      const s = this.renderer.worldToScreen(p.x, p.y);
-      return Math.atan2(sample.aimScreen.y - s.y, sample.aimScreen.x - s.x);
-    }
-    if (sample.aimStick) return Math.atan2(sample.aimStick.y, sample.aimStick.x);
+    const t = this.target;
+    if (t && !t.dead) return Math.atan2(t.y - p.y, t.x - p.x);
     if (sample.moveX || sample.moveY) return Math.atan2(sample.moveY, sample.moveX);
     return p.facing;
   }
@@ -724,8 +733,9 @@ export class Game {
     if (moving) p.walkT += dt * (p.sprinting ? 14 : 9);
     if (p.sprinting && Math.random() < 0.3) this.fx.emit('dust', p.x, p.y + 0.3, 1, 0.2, 0.5);
 
-    let aim = this.#aim(sample);
-    if (!sample.aimScreen && !sample.aimStick && sample.attack) aim = autoAim(this, aim);
+    // Aiming is automatic on every device: the weapon locks onto an enemy.
+    this.target = acquireTarget(this, this.target);
+    const aim = this.#aim(sample);
     if (!p.attackAnim) p.facing = aim;
 
     if (!sample.attack) this.suppressAttack = false;
@@ -736,7 +746,6 @@ export class Game {
     if (part && Math.random() < part.rate * 0.25 * (this.quality.glow ? 1 : 0.4)) {
       this.fx.emit(part.kind, p.x + Math.cos(p.facing) * 0.6, p.y - 0.4 + Math.sin(p.facing) * 0.6, 1, 0.3, 0.6);
     }
-    return aim;
   }
 
   update(dt) {
@@ -746,18 +755,17 @@ export class Game {
     this.#runTimers();
 
     const sample = this.input.sample();
-    let aim = this.player.facing;
     for (const c of sample.commands) {
       if (c === 'interact' || c === 'interact-or-attack') {
         if (this.interact()) this.suppressAttack = true;
-        else if (c === 'interact-or-attack') tryAttack(this, aim);
+        else if (c === 'interact-or-attack') tryAttack(this, this.#aim(sample));
       } else if (c === 'ability') {
         castAbility(this, this.#aim(sample));
       } else {
         this.emit('ui', c);
       }
     }
-    aim = this.#updatePlayer(dt, sample) ?? aim;
+    this.#updatePlayer(dt, sample);
 
     if (this.buffs.length) {
       const before = this.buffs.length;

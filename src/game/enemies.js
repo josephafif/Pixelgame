@@ -350,6 +350,7 @@ export function updateEnemies(game, dt) {
     tickStatuses(game, e, dt);
     if (e.dead) continue;
     e.flash = Math.max(0, e.flash - dt);
+    if (e.squash) e.squash = Math.max(0, e.squash - dt * 7);
     if (e.stunned) {
       e.vx = e.vy = 0;
     } else if (e.boss) {

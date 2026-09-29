@@ -2,9 +2,11 @@
 // keyboard, and gamepads all feed the same small action state, so every
 // control works with every input method.
 //
+// Aiming is automatic (the weapon locks onto the nearest enemy), so input
+// only has to say "move", "attack", "sprint" and "use".
+//
 // Touch: a joystick on the left half of the play area (right half in
-// left-handed mode). Touching the other half aims and attacks toward the
-// finger. The game area uses `touch-action: none`, so these gestures never
+// left-handed mode). Touching the other half attacks. The game area uses `touch-action: none`, so these gestures never
 // scroll or zoom the page, while menus and panels stay scrollable.
 
 const KEYMAP = {
@@ -40,8 +42,7 @@ export class Input {
     this.keys = new Set();
     this.move = { x: 0, y: 0 };
     this.joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
-    this.aimTouch = { id: null, x: 0, y: 0 };
-    this.pointer = { x: 0, y: 0, active: false, lastMove: 0 };
+    this.attackTouchId = null;
     this.mouseAttack = false;
     this.touchAttack = false;
     this.buttonAttack = false;
@@ -49,7 +50,6 @@ export class Input {
     this.padAttack = false;
     this.sprintToggle = false;
     this.sprintHeld = false;
-    this.padAim = null;
     this.commands = [];
     this.mode = matchMedia?.('(pointer: coarse)').matches ? 'touch' : 'keyboard';
     this.enabled = true;
@@ -119,9 +119,6 @@ export class Input {
     s.addEventListener('pointermove', (e) => this.#pointerMove(e));
     s.addEventListener('pointerup', (e) => this.#pointerUp(e));
     s.addEventListener('pointercancel', (e) => this.#pointerUp(e));
-    s.addEventListener('pointerleave', (e) => {
-      if (e.pointerType === 'mouse') this.pointer.active = false;
-    });
 
     const hold = (el, onDown, onUp) => {
       if (!el) return;
@@ -166,7 +163,6 @@ export class Input {
     if (!this.enabled) return;
     if (e.pointerType === 'mouse') {
       this.#setMode('keyboard');
-      this.pointer = { x: e.clientX, y: e.clientY, active: true, lastMove: performance.now() };
       if (e.button === 0) this.mouseAttack = true;
       if (e.button === 2) this.#command('ability');
       return;
@@ -182,25 +178,14 @@ export class Input {
       this.joy = { id: e.pointerId, ox, oy, x: 0, y: 0 };
       this.#updateJoystick(e.clientX, e.clientY);
       this.joyEl.classList.add('active');
-    } else if (this.aimTouch.id === null) {
-      this.aimTouch = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    } else if (this.attackTouchId === null) {
+      this.attackTouchId = e.pointerId;
       this.touchAttack = true;
     }
   }
 
   #pointerMove(e) {
-    if (e.pointerType === 'mouse') {
-      this.pointer.x = e.clientX;
-      this.pointer.y = e.clientY;
-      this.pointer.active = true;
-      this.pointer.lastMove = performance.now();
-      return;
-    }
     if (e.pointerId === this.joy.id) this.#updateJoystick(e.clientX, e.clientY);
-    else if (e.pointerId === this.aimTouch.id) {
-      this.aimTouch.x = e.clientX;
-      this.aimTouch.y = e.clientY;
-    }
   }
 
   #pointerUp(e) {
@@ -213,8 +198,8 @@ export class Input {
       this.joyEl.classList.remove('active');
       this.joyEl.style.left = this.joyEl.style.top = this.joyEl.style.width = this.joyEl.style.height = '';
       this.knobEl.style.transform = 'translate(-50%, -50%)';
-    } else if (e.pointerId === this.aimTouch.id) {
-      this.aimTouch.id = null;
+    } else if (e.pointerId === this.attackTouchId) {
+      this.attackTouchId = null;
       this.touchAttack = false;
     }
   }
@@ -245,8 +230,7 @@ export class Input {
     const pressed = (i) => Boolean(pad.buttons[i]?.pressed);
     const edge = (i) => pressed(i) && !this.padPrev[i];
     const move = { x: ax(0), y: ax(1) };
-    const aim = { x: ax(2), y: ax(3) };
-    const any = move.x || move.y || aim.x || aim.y || pad.buttons.some((b) => b.pressed);
+    const any = move.x || move.y || pad.buttons.some((b) => b.pressed);
     if (any) this.#setMode('gamepad');
     this.padAttack = pressed(0) || pressed(7);
     if (edge(0)) this.#command('interact');
@@ -260,7 +244,6 @@ export class Input {
       this.sprintToggle = !this.sprintToggle;
     }
     this.padPrev = pad.buttons.map((b) => b.pressed);
-    this.padAim = aim.x || aim.y ? aim : null;
     return move;
   }
 
@@ -270,7 +253,7 @@ export class Input {
     this.mouseAttack = this.touchAttack = this.buttonAttack = this.padAttack = false;
     this.sprintHeld = false;
     this.joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
-    this.aimTouch.id = null;
+    this.attackTouchId = null;
     this.joyEl?.classList.remove('active');
   }
 
@@ -304,18 +287,11 @@ export class Input {
     this.keyAttack = this.keys.has('attack');
     const commands = this.commands;
     this.commands = [];
-    let aimScreen = null;
-    if (this.aimTouch.id !== null) aimScreen = { x: this.aimTouch.x, y: this.aimTouch.y };
-    else if (this.mode === 'keyboard' && this.pointer.active && performance.now() - this.pointer.lastMove < 4000) {
-      aimScreen = { x: this.pointer.x, y: this.pointer.y };
-    }
     return {
       moveX: this.enabled ? x : 0,
       moveY: this.enabled ? y : 0,
       attack: this.enabled && (this.mouseAttack || this.touchAttack || this.buttonAttack || this.keyAttack || this.padAttack),
       sprint: this.settings().sprintMode === 'hold' ? this.sprintHeld : this.sprintToggle,
-      aimScreen,
-      aimStick: this.padAim,
       commands,
       mode: this.mode,
     };

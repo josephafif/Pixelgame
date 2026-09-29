@@ -8,6 +8,7 @@ import { renderChunk, TILE_PX } from './tiles-art.js';
 import { CHUNK } from '../game/world.js';
 import { playerSprites, objectSprite, pickupSprite, tintedSprite } from './sprites.js';
 import { weaponSprite, weaponIcon } from './weapon-sprite.js';
+import { weaponPose } from './weapon-anim.js';
 import { drawPixelText } from './font.js';
 
 const T = TILE_PX;
@@ -310,6 +311,7 @@ export class Renderer {
         default: break;
       }
     }
+    this.#drawReticle(game);
     if (game.interactTarget) {
       const o = game.interactTarget;
       const x = this.#sx(o.x);
@@ -403,8 +405,9 @@ export class Renderer {
     else if (e.elite) img = tintedSprite(img, '#ffd24a', 0.18);
     const bob = e.boss ? Math.round(Math.sin(game.time * 3) * 1.5) : e.stunned ? 0 : Math.round(Math.sin(game.time * 8 + e.phase) * 1);
     const scale = e.scale ?? 1;
-    const w = Math.round(img.width * scale);
-    const h = Math.round(img.height * scale);
+    const squash = e.squash ?? 0;
+    const w = Math.round(img.width * scale * (1 + 0.22 * squash));
+    const h = Math.round(img.height * scale * (1 - 0.18 * squash));
     this.#shadow(x, y + 1, Math.max(4, w * 0.4));
     if (e.state === 'windup' && Math.floor(game.time * 16) % 2) v.globalAlpha = 0.6;
     v.drawImage(img, x - (w >> 1), y - h + 2 + bob, w, h);
@@ -419,61 +422,105 @@ export class Renderer {
   #drawCharacter(game, c, x, y, isClone) {
     const v = this.v;
     const sprites = playerSprites(isClone ? '#9a5cff' : '#3f6fd8');
+    const w = game.weapon;
+    const anim = isClone
+      ? (game.time - (c.attackT ?? -1) < 0.22 ? { t: game.time - c.attackT, dur: 0.22, angle: c.facing, dir: 1 } : null)
+      : c.attackAnim;
+    const pattern = w?.attack.pattern ?? 'swing';
+    const pose = w ? weaponPose(pattern, anim, c.facing, {
+      arc: ((w.attack.arc ?? 120) * Math.PI) / 180,
+      time: game.time,
+      moving: c.moving,
+      walkT: c.walkT ?? 0,
+      guard: c.guard ?? 1,
+    }) : null;
+    // The body leans into lunges and thrusts.
+    const lungeAngle = anim?.angle ?? c.facing;
+    const lx = pose ? Math.round(Math.cos(lungeAngle) * pose.lunge) : 0;
+    const ly = pose ? Math.round(Math.sin(lungeAngle) * pose.lunge) : 0;
     const right = Math.cos(c.facing) >= 0;
     const frame = c.moving ? 1 + (Math.floor(c.walkT) % 2) : 0;
     let img = (right ? sprites.right : sprites.left)[isClone ? 0 : frame];
     if (!isClone && c.hurtFlash > 0) img = sprites.flash;
     const bob = c.moving ? (Math.floor(c.walkT) % 2) : 0;
-    this.#shadow(x, y + 1, 5);
-    const facingUp = Math.sin(c.facing) < -0.4;
+    this.#shadow(x + lx, y + 1 + ly, 5);
+    const behind = pose && Math.sin(pose.angle) < -0.35;
     if (isClone) v.globalAlpha = 0.65;
     else if (c.invuln > 0 && Math.floor(game.time * 20) % 2) v.globalAlpha = 0.5;
-    if (facingUp) this.#drawHeldWeapon(game, c, x, y - 6 - bob, isClone);
-    v.drawImage(img, x - 5, y - 12 - bob);
-    if (!facingUp) this.#drawHeldWeapon(game, c, x, y - 6 - bob, isClone);
+    const hand = { x: x + lx + (right ? 1 : -1), y: y - 6 - bob + ly };
+    if (behind) this.#drawHeldWeapon(game, pose, hand, isClone);
+    v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
+    if (!behind) this.#drawHeldWeapon(game, pose, hand, isClone);
     v.globalAlpha = 1;
   }
 
-  #drawHeldWeapon(game, c, x, y, isClone) {
+  #boomerangInFlight(game) {
+    return game.projectiles.some((p) => p.kind === 'boomerang' && p.owner === 'player' && p.depth === 0);
+  }
+
+  #drawHeldWeapon(game, pose, hand, isClone) {
     const w = game.weapon;
-    if (!w) return;
+    if (!w || !pose) return;
+    if (!isClone && w.attack.pattern === 'boomerang' && this.#boomerangInFlight(game)) return;
     const v = this.v;
     const spr = weaponSprite(w.dna);
-    const anim = isClone ? (game.time - (c.attackT ?? -1) < 0.15 ? { t: game.time - c.attackT, dur: 0.15, angle: c.facing } : null) : c.attackAnim;
-    let angle = c.facing;
-    let reach = 3;
-    const pattern = w.attack.pattern;
-    if (anim) {
-      const k = Math.min(1, anim.t / anim.dur);
-      angle = anim.angle;
-      if (pattern === 'swing' || pattern === 'lash') {
-        const arc = ((w.attack.arc ?? 120) * Math.PI) / 180;
-        angle += -arc / 2 + arc * k;
-      } else if (pattern === 'thrust') {
-        reach += Math.sin(k * Math.PI) * 8;
-      } else if (pattern === 'slam') {
-        angle += (k < 0.5 ? -1.2 + k * 2.4 : 0);
-      } else {
-        reach -= Math.sin(k * Math.PI) * 2;
-      }
-    }
-    const hx = x + Math.cos(angle) * reach;
-    const hy = y + Math.sin(angle) * reach;
-    const drawAt = (ox, oy, alpha) => {
+    const scale = 0.75;
+    const at = (angle) => ({
+      x: hand.x + Math.cos(angle) * pose.reach,
+      y: hand.y + Math.sin(angle) * pose.reach + pose.lift,
+    });
+    const drawAt = (img, angle, alpha, ox = 0, oy = 0) => {
+      const p = at(angle);
       v.save();
       v.globalAlpha *= alpha;
-      v.translate(hx + ox, hy + oy);
+      v.translate(Math.round(p.x + ox), Math.round(p.y + oy));
       v.rotate(angle + Math.PI / 2);
-      v.scale(0.75, 0.75);
-      v.drawImage(spr.canvas, -spr.pivotX, -spr.pivotY);
+      v.scale(scale, scale);
+      v.drawImage(img, -spr.pivotX, -spr.pivotY);
       v.restore();
     };
-    if (w.dna.visual.distortion && game.quality.glow) {
-      drawAt((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, 0.35);
+    // Motion trail: fading after-images in the weapon's trail colour.
+    if (pose.trail.length) {
+      const ghost = tintedSprite(spr.canvas, w.trail, 0.85);
+      pose.trail.forEach((angle, i) => drawAt(ghost, angle, 0.34 - i * 0.07));
     }
-    drawAt(0, 0, 1);
+    if (w.dna.visual.distortion && game.quality.glow) {
+      drawAt(tintedSprite(spr.canvas, '#6b3fc6', 0.6), pose.angle, 0.35, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+    }
+    drawAt(spr.canvas, pose.angle, 1);
+    const base = at(pose.angle);
+    const tipX = base.x + Math.cos(pose.angle) * (spr.pivotY - 4) * scale;
+    const tipY = base.y + Math.sin(pose.angle) * (spr.pivotY - 4) * scale;
     if (w.dna.visual.glow && w.dna.visual.palette.glow) {
-      this.#glow(hx + Math.cos(angle) * 10, hy + Math.sin(angle) * 10, w.dna.visual.palette.glow, 12);
+      this.#glow((base.x + tipX) / 2, (base.y + tipY) / 2, w.dna.visual.palette.glow, pose.striking ? 16 : 11);
+    }
+    if (pose.flash > 0) {
+      // Muzzle flash / cast burst at the tip for ranged weapons.
+      const r = 2 + pose.flash * 3;
+      this.#circle(tipX, tipY, r + 1, w.trail, null, 0.6 * pose.flash);
+      this.#circle(tipX, tipY, r * 0.6, '#ffffff', null, pose.flash);
+      this.#glow(tipX, tipY, w.trail, 12 + pose.flash * 8);
+    }
+  }
+
+  #drawReticle(game) {
+    const t = game.target;
+    if (!t || t.dead || game.player.dead) return;
+    const v = this.v;
+    const x = this.#sx(t.x);
+    const y = this.#sy(t.y) - Math.round(t.r * T * 0.9);
+    const size = Math.round(t.r * T + 5 + Math.sin(game.time * 8) * 1.5);
+    const arm = Math.max(3, Math.round(size / 3));
+    const color = t.boss ? '#ff5a3a' : '#ffd24a';
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const cx = x + sx * size;
+      const cy = y + sy * size;
+      v.fillStyle = '#161622';
+      v.fillRect(cx - (sx > 0 ? arm : 0) - 1, cy - 1, arm + 2, 3);
+      v.fillRect(cx - 1, cy - (sy > 0 ? arm : 0) - 1, 3, arm + 2);
+      v.fillStyle = color;
+      v.fillRect(cx - (sx > 0 ? arm - 1 : 0), cy, arm, 1);
+      v.fillRect(cx, cy - (sy > 0 ? arm - 1 : 0), 1, arm);
     }
   }
 
@@ -561,29 +608,110 @@ export class Renderer {
       v.globalAlpha = Math.max(0, alpha);
       switch (s.type) {
         case 'slash': {
-          const r = s.r * T * 0.85;
-          v.strokeStyle = s.color;
-          v.lineWidth = s.thin ? 1 : Math.max(1, 3 - k * 3);
+          // A travelling crescent: thick in the middle, tapered at both ends,
+          // sweeping in the swing's direction.
+          const r = s.r * T * 0.9;
+          const dir = s.dir ?? 1;
+          const sweep = Math.min(1, k * 2.2);
+          const tail = Math.max(0, k * 2.2 - 0.55);
+          const a0 = s.angle - dir * s.arc / 2;
+          const span = dir * s.arc;
+          const from = a0 + span * tail;
+          const to = a0 + span * sweep;
+          const n = 14;
+          const thick = Math.max(3, r * 0.34) * (1 - k * 0.6);
+          const cy = y - 5;
+          v.globalAlpha = Math.max(0, (1 - k) * (s.ghost ? 0.4 : 0.85));
+          v.fillStyle = s.color;
           v.beginPath();
-          const start = s.angle - s.arc / 2;
-          v.arc(x, y - 5, r, start, start + s.arc * Math.min(1, k * 2.5));
-          v.stroke();
-          v.strokeStyle = '#ffffff';
+          for (let i = 0; i <= n; i++) {
+            const a = from + (to - from) * (i / n);
+            v.lineTo(x + Math.cos(a) * r, cy + Math.sin(a) * r);
+          }
+          for (let i = n; i >= 0; i--) {
+            const a = from + (to - from) * (i / n);
+            const w = thick * Math.sin((i / n) * Math.PI);
+            v.lineTo(x + Math.cos(a) * (r - w), cy + Math.sin(a) * (r - w));
+          }
+          v.closePath();
+          v.fill();
+          v.strokeStyle = s.core ?? '#ffffff';
           v.lineWidth = 1;
           v.beginPath();
-          v.arc(x, y - 5, r - 1, start, start + s.arc * Math.min(1, k * 2.5));
+          v.arc(x, cy, r, Math.min(from, to), Math.max(from, to));
           v.stroke();
+          const tipA = to;
+          this.#glow(x + Math.cos(tipA) * r, cy + Math.sin(tipA) * r, s.color, 10);
+          break;
+        }
+        case 'whip': {
+          // A lash that uncoils towards the target, then relaxes.
+          const len = s.r * T * Math.min(1, k * 3);
+          const cy = y - 5;
+          const ex = x + Math.cos(s.angle) * len;
+          const ey = cy + Math.sin(s.angle) * len;
+          const bend = (1 - Math.min(1, k * 2)) * len * 0.45 * (s.dir ?? 1);
+          const mx = (x + ex) / 2 - Math.sin(s.angle) * bend;
+          const my = (cy + ey) / 2 + Math.cos(s.angle) * bend;
+          v.globalAlpha = s.ghost ? 0.45 : 1 - k * 0.7;
+          v.strokeStyle = '#161622';
+          v.lineWidth = 3;
+          v.beginPath();
+          v.moveTo(x, cy);
+          v.quadraticCurveTo(mx, my, ex, ey);
+          v.stroke();
+          v.strokeStyle = s.color;
+          v.lineWidth = 1.5;
+          v.stroke();
+          if (k < 0.5) {
+            this.#circle(ex, ey, 2, s.tip, null, 1);
+            this.#glow(ex, ey, s.tip, 10);
+          }
+          v.lineWidth = 1;
           break;
         }
         case 'thrust': {
-          const len = s.r * T;
-          v.strokeStyle = s.color;
-          v.lineWidth = 2;
+          // A spear-shaped streak that shoots out and thins.
+          const len = s.r * T * Math.min(1, k * 3);
+          const cy = y - 5;
+          const nx = Math.cos(s.angle);
+          const ny = Math.sin(s.angle);
+          const w = 3 * (1 - k);
+          v.globalAlpha = Math.max(0, (1 - k) * (s.ghost ? 0.4 : 0.9));
+          v.fillStyle = s.color;
           v.beginPath();
-          v.moveTo(x, y - 5);
-          v.lineTo(x + Math.cos(s.angle) * len, y - 5 + Math.sin(s.angle) * len);
+          v.moveTo(x - ny * w, cy + nx * w);
+          v.lineTo(x + nx * len, cy + ny * len);
+          v.lineTo(x + ny * w, cy - nx * w);
+          v.closePath();
+          v.fill();
+          v.strokeStyle = s.core ?? '#ffffff';
+          v.beginPath();
+          v.moveTo(x, cy);
+          v.lineTo(x + nx * len, cy + ny * len);
           v.stroke();
-          v.lineWidth = 1;
+          this.#glow(x + nx * len, cy + ny * len, s.color, 9);
+          break;
+        }
+        case 'cracks': {
+          // Ground cracks radiating from a slam.
+          v.globalAlpha = Math.max(0, 1 - k) * 0.8;
+          v.strokeStyle = s.color;
+          const r = s.r * T;
+          for (let i = 0; i < 6; i++) {
+            let a = s.seed + i * 1.05;
+            let px = x;
+            let py = y;
+            v.beginPath();
+            v.moveTo(px, py);
+            for (let j = 0; j < 3; j++) {
+              a += Math.sin(s.seed * (i + 1) * (j + 2)) * 0.5;
+              px += Math.cos(a) * r * 0.33;
+              py += Math.sin(a) * r * 0.2;
+              v.lineTo(Math.round(px), Math.round(py));
+            }
+            v.stroke();
+          }
           break;
         }
         case 'ring': {
