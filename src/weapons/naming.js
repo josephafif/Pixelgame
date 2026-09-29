@@ -15,7 +15,7 @@ const MODIFIER_WORDS = {
   execute: ['Doom', 'Grave'],
   homing: ['Seeker', 'Hawk'],
   split: ['Hydra', 'Swarm'],
-  critc: ['Keen', 'Fate'],
+  critc: ['Hawk', 'Fate'],
   critd: ['Ruin', 'Fate'],
   momentum: ['Rush', 'Comet'],
 };
@@ -34,11 +34,9 @@ export function generateName(data, parts, rng) {
   const adjectives = [...(names.elementAdjectives[element] ?? names.elementAdjectives.physical)];
   const themeWords = names.themeWords[theme?.id] ?? [];
   // Theme and modifier words let two fire swords with different builds get
-  // differently flavoured names.
-  for (const w of themeWords) {
-    roots.push(w);
-    adjectives.push(w);
-  }
+  // differently flavoured names. Theme words are adjectives ("Precise"), so
+  // they never start compound names; modifier words are nouns ("Blood").
+  for (const w of themeWords) adjectives.push(w);
   for (const m of modifiers) {
     for (const w of MODIFIER_WORDS[m.id] ?? []) roots.push(w);
   }

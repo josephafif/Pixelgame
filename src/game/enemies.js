@@ -1,0 +1,445 @@
+// Enemies: spawning around the player, simple readable AI per behaviour,
+// elemental variants per biome, elites, and multi-phase bosses.
+
+import { dist2, normalize, angleTo } from '../core/math.js';
+import { tickStatuses } from './status.js';
+import { enemySprites, bossSprites } from '../render/sprites.js';
+
+let nextId = 1;
+const DESPAWN_DIST = 34;
+const SAFE_CAMP_RADIUS = 11;
+
+function scaleFor(level) {
+  return { hp: 1 + 0.3 * (level - 1), dmg: 1 + 0.14 * (level - 1) };
+}
+
+export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite = false, biome = null } = {}) {
+  const def = game.data.byId.enemies.get(defId);
+  if (!def) return null;
+  let el = element;
+  if (!el && biome) {
+    const nonPhysical = biome.elements.filter((e) => e !== 'physical');
+    if ((def.elemental || Math.random() < 0.3) && nonPhysical.length) el = nonPhysical[(Math.random() * nonPhysical.length) | 0];
+  }
+  el ??= 'physical';
+  const elDef = game.data.byId.elements.get(el);
+  const color = el !== 'physical' && elDef?.palette ? elDef.palette[1] : def.color;
+  const s = scaleFor(level);
+  const hp = Math.round(def.hp * s.hp * (elite ? 2.4 : 1));
+  const e = {
+    id: nextId++,
+    kind: def.id,
+    def,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    kx: 0,
+    ky: 0,
+    r: def.size * 0.45 * (elite ? 1.3 : 1),
+    hp,
+    maxHp: hp,
+    dmg: def.damage * s.dmg * (elite ? 1.4 : 1),
+    speed: def.speed,
+    level,
+    element: el,
+    elite,
+    xp: Math.round(def.xp * (1 + 0.25 * (level - 1)) * (elite ? 3 : 1)),
+    status: {},
+    flash: 0,
+    atkCd: 0.5 + Math.random(),
+    state: 'move',
+    stateT: 0,
+    facing: 1,
+    phase: Math.random() * 10,
+    sprites: enemySprites(def.id, color),
+    color,
+    boss: false,
+    dead: false,
+    slowMult: 1,
+    scale: elite ? 1.3 : 1,
+  };
+  game.enemies.push(e);
+  return e;
+}
+
+export function spawnBoss(game, bossId, x, y) {
+  const def = game.data.byId.bosses.get(bossId);
+  const level = Math.max(game.save.player.level, game.world.worldLevel(x, y) + 1);
+  const s = scaleFor(level);
+  const hp = Math.round(def.hp * (1 + 0.22 * (level - 1)));
+  const boss = {
+    id: nextId++,
+    kind: def.id,
+    def,
+    bossDef: def,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    kx: 0,
+    ky: 0,
+    r: def.size * 0.5,
+    hp,
+    maxHp: hp,
+    dmg: def.damage * s.dmg,
+    speed: def.speed,
+    level,
+    element: def.element,
+    elite: false,
+    xp: Math.round(def.xp * (1 + 0.2 * (level - 1))),
+    status: {},
+    flash: 0,
+    atkCd: 1,
+    state: 'move',
+    stateT: 0,
+    facing: 1,
+    phase: 1,
+    patternIdx: 0,
+    patternCd: 2,
+    sprites: bossSprites(def.id, def.color),
+    color: def.color,
+    boss: true,
+    dead: false,
+    slowMult: 1,
+    scale: 1,
+    anchorX: x,
+    anchorY: y,
+  };
+  game.enemies.push(boss);
+  return boss;
+}
+
+function moveEnemy(game, e, dx, dy, dt) {
+  const nx = e.x + dx * dt;
+  const ny = e.y + dy * dt;
+  const r = Math.min(e.r, 0.45);
+  const flying = e.kind === 'bat' || e.kind === 'wisp' || e.boss;
+  if (flying) {
+    e.x = nx;
+    e.y = ny;
+    return;
+  }
+  if (game.world.isFree(nx, e.y, r)) e.x = nx;
+  if (game.world.isFree(e.x, ny, r)) e.y = ny;
+}
+
+function enemyShoot(game, e, angle, { speed, damage, size = 2, sprite = 'orb' }) {
+  game.spawnProjectile({
+    x: e.x, y: e.y, angle, speed, damage, range: 12, size, sprite, owner: 'enemy',
+    element: e.element, color: game.data.byId.elements.get(e.element)?.glow ?? '#ff5050', depth: 0,
+    status: e.element === 'ice' ? 'chill' : e.element === 'fire' ? 'burn' : e.element === 'poison' ? 'poison' : null,
+  });
+}
+
+function updateBehaviour(game, e, dt) {
+  const p = game.player;
+  const dx = p.x - e.x;
+  const dy = p.y - e.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const n = { x: dx / d, y: dy / d };
+  const speed = e.speed * e.slowMult;
+  let vx = 0;
+  let vy = 0;
+  e.stateT += dt;
+  e.atkCd -= dt;
+  const aggro = p.dead ? 0 : d < 18;
+
+  switch (e.def.behavior) {
+    case 'chase':
+      if (aggro) { vx = n.x * speed; vy = n.y * speed; }
+      break;
+    case 'swoop': {
+      if (aggro) {
+        const wobble = Math.sin(game.time * 6 + e.phase) * 0.8;
+        vx = (n.x - n.y * wobble) * speed;
+        vy = (n.y + n.x * wobble) * speed;
+      }
+      break;
+    }
+    case 'ranged':
+    case 'caster': {
+      const want = (e.def.range ?? 6) * 0.75;
+      if (aggro) {
+        const dir = d > want + 0.5 ? 1 : d < want - 1 ? -1 : 0;
+        vx = n.x * speed * dir + -n.y * speed * 0.3 * Math.sin(e.phase + game.time);
+        vy = n.y * speed * dir + n.x * speed * 0.3 * Math.sin(e.phase + game.time);
+        if (e.atkCd <= 0 && d < (e.def.range ?? 6) + 1) {
+          e.atkCd = e.def.behavior === 'caster' ? 2.2 : 1.8;
+          enemyShoot(game, e, angleTo(e.x, e.y, p.x, p.y), {
+            speed: e.def.projSpeed ?? 6, damage: e.dmg, sprite: e.def.behavior === 'caster' ? 'orb' : 'bone',
+          });
+        }
+      }
+      break;
+    }
+    case 'charger': {
+      if (e.state === 'move') {
+        if (aggro) { vx = n.x * speed; vy = n.y * speed; }
+        if (d < 4.5 && e.atkCd <= 0) {
+          e.state = 'windup';
+          e.stateT = 0;
+          e.chargeDir = n;
+        }
+      } else if (e.state === 'windup') {
+        if (e.stateT > 0.6) { e.state = 'charge'; e.stateT = 0; }
+      } else if (e.state === 'charge') {
+        vx = e.chargeDir.x * speed * 4.5;
+        vy = e.chargeDir.y * speed * 4.5;
+        if (e.stateT > 0.45) { e.state = 'move'; e.atkCd = 2.5; }
+      }
+      break;
+    }
+    default:
+      if (aggro) { vx = n.x * speed; vy = n.y * speed; }
+  }
+  e.vx = vx;
+  e.vy = vy;
+  if (Math.abs(vx) > 0.05) e.facing = vx > 0 ? 1 : -1;
+
+  // Contact damage.
+  const reach = e.r + p.r;
+  if (!p.dead && d < reach && (e.contactCd ?? 0) <= game.time) {
+    e.contactCd = game.time + 0.9;
+    game.hurtPlayer(e.dmg * (e.state === 'charge' ? 1.5 : 1), { element: e.element, fromX: e.x, fromY: e.y });
+  }
+}
+
+// --- Bosses ---------------------------------------------------------------------
+
+function bossPattern(game, b, pattern) {
+  const p = game.player;
+  const dmg = b.dmg * 0.8;
+  const speed = b.phase === 2 ? 7 : 6;
+  const color = b.color;
+  switch (pattern) {
+    case 'ring': {
+      const waves = b.phase === 2 ? 3 : 2;
+      for (let w = 0; w < waves; w++) {
+        game.schedule(w * 0.45, () => {
+          if (b.dead) return;
+          const n = b.phase === 2 ? 18 : 14;
+          const off = w * 0.2;
+          for (let i = 0; i < n; i++) enemyShoot(game, b, (i / n) * Math.PI * 2 + off, { speed, damage: dmg, size: 3 });
+        });
+      }
+      return 2;
+    }
+    case 'spiral': {
+      const shots = b.phase === 2 ? 36 : 26;
+      for (let i = 0; i < shots; i++) {
+        game.schedule(i * 0.07, () => {
+          if (b.dead) return;
+          const a = i * 0.55;
+          enemyShoot(game, b, a, { speed: speed * 0.9, damage: dmg, size: 3 });
+          if (b.phase === 2) enemyShoot(game, b, a + Math.PI, { speed: speed * 0.9, damage: dmg, size: 3 });
+        });
+      }
+      return shots * 0.07 + 1.2;
+    }
+    case 'charge': {
+      const n = normalize(p.x - b.x, p.y - b.y);
+      const len = 9;
+      game.spawnArea('telegraph', {
+        owner: 'enemy', shape: 'line', x: b.x, y: b.y, x2: b.x + n.x * len, y2: b.y + n.y * len,
+        r: b.r, dur: 0.75, color,
+        onEnd: () => {
+          if (b.dead) return;
+          b.state = 'charge';
+          b.stateT = 0;
+          b.chargeDir = n;
+        },
+      });
+      b.state = 'windup';
+      return 2.2;
+    }
+    case 'slam': {
+      const tx = p.x;
+      const ty = p.y;
+      const r = b.phase === 2 ? 3 : 2.4;
+      game.spawnArea('telegraph', {
+        owner: 'enemy', shape: 'circle', x: tx, y: ty, r, dur: 0.95, color,
+        onEnd: () => {
+          if (b.dead) return;
+          game.fx.add({ type: 'ring', x: tx, y: ty, r0: 0.3, r1: r, color, dur: 0.3, fill: true });
+          game.shake = Math.max(game.shake, 0.35);
+          game.audio.play('boom');
+          if (dist2(tx, ty, p.x, p.y) <= (r + p.r) * (r + p.r)) game.hurtPlayer(b.dmg * 1.6, { element: b.element, fromX: tx, fromY: ty });
+          game.spawnArea('hazard', { owner: 'enemy', x: tx, y: ty, r: r * 0.7, dur: 3, dps: b.dmg * 0.5, element: b.element });
+        },
+      });
+      return 2;
+    }
+    case 'summon': {
+      const biome = game.data.byId.biomes.get(b.bossDef.biome);
+      const count = b.phase === 2 ? 4 : 3;
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2;
+        const x = b.x + Math.cos(a) * 2.5;
+        const y = b.y + Math.sin(a) * 2.5;
+        const kind = biome.enemies[i % biome.enemies.length];
+        const minion = spawnEnemy(game, kind, x, y, { level: b.level, element: b.element });
+        if (minion) minion.summoned = true;
+        game.fx.emit('smoke', x, y, 6, 0.5);
+      }
+      return 2.5;
+    }
+    case 'blink': {
+      const a = Math.random() * Math.PI * 2;
+      const tx = p.x + Math.cos(a) * 5;
+      const ty = p.y + Math.sin(a) * 5;
+      game.fx.emit('void', b.x, b.y, 16, b.r * 2);
+      b.x = tx;
+      b.y = ty;
+      game.fx.emit('void', tx, ty, 16, b.r * 2);
+      game.schedule(0.4, () => !b.dead && bossPattern(game, b, 'ring'));
+      return 2.4;
+    }
+    default:
+      return 1.5;
+  }
+}
+
+function updateBoss(game, b, dt) {
+  const p = game.player;
+  b.stateT += dt;
+  if (b.phase === 1 && b.hp < b.maxHp * 0.5) {
+    b.phase = 2;
+    game.emit('toast', { text: `${b.bossDef.name} is enraged!`, kind: 'boss' });
+    game.shake = 0.5;
+    game.audio.play('boss');
+  }
+  const d = Math.sqrt(dist2(b.x, b.y, p.x, p.y)) || 1;
+  const n = { x: (p.x - b.x) / d, y: (p.y - b.y) / d };
+  if (b.state === 'charge') {
+    b.vx = b.chargeDir.x * 13;
+    b.vy = b.chargeDir.y * 13;
+    if (b.stateT > 0.55) {
+      b.state = 'move';
+      b.vx = b.vy = 0;
+    }
+  } else if (b.state === 'windup') {
+    b.vx = b.vy = 0;
+  } else {
+    const speed = b.speed * b.slowMult * (b.phase === 2 ? 1.25 : 1);
+    const want = d > 3.5 ? 1 : 0;
+    b.vx = n.x * speed * want;
+    b.vy = n.y * speed * want;
+    b.patternCd -= dt * (b.phase === 2 ? 1.35 : 1);
+    if (b.patternCd <= 0 && !p.dead) {
+      const list = b.bossDef.patterns;
+      const pattern = list[b.patternIdx % list.length];
+      b.patternIdx += Math.random() < 0.3 ? 2 : 1;
+      b.patternCd = bossPattern(game, b, pattern);
+    }
+  }
+  if (Math.abs(b.vx) > 0.05) b.facing = b.vx > 0 ? 1 : -1;
+  if (!p.dead && d < b.r + p.r && (b.contactCd ?? 0) <= game.time) {
+    b.contactCd = game.time + 0.8;
+    game.hurtPlayer(b.dmg * (b.state === 'charge' ? 1.6 : 1), { element: b.element, fromX: b.x, fromY: b.y });
+  }
+}
+
+// --- Update + spawning -------------------------------------------------------------
+
+export function updateEnemies(game, dt) {
+  const list = game.enemies;
+  const p = game.player;
+  for (const e of list) {
+    if (e.dead) continue;
+    tickStatuses(game, e, dt);
+    if (e.dead) continue;
+    e.flash = Math.max(0, e.flash - dt);
+    if (e.stunned) {
+      e.vx = e.vy = 0;
+    } else if (e.boss) {
+      updateBoss(game, e, dt);
+    } else {
+      updateBehaviour(game, e, dt);
+    }
+    const kx = e.kx;
+    const ky = e.ky;
+    moveEnemy(game, e, e.vx + kx, e.vy + ky, dt);
+    const damp = Math.exp(-9 * dt);
+    e.kx *= damp;
+    e.ky *= damp;
+  }
+  // Light separation so crowds don't collapse into one sprite.
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    if (a.dead) continue;
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j];
+      if (b.dead) continue;
+      const rr = a.r + b.r;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d2v = dx * dx + dy * dy;
+      if (d2v > 0.0001 && d2v < rr * rr) {
+        const d = Math.sqrt(d2v);
+        const push = (rr - d) * 0.5;
+        const wa = a.boss ? 0 : b.boss ? 1 : 0.5;
+        const wb = 1 - wa;
+        a.x -= (dx / d) * push * wa * 2;
+        a.y -= (dy / d) * push * wa * 2;
+        b.x += (dx / d) * push * wb * 2;
+        b.y += (dy / d) * push * wb * 2;
+      }
+    }
+  }
+  // Remove dead and far-away enemies.
+  for (let i = list.length - 1; i >= 0; i--) {
+    const e = list[i];
+    const far = !e.boss && dist2(e.x, e.y, p.x, p.y) > DESPAWN_DIST * DESPAWN_DIST;
+    if (e.dead || far) list.splice(i, 1);
+  }
+}
+
+export function updateSpawner(game, dt) {
+  const p = game.player;
+  if (p.dead) return;
+  game.spawnTimer -= dt;
+  if (game.spawnTimer > 0) return;
+  game.spawnTimer = 0.45;
+  if (Math.hypot(p.x, p.y) < SAFE_CAMP_RADIUS) return;
+  const wl = game.world.worldLevel(p.x, p.y);
+  const bossActive = Boolean(game.boss);
+  const quality = game.quality.enemyFactor;
+  const target = Math.round(Math.min(26, 5 + wl * 2 + Math.floor(game.save.player.level / 2)) * quality * (bossActive ? 0.3 : 1));
+  const alive = game.enemies.filter((e) => !e.dead && !e.boss).length;
+  if (alive >= target) return;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = 12 + Math.random() * 5;
+    const x = p.x + Math.cos(a) * d;
+    const y = p.y + Math.sin(a) * d;
+    if (Math.hypot(x, y) < SAFE_CAMP_RADIUS || !game.world.isFree(x, y, 0.45)) continue;
+    const biome = game.world.biomeAt(Math.floor(x), Math.floor(y));
+    const candidates = biome.enemies.map((id) => game.data.byId.enemies.get(id)).filter(Boolean);
+    let total = 0;
+    for (const c of candidates) total += c.weight;
+    let r = Math.random() * total;
+    let def = candidates[0];
+    for (const c of candidates) {
+      if (r < c.weight) { def = c; break; }
+      r -= c.weight;
+    }
+    const level = Math.max(game.world.worldLevel(x, y), game.save.player.level - 1);
+    const group = def.id === 'brute' ? 1 : 1 + ((Math.random() * 3) | 0);
+    const element = null;
+    for (let g = 0; g < group && alive + g < target; g++) {
+      const gx = x + (Math.random() - 0.5) * 1.5;
+      const gy = y + (Math.random() - 0.5) * 1.5;
+      if (!game.world.isFree(gx, gy, 0.4)) continue;
+      spawnEnemy(game, def.id, gx, gy, { level, element, biome, elite: Math.random() < 0.05 + level * 0.004 });
+    }
+    return;
+  }
+}
+
+/** Marks an enemy dead and hands out rewards. */
+export function killEnemy(game, e) {
+  if (e.dead) return;
+  e.dead = true;
+  game.onEnemyKilled(e);
+}

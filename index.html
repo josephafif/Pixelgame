@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pixelgame: Infinite Arsenal</title>
+  <meta name="description" content="A pixel action RPG where every weapon is procedurally generated from its own Weapon DNA. Installable, works offline.">
+  <meta name="theme-color" content="#161622">
+  <meta name="color-scheme" content="dark">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pixelgame">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="modulepreload" href="src/main.js">
+  <script type="module" src="src/main.js"></script>
+</head>
+<body data-input="touch">
+  <noscript><p class="noscript">Pixelgame needs JavaScript to run.</p></noscript>
+
+  <!-- In-app splash (also covers iOS, which has no manifest splash screen). -->
+  <div id="splash" class="splash" role="status" aria-live="polite">
+    <img src="icons/icon-192.png" width="96" height="96" alt="" class="pixel splash-logo">
+    <h1 class="splash-title">Pixelgame<small>Infinite Arsenal</small></h1>
+    <div class="splash-progress"><div id="splash-bar"></div></div>
+    <p id="splash-text">Loading…</p>
+  </div>
+
+  <canvas id="game" aria-label="Game world"></canvas>
+  <div id="surface" class="surface" aria-hidden="true"></div>
+
+  <div id="title" class="title-screen" hidden>
+    <div class="title-card">
+      <img src="icons/icon-192.png" width="72" height="72" alt="" class="pixel">
+      <h1>Pixelgame<small>Infinite Arsenal</small></h1>
+      <p class="tagline">Every weapon is one of a kind.</p>
+      <button id="title-play" class="btn-primary big" autofocus>Play</button>
+      <button id="title-install" hidden>Install app</button>
+      <p id="title-ios" class="small" hidden>Install: tap Share → “Add to Home Screen”.</p>
+      <p id="title-status" class="small muted"></p>
+    </div>
+  </div>
+
+  <div id="hud" class="hud" hidden>
+    <div class="hud-top-left">
+      <div class="hp-bar" aria-label="Health"><div id="hp-fill" class="fill"></div><span id="hp-text"></span></div>
+      <div class="xp-row"><span id="lvl">Lv 1</span><div class="xp-bar" aria-label="Experience"><div id="xp-fill" class="fill"></div></div></div>
+      <div id="hud-weapon" class="hud-weapon"></div>
+      <div id="compass" class="compass" hidden></div>
+    </div>
+    <div class="hud-top-right">
+      <span id="net-status" class="net">● Online</span>
+      <span class="res" title="Essence"><i class="gem"></i><b id="res-essence">0</b></span>
+      <span class="res" title="Scrap"><i class="gear"></i><b id="res-scrap">0</b></span>
+      <button id="btn-menu" class="icon-btn" aria-label="Menu">☰</button>
+    </div>
+    <div id="fps" class="fps" hidden></div>
+    <div id="boss-bar" class="boss-bar" hidden><span id="boss-name"></span><div class="bar"><div id="boss-fill" class="fill"></div></div></div>
+    <div id="interact-hint" class="interact-hint" hidden></div>
+    <div id="death" class="death" hidden><h2>You fell</h2><p>Returning to your last shrine…</p></div>
+
+    <div id="joystick" class="joystick" aria-hidden="true"><div id="knob" class="knob"></div></div>
+    <div class="action-buttons">
+      <button id="btn-ability" class="btn ability" hidden aria-label="Ability"><span class="cd"></span><span class="glyph">★</span></button>
+      <button id="btn-sprint" class="btn sprint" aria-label="Sprint" aria-pressed="false"><span class="glyph">»</span></button>
+      <button id="btn-attack" class="btn attack" aria-label="Attack"><span class="glyph atk">⚔</span><span class="glyph use">✋</span></button>
+    </div>
+    <div class="key-hints">WASD move · mouse aim · click/Space attack · Shift sprint · Q ability · E use · I inventory · C forge · R research · Esc menu</div>
+  </div>
+
+  <div id="overlay-root"></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <div id="update-banner" class="update-banner" role="alert" hidden>
+    <span>A new version is ready.</span>
+    <button id="update-now" class="btn-primary">Update now</button>
+    <button id="update-later">Later</button>
+  </div>
+</body>
+</html>

@@ -8,8 +8,8 @@
 // Every stage draws from its own RNG stream derived from (seed, stage) so
 // adding content to one stage never reshuffles the others. The generator is
 // a pure function of (data, request): it runs in a Web Worker, on the main
-// thread as a fallback, and in Node tests. It never uses Math.random or
-// transcendental Math functions, so the same seed + context produces the
+// thread as a fallback, and in Node tests. It never uses unseeded randomness
+// or transcendental Math functions, so the same seed + context produces the
 // same weapon on every device.
 
 import { createRng, deriveSeed, roundTo, clamp, hashString } from '../core/rng.js';
@@ -268,7 +268,9 @@ function selectModifiers(data, pool, state, plan, budget, ctx, theme, craftTags,
   if (ctx.craft?.rune) {
     const def = data.byId.modifiers.get(ctx.craft.rune);
     if (def && !incompatibility(def, state, 'modifier')) {
-      const v = fitMagnitude(def, rollMagnitude(def, rarity, rng), budget.total10 - budget.used10);
+      const wanted = rollMagnitude(def, rarity, rng);
+      const v = fitMagnitude(def, wanted, budget.total10 - budget.used10 - budget.reserveLater10)
+        ?? fitMagnitude(def, wanted, budget.total10 - budget.used10 - budget.abilityReserve10);
       if (v !== null) take(def, v);
     }
   }
@@ -278,20 +280,25 @@ function selectModifiers(data, pool, state, plan, budget, ctx, theme, craftTags,
     if (!compatible.length) break;
     const cheapest = Math.min(...compatible.map(minCost10));
     const requiredAfter = Math.max(0, minMods - i - 1);
-    const mustBehave = plan.minBehavior - behaviors > plan.modCount - i - 1;
+    // Behaviour-changing modifiers required by the rarity are picked first,
+    // while the whole budget is still available.
+    const mustBehave = behaviors < plan.minBehavior;
 
-    const attempt = (reserveLater) => {
+    const attempt = (reserveLater, behaveOnly) => {
       const available = budget.total10 - budget.used10 - requiredAfter * cheapest - reserveLater;
       let cands = compatible.filter((m) => minCost10(m) <= available);
-      if (mustBehave) {
-        const behaving = cands.filter((m) => m.kind !== 'stat');
-        if (behaving.length) cands = behaving;
-      }
+      if (behaveOnly) cands = cands.filter((m) => m.kind !== 'stat');
       return { cands, available };
     };
-    let { cands, available } = attempt(budget.reserveLater10);
-    // The rarity's minimum modifier count beats optional effects/abilities.
-    if (!cands.length && i < minMods) ({ cands, available } = attempt(0));
+    // Priority when the budget is tight: the rarity's minimum modifier count
+    // and behaviour-changing modifiers, then a planned ability, then effects.
+    let { cands, available } = attempt(budget.reserveLater10, mustBehave);
+    if (!cands.length && i < minMods) {
+      ({ cands, available } = attempt(budget.requiredEffectReserve10 + budget.abilityReserve10, mustBehave));
+    }
+    if (!cands.length && i < minMods) ({ cands, available } = attempt(budget.requiredEffectReserve10, mustBehave));
+    if (!cands.length && i < minMods) ({ cands, available } = attempt(0, mustBehave));
+    if (!cands.length && mustBehave) ({ cands, available } = attempt(0, false));
     if (!cands.length) break;
 
     const def = rng.weighted(cands, weightOf);
@@ -308,14 +315,17 @@ function selectEffects(data, pool, state, plan, budget, theme, coreDef, seed) {
   const coreEffects = new Set(coreDef?.unlocks?.effects ?? []);
   const chosen = [];
   for (let i = 0; i < plan.effectCount; i++) {
-    const available = budget.total10 - budget.used10 - budget.abilityReserve10;
+    // The rarity's required effects come before a planned ability; optional
+    // extra effects only use what the ability doesn't need.
+    const reserve = i < budget.requiredEffects ? 0 : budget.abilityReserve10;
+    const available = budget.total10 - budget.used10 - reserve;
     const cands = pool.effects.filter((e) => !incompatibility(e, state, 'effect') && e.cost * 10 <= available);
     if (!cands.length) break;
     const def = rng.weighted(cands, (e) =>
       e.weight
       * (e.tags.some((t) => themeTags.has(t)) ? THEME_BIAS : 1)
       * (coreEffects.has(e.id) ? 6 : 1)
-      * (e.element && e.element === state.element ? 2 : 1));
+      * (e.element && e.element === state.element ? 3 : 1));
     budget.used10 += def.cost * 10;
     addToState(def, state);
     chosen.push({ id: def.id, name: def.name, desc: def.desc, cost: def.cost, hooks: resolveHooks(def.hooks, 0) });
@@ -355,7 +365,9 @@ function generateAbility(data, pool, state, budget, rarityIdx, ctx, coreDef, see
   }
   const element = data.byId.elements.get(state.element);
   let prefix = element?.abilityPrefix ?? '';
-  if (prefix && tpl.name.toLowerCase().includes(prefix.toLowerCase())) prefix = '';
+  // "Frost Glacial Nova" / "Storm Storm Call" read badly: no prefix when the
+  // ability already belongs to that element or already contains the word.
+  if (prefix && (tpl.affinity === state.element || tpl.name.toLowerCase().includes(prefix.toLowerCase()))) prefix = '';
   const name = [twist?.name, prefix, tpl.name].filter(Boolean).join(' ');
   const cooldown = lerp(tpl.cooldown, clamp(0.5 * p + 0.5 * cooldownRoll, 0, 1)) * (twist?.id === 'swift' ? 0.75 : 1);
   const total10 = c10 + (twist ? twist.cost * 10 : 0);
@@ -473,20 +485,27 @@ export function generateWeapon(data, request) {
   const state = createRuleState(data, { archetype, rarity, element: elementId });
   for (const tag of plan.drawback?.tags ?? []) state.tags.add(tag);
 
-  const abilityReserve10 = plan.hasAbility && pool.abilities.length
-    ? Math.min(...pool.abilities.map((a) => a.cost[0] * 10))
-    : 0;
-  // Reserve room for the planned effects, priced by the cheapest effect that
-  // can actually go on this weapon (modifiers can only narrow that set).
+  // Reserve enough that *any* ability template fits at its minimum power;
+  // reserving only the cheapest would make that one ability dominate.
+  const forcedAbility = ctx.craft?.ability ? data.byId.abilities.get(ctx.craft.ability) : null;
+  const abilityReserve10 = !plan.hasAbility ? 0
+    : forcedAbility ? forcedAbility.cost[0] * 10
+      : pool.abilities.length ? Math.max(...pool.abilities.map((a) => a.cost[0] * 10)) : 0;
+  // Reserve room for the planned effects, priced by the most expensive effect
+  // that can actually go on this weapon (modifiers can only narrow that set).
+  // Pricing by the cheapest one would leave room for nothing else, and the
+  // cheapest effect would end up on almost every weapon.
   const fittingEffects = pool.effects.filter((e) => !incompatibility(e, state, 'effect'));
-  const effectReserve10 = plan.effectCount && fittingEffects.length
-    ? plan.effectCount * Math.min(...fittingEffects.map((e) => e.cost * 10))
-    : 0;
+  const effectPrice10 = fittingEffects.length ? Math.max(...fittingEffects.map((e) => e.cost * 10)) : 0;
+  const requiredEffects = Math.min(plan.effectCount, rarity.effects[0]);
   const budget = {
     total10: (rarity.budget + (plan.drawback?.refund ?? 0)) * 10,
     used10: 0,
+    requiredEffects,
+    // What later steps still need, from most to least important.
+    requiredEffectReserve10: requiredEffects * effectPrice10,
     abilityReserve10,
-    reserveLater10: abilityReserve10 + effectReserve10,
+    reserveLater10: abilityReserve10 + plan.effectCount * effectPrice10,
   };
 
   const modifiers = selectModifiers(data, pool, state, plan, budget, ctx, theme, craftTags, seed); // 5.

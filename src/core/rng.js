@@ -43,7 +43,8 @@ export function deriveSeed(seed, label) {
 /** Rounds to a fixed number of decimals using only exact operations. */
 export function roundTo(value, decimals = 0) {
   const f = decimals === 0 ? 1 : decimals === 1 ? 10 : decimals === 2 ? 100 : 1000;
-  return Math.round(value * f) / f;
+  const r = Math.round(value * f) / f;
+  return r === 0 ? 0 : r; // never -0: it would not survive a JSON round trip
 }
 
 export function clamp(v, min, max) {

@@ -13,7 +13,12 @@ import { PROJECTILE_PATTERNS } from '../data/capabilities.js';
 export function createRuleState(data, { archetype, rarity, element }) {
   const tags = new Set(archetype.tags);
   const pattern = archetype.attack.pattern;
-  if (PROJECTILE_PATTERNS.has(pattern)) tags.add('projectile');
+  if (PROJECTILE_PATTERNS.has(pattern)) {
+    tags.add('projectile');
+    // Only the weapon's own attack fires "primary" projectiles; effects like
+    // Flame Arc add extra ones, which Ricochet does not apply to.
+    tags.add('projectile-attack');
+  }
   if (pattern === 'boomerang') tags.add('returning');
   if (pattern === 'wisp' || archetype.attack.homing) tags.add('homing');
   tags.add(archetype.class);

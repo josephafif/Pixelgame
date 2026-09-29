@@ -2,5 +2,20 @@
   "name": "pixelgame",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "description": "Pixelgame: Infinite Arsenal — an installable, offline-capable pixel action RPG with procedurally generated weapons (Weapon DNA).",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "build": "node scripts/build-precache.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "test": "node --test \"tests/unit/*.test.js\"",
+    "test:e2e": "playwright test",
+    "check": "node scripts/build-precache.mjs --check && node --test \"tests/unit/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
 }

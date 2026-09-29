@@ -82,7 +82,9 @@ export class World {
     const s = this.seed;
     const t = fbm(s ^ 0x1111, x / 80, y / 80);
     const m = fbm(s ^ 0x2222, x / 70, y / 70);
-    const c = fbm(s ^ 0x3333, x / 110, y / 110) + Math.min(0.05, Math.sqrt(d2) / 6000);
+    const dist = Math.sqrt(d2);
+    // Corruption grows with distance; the Voidreach never borders the camp.
+    const c = fbm(s ^ 0x3333, x / 110, y / 110) + Math.min(0.05, dist / 6000) - Math.max(0, 0.12 - dist / 500);
     const q = this.q;
     let id;
     if (c > q.void) id = 'void';
