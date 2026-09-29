@@ -14,11 +14,12 @@ const KEYMAP = {
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyQ: 'ability', KeyK: 'ability',
   KeyE: 'interact', KeyF: 'interact',
-  KeyI: 'inventory', Tab: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyM: 'map',
+  KeyI: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyM: 'map',
   Escape: 'menu', KeyP: 'menu',
 };
 
 const DEADZONE = 0.18;
+const UI_ACTIONS = new Set(['inventory', 'crafting', 'research', 'menu', 'map', 'back']);
 
 export class Input {
   /**
@@ -54,6 +55,9 @@ export class Input {
     this.enabled = true;
     this.padPrev = [];
     this.onModeChange = () => {};
+    // UI commands (open inventory, menu, ...) are dispatched immediately so
+    // they also work while the game is paused behind a panel.
+    this.onUiCommand = null;
     this.#bind();
   }
 
@@ -64,7 +68,8 @@ export class Input {
   }
 
   #command(name) {
-    this.commands.push(name);
+    if (UI_ACTIONS.has(name) && this.onUiCommand) this.onUiCommand(name);
+    else this.commands.push(name);
   }
 
   get joystickRadius() {
@@ -83,7 +88,10 @@ export class Input {
       const action = KEYMAP[e.code];
       if (!action) return;
       this.#setMode('keyboard');
-      if (['inventory', 'crafting', 'research', 'menu', 'map'].includes(action)) {
+      // Inside dialogs, Space/Enter/arrows belong to the focused control.
+      const inDialog = e.target instanceof Element && e.target.closest('#overlay-root, #title, #update-banner');
+      if (inDialog && !UI_ACTIONS.has(action)) return;
+      if (UI_ACTIONS.has(action)) {
         if (!e.repeat) this.#command(action);
         e.preventDefault();
         return;
@@ -257,6 +265,7 @@ export class Input {
   }
 
   reset() {
+    this.commands = [];
     this.keys.clear();
     this.mouseAttack = this.touchAttack = this.buttonAttack = this.padAttack = false;
     this.sprintHeld = false;

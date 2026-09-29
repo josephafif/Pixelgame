@@ -21,6 +21,11 @@ export function isModalOpen() {
   return Boolean(current);
 }
 
+/** Locked dialogs (tutorial, discovery) must be answered, not replaced. */
+export function isModalLocked() {
+  return Boolean(current?.locked);
+}
+
 /**
  * @param {object} opts { title, body (Node), className, onClose, locked, actions }
  */

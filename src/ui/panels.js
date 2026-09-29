@@ -3,7 +3,7 @@
 // they're opened and prefetched when the browser is idle.
 
 import { h } from './dom.js';
-import { openModal, closeModal, isModalOpen } from './modal.js';
+import { openModal, closeModal, isModalOpen, isModalLocked } from './modal.js';
 import { isCraftingUnlocked } from '../weapons/crafting.js';
 
 const loaders = {
@@ -28,7 +28,7 @@ export class Panels {
   }
 
   command(cmd) {
-    if (this.game.discoveryOpen) return;
+    if (!this.app.started || this.game.discoveryOpen || isModalLocked()) return;
     if (cmd === 'back') {
       closeModal();
       return;
@@ -43,7 +43,7 @@ export class Panels {
   }
 
   async show(name, arg) {
-    if (this.game.discoveryOpen) return;
+    if (this.game.discoveryOpen || isModalLocked()) return;
     this.open = name;
     if (name === 'menu') return this.#menu();
     if (name === 'camp') return this.#camp();

@@ -75,6 +75,7 @@ export class Game {
     this.running = false;
 
     this.damageEnemy = (e, amount, opts) => dealDamage(this, e, amount, opts);
+    input.onUiCommand = (cmd) => this.emit('ui', cmd);
     this.weapon = null;
     this.player = {
       x: save.player.x, y: save.player.y, r: 0.32, vx: 0, vy: 0, kx: 0, ky: 0, facing: 0,

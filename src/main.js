@@ -54,6 +54,7 @@ function acquireTabLock() {
 
 class App {
   constructor() {
+    this.started = false;
     this.updateReady = false;
     this.applyUpdateFn = null;
     this.offlineReady = false;
@@ -181,9 +182,11 @@ class App {
   }
 
   async #play() {
+    this.started = true;
     this.audio.unlock();
     $('#title').setAttribute('hidden', '');
     $('#hud').removeAttribute('hidden');
+    this.input.reset();
     requestPersistence().then((p) => {
       this.persisted = p;
     });
