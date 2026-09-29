@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   screenShake: true,
   damageNumbers: true,
   showFps: false,
+  autoFullscreen: true, // phones/tablets: go full screen when you press Play
 });
 
 export class NewerSaveError extends Error {
@@ -39,12 +40,15 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     appVersion,
     worldSeed: worldSeed >>> 0,
     player: { level: 1, xp: 0, hp: null, x: 0.5, y: 1.6, spawnX: 0.5, spawnY: 1.6, kills: 0, deaths: 0, playTime: 0 },
-    inventory: { equipped: null, bag: [], storage: [], bagSize: 24, storageSize: 120, favorites: [], unseen: [] },
+    inventory: { equipped: null, secondary: null, activeSlot: 'main', bag: [], storage: [], bagSize: 24, storageSize: 120, favorites: [], unseen: [] },
     codex: { weapons: {}, modifiers: [], effects: [], abilities: [] },
-    resources: { scrap: 0, essence: 0, wood: 0, stone: 0 },
+    resources: { scrap: 0, essence: 0, wood: 0, stone: 0, gold: 0, shards: 0 },
     components: {},
     bosses: { defeated: {} },
-    world: { chests: [], shrines: [], harvested: {} },
+    // explored: chunk keys "cx,cy" you have seen (for the map); pins: your map markers.
+    world: { chests: [], shrines: [], harvested: {}, explored: [], pins: [] },
+    // Per-market state: { visited, hostileUntil, stockPeriod, bought: [] }.
+    markets: {},
     abilityState: { cooldowns: {} },
     counters: { drop: 0, craft: 0 },
     settings: { ...DEFAULT_SETTINGS },

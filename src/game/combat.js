@@ -240,6 +240,7 @@ function meleeArc(game, x, y, angle, range, arcDeg, damage) {
     if (d < e.r + 0.4) return true;
     return Math.abs(angleDiff(angle, angleTo(x, y, e.x, e.y))) <= half + Math.atan2(e.r, d);
   });
+  game.hitNpcs?.({ kind: 'arc', x, y, angle, range, half }, damage);
   return hitMeleeTargets(game, targets, damage, null, { x, y });
 }
 
@@ -251,6 +252,7 @@ function meleeLine(game, x, y, angle, range, width, damage) {
     const rr = width / 2 + e.r;
     return segmentDist2(e.x, e.y, x, y, ex, ey) <= rr * rr;
   });
+  game.hitNpcs?.({ kind: 'line', x, y, ex, ey, width }, damage);
   return hitMeleeTargets(game, targets, damage, null, { x, y });
 }
 
@@ -458,6 +460,7 @@ function explosion(game, x, y, radius, damage, element, depth, exclude = null) {
   game.fx.add({ type: 'ring', x, y, r0: 0.2, r1: radius, color, dur: 0.22, fill: true });
   game.fx.emit(element === 'physical' ? 'smoke' : game.data.byId.elements.get(element)?.particles ?? 'ember', x, y, 8, radius);
   game.audio.play('explode', { throttle: 80 });
+  game.hitNpcs?.({ kind: 'circle', x, y, r: radius }, damage);
   for (const e of enemiesInRadius(game, x, y, radius)) {
     if (e === exclude) continue;
     dealDamage(game, e, damage, { element, depth, source: 'weapon' });

@@ -139,6 +139,10 @@ export class Audio {
       case 'pickup':
         this.#tone({ wave: 'square', freq: 660, to: 990, dur: 0.07, vol: 0.1 });
         break;
+      case 'tick':
+        // Case-opening strip passing the marker.
+        this.#tone({ wave: 'square', freq: 1800, to: 1500, dur: 0.02, vol: 0.05 });
+        break;
       case 'discover': {
         // Bigger fanfare for rarer weapons.
         const r = opts.rarity ?? 0;
@@ -164,6 +168,9 @@ export class Audio {
         if (r >= 4) this.#noiseBurst({ freq: 5000, q: 1, dur: 0.8, vol: 0.06, type: 'highpass', delay: 0.1 });
         break;
       }
+      case 'swish':
+        this.#noiseBurst({ freq: 1400, q: 2, dur: 0.08, vol: 0.14 });
+        break;
       case 'chop':
         this.#noiseBurst({ freq: 700, q: 1.2, dur: 0.09, vol: 0.22 });
         this.#tone({ wave: 'triangle', freq: 180, to: 120, dur: 0.08, vol: 0.14 });

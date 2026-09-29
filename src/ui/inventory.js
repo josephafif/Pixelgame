@@ -1,8 +1,9 @@
 // Inventory (bag + storage), character sheet and weapon codex.
 //
 // Navigation: tabs with counts, sort and filter chips, a slot grid with
-// badges (E = equipped, NEW, ★ favorite) and a detail pane that compares
-// with the equipped weapon. Keyboard: arrows move, Enter equips, T moves
+// badges (1 = main, 2 = secondary, NEW, ★ favorite) and a detail pane that
+// compares with the weapon in hand. Keyboard: arrows move, Enter equips as
+// main, 2 as secondary, T moves
 // between bag and storage, F favorites, X salvages, Q/E switch tabs.
 
 import { h } from './dom.js';
@@ -58,8 +59,9 @@ export function open(game, app, arg = {}) {
         || rarity(b.dna) - rarity(a.dna),
     }[view.sort];
     out.sort(by);
-    // The equipped weapon always leads the bag.
-    out.sort((a, b) => Number(b.dna.id === i.equipped) - Number(a.dna.id === i.equipped));
+    // The loadout (main, then secondary) always leads the bag.
+    const rank = (d) => (d.id === i.equipped ? 2 : d.id === i.secondary ? 1 : 0);
+    out.sort((a, b) => rank(b.dna) - rank(a.dna));
     return out.map(({ dna }) => dna);
   }
 
@@ -79,8 +81,8 @@ export function open(game, app, arg = {}) {
 
   // --- Actions -------------------------------------------------------------------
 
-  function equip(dna) {
-    if (dna && game.equip(dna.id)) game.toast(`Equipped ${dna.name.text}`);
+  function equip(dna, slot = 'main') {
+    if (dna && game.equip(dna.id, slot)) game.toast(`${dna.name.text} is now your ${slot === 'secondary' ? 'secondary' : 'main'} weapon`);
   }
 
   function move(dna) {
@@ -96,7 +98,7 @@ export function open(game, app, arg = {}) {
   }
 
   function salvage(dna) {
-    if (!dna || dna.id === inv().equipped || inv().favorites.includes(dna.id)) return;
+    if (!dna || game.inLoadout(dna.id) || inv().favorites.includes(dna.id)) return;
     const value = salvageValue(dna);
     if (!confirm(`Salvage ${dna.name.text} for ${value.scrap} scrap and ${value.essence} essence?`)) return;
     const list = visible(tab);
@@ -147,19 +149,20 @@ export function open(game, app, arg = {}) {
     const slots = list.map((dna) => {
       const r = rarityInfo(data, dna.rarity);
       const equipped = dna.id === i.equipped;
+      const second = dna.id === i.secondary;
       const isNew = i.unseen.includes(dna.id);
       const fav = i.favorites.includes(dna.id);
       return h('button.slot', {
         style: { '--rarity': r.color },
-        class: [`r-${dna.rarity}`, dna.id === selected ? 'selected' : null, equipped ? 'equipped' : null].filter(Boolean).join(' '),
+        class: [`r-${dna.rarity}`, dna.id === selected ? 'selected' : null, equipped || second ? 'equipped' : null].filter(Boolean).join(' '),
         'data-id': dna.id,
-        'aria-label': `${dna.name.text}, ${summaryLine(data, dna)}${equipped ? ', equipped' : ''}${fav ? ', favorite' : ''}${isNew ? ', new' : ''}`,
+        'aria-label': `${dna.name.text}, ${summaryLine(data, dna)}${equipped ? ', main weapon' : second ? ', secondary weapon' : ''}${fav ? ', favorite' : ''}${isNew ? ', new' : ''}`,
         title: dna.name.text,
         onclick: () => select(dna.id, { scrollDetail: true }),
         ondblclick: () => equip(dna),
       },
       weaponIconEl(dna, 40),
-      equipped ? h('span.badge-e', 'E') : null,
+      equipped ? h('span.badge-e', { title: 'Main weapon' }, '1') : second ? h('span.badge-e.two', { title: 'Secondary weapon' }, '2') : null,
       isNew ? h('span.badge-new', 'NEW') : null,
       fav ? h('span.badge-fav', icon('star', 14)) : null);
     });
@@ -175,16 +178,21 @@ export function open(game, app, arg = {}) {
     }
     const i = inv();
     const inBag = i.bag.some((w) => w.id === dna.id);
-    const equipped = i.equipped === dna.id;
+    const main = i.equipped === dna.id;
+    const second = i.secondary === dna.id;
+    const equipped = main || second;
     const fav = i.favorites.includes(dna.id);
     const value = salvageValue(dna);
     const code = encodeDnaCode(dna);
     return h('div.inv-detail',
-      weaponCard(data, dna, { compareTo: equipped ? null : game.weapon?.dna, compact: true }),
+      weaponCard(data, dna, { compareTo: game.weapon?.dna?.id === dna.id ? null : game.weapon?.dna, compact: true }),
       h('div.actions',
-        equipped
-          ? h('button', { disabled: true }, icon('sword', 20), 'Equipped')
-          : h('button.btn-primary', { onclick: () => equip(dna) }, icon('sword', 20), 'Equip'),
+        main
+          ? h('button', { disabled: true }, h('span.slotnum', '1'), 'Main weapon')
+          : h('button.btn-primary', { onclick: () => equip(dna, 'main') }, h('span.slotnum', '1'), second ? 'Make main' : 'Equip as main'),
+        second
+          ? h('button', { disabled: true }, h('span.slotnum', '2'), 'Secondary')
+          : h('button', { onclick: () => equip(dna, 'secondary') }, h('span.slotnum', '2'), main ? 'Make secondary' : 'As secondary'),
         h('button', { disabled: equipped, onclick: () => move(dna) },
           icon(inBag ? 'chest' : 'bag', 20), inBag ? 'To storage' : 'To bag')),
       h('div.actions',
@@ -215,7 +223,7 @@ export function open(game, app, arg = {}) {
     const tiers = data.rarities.slice(0, 3);
     const idx = (dna) => data.rarityIndex.get(dna.rarity) ?? 0;
     const rows = tiers.map((r, n) => {
-      const pick = list.filter((d) => idx(d) <= n && d.id !== i.equipped && !i.favorites.includes(d.id));
+      const pick = list.filter((d) => idx(d) <= n && !game.inLoadout(d.id) && !i.favorites.includes(d.id));
       const total = pick.reduce((s, d) => {
         const v = salvageValue(d);
         return { scrap: s.scrap + v.scrap, essence: s.essence + v.essence };
@@ -234,7 +242,7 @@ export function open(game, app, arg = {}) {
     });
     return h('div.inv-detail.framed.bulk',
       h('h3', 'Quick salvage'),
-      h('p.small.muted', `Salvages every weapon in your ${which} up to the chosen rarity. The equipped weapon and your favorites (★) are never salvaged.`),
+      h('p.small.muted', `Salvages every weapon in your ${which} up to the chosen rarity. Your main and secondary weapons and your favorites (★) are never salvaged.`),
       h('div.menu', rows),
       h('button', { onclick: () => { bulk = false; rerender(); } }, 'Cancel'));
   }
@@ -259,7 +267,7 @@ export function open(game, app, arg = {}) {
               h('p', which === 'bag' ? 'Your bag is empty. Defeat enemies and open chests to find weapons.' : 'Nothing in storage yet. Move weapons here from your bag.'))),
         bulk ? bulkPanel(which) : details(dna)),
       h('div.keys',
-        h('span', h('kbd', '←↑↓→'), ' select'), h('span', h('kbd', 'Enter'), ' equip'),
+        h('span', h('kbd', '←↑↓→'), ' select'), h('span', h('kbd', 'Enter'), '/', h('kbd', '1'), ' main'), h('span', h('kbd', '2'), ' secondary'),
         h('span', h('kbd', 'T'), ' bag/storage'), h('span', h('kbd', 'F'), ' favorite'),
         h('span', h('kbd', 'X'), ' salvage'), h('span', h('kbd', 'Q'), '/', h('kbd', 'E'), ' tabs')));
   }
@@ -392,6 +400,9 @@ export function open(game, app, arg = {}) {
     if (e.key === 'Enter' && (inGrid || e.target === document.body)) {
       e.preventDefault();
       equip(dna);
+    } else if (e.code === 'Digit1' || e.code === 'Digit2') {
+      e.preventDefault();
+      equip(dna, e.code === 'Digit2' ? 'secondary' : 'main');
     } else if (e.code === 'KeyT') {
       e.preventDefault();
       move(dna);

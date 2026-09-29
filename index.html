@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Pixelgame: Infinite Arsenal</title>
   <meta name="description" content="A pixel action RPG where every weapon is procedurally generated from its own Weapon DNA. Installable, works offline.">
-  <meta name="theme-color" content="#161622">
+  <meta name="theme-color" content="#10101a">
   <meta name="color-scheme" content="dark">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -61,9 +61,10 @@
     <div class="hud-right">
       <div class="dock">
         <button id="btn-inventory" aria-label="Inventory"><i data-icon="bag"></i><span class="key">I</span></button>
-        <button id="btn-forge" aria-label="Forge"><i data-icon="anvil"></i><span class="key">C</span></button>
-        <button id="btn-research" aria-label="Research"><i data-icon="book"></i><span class="key">R</span></button>
-        <button id="btn-base" aria-label="Camp"><i data-icon="home"></i><span class="key">B</span></button>
+        <button id="btn-map" aria-label="Map"><i data-icon="map"></i><span class="key">M</span></button>
+        <button id="btn-forge" class="dock-extra" aria-label="Forge"><i data-icon="anvil"></i><span class="key">C</span></button>
+        <button id="btn-research" class="dock-extra" aria-label="Research"><i data-icon="book"></i><span class="key">R</span></button>
+        <button id="btn-base" class="dock-extra" aria-label="Camp"><i data-icon="home"></i><span class="key">B</span></button>
         <button id="btn-build" aria-label="Build" hidden><i data-icon="hammer"></i><span class="key">G</span></button>
         <button id="btn-menu" aria-label="Menu"><i data-icon="gear"></i><span class="key">Esc</span></button>
       </div>
@@ -89,8 +90,13 @@
       <button id="btn-sprint" class="btn sprint" aria-label="Sprint" aria-pressed="false"><span class="glyph"><i data-icon="boot" data-size="36"></i></span></button>
       <button id="btn-attack" class="btn attack" aria-label="Attack"><span class="glyph atk"><i data-icon="sword" data-size="44"></i></span><span class="glyph use"><i data-icon="hand" data-size="44"></i></span><span class="glyph bld"><i data-icon="hammer" data-size="44"></i></span></button>
     </div>
+    <div id="hotbar" class="hotbar" role="toolbar" aria-label="Loadout">
+      <button id="slot-main" class="hslot" data-slot="main" aria-label="Main weapon"><span class="art"></span><span class="num">1</span></button>
+      <button id="slot-secondary" class="hslot" data-slot="secondary" aria-label="Secondary weapon"><span class="art"></span><span class="num">2</span></button>
+      <button id="slot-tool" class="hslot" data-slot="tool" aria-label="Pickaxe"><span class="art"></span><span class="num">3</span></button>
+    </div>
     <div id="build-bar" class="build-bar" hidden></div>
-    <div class="key-hints">WASD move · Space/click attack (auto-aim) · Shift sprint · Q ability · E use · I bag · C forge · R research · B camp · G build · Esc menu</div>
+    <div class="key-hints">WASD move · Space/click attack · 1 2 3 / wheel switch · Shift sprint · Q ability · E use · I bag · M map · C forge · B camp · G build · Esc menu</div>
   </div>
 
   <div id="overlay-root"></div>

@@ -86,6 +86,10 @@ test('crafted weapons honour the chosen components', () => {
   const choice = { archetype: 'axe', material: 'steel', core: 'inferno_core', rune: 'lifesteal', catalyst: 'epic', ability: 'phoenix' };
   assert.deepEqual(validateCraft(data, save, choice), []);
   save.base.buildings.forge = 5;
+  // Golden catalysts are extremely expensive and need Star Shards from bosses.
+  const golden = validateCraft(data, save, { ...choice, catalyst: 'legendary' });
+  assert.ok(golden.some((e) => e.includes('Star Shards')));
+  Object.assign(save.resources, { scrap: 99999, essence: 99999, shards: 3 });
   assert.deepEqual(validateCraft(data, save, { ...choice, catalyst: 'legendary' }), []);
   save.base.buildings.forge = 4;
   for (let i = 0; i < 25; i++) {

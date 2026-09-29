@@ -8,7 +8,9 @@ const MANIFEST = fileURLToPath(new URL('../../precache-manifest.js', import.meta
 test('installable: manifest and service worker are in place', async ({ page }) => {
   await page.goto('/');
   const manifest = await page.evaluate(async () => (await fetch(document.querySelector('link[rel=manifest]').href)).json());
-  expect(manifest.display).toBe('standalone');
+  // Full screen on phones (no system bars around the game), standalone as a fallback.
+  expect(manifest.display).toBe('fullscreen');
+  expect(manifest.display_override).toContain('standalone');
   const scope = await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
   expect(scope).toMatch(/\/$/);
 });

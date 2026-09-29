@@ -187,7 +187,9 @@ export function updateProjectiles(game, dt) {
         } else if (p.owner === 'enemy') {
           // Walls and turrets shield you from enemy shots (and take the hit).
           const st = game.world.structureAt(tx, ty);
-          if (st && !st.def.walkable) {
+          // A market's own turrets shoot over its walls and stalls.
+          const own = st && p.structure?.marketId && st.marketId === p.structure.marketId;
+          if (st && !st.def.walkable && !own) {
             game.damageStructure?.(st, p.damage * 0.5);
             game.fx.emit('hit', p.x, p.y, 3, 0.2, 1.5);
             remove = true;
@@ -198,7 +200,10 @@ export function updateProjectiles(game, dt) {
     }
 
     if (!remove && p.kind !== 'lob') {
-      if (p.owner === 'player') {
+      if (p.owner === 'player' && game.markets?.npcs.length && game.hitNpcs({ kind: 'circle', x: p.x, y: p.y, r: p.r }, p.damage)) {
+        expire(game, p);
+        remove = true;
+      } else if (p.owner === 'player') {
         for (const e of game.enemies) {
           if (e.dead || p.hit.has(e)) continue;
           const rr = e.r + p.r;

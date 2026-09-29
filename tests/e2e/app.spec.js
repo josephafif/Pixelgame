@@ -87,6 +87,9 @@ test('inventory, research, camp, forge and settings panels open', async ({ page 
   await page.click('.forge .chip:has-text("Fire Core")');
   await expect(page.locator('.forge-preview .result')).toContainText('Fire Sword');
   await page.click('.forge-preview .btn-primary');
+  // Forged weapons are revealed with a case roll; Skip jumps to the result.
+  await expect(page.locator('.case-roll')).toBeVisible();
+  await page.click('.case-roll .skip');
   await expect(page.locator('.discovery')).toBeVisible();
   await expect(page.locator('.weapon-card .subtitle')).toContainText('Fire');
   await page.click('.discovery button:has-text("Keep in bag")');
@@ -200,11 +203,15 @@ test('auto-aim: the weapon turns to the nearest enemy by itself', async ({ page 
     const { spawnEnemy } = await import('/src/game/enemies.js');
     const e = spawnEnemy(g, 'slime', 60, 57);
     await new Promise((r) => setTimeout(r, 300));
-    return { locked: g.target === e, facing: g.player.facing };
+    // The slime may have shuffled a little: aim is checked against where it is now.
+    const want = Math.atan2(e.y - g.player.y, e.x - g.player.x);
+    return { locked: g.target === e, facing: g.player.facing, want };
   });
   expect(aimed.locked).toBe(true);
-  // Enemy straight "up" (negative y) → facing ≈ -π/2.
-  expect(Math.abs(Math.sin(aimed.facing) + 1)).toBeLessThan(0.05);
+  // Enemy above (negative y; it may spawn a tile aside if that spot is blocked),
+  // and the weapon points right at it.
+  expect(Math.sin(aimed.facing)).toBeLessThan(-0.5);
+  expect(Math.abs(Math.sin((aimed.facing - aimed.want) / 2))).toBeLessThan(0.05);
   expect(errors).toEqual([]);
 });
 
@@ -265,6 +272,10 @@ test('gathering: forge a pickaxe, chop a tree, collect the wood', async ({ page 
   await page.click('.tool-card:has-text("Iron Pickaxe") button:has-text("Forge")');
   await expect(page.locator('.tool-card').first()).toContainText('Equipped');
   await page.keyboard.press('Escape');
+  // The pickaxe lives in slot 3: switch to it before chopping.
+  await expect(page.locator('#interact-hint')).not.toContainText('Chop tree');
+  await page.keyboard.press('Digit3');
+  await expect(page.locator('#slot-tool')).toHaveClass(/\bon\b/);
   await expect(page.locator('#interact-hint')).toContainText('Chop tree');
   await page.keyboard.down('Space');
   await expect.poll(() => game(page, (s) => window.__pixelgame.game.world.blockAt(s.x, s.y), spot), { timeout: 8000 }).toBe(0);
@@ -370,4 +381,169 @@ test('browser safety: no context menu, no text selection, Ctrl+S saves the game'
   expect(blocked).toEqual([true, true, 'none']);
   await page.keyboard.press('Control+s');
   await expect(page.locator('.toast', { hasText: 'Game saved' })).toBeVisible();
+});
+
+test('loadout: main, secondary and a reserved pickaxe slot on the hotbar', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await expect(page.locator('#hotbar')).toBeVisible();
+  await expect(page.locator('#slot-main')).toHaveClass(/\bon\b/);
+  const mainId = await game(page, () => window.__pixelgame.game.weapon.dna.id);
+
+  // A new weapon can go straight into the secondary slot.
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const dna = await g.weapons.generate({ seed: 91, level: 3, luck: 0, source: 'drop', unlocked: [], minRarity: 'rare', maxRarity: 'rare' });
+    g.discoverWeapon(dna);
+  });
+  await expect(page.locator('.discovery')).toBeVisible();
+  await page.click('.discovery button:has-text("Secondary")');
+  await expect(page.locator('.discovery')).toBeHidden();
+  const secId = await game(page, () => window.__pixelgame.game.save.inventory.secondary);
+  expect(secId).toBeTruthy();
+  expect(await game(page, () => window.__pixelgame.game.save.inventory.equipped)).toBe(mainId);
+
+  await page.keyboard.press('Digit2');
+  await expect(page.locator('#slot-secondary')).toHaveClass(/\bon\b/);
+  expect(await game(page, () => window.__pixelgame.game.weapon.dna.id)).toBe(secId);
+
+  // No pickaxe yet: slot 3 is locked.
+  await page.keyboard.press('Digit3');
+  expect(await game(page, () => window.__pixelgame.game.toolActive)).toBe(false);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.tools.pickaxe = 1;
+    g.emit('tools');
+  });
+  await page.keyboard.press('Digit3');
+  await expect(page.locator('#slot-tool')).toHaveClass(/\bon\b/);
+  expect(await game(page, () => window.__pixelgame.game.toolActive)).toBe(true);
+  await expect(page.locator('#hud-weapon')).toContainText('Pickaxe');
+
+  await page.click('#slot-main');
+  expect(await game(page, () => window.__pixelgame.game.activeSlot)).toBe('main');
+  expect(await game(page, () => window.__pixelgame.game.weapon.dna.id)).toBe(mainId);
+  expect(errors).toEqual([]);
+});
+
+test('legendaries are revealed with a case roll and have a gold value', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const dna = await g.weapons.generate({ seed: 777, level: 12, luck: 0, source: 'drop', unlocked: [], minRarity: 'legendary' });
+    g.discoverWeapon(dna, { caseRoll: { min: 'uncommon', max: 'legendary', title: 'Opening chest…' } });
+  });
+  await expect(page.locator('.case-roll')).toBeVisible();
+  await expect(page.locator('.case-item').first()).toBeVisible();
+  // The strip ends on the weapon that was decided before the roll.
+  await expect(page.locator('.case-roll.legendary .case-item.win')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.discovery')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.discovery .jackpot')).toContainText('gold');
+  await expect(page.locator('.discovery .value-row')).toContainText('gold');
+  await page.click('.discovery button:has-text("Keep in bag")');
+  await expect(page.locator('.discovery')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('markets: trade with merchants, sell loot, and anger the guards', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const m = await game(page, () => {
+    const g = window.__pixelgame.game;
+    const m = g.world.firstMarket;
+    g.save.resources.gold = 5000;
+    g.save.resources.wood = 50;
+    g.player.x = m.x + 0.5;
+    g.player.y = m.y + m.r + 4;
+    g.renderer.snapCamera();
+    return { id: m.id, x: m.x, y: m.y, name: m.name };
+  });
+  await expect.poll(() => game(page, () => window.__pixelgame.game.markets.npcs.length)).toBeGreaterThan(3);
+  expect(await game(page, (id) => window.__pixelgame.game.save.markets[id]?.seen, m.id)).toBe(true);
+  // Monsters never spawn inside the market.
+  expect(await game(page, (mm) => window.__pixelgame.game.world.marketAt(mm.x + 0.5, mm.y + 0.5, 0) !== null, m)).toBe(true);
+
+  // Stand across the counter from a merchant.
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    const n = g.markets.npcs.find((v) => v.role === 'merchant');
+    g.player.x = n.x;
+    g.player.y = n.y + 1.85;
+    g.renderer.snapCamera();
+  });
+  await expect(page.locator('#interact-hint')).toContainText('Trade with');
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('.market-panel')).toBeVisible();
+  await expect(page.locator('.market-head')).toContainText('5,000');
+  await expect(page.locator('.market-panel .mrow').first()).not.toContainText('Unpacking', { timeout: 10000 });
+
+  // Buy a bundle of wood.
+  const woodRow = page.locator('.market-panel .mrow', { hasText: 'Wood' }).first();
+  await woodRow.locator('button:has-text("Buy")').click();
+  expect(await game(page, () => window.__pixelgame.game.save.resources.wood)).toBe(70);
+  expect(await game(page, () => window.__pixelgame.game.save.resources.gold)).toBeLessThan(5000);
+  await expect(woodRow).toContainText('Sold');
+
+  // Sell a spare weapon.
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const dna = await g.weapons.generate({ seed: 55, level: 3, luck: 0, source: 'drop', unlocked: [], maxRarity: 'rare' });
+    g.addWeapon(dna);
+  });
+  await page.click('.market-panel .tab:has-text("Sell")');
+  const goldBefore = await game(page, () => window.__pixelgame.game.save.resources.gold);
+  const weapons = await game(page, () => window.__pixelgame.game.allWeapons().length);
+  await page.locator('.market-panel .mrow button:has-text("Sell")').first().click();
+  expect(await game(page, () => window.__pixelgame.game.allWeapons().length)).toBe(weapons - 1);
+  expect(await game(page, () => window.__pixelgame.game.save.resources.gold)).toBeGreaterThan(goldBefore);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.market-panel')).toBeHidden();
+
+  // Hurting someone turns the turrets hostile and closes the stalls.
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    const n = g.markets.npcs.find((v) => v.role === 'villager');
+    g.hitNpcs({ kind: 'circle', x: n.x, y: n.y, r: 0.5 }, 5);
+  });
+  expect(await game(page, (id) => window.__pixelgame.game.markets.isHostile(id), m.id)).toBe(true);
+  await expect(page.locator('#interact-hint')).toContainText("won't trade");
+  const hp = await game(page, () => window.__pixelgame.game.player.hp);
+  await expect.poll(() => game(page, () => window.__pixelgame.game.player.hp), { timeout: 6000 }).toBeLessThan(hp);
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('.market-panel')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('map: shows explored areas, hotspots and your own pins', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.world.explored.length)).toBeGreaterThan(0);
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('.map-panel')).toBeVisible();
+  await expect(page.locator('.map-status')).toContainText('explored');
+  // Let the panel's opening animation finish so the canvas stays put.
+  await page.waitForFunction(() => document.querySelector('.map-panel').getAnimations().length === 0);
+  const canvas = page.locator('.map-canvas');
+  const box = await canvas.boundingBox();
+  expect(box.width).toBeGreaterThan(200);
+  // The canvas actually drew explored ground.
+  const painted = await page.evaluate(() => {
+    const c = document.querySelector('.map-canvas');
+    const d = c.getContext('2d').getImageData(c.width / 2 - 20, c.height / 2 - 20, 40, 40).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 120) lit++;
+    return lit;
+  });
+  expect(painted).toBeGreaterThan(50);
+
+  await page.click('.map-tools button:has-text("Pin")');
+  await canvas.click({ position: { x: box.width / 2 + 60, y: box.height / 2 + 30 } });
+  expect(await game(page, () => window.__pixelgame.game.save.world.pins.length)).toBe(1);
+  await canvas.click({ position: { x: box.width / 2 + 60, y: box.height / 2 + 30 } });
+  expect(await game(page, () => window.__pixelgame.game.save.world.pins.length)).toBe(0);
+  await page.click('.map-tools button:has-text("+")');
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('.map-panel')).toBeHidden();
+  expect(errors).toEqual([]);
 });

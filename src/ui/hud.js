@@ -2,9 +2,12 @@
 // network status, equipped weapon, boss bar, interaction hint, toasts, and
 // the touch buttons' state.
 
-import { $, clear, h } from './dom.js';
+import { $, clear, h, pixelCanvas } from './dom.js';
 import { weaponIconEl } from './weapon-card.js';
 import { playerSprites } from '../render/sprites.js';
+import { pickaxeSprite } from '../render/structures.js';
+import { currentPickaxe } from '../game/gathering.js';
+import { icon } from './icons.js';
 
 export class Hud {
   constructor(game) {
@@ -35,12 +38,24 @@ export class Hud {
       fps: $('#fps'),
       compass: $('#compass'),
       death: $('#death'),
+      hotbar: $('#hotbar'),
     };
+    for (const btn of this.el.hotbar?.querySelectorAll('.hslot') ?? []) {
+      btn.addEventListener('pointerdown', (e) => {
+        // Don't let the tap reach the game or keep focus.
+        e.preventDefault();
+        e.stopPropagation();
+        game.switchSlot(btn.dataset.slot);
+      });
+    }
     this.drawPortrait();
     game.on('hud', (s) => this.update(s));
     game.on('toast', (t) => this.toast(t.text, t.kind));
     game.on('interact', ({ label }) => this.setHint(label));
     game.on('equip', (dna) => this.setWeapon(dna));
+    game.on('slot', () => this.setWeapon(game.weapon?.dna ?? null));
+    game.on('inventory', () => this.renderHotbar());
+    game.on('tools', () => this.renderHotbar());
     game.on('boss', (b) => this.el.boss.toggleAttribute('hidden', !b.active));
     game.on('levelup', ({ level }) => this.toast(`Level ${level}! You feel stronger.`, 'level'));
     game.on('death', () => this.el.death.removeAttribute('hidden'));
@@ -49,6 +64,7 @@ export class Hud {
       this.el.attack.classList.toggle('build', active);
       this.el.attack.setAttribute('aria-label', active ? 'Place' : 'Attack');
       this.el.buildBtn?.classList.toggle('on', active);
+      this.el.hotbar?.toggleAttribute('hidden', active);
     });
     this.setWeapon(game.weapon?.dna ?? null);
   }
@@ -64,14 +80,61 @@ export class Hud {
   setWeapon(dna) {
     const el = this.el.weapon;
     clear(el);
+    this.renderHotbar();
+    const g = this.game;
+    if (g.toolActive) {
+      const tool = currentPickaxe(g.data, g.save);
+      const art = pixelCanvas(pickaxeSprite(tool.color));
+      art.style.width = '24px';
+      art.style.height = '28px';
+      el.append(h('div.slot.framed', art), h('span.name', tool.name));
+      el.title = `${tool.name}: chop trees and break rocks`;
+      this.el.ability.setAttribute('hidden', '');
+      return;
+    }
     if (!dna) return;
-    const color = this.game.data.byId.rarities.get(dna.rarity)?.color;
+    const color = g.data.byId.rarities.get(dna.rarity)?.color;
     el.append(
       h(`div.slot.framed.r-${dna.rarity}`, { style: { '--rarity': color } }, weaponIconEl(dna, 32)),
       h('span.name', { style: { color } }, dna.name.text));
     el.title = `${dna.name.text} — ${dna.identity}`;
     this.el.ability.toggleAttribute('hidden', !dna.ability);
     if (dna.ability) this.el.ability.setAttribute('aria-label', `Ability: ${dna.ability.name}`);
+  }
+
+  /** The three loadout slots: main weapon, secondary weapon, pickaxe. */
+  renderHotbar() {
+    const bar = this.el.hotbar;
+    if (!bar) return;
+    const g = this.game;
+    const inv = g.save.inventory;
+    const active = g.activeSlot;
+    const fill = (slot, node, color, title) => {
+      const btn = bar.querySelector(`[data-slot="${slot}"]`);
+      const art = btn.querySelector('.art');
+      clear(art).append(node);
+      btn.classList.toggle('on', active === slot);
+      btn.style.setProperty('--rarity', color ?? 'transparent');
+      btn.title = title;
+    };
+    for (const slot of ['main', 'secondary']) {
+      const id = slot === 'main' ? inv.equipped : inv.secondary;
+      const dna = id ? inv.bag.find((w) => w.id === id) : null;
+      const color = dna ? g.data.byId.rarities.get(dna.rarity)?.color : null;
+      fill(slot, dna ? weaponIconEl(dna, 32) : h('span.plus', '+'), color,
+        dna ? `${slot === 'main' ? 'Main' : 'Secondary'}: ${dna.name.text}` : `${slot === 'main' ? 'Main' : 'Secondary'} weapon (empty — pick one in the inventory)`);
+      bar.querySelector(`[data-slot="${slot}"]`).classList.toggle('empty', !dna);
+    }
+    const tool = currentPickaxe(g.data, g.save);
+    if (tool) {
+      const art = pixelCanvas(pickaxeSprite(tool.color));
+      art.style.width = '24px';
+      art.style.height = '28px';
+      fill('tool', art, null, tool.name);
+    } else {
+      fill('tool', icon('lock', 20), null, 'Pickaxe slot: forge a pickaxe at the Forge');
+    }
+    bar.querySelector('[data-slot="tool"]').classList.toggle('empty', !tool);
   }
 
   setHint(label) {

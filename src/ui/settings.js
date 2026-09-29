@@ -46,6 +46,7 @@ export function open(game, app) {
         toggle('Screen shake', 'screenShake'),
         toggle('Damage numbers', 'damageNumbers'),
         toggle('Show FPS', 'showFps'),
+        document.fullscreenEnabled ? toggle('Full screen on phones', 'autoFullscreen', 'Hides the browser bars when you start playing') : null,
         document.fullscreenEnabled ? h('button', { onclick: () => app.toggleFullscreen() }, 'Toggle fullscreen') : null),
       h('section',
         h('h3', 'Save data'),

@@ -158,6 +158,42 @@ function banner(g) {
   g.fillRect(1, 22, 4, 2);
 }
 
+/** Market stall: a counter with goods under a striped awning. */
+function stall(g, tint = '#c8364a') {
+  // Posts.
+  rect(g, 1, 4, 2, 18, '#6b4a2a');
+  rect(g, 13, 4, 2, 18, '#6b4a2a');
+  // Awning with stripes and a scalloped edge.
+  for (let x = 0; x < 16; x++) {
+    const c = Math.floor(x / 3) % 2 ? '#f3ecdc' : tint;
+    rect(g, x, 2, 1, 6, c);
+    if (x % 3 === 1) rect(g, x, 8, 1, 1, c);
+  }
+  rect(g, 0, 1, 16, 1, O);
+  rect(g, 0, 8, 16, 1, 'rgba(0,0,0,0.25)');
+  // Counter and goods.
+  rect(g, 0, 14, 16, 8, '#9a6a3c');
+  rect(g, 0, 14, 16, 1, '#c8945a');
+  rect(g, 0, 18, 16, 1, '#6b4a2a');
+  rect(g, 2, 11, 3, 3, '#e8364a');
+  rect(g, 6, 12, 3, 2, '#ffd24a');
+  rect(g, 10, 11, 3, 3, '#7ae0ff');
+  rect(g, 0, 22, 16, 2, O);
+  rect(g, 0, 14, 1, 8, O);
+  rect(g, 15, 14, 1, 8, O);
+}
+
+function crate(g) {
+  rect(g, 2, 10, 12, 12, '#b07a48');
+  rect(g, 2, 10, 12, 2, '#d8a870');
+  rect(g, 2, 15, 12, 1, '#7a4a28');
+  rect(g, 7, 12, 2, 10, '#7a4a28');
+  rect(g, 1, 9, 14, 1, O);
+  rect(g, 1, 10, 1, 12, O);
+  rect(g, 14, 10, 1, 12, O);
+  rect(g, 1, 22, 14, 2, O);
+}
+
 function woodFloor(g) {
   for (let row = 0; row < 4; row++) {
     const y = row * 4;
@@ -197,8 +233,8 @@ function spikes(g, up) {
 }
 
 /** 16×24 sprite (or 16×16 for flat kinds) for a structure. */
-export function structureSprite(id, mask = 0, state = 0) {
-  const key = `${id}:${mask}:${state}`;
+export function structureSprite(id, mask = 0, state = 0, tint = null) {
+  const key = `${id}:${mask}:${state}:${tint ?? ''}`;
   let c = cache.get(key);
   if (c) return c;
   const flat = id === 'wood_floor' || id === 'stone_floor' || id === 'spikes';
@@ -215,6 +251,8 @@ export function structureSprite(id, mask = 0, state = 0) {
     case 'wood_floor': woodFloor(g); break;
     case 'stone_floor': stoneFloor(g); break;
     case 'spikes': spikes(g, state); break;
+    case 'stall': stall(g, tint ?? undefined); break;
+    case 'crate': crate(g); break;
     default: rect(g, 2, 8, 12, 14, '#8d8a9e');
   }
   cache.set(key, c);

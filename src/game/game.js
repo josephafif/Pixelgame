@@ -5,7 +5,7 @@
 import { CONFIG } from '../config.js';
 import { hashInts } from '../core/rng.js';
 import { angleTo, dist2 } from '../core/math.js';
-import { World } from './world.js';
+import { World, CHUNK } from './world.js';
 import { Fx } from './fx.js';
 import { computePlayerStats, xpToNext } from './stats.js';
 import {
@@ -29,6 +29,7 @@ import {
   currentPickaxe, forgePickaxe, findHarvestTarget, rollDrops, regrow, REGROW_INTERVAL,
 } from './gathering.js';
 import { Construction, buildRadius, structureDef, structureDefs, structureLock } from './construction.js';
+import { Markets } from './markets.js';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 5;
@@ -87,6 +88,7 @@ export class Game {
 
     this.damageEnemy = (e, amount, opts) => dealDamage(this, e, amount, opts);
     this.construction = new Construction(this);
+    this.markets = new Markets(this);
     // Build mode (camp construction) and gathering state.
     this.build = {
       active: false, selected: structureDefs(data)[0]?.id ?? null, tool: 'place',
@@ -94,6 +96,9 @@ export class Game {
     };
     this.harvestDamage = new Map();
     this.regrowT = 1;
+    // Chunks you have seen (for the map).
+    this.explored = new Set(save.world.explored);
+    this.exploreT = 0;
     this.#bindBuildInput();
     input.onUiCommand = (cmd) => this.emit('ui', cmd);
     this.weapon = null;
@@ -323,14 +328,40 @@ export class Game {
     return this.allWeapons().find((w) => w.id === id) ?? null;
   }
 
+  // --- Loadout: main weapon (1), secondary weapon (2), pickaxe (3) --------------
+
+  /** Weapon ids in the loadout (never moved to storage or salvaged). */
+  inLoadout(id) {
+    const inv = this.save.inventory;
+    return Boolean(id) && (inv.equipped === id || inv.secondary === id);
+  }
+
+  get activeSlot() {
+    return this.save.inventory.activeSlot ?? 'main';
+  }
+
+  /** True while the pickaxe is in hand. */
+  get toolActive() {
+    return this.activeSlot === 'tool' && Boolean(currentPickaxe(this.data, this.save));
+  }
+
+  #slotDna(slot) {
+    const inv = this.save.inventory;
+    const id = slot === 'secondary' ? inv.secondary : inv.equipped;
+    return id ? inv.bag.find((w) => w.id === id) ?? null : null;
+  }
+
   #equipFromSave() {
-    const id = this.save.inventory.equipped;
-    const dna = id ? this.save.inventory.bag.find((w) => w.id === id) : null;
+    const inv = this.save.inventory;
+    if (inv.secondary && !inv.bag.some((w) => w.id === inv.secondary)) inv.secondary = null;
+    const slot = inv.activeSlot === 'secondary' && inv.secondary ? 'secondary' : 'main';
+    const dna = this.#slotDna(slot) ?? this.#slotDna(slot === 'main' ? 'secondary' : 'main');
     this.weapon = dna ? compileWeapon(dna) : null;
     this.recomputeStats();
   }
 
-  equip(id) {
+  /** Puts a weapon in the main or secondary slot (swapping if needed). */
+  equip(id, slot = 'main') {
     const inv = this.save.inventory;
     let dna = inv.bag.find((w) => w.id === id);
     if (!dna) {
@@ -343,14 +374,66 @@ export class Game {
       [dna] = inv.storage.splice(idx, 1);
       inv.bag.push(dna);
     }
-    inv.equipped = dna.id;
-    this.weapon = compileWeapon(dna);
-    this.player.attackCd = 0.2;
-    this.recomputeStats();
+    const key = slot === 'secondary' ? 'secondary' : 'equipped';
+    const other = key === 'equipped' ? 'secondary' : 'equipped';
+    if (inv[other] === dna.id) inv[other] = inv[key] ?? null; // swap the two
+    inv[key] = dna.id;
+    if (key === 'equipped' && !inv.equipped) inv.equipped = dna.id;
+    // Equipping always puts that weapon in your hands.
+    inv.activeSlot = slot === 'secondary' ? 'secondary' : 'main';
+    this.#applySlot();
     this.emit('inventory');
-    this.emit('equip', dna);
     this.saveNow();
     return true;
+  }
+
+  /** Switches what you hold: 'main' | 'secondary' | 'tool'. */
+  switchSlot(slot) {
+    const inv = this.save.inventory;
+    if (slot === inv.activeSlot && slot !== 'tool') return true;
+    if (slot === 'tool' && !currentPickaxe(this.data, this.save)) {
+      this.toast('No pickaxe yet: forge one at the Forge (Tools)', 'warn');
+      return false;
+    }
+    if (slot === 'secondary' && !inv.secondary) {
+      this.toast('No secondary weapon: pick one in the inventory', 'warn');
+      return false;
+    }
+    if (slot === 'main' && !inv.equipped) return false;
+    if (slot === 'tool' && inv.activeSlot === 'tool') return true;
+    inv.activeSlot = slot;
+    this.#applySlot();
+    this.audio.play('ui');
+    return true;
+  }
+
+  /** Cycles through the filled slots (mouse wheel / gamepad). */
+  cycleSlot(dir = 1) {
+    const inv = this.save.inventory;
+    const order = ['main', 'secondary', 'tool'].filter((s) =>
+      (s === 'main' && inv.equipped) || (s === 'secondary' && inv.secondary) || (s === 'tool' && currentPickaxe(this.data, this.save)));
+    if (order.length < 2) return;
+    const i = order.indexOf(this.activeSlot);
+    this.switchSlot(order[(i + dir + order.length) % order.length]);
+  }
+
+  #applySlot() {
+    const inv = this.save.inventory;
+    if (inv.activeSlot !== 'tool') {
+      const dna = this.#slotDna(inv.activeSlot) ?? this.#slotDna('main');
+      if (dna && dna.id !== this.weapon?.dna.id) this.weapon = compileWeapon(dna);
+      if (!dna) this.weapon = null;
+    }
+    const p = this.player;
+    p.attackAnim = null;
+    p.toolAnim = null;
+    p.attackCd = 0.25;
+    p.swapT = 0.25;
+    this.recomputeStats();
+    this.interactTarget = null;
+    this.emit('interact', { label: null });
+    this.emit('equip', this.weapon?.dna ?? null);
+    this.emit('slot', { slot: inv.activeSlot });
   }
 
   moveWeapon(id, to) {
@@ -364,8 +447,8 @@ export class Game {
       this.toast(to === 'storage' ? 'Storage is full' : 'Your bag is full', 'warn');
       return false;
     }
-    if (inv.equipped === id) {
-      this.toast('Unequip by equipping another weapon first', 'warn');
+    if (this.inLoadout(id)) {
+      this.toast('That weapon is in your loadout: swap it out first', 'warn');
       return false;
     }
     dest.push(...from.splice(idx, 1));
@@ -375,9 +458,8 @@ export class Game {
   }
 
   salvage(id) {
-    const inv = this.save.inventory;
-    if (inv.equipped === id) {
-      this.toast("You can't salvage the weapon you are holding", 'warn');
+    if (this.inLoadout(id)) {
+      this.toast("You can't salvage a weapon in your loadout", 'warn');
       return null;
     }
     const value = this.#salvageOne(id);
@@ -393,7 +475,7 @@ export class Game {
     const inv = this.save.inventory;
     const total = { scrap: 0, essence: 0, count: 0 };
     for (const id of ids) {
-      if (id === inv.equipped || inv.favorites.includes(id)) continue;
+      if (this.inLoadout(id) || inv.favorites.includes(id)) continue;
       const v = this.#salvageOne(id);
       if (!v) continue;
       total.scrap += v.scrap;
@@ -415,13 +497,42 @@ export class Game {
       if (idx < 0) continue;
       const [dna] = list.splice(idx, 1);
       const value = salvageValue(dna);
-      this.save.resources.scrap += value.scrap;
-      this.save.resources.essence += value.essence;
+      this.#grant(value);
       inv.favorites = inv.favorites.filter((f) => f !== id);
       inv.unseen = inv.unseen.filter((f) => f !== id);
       return value;
     }
     return null;
+  }
+
+  /** Adds a weapon you bought/traded for (bag first, then storage). */
+  addWeapon(dna) {
+    const inv = this.save.inventory;
+    this.#registerDiscovery(dna);
+    if (inv.bag.length < inv.bagSize) inv.bag.push(dna);
+    else inv.storage.push(dna);
+    inv.unseen.push(dna.id);
+    this.emit('inventory');
+  }
+
+  /** Removes a weapon (sold / traded away). Loadout weapons are protected. */
+  removeWeapon(id) {
+    const inv = this.save.inventory;
+    if (this.inLoadout(id)) return false;
+    for (const list of [inv.bag, inv.storage]) {
+      const idx = list.findIndex((w) => w.id === id);
+      if (idx >= 0) list.splice(idx, 1);
+    }
+    inv.favorites = inv.favorites.filter((f) => f !== id);
+    inv.unseen = inv.unseen.filter((f) => f !== id);
+    this.emit('inventory');
+    return true;
+  }
+
+  /** Adds a { scrap, essence, shards, gold, ... } bundle to the resources. */
+  #grant(bundle) {
+    const r = this.save.resources;
+    for (const [k, v] of Object.entries(bundle)) if (v) r[k] = (r[k] ?? 0) + v;
   }
 
   toggleFavorite(id) {
@@ -456,30 +567,38 @@ export class Game {
     return isNew;
   }
 
-  discoverWeapon(dna) {
+  /**
+   * Shows the discovery screen. `caseRoll` ({ min, max, title }) plays a
+   * case-opening roll first (chests, the Forge).
+   */
+  discoverWeapon(dna, { caseRoll = null } = {}) {
     this.#registerDiscovery(dna);
-    this.discoveryQueue.push(dna);
+    this.discoveryQueue.push({ dna, caseRoll });
     if (!this.discoveryOpen) this.#openNextDiscovery();
   }
 
   #openNextDiscovery() {
-    const dna = this.discoveryQueue.shift();
-    if (!dna) return;
+    const next = this.discoveryQueue.shift();
+    if (!next) return;
+    const { dna, caseRoll } = next;
     this.discoveryOpen = true;
     const r = this.data.rarityIndex.get(dna.rarity) ?? 0;
     const color = this.data.byId.rarities.get(dna.rarity)?.color ?? '#ffffff';
-    if (r >= 2) {
+    if (caseRoll) {
+      // The roll makes its own reveal.
+    } else if (r >= 2) {
       const p = this.player;
       this.fx.add({ type: 'ring', x: p.x, y: p.y, r0: 0.3, r1: 1.5 + r * 0.6, color, dur: 0.5, fill: r >= 3 });
       this.fx.emit('glint', p.x, p.y - 0.5, 8 + r * 6, 1.2, 3, [color, '#ffffff']);
     }
-    if (r >= 3) this.flash(color, 0.4);
+    if (r >= 3 && !caseRoll) this.flash(color, 0.4);
     this.pause('discovery');
-    this.audio.play('discover', { rarity: r });
+    if (!caseRoll) this.audio.play('discover', { rarity: r });
     this.vibrate(r >= 4 ? [40, 60, 80] : 40);
     const inv = this.save.inventory;
     this.emit('discovery', {
       dna,
+      caseRoll,
       canKeep: inv.bag.length < inv.bagSize,
       canStore: inv.storage.length < inv.storageSize,
       salvage: salvageValue(dna),
@@ -487,30 +606,30 @@ export class Game {
     });
   }
 
-  /** choice: 'equip' | 'keep' | 'storage' | 'salvage' */
+  /** choice: 'equip' | 'secondary' | 'keep' | 'storage' | 'salvage' */
   resolveDiscovery(dna, choice) {
     const inv = this.save.inventory;
     const bagFull = inv.bag.length >= inv.bagSize;
     const storageFull = inv.storage.length >= inv.storageSize;
-    if ((choice === 'keep' || choice === 'equip') && bagFull) choice = storageFull ? 'salvage' : 'storage';
+    if ((choice === 'keep' || choice === 'equip' || choice === 'secondary') && bagFull) choice = storageFull ? 'salvage' : 'storage';
     if (choice === 'storage' && storageFull) choice = 'salvage';
     if (choice === 'salvage') {
       const v = salvageValue(dna);
-      this.save.resources.scrap += v.scrap;
-      this.save.resources.essence += v.essence;
-      this.toast(`Salvaged for ${v.scrap} scrap and ${v.essence} essence`);
+      this.#grant(v);
+      this.toast(`Salvaged for ${v.scrap} scrap and ${v.essence} essence${v.shards ? ` and ${v.shards} Star Shard` : ''}`);
     } else if (choice === 'storage') {
       inv.storage.push(dna);
       inv.unseen.push(dna.id);
       this.toast(`${dna.name.text} sent to storage`);
     } else {
       inv.bag.push(dna);
-      if (choice !== 'equip') inv.unseen.push(dna.id);
-      if (choice === 'equip') {
-        inv.equipped = dna.id;
-        this.weapon = compileWeapon(dna);
-        this.recomputeStats();
-        this.emit('equip', dna);
+      if (choice === 'equip' || choice === 'secondary') {
+        const key = choice === 'secondary' ? 'secondary' : 'equipped';
+        inv[key] = dna.id;
+        inv.activeSlot = choice === 'secondary' ? 'secondary' : 'main';
+        this.#applySlot();
+      } else {
+        inv.unseen.push(dna.id);
       }
     }
     this.emit('inventory');
@@ -570,10 +689,12 @@ export class Game {
     const request = buildCraftRequest(this.data, this.save, choice, Math.floor(this.pstats.luck));
     this.save.resources.scrap -= cost.scrap;
     this.save.resources.essence -= cost.essence;
+    if (cost.shards) this.save.resources.shards -= cost.shards;
     this.save.counters.craft += 1;
     await this.saveNow();
     const dna = await this.weapons.generate(request);
-    this.discoverWeapon(dna);
+    const catalyst = this.data.byId.catalysts.get(choice.catalyst ?? 'none');
+    this.discoverWeapon(dna, { caseRoll: { min: catalyst.minRarity, max: catalyst.maxRarity, title: 'Forging…' } });
     return dna;
   }
 
@@ -591,6 +712,7 @@ export class Game {
       if (forge && pl.level === forge.levels[0].playerLevel && buildingLevel(this.data, this.save, 'forge') === 0) {
         this.toast('You can now build a Forge at your camp and craft your own weapons!', 'legendary');
       }
+      if (pl.level === 4) this.#rumourOfMarket();
     }
     if (leveled) {
       this.recomputeStats();
@@ -620,6 +742,48 @@ export class Game {
     }
   }
 
+  /** Marks the chunks around you as explored (what the map shows). */
+  #explore() {
+    const p = this.player;
+    const cx = Math.floor(p.x / CHUNK);
+    const cy = Math.floor(p.y / CHUNK);
+    let added = false;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const key = `${cx + dx},${cy + dy}`;
+        if (this.explored.has(key)) continue;
+        this.explored.add(key);
+        this.save.world.explored.push(key);
+        added = true;
+      }
+    }
+    if (added) this.emit('explored');
+  }
+
+  /** A traveller's tip about the nearest market: it shows up on the map. */
+  #rumourOfMarket() {
+    const m = this.world.firstMarket;
+    const st = this.markets.state(m.id);
+    if (st.seen || st.visited) return;
+    st.seen = true;
+    const dirs = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
+    const dir = dirs[((Math.round(Math.atan2(m.y, m.x) / (Math.PI / 4)) % 8) + 8) % 8];
+    this.schedule(2, () => this.toast(`A traveller mentions ${m.name}, a market to the ${dir}. It's on your map (M).`, 'component'));
+  }
+
+  /** Your own map markers (max 40). */
+  addPin(x, y, label = '') {
+    const pins = this.save.world.pins;
+    if (pins.length >= 40) pins.shift();
+    pins.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, label });
+    this.requestSave();
+  }
+
+  removePin(index) {
+    this.save.world.pins.splice(index, 1);
+    this.requestSave();
+  }
+
   /** Brief full-screen colour flash (legendary drops and pickups). */
   flash(color, dur = 0.3) {
     this.screenFlash = { color, t: dur, dur };
@@ -638,8 +802,15 @@ export class Game {
         break;
       case 'wood':
       case 'stone':
+      case 'gold':
         r[it.kind] = (r[it.kind] ?? 0) + it.value;
         this.audio.play('pickup', { throttle: 60 });
+        break;
+      case 'shard':
+        r.shards = (r.shards ?? 0) + it.value;
+        this.audio.play('discover', { rarity: 3 });
+        this.flash('#ffd24a', 0.25);
+        this.toast(`Star Shard! (${r.shards}) — the Golden Catalyst needs them`, 'legendary');
         break;
       case 'heart':
         healPlayer(this, this.pstats.maxHp * 0.2);
@@ -703,9 +874,18 @@ export class Game {
         best = o;
       }
     }
-    // With a pickaxe, trees and rocks next to you can be harvested (unless
-    // you are fighting: then the attack button attacks).
-    if (!best && !this.build.active && !this.target && currentPickaxe(this.data, this.save)) {
+    // Merchants at markets (reachable across their stall's counter).
+    const npc = this.markets.merchantNear(p.x, p.y, 2.4);
+    if (npc && (!best || dist2(p.x, p.y, npc.x, npc.y) < bestD)) {
+      const prev = this.interactTarget;
+      const hostile = this.markets.isHostile(npc.marketId);
+      // A new target (and so a fresh hint) when the merchant's mood changes.
+      return prev?.type === 'merchant' && prev.npc === npc && prev.hostile === hostile
+        ? prev
+        : { type: 'merchant', x: npc.x, y: npc.y, npc, hostile };
+    }
+    // With the pickaxe in hand, trees and rocks next to you can be harvested.
+    if (!best && !this.build.active && this.toolActive) {
       const h = findHarvestTarget(this);
       if (h) {
         const prev = this.interactTarget;
@@ -718,6 +898,10 @@ export class Game {
   interactLabel(o) {
     if (!o) return null;
     switch (o.type) {
+      case 'merchant': {
+        const left = this.markets.hostileSecondsLeft(o.npc.marketId);
+        return left > 0 ? `${o.npc.name} won't trade with you (${Math.ceil(left / 60)} min)` : `Trade with ${o.npc.name}`;
+      }
       case 'harvest': {
         const tool = currentPickaxe(this.data, this.save);
         const need = o.info.tier > (tool?.tier ?? 0);
@@ -744,10 +928,38 @@ export class Game {
   // --- Gathering ------------------------------------------------------------------------
 
   /** One pickaxe swing at a tree/rock; felling it drops wood/stone. */
+  /** Pickaxe in hand with nothing to chop: a light melee swing. */
+  #swingAtEnemies(tool) {
+    const p = this.player;
+    const t = this.target && !this.target.dead ? this.target : null;
+    const angle = t ? Math.atan2(t.y - p.y, t.x - p.x) : p.facing;
+    p.facing = angle;
+    p.toolAnim = { t: 0, dur: 0.32, angle };
+    p.toolCd = 0.45;
+    this.audio.play('swish', { throttle: 80 });
+    this.schedule(0.13, () => {
+      const dmg = 4 + 6 * tool.tier + this.save.player.level * 1.5;
+      this.hitNpcs({ kind: 'arc', x: p.x, y: p.y, angle, range: 1.4, half: 1.2 }, dmg);
+      for (const e of this.enemies) {
+        if (e.dead) continue;
+        const dx = e.x - p.x;
+        const dy = e.y - p.y;
+        const d = Math.hypot(dx, dy);
+        if (d > 1.4 + e.r) continue;
+        if (Math.cos(Math.atan2(dy, dx) - angle) < 0.2) continue;
+        dealDamage(this, e, dmg, { canCrit: false, melee: true });
+      }
+    });
+  }
+
   #swingPickaxe(o) {
     const p = this.player;
     const tool = currentPickaxe(this.data, this.save);
     if (!tool || p.toolCd > 0 || p.dead) return;
+    if (!o) {
+      this.#swingAtEnemies(tool);
+      return;
+    }
     if (o.info.tier > tool.tier) {
       if (!this.warnedTier) this.toast(`You need a stronger pickaxe for ${o.info.name.toLowerCase()}s. Forge one at the Forge.`, 'warn');
       this.warnedTier = true;
@@ -810,7 +1022,24 @@ export class Game {
   }
 
   damageStructure(st, amount) {
+    // Market walls and turrets are built to last.
+    if (st.owner === 'market') {
+      st.rt.flash = 0.1;
+      return;
+    }
     this.construction.damage(st, amount);
+  }
+
+  /** Every structure to draw: your camp's and those of nearby markets. */
+  structuresForDraw() {
+    const mine = this.save.base.structures;
+    const markets = this.markets.structures;
+    return markets.length ? mine.concat(markets) : mine;
+  }
+
+  /** Your attacks can hurt people at markets (see Markets.hitNpcs). */
+  hitNpcs(shape, damage) {
+    return this.markets.npcs.length ? this.markets.hitNpcs(shape, damage) : false;
   }
 
   /** A turret's projectile reached an enemy. */
@@ -1042,6 +1271,13 @@ export class Game {
       case 'harvest':
         this.#swingPickaxe(o);
         return true;
+      case 'merchant':
+        if (this.markets.isHostile(o.npc.marketId)) {
+          this.toast(`${o.npc.name} backs away from you.`, 'warn');
+        } else {
+          this.emit('ui', { name: 'market', marketId: o.npc.marketId });
+        }
+        return true;
       case 'chest':
         this.save.world.chests.push(o.key);
         openChestLoot(this, o);
@@ -1101,6 +1337,8 @@ export class Game {
   /** Where the weapon points: the locked target if any, else where we walk. */
   #aim(sample) {
     const p = this.player;
+    const h = this.interactTarget;
+    if (this.toolActive && h?.type === 'harvest') return Math.atan2(h.y - p.y, h.x - p.x);
     const t = this.target;
     if (t && !t.dead) return Math.atan2(t.y - p.y, t.x - p.x);
     if (sample.moveX || sample.moveY) return Math.atan2(sample.moveY, sample.moveX);
@@ -1171,13 +1409,17 @@ export class Game {
     if (!sample.attack) this.suppressAttack = false;
     if (this.build.active) {
       this.#updateBuildGhost(sample);
-    } else if (sample.attack && this.interactTarget?.type === 'harvest') {
-      // Hold the button to keep swinging the pickaxe.
-      this.suppressAttack = true;
-      if (p.toolCd <= 0) this.#swingPickaxe(this.interactTarget);
+    } else if (this.toolActive) {
+      // Pickaxe in hand: hold to keep chopping (or swing at enemies).
+      const h = this.interactTarget?.type === 'harvest' ? this.interactTarget : null;
+      if (sample.attack && p.toolCd <= 0 && (h || !this.suppressAttack)) {
+        this.suppressAttack = true;
+        this.#swingPickaxe(h);
+      }
     } else if (sample.attack && !this.suppressAttack) {
       tryAttack(this, aim);
     }
+    p.swapT = Math.max(0, (p.swapT ?? 0) - dt);
 
     // Weapon ambience particles from the DNA's visual parameters.
     const part = this.weapon?.particles;
@@ -1202,7 +1444,11 @@ export class Game {
         if (this.interact()) this.suppressAttack = true;
         else if (c === 'interact-or-attack') tryAttack(this, this.#aim(sample));
       } else if (c === 'ability') {
-        castAbility(this, this.#aim(sample));
+        if (!this.toolActive) castAbility(this, this.#aim(sample));
+      } else if (c === 'slot1' || c === 'slot2' || c === 'slot3') {
+        if (!this.build.active) this.switchSlot({ slot1: 'main', slot2: 'secondary', slot3: 'tool' }[c]);
+      } else if (c === 'slotNext' || c === 'slotPrev') {
+        if (!this.build.active) this.cycleSlot(c === 'slotNext' ? 1 : -1);
       } else {
         this.emit('ui', c);
       }
@@ -1222,6 +1468,12 @@ export class Game {
     updateAllies(this, dt);
     updatePickups(this, dt);
     this.construction.update(dt);
+    this.markets.update(dt);
+    this.exploreT -= dt;
+    if (this.exploreT <= 0) {
+      this.exploreT = 0.5;
+      this.#explore();
+    }
     this.regrowT -= dt;
     if (this.regrowT <= 0) {
       this.regrowT = REGROW_INTERVAL;

@@ -63,6 +63,8 @@ export function craftCost(data, choice, save = null) {
     scrap: Math.ceil((cfg.scrapCost + (catalyst?.scrap ?? 0)) * keep),
     essence: Math.ceil((cfg.essenceCost + (catalyst?.essence ?? 0) + (choice.rune ? cfg.runeCost : 0)
       + (choice.ability ? cfg.abilityCost : 0)) * keep),
+    // Star Shards (Golden Catalyst) are never discounted.
+    shards: catalyst?.shards ?? 0,
   };
 }
 
@@ -101,6 +103,7 @@ export function validateCraft(data, save, choice) {
   const cost = craftCost(data, choice, save);
   if (save.resources.scrap < cost.scrap) errors.push(`Needs ${cost.scrap} scrap`);
   if (save.resources.essence < cost.essence) errors.push(`Needs ${cost.essence} essence`);
+  if (cost.shards && (save.resources.shards ?? 0) < cost.shards) errors.push(`Needs ${cost.shards} Star Shards (from bosses)`);
   return errors;
 }
 

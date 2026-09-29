@@ -54,6 +54,7 @@
 html, body {
   margin: 0;
   height: 100%;
+  width: 100%;
   background: var(--night);
   color: var(--text);
   font-family: var(--font);
@@ -82,12 +83,12 @@ button, select, input { font: inherit; color: inherit; }
 .good { color: var(--good); }
 .bad { color: var(--bad); }
 
+/* The game fills the whole screen, under notches and system bars too. */
 #game, .surface {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
 }
 #game { display: block; }
 .surface { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
@@ -268,8 +269,8 @@ body.offline .net { color: #ffb070; }
   position: fixed; z-index: 45; pointer-events: none; top: calc(112px + var(--safe-t)); left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(92vw, 540px);
 }
-/* While a panel is open, toasts sit over its title bar, away from the content. */
-body:has(#overlay-root .backdrop) .toasts { top: calc(6px + var(--safe-t)); }
+/* While a panel is open, toasts move to the bottom edge so they never cover its title or close button. */
+body:has(#overlay-root .backdrop) .toasts { top: auto; bottom: calc(8px + var(--safe-b)); flex-direction: column-reverse; }
 .toast {
   border-image-source: var(--frame-toast); padding: 4px 14px; font-size: 15px; text-align: center;
   animation: toast-in 0.22s steps(4); transition: opacity 0.4s, transform 0.4s;
@@ -413,6 +414,36 @@ body[data-input="keyboard"] .key-hints { display: block; }
 .btn .cd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; font-weight: 700; text-shadow: 0 2px 0 var(--ink); }
 .btn.ability:not(.ready) .glyph { opacity: 0.35; }
 
+/* Loadout hotbar: main (1), secondary (2), pickaxe (3). */
+.hotbar {
+  position: absolute; left: 50%; bottom: calc(34px + var(--safe-b)); transform: translateX(-50%);
+  display: flex; gap: 6px; pointer-events: auto;
+}
+.hslot {
+  --rarity: transparent;
+  position: relative; width: 56px; min-width: 0; height: 56px; min-height: 0; padding: 0;
+  border-image-source: var(--frame-chip);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rarity) 70%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--rarity) 28%, transparent) 20%, transparent 70%);
+  background-clip: padding-box;
+}
+.hslot .art { display: grid; place-items: center; width: 100%; height: 100%; }
+.hslot .plus { font-size: 22px; color: var(--muted); }
+.hslot .num {
+  position: absolute; top: -3px; left: -3px; min-width: 16px; height: 16px; padding: 0 3px;
+  font-size: 11px; font-weight: 700; line-height: 16px; text-align: center;
+  color: var(--ink); background: var(--muted); box-shadow: 0 0 0 2px var(--ink);
+}
+.hslot.on { border-image-source: var(--frame-chip-on); transform: translateY(-3px); filter: brightness(1.15); }
+.hslot.on .num { background: var(--gold); }
+.hslot.empty { opacity: 0.55; }
+body[data-input="touch"] .hotbar {
+  left: auto; transform: none;
+  right: calc(16px + var(--safe-r)); bottom: calc(24px + var(--btn) * 2.1 + var(--safe-b));
+}
+body[data-input="touch"] .hslot { width: 50px; height: 50px; }
+.left-handed body[data-input="touch"] .hotbar, body.left-handed[data-input="touch"] .hotbar { right: auto; left: calc(16px + var(--safe-l)); }
+
 .key-hints {
   position: absolute; bottom: calc(6px + var(--safe-b)); left: 50%; transform: translateX(-50%);
   font-size: 13px; color: rgba(243, 236, 220, 0.8); white-space: nowrap; text-shadow: 0 1px 0 var(--ink);
@@ -420,8 +451,10 @@ body[data-input="keyboard"] .key-hints { display: block; }
 }
 
 @media (max-width: 640px) {
-  .hud-player { width: min(240px, calc(100vw - 160px - var(--safe-l) - var(--safe-r))); }
-  .dock { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; }
+  /* Phones: a slim dock (bag, map, build, menu); forge/research/camp live in the menu. */
+  .hud-player { width: min(240px, calc(100vw - 196px - var(--safe-l) - var(--safe-r))); }
+  .dock .dock-extra { display: none; }
+  .dock { gap: 4px; }
   .res-row { display: grid; grid-template-columns: auto auto; gap: 0 8px; padding: 2px 8px; font-size: 14px; }
   .dock button { min-width: 40px; min-height: 40px; }
   .dock button .icon { width: 20px; height: 20px; }
@@ -626,6 +659,11 @@ body[data-input="keyboard"] .key-hints { display: block; }
   position: absolute; font-size: 11px; font-weight: 700; line-height: 1; padding: 2px 3px; box-shadow: 0 0 0 2px var(--ink);
 }
 .slot .badge-e { top: -2px; left: -2px; background: var(--gold); color: var(--ink); }
+.slot .badge-e.two { background: #9fd0ff; }
+.slotnum {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; font-size: 12px; font-weight: 700;
+  color: var(--ink); background: var(--gold); box-shadow: 0 0 0 2px var(--ink);
+}
 .slot .badge-new { top: -2px; right: -2px; background: var(--good); color: var(--ink); }
 .slot .badge-fav { bottom: 2px; right: -2px; background: none; box-shadow: none; }
 .inv-detail { position: sticky; top: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -750,3 +788,104 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 }
 
 .noscript { padding: 20px; text-align: center; }
+
+/* ---------- Case opening ---------- */
+
+.case-panel { width: min(640px, 100%); }
+.case-roll { display: flex; flex-direction: column; gap: 10px; }
+.case-title { text-align: center; font-size: 22px; font-weight: 700; letter-spacing: 3px; color: var(--gold); text-shadow: 0 3px 0 var(--ink); }
+.case-window {
+  position: relative; height: 104px; overflow: hidden;
+  border: 6px solid transparent; border-image: var(--frame-slot) 3 fill / 6px / 0 stretch;
+}
+.case-strip { position: absolute; left: 0; top: 6px; display: flex; gap: 4px; will-change: transform; }
+.case-item {
+  --rarity: #c3c8cf; flex: none; width: 84px; height: 80px; display: grid; place-items: center;
+  background: linear-gradient(180deg, #2a2440, #15121f);
+  box-shadow: inset 0 -6px 0 var(--rarity), inset 0 0 0 2px var(--ink);
+}
+.case-item canvas { width: 48px; height: 48px; }
+.case-item.r-legendary { background: radial-gradient(circle, #7a5410, #2a1c08 75%); }
+.case-star { font-size: 44px; line-height: 1; color: #ffd24a; text-shadow: 0 0 12px #ffb020, 0 3px 0 var(--ink); }
+.case-marker {
+  position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; z-index: 2;
+  background: var(--gold); box-shadow: 0 0 8px var(--gold);
+}
+.case-marker::before, .case-marker::after {
+  content: ""; position: absolute; left: -5px; border: 6px solid transparent;
+}
+.case-marker::before { top: 0; border-top-color: var(--gold); }
+.case-marker::after { bottom: 0; border-bottom-color: var(--gold); }
+.case-item.win {
+  position: relative; z-index: 1; animation: win-pop 0.5s steps(4);
+  box-shadow: inset 0 -6px 0 var(--rarity), 0 0 0 3px var(--rarity), 0 0 26px var(--rarity);
+}
+@keyframes win-pop { 50% { transform: scale(1.12); filter: brightness(1.5); } }
+.case-roll.legendary .case-window { box-shadow: 0 0 44px #ffb020; }
+.case-roll.legendary .case-title { color: #ffe0a0; }
+.case-foot { display: flex; justify-content: center; }
+.case-roll.stopped .skip { visibility: hidden; }
+
+.value-row { display: flex; align-items: center; gap: 4px; margin: -2px 0 6px; font-size: 14px; color: var(--gold); }
+.jackpot { display: flex; align-items: center; justify-content: center; gap: 4px; margin: -4px 0 8px; color: #ffe0a0; font-weight: 700; }
+
+/* ---------- Market ---------- */
+
+.market-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.market-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; color: var(--gold); flex: 1 1 auto; }
+.market-title .flag { width: 12px; height: 16px; background: var(--mcolor); box-shadow: 0 0 0 2px var(--ink); }
+.cost.gold { color: var(--gold); }
+.market-hostile { flex-basis: 100%; margin: 0; color: #ff8a8a; display: flex; align-items: center; gap: 4px; }
+.market-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mrow {
+  --rarity: transparent; display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
+  padding: 6px 8px; border: 6px solid transparent; border-image: var(--frame-slot) 3 fill / 6px / 0 stretch;
+  box-shadow: inset 3px 0 0 var(--rarity);
+}
+.mart { width: 44px; height: 44px; display: grid; place-items: center; }
+.minfo { display: flex; flex-direction: column; min-width: 0; }
+.minfo b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mbuy { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-end; }
+.mbuy button { min-height: 38px; }
+.mdetail { grid-column: 1 / -1; }
+.mh { margin: 12px 0 6px; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--brass-light); }
+.trade-picker { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.trade-picker h3 { margin: 0; }
+@media (max-width: 640px) {
+  .mrow { grid-template-columns: auto 1fr; }
+  .mbuy { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* ---------- Map ---------- */
+
+.map-panel { width: min(1100px, 100%); height: min(760px, 100%); }
+.map-panel .panel-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.map { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; width: 100%; }
+.map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.map-tools .icon-btn { font-size: 22px; font-weight: 700; }
+.map-tools button.on { border-image-source: var(--frame-chip-on); color: var(--gold); }
+.map-status { margin-left: auto; }
+.map-canvas {
+  flex: 1; min-height: 240px; width: 100%; cursor: grab; touch-action: none;
+  border: 6px solid transparent; border-image: var(--frame-slot) 3 fill / 6px / 0 stretch;
+}
+.map-canvas.pinning { cursor: crosshair; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
+.map-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.map-legend .lg { width: 10px; height: 10px; box-shadow: 0 0 0 2px var(--ink); }
+.lg.you { background: #ffffff; }
+.lg.camp { background: #ffd24a; }
+.lg.boss { background: #ff6a2a; border-radius: 50%; }
+.lg.market { background: #ffd24a; outline: 2px solid #c8364a; }
+.lg.shrine { background: #7ae0ff; transform: rotate(45deg); }
+.lg.chest { background: #e0b040; }
+.lg.pin { background: #e8364a; border-radius: 50%; }
+@media (max-width: 640px) {
+  .map-panel { height: 100%; }
+  .map-status { flex-basis: 100%; margin: 0; }
+  .map-tools { gap: 4px; }
+  .map-tools button { min-height: 40px; padding: 2px 10px; font-size: 15px; }
+  .map-legend { font-size: 13px; gap: 2px 10px; }
+  /* The case roll is a compact strip in the middle of the screen, not a full page. */
+  .panel.case-panel { align-self: center; border-width: 9px; border-image: var(--frame-panel) 3 fill / 9px / 0 stretch; }
+}

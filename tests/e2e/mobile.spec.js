@@ -83,7 +83,11 @@ test('phone HUD: player plate and dock never overlap; forge button stays reachab
     const g = window.__pixelgame.game;
     g.save.base.buildings.forge = 1;
   });
-  await page.tap('#btn-forge');
+  // Phones keep a slim dock: Forge, Research and Camp live in the menu.
+  await expect(page.locator('#btn-forge')).toBeHidden();
+  await expect(page.locator('#btn-map')).toBeVisible();
+  await page.tap('#btn-menu');
+  await page.tap('.menu button:has-text("Forge")');
   await expect(page.locator('.forge-panel')).toBeVisible();
   await page.tap('.forge-panel .tab:has-text("Weapons")');
   // The sticky bar keeps cost + Forge button on screen while picking.
@@ -112,5 +116,39 @@ test('build mode on a phone: tap the ground to place, the attack button becomes 
   expect(await game(page, () => window.__pixelgame.game.world.structureAt(8, 1)?.id)).toBe('wood_wall');
   await page.tap('#build-bar .done');
   await expect(page.locator('#build-bar')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('phone hotbar: tap to switch weapon slots and the pickaxe; the map opens from the dock', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page, { tap: true });
+  const size = page.viewportSize();
+  const bar = await page.locator('#hotbar').boundingBox();
+  const attack = await page.locator('#btn-attack').boundingBox();
+  expect(bar.x + bar.width).toBeLessThanOrEqual(size.width);
+  expect(bar.y + bar.height).toBeLessThanOrEqual(attack.y);
+  for (const id of ['#slot-main', '#slot-secondary', '#slot-tool']) {
+    const b = await page.locator(id).boundingBox();
+    expect(b.width).toBeGreaterThanOrEqual(44); // comfortable touch target
+  }
+  await page.tap('#slot-tool');
+  expect(await game(page, () => window.__pixelgame.game.activeSlot)).toBe('main');
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.tools.pickaxe = 1;
+    g.emit('tools');
+  });
+  await page.tap('#slot-tool');
+  expect(await game(page, () => window.__pixelgame.game.toolActive)).toBe(true);
+  await expect(page.locator('#btn-ability')).toBeHidden();
+  await page.tap('#slot-main');
+  expect(await game(page, () => window.__pixelgame.game.activeSlot)).toBe('main');
+
+  await page.tap('#btn-map');
+  await expect(page.locator('.map-panel')).toBeVisible();
+  const width = await page.evaluate(() => document.querySelector('.map-panel').offsetWidth);
+  expect(width).toBe(size.width);
+  await page.tap('.map-panel .close');
+  await expect(page.locator('.map-panel')).toBeHidden();
   expect(errors).toEqual([]);
 });

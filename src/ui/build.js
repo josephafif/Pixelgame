@@ -105,7 +105,7 @@ export class BuildBar {
       const ok = canAfford(g.save.resources, def.cost);
       btn.classList.toggle('poor', !ok);
       for (const chip of btn.querySelectorAll('.cost')) {
-        const kind = chip.title.toLowerCase();
+        const kind = chip.dataset.kind;
         chip.classList.toggle('short', (g.save.resources[kind] ?? 0) < (def.cost[kind] ?? 0));
       }
     }

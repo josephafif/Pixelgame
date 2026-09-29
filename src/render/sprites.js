@@ -209,6 +209,23 @@ const MAPS = {
     '.oGGGo.',
     '..ooo..',
   ],
+  shard: [
+    '...o...',
+    '..oGo..',
+    'ooGwGoo',
+    'oGgwgGo',
+    '.oGgGo.',
+    '.oGogo.',
+    'oGo.oGo',
+    'oo...oo',
+  ],
+  gold: [
+    '.ooo.',
+    'oGgGo',
+    'ogGGo',
+    'oGGGo',
+    '.ooo.',
+  ],
   wood: [
     '.oooooo.',
     'obbbbbwo',

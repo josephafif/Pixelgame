@@ -18,6 +18,7 @@ const KEYMAP = {
   KeyE: 'interact', KeyF: 'interact',
   KeyI: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyB: 'base', KeyG: 'build', KeyM: 'map',
   Escape: 'menu', KeyP: 'menu',
+  Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3',
 };
 
 const DEADZONE = 0.18;
@@ -103,6 +104,7 @@ export class Input {
       if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab') e.preventDefault();
       if (e.repeat) return;
       this.keys.add(action);
+      if (action.startsWith('slot')) this.#command(action);
       if (action === 'ability') this.#command('ability');
       // Attack doubles as Use: the game interacts instead when something usable is near.
       if (action === 'interact' || action === 'attack') this.#command('interact');
@@ -118,6 +120,14 @@ export class Input {
 
     const s = this.surface;
     s.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Mouse wheel cycles weapon/pickaxe slots.
+    let wheelAt = 0;
+    s.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (!this.enabled || e.ctrlKey || performance.now() - wheelAt < 160) return;
+      wheelAt = performance.now();
+      this.#command(e.deltaY > 0 ? 'slotNext' : 'slotPrev');
+    }, { passive: false });
     s.addEventListener('pointerdown', (e) => this.#pointerDown(e));
     s.addEventListener('pointermove', (e) => this.#pointerMove(e));
     s.addEventListener('pointerup', (e) => this.#pointerUp(e));
@@ -259,6 +269,7 @@ export class Input {
     if (edge(3)) this.#command('inventory');
     if (edge(9)) this.#command('menu');
     if (edge(1)) this.#command('back');
+    if (edge(5)) this.#command('slotNext');
     if (this.settings().sprintMode === 'hold') {
       if (this.mode === 'gamepad') this.sprintHeld = pressed(4) || pressed(10);
     } else if (edge(4) || edge(10)) {

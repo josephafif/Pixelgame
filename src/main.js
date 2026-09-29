@@ -183,7 +183,16 @@ class App {
     $('#title-ios')?.toggleAttribute('hidden', !iosInstallHint());
   }
 
+  /** Phones/tablets: fill the whole screen (no browser bars). Needs a tap. */
+  enterFullscreen() {
+    const touch = matchMedia('(pointer: coarse)').matches;
+    if (!touch || !this.game?.save.settings.autoFullscreen || !document.fullscreenEnabled || document.fullscreenElement) return;
+    if (matchMedia('(display-mode: fullscreen)').matches) return;
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  }
+
   async #play() {
+    this.enterFullscreen();
     this.started = true;
     this.audio.unlock();
     $('#title').setAttribute('hidden', '');

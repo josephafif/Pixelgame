@@ -58,6 +58,62 @@ export function refundFor(data, def) {
 
 const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });
 
+/**
+ * One turret tick: turn towards the nearest target and fire when lined up.
+ * Normally targets enemies; with `hostile` (a market you angered) it
+ * targets you instead, with shots that hurt.
+ */
+export function runTurret(game, st, dt, { hostile = false, range = null } = {}) {
+  const rt = st.rt;
+  const spec = st.def.turret;
+  rt.cd -= dt;
+  const cx = st.x + 0.5;
+  const cy = st.y + 0.3;
+  const reach = range ?? spec.range;
+  let best = null;
+  let bestD = reach * reach;
+  if (hostile) {
+    const p = game.player;
+    const d = dist2(cx, cy, p.x, p.y);
+    if (!p.dead && d < bestD) {
+      best = p;
+      bestD = d;
+    }
+  } else {
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const d = dist2(cx, cy, e.x, e.y);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+  }
+  if (!best) return;
+  const want = Math.atan2(best.y - cy, best.x - cx);
+  let diff = want - rt.aim;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  rt.aim += Math.max(-dt * 8, Math.min(dt * 8, diff));
+  if (rt.cd > 0 || Math.abs(diff) > 0.5) return;
+  rt.cd = spec.interval * (hostile ? 0.8 : 1);
+  rt.flash = 0.06;
+  const lead = Math.sqrt(bestD) / spec.speed;
+  const vx = best.vx ?? 0;
+  const vy = best.vy ?? 0;
+  const angle = Math.atan2(best.y + vy * lead - cy, best.x + vx * lead - cx);
+  const damage = hostile
+    ? 8 + game.save.player.level * 3
+    : game.construction.turretDamage(st.def);
+  const proj = game.spawnProjectile({
+    x: cx, y: cy, angle, speed: spec.speed, damage, range: reach + 1,
+    size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, owner: hostile ? 'enemy' : 'turret',
+    element: spec.element ?? 'physical', color: spec.color, status: spec.status ?? null, depth: 1,
+  });
+  if (proj) proj.structure = st;
+  game.audio.play(spec.element === 'fire' ? 'whirl' : 'hit', { throttle: 120 });
+}
+
 export class Construction {
   constructor(game) {
     this.game = game;
@@ -198,50 +254,13 @@ export class Construction {
       const rt = st.rt;
       if (rt.flash > 0) rt.flash -= dt;
       const kind = st.def.kind;
-      if (kind === 'turret') this.#updateTurret(st, dt);
+      if (kind === 'turret') runTurret(g, st, dt);
       else if (kind === 'trap') this.#updateTrap(st, dt);
       else if (kind === 'gate') {
         const near = !p.dead && dist2(p.x, p.y, st.x + 0.5, st.y + 0.5) < 1.6 * 1.6;
         rt.open = Math.max(0, Math.min(1, rt.open + (near ? dt : -dt) * 6));
       }
     }
-  }
-
-  #updateTurret(st, dt) {
-    const g = this.game;
-    const rt = st.rt;
-    const spec = st.def.turret;
-    rt.cd -= dt;
-    const cx = st.x + 0.5;
-    const cy = st.y + 0.3;
-    let best = null;
-    let bestD = spec.range * spec.range;
-    for (const e of g.enemies) {
-      if (e.dead) continue;
-      const d = dist2(cx, cy, e.x, e.y);
-      if (d < bestD) {
-        bestD = d;
-        best = e;
-      }
-    }
-    if (!best) return;
-    const want = Math.atan2(best.y - cy, best.x - cx);
-    let diff = want - rt.aim;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    rt.aim += Math.max(-dt * 8, Math.min(dt * 8, diff));
-    if (rt.cd > 0 || Math.abs(diff) > 0.5) return;
-    rt.cd = spec.interval;
-    rt.flash = 0.06;
-    const lead = Math.sqrt(bestD) / spec.speed;
-    const angle = Math.atan2(best.y + best.vy * lead - cy, best.x + best.vx * lead - cx);
-    const proj = g.spawnProjectile({
-      x: cx, y: cy, angle, speed: spec.speed, damage: this.turretDamage(st.def), range: spec.range + 1,
-      size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, owner: 'turret', element: spec.element ?? 'physical',
-      color: spec.color, status: spec.status ?? null, depth: 1,
-    });
-    if (proj) proj.structure = st;
-    g.audio.play(spec.element === 'fire' ? 'whirl' : 'hit', { throttle: 120 });
   }
 
   #updateTrap(st, dt) {

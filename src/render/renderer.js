@@ -340,9 +340,10 @@ export class Renderer {
     const p = game.player;
     for (const o of game.world.objectsNear(p.x, p.y, 2)) list.push({ y: o.y, kind: 'object', o });
     for (const it of game.pickups) list.push({ y: it.y, kind: 'pickup', o: it });
-    for (const st of game.save.base.structures) {
+    for (const st of game.structuresForDraw()) {
       if (!isFlat(st.id)) list.push({ y: st.y + 0.95, kind: 'structure', o: st });
     }
+    for (const n of game.markets.npcs) if (!n.dead) list.push({ y: n.y, kind: 'npc', o: n });
     for (const e of game.enemies) if (!e.dead) list.push({ y: e.y, kind: 'enemy', o: e });
     for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
@@ -356,6 +357,7 @@ export class Renderer {
       switch (d.kind) {
         case 'object': this.#drawObject(game, d.o, x, y); break;
         case 'structure': this.#drawStructure(game, d.o); break;
+        case 'npc': this.#drawNpc(game, d.o, x, y); break;
         case 'pickup': this.#drawPickup(game, d.o, x, y); break;
         case 'enemy': this.#drawEnemy(game, d.o, x, y); break;
         case 'ally': this.#drawCharacter(game, d.o, x, y, true); break;
@@ -393,7 +395,7 @@ export class Renderer {
 
   #drawFlatStructures(game, W, H) {
     const v = this.v;
-    for (const st of game.save.base.structures) {
+    for (const st of game.structuresForDraw()) {
       if (!isFlat(st.id)) continue;
       const x = this.#sx(st.x);
       const y = this.#sy(st.y);
@@ -419,7 +421,7 @@ export class Renderer {
     const t = game.time;
     const id = st.id;
     const state = id === 'gate' && st.rt.open > 0.5 ? 1 : 0;
-    const img = structureSprite(id, this.#mask(game, st), state);
+    const img = structureSprite(id, this.#mask(game, st), state, id === 'stall' ? st.color : null);
     v.drawImage(img, x, y);
     if (st.rt.flash > 0 && st.def.kind !== 'turret') this.#flashRect(x, y + 2, 16, STRUCT_H - 2);
     if (id === 'arrow_turret') {
@@ -434,6 +436,33 @@ export class Renderer {
       if (Math.random() < 0.05) game.fx.emit('ember', st.x + 0.5, st.y + 0.25, 1, 0.2, 0.3);
     }
     if (st.hp < st.def.hp) this.#healthBar(x + 8, y - 2, 12, st.hp / st.def.hp, '#6cd66c');
+  }
+
+  /** Market people: merchants behind stalls, villagers strolling about. */
+  #drawNpc(game, n, x, y) {
+    const v = this.v;
+    const sprites = playerSprites(n.cloak);
+    const right = Math.cos(n.facing) >= 0;
+    const frame = n.moving ? 1 + (Math.floor(n.walkT) % 2) : 0;
+    let img = (right ? sprites.right : sprites.left)[frame];
+    if (n.hurtFlash > 0) img = sprites.flash;
+    this.#shadow(x, y + 1, 5);
+    v.drawImage(img, x - 5, y - 12 - (n.moving ? Math.floor(n.walkT) % 2 : 0));
+    const p = game.player;
+    const near = (p.x - n.x) ** 2 + (p.y - n.y) ** 2 < 20;
+    const hostile = game.markets.isHostile(n.marketId);
+    if (hostile) {
+      drawPixelText(v, '!', x, y - 22, '#ff5050');
+    } else if (n.role === 'merchant') {
+      // A little coin above traders.
+      const bob = Math.round(Math.sin(game.time * 3 + n.x) * 1);
+      v.fillStyle = '#161622';
+      v.fillRect(x - 2, y - 21 + bob, 5, 5);
+      v.fillStyle = '#ffd24a';
+      v.fillRect(x - 1, y - 20 + bob, 3, 3);
+    }
+    if (near) drawPixelText(v, n.name.toUpperCase(), x, y - 29, n.role === 'merchant' ? '#ffe890' : '#c8c8d8');
+    if (n.hp < n.maxHp) this.#healthBar(x, y - 16, 12, n.hp / n.maxHp, '#6cd66c');
   }
 
   #drawHarvestTarget(game) {
@@ -618,6 +647,10 @@ export class Renderer {
     this.#shadow(x, y + 2, 2);
     v.drawImage(s, x - (s.width >> 1), y - s.height - 1 + bob);
     if (it.kind === 'component') this.#glow(x, y - 4 + bob, it.color, 10);
+    if (it.kind === 'shard') {
+      this.#glow(x, y - 4 + bob, '#ffd24a', 16 + Math.sin(game.time * 5) * 3);
+      if (Math.random() < 0.1) game.fx.emit('glint', it.x, it.y - 0.4, 1, 0.4, 0.6, ['#ffd24a', '#ffffff']);
+    }
   }
 
   /**
@@ -761,7 +794,7 @@ export class Renderer {
     if (isClone) v.globalAlpha = 0.65;
     else if (c.invuln > 0 && Math.floor(game.time * 20) % 2) v.globalAlpha = 0.5;
     const hand = { x: x + lx + (right ? 1 : -1), y: y - 6 - bob + ly };
-    if (!isClone && c.toolAnim) {
+    if (!isClone && (c.toolAnim || game.toolActive)) {
       v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
       this.#drawPickaxe(game, c, hand);
       v.globalAlpha = 1;
@@ -778,11 +811,18 @@ export class Renderer {
     const tool = currentPickaxe(game.data, game.save);
     if (!tool) return;
     const a = c.toolAnim;
-    const k = Math.min(1, a.t / a.dur);
-    const side = Math.cos(a.angle) >= 0 ? 1 : -1;
-    // Swing from raised back (-110°) to striking forward (+40°) relative to aim.
-    const swing = k < 0.4 ? -1.9 + k * 0.5 : -1.7 + Math.min(1, (k - 0.4) / 0.25) * 2.4;
-    const angle = a.angle + swing * side * (Math.sin(a.angle) < -0.5 ? -1 : 1);
+    const facing = a ? a.angle : c.facing;
+    const side = Math.cos(facing) >= 0 ? 1 : -1;
+    let angle;
+    if (a) {
+      const k = Math.min(1, a.t / a.dur);
+      // Swing from raised back (-110°) to striking forward (+40°) relative to aim.
+      const swing = k < 0.4 ? -1.9 + k * 0.5 : -1.7 + Math.min(1, (k - 0.4) / 0.25) * 2.4;
+      angle = a.angle + swing * side * (Math.sin(a.angle) < -0.5 ? -1 : 1);
+    } else {
+      // Resting on the shoulder, bobbing a little while walking.
+      angle = -Math.PI / 2 + side * (0.55 + (c.moving ? Math.sin((c.walkT ?? 0) * Math.PI) * 0.1 : 0));
+    }
     const v = this.v;
     v.save();
     v.translate(Math.round(hand.x + Math.cos(angle) * 3), Math.round(hand.y + Math.sin(angle) * 3));

@@ -4,6 +4,8 @@ import { h, pixelCanvas } from './dom.js';
 import { weaponIcon } from '../render/weapon-sprite.js';
 import { statRows, abilityRows, rarityInfo, summaryLine, dpsEstimate, elementName } from '../weapons/describe.js';
 import { formatSeed } from '../core/rng.js';
+import { weaponValue } from '../game/economy.js';
+import { icon } from './icons.js';
 
 export function weaponIconEl(dna, size = 48) {
   const el = pixelCanvas(weaponIcon(dna, 32), size);
@@ -57,6 +59,8 @@ export function weaponCard(data, dna, { compareTo = null, compact = false } = {}
     h('div.dps-row',
       h('span', `≈ ${dps} DPS`),
       cmp !== null ? h(`span.delta.${cmp >= 0 ? 'up' : 'down'}`, `${cmp >= 0 ? '▲' : '▼'} ${Math.abs(cmp)} vs equipped`) : null),
+    h('div.value-row', { title: 'What traders at markets would value it at' },
+      icon('coin', 16), ` ${weaponValue(dna).toLocaleString()} gold`),
     statTable,
     mods.length ? section('Modifiers', h('ul.mods', mods)) : null,
     effects.length ? section('Special Effects', h('ul.effects', effects)) : null,

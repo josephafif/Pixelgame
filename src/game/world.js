@@ -13,6 +13,16 @@ const CAMP_RADIUS = 6.5;
 const CAMP_CLEAR = 9;
 const LANDMARK_RADIUS = 22;
 const MAX_CHUNKS = 160;
+// Markets: at most one per big cell of the world, and only in some cells.
+export const MARKET_CELL = 112;
+const MARKET_CHANCE = 0.1; // ~1 market per 10 cells (plus the guaranteed first one)
+const MARKET_NAMES = [
+  'Copperwind Bazaar', 'Lanternrest Market', 'Saltroad Post', 'Gilded Gate Exchange', 'Mossy Mile Post',
+  "Crow's Rest Market", 'Emberline Bazaar', 'Stonebridge Exchange', "Wanderer's Rest", 'Duskhollow Market',
+  'Brightwater Post', 'Ironvale Exchange', 'Tinker Hollow', 'Sunward Bazaar', 'Old Mill Market',
+];
+const MARKET_COLORS = ['#c8364a', '#3f9ad8', '#e0a030', '#4fb04f', '#9a5cff', '#e86a2a'];
+const MARKET_LAYOUTS = ['bazaar', 'fort', 'palisade', 'oasis'];
 
 // Tile ids. Ground tiles are walkable; blockers sit on top of ground.
 export const T = {
@@ -84,6 +94,75 @@ export class World {
       const dist = 70 + 50 * i;
       return { bossId: boss.id, biome: boss.biome, x: Math.round(dx * dist) + 0.5, y: Math.round(dy * dist) + 0.5 };
     });
+    // One market is guaranteed within reach, in a direction no boss uses.
+    this.marketCache = new Map();
+    const [fx, fy] = COMPASS[(start + 1) % 8];
+    this.firstMarket = this.#makeMarket('m:first', Math.round(fx * 100), Math.round(fy * 100), hashInts(this.seed, 0xf125));
+  }
+
+  // --- Markets ----------------------------------------------------------------------
+
+  #makeMarket(id, x, y, h) {
+    const layout = MARKET_LAYOUTS[h % MARKET_LAYOUTS.length];
+    const biome = this.biomeAt(x, y);
+    const stone = ['highlands', 'snow', 'void', 'volcanic'].includes(biome.id) || ((h >>> 4) & 1) === 1;
+    return {
+      id, x, y, seed: h, layout,
+      r: layout === 'oasis' ? 8 : layout === 'fort' ? 8 : 7,
+      material: stone ? 'stone' : 'wood',
+      color: MARKET_COLORS[(h >>> 8) % MARKET_COLORS.length],
+      name: MARKET_NAMES[(h >>> 12) % MARKET_NAMES.length],
+      biome: biome.id,
+    };
+  }
+
+  /** The market in a world cell, or null (deterministic per seed). */
+  marketForCell(mx, my) {
+    const key = `${mx},${my}`;
+    if (this.marketCache.has(key)) return this.marketCache.get(key);
+    let m = null;
+    const f = this.firstMarket;
+    if (Math.floor(f.x / MARKET_CELL) === mx && Math.floor(f.y / MARKET_CELL) === my) {
+      m = f;
+    } else {
+      const h = hashInts(this.seed, mx, my, 0x3a7e7);
+      if ((h % 1000) / 1000 < MARKET_CHANCE) {
+        const x = mx * MARKET_CELL + 20 + ((h >>> 10) % (MARKET_CELL - 40));
+        const y = my * MARKET_CELL + 20 + ((h >>> 20) % (MARKET_CELL - 40));
+        const farFromCamp = x * x + y * y > 150 * 150;
+        const clear = !this.landmarks.some((lm) => (lm.x - x) ** 2 + (lm.y - y) ** 2 < 50 * 50);
+        if (farFromCamp && clear) m = this.#makeMarket(`m:${key}`, x, y, h);
+      }
+    }
+    this.marketCache.set(key, m);
+    return m;
+  }
+
+  /** Markets whose area comes within `range` tiles of (x, y). */
+  marketsNear(x, y, range) {
+    const out = [];
+    const m0x = Math.floor((x - range) / MARKET_CELL);
+    const m1x = Math.floor((x + range) / MARKET_CELL);
+    const m0y = Math.floor((y - range) / MARKET_CELL);
+    const m1y = Math.floor((y + range) / MARKET_CELL);
+    for (let my = m0y; my <= m1y; my++) {
+      for (let mx = m0x; mx <= m1x; mx++) {
+        const m = this.marketForCell(mx, my);
+        if (m && (m.x - x) ** 2 + (m.y - y) ** 2 <= (range + m.r) ** 2) out.push(m);
+      }
+    }
+    return out;
+  }
+
+  /** The market whose grounds contain (x, y) (+ margin), or null. */
+  marketAt(x, y, margin = 0) {
+    return this.marketsNear(x, y, 2 + margin).find((m) => (m.x + 0.5 - x) ** 2 + (m.y + 0.5 - y) ** 2 <= (m.r + 1.5 + margin) ** 2) ?? null;
+  }
+
+  marketById(id) {
+    if (id === 'm:first') return this.firstMarket;
+    const [mx, my] = id.slice(2).split(',').map(Number);
+    return Number.isFinite(mx) && Number.isFinite(my) ? this.marketForCell(mx, my) : null;
   }
 
   biomeAt(x, y) {
@@ -121,6 +200,7 @@ export class World {
     const block = new Uint8Array(CHUNK * CHUNK);
     const biomeIdx = new Uint8Array(CHUNK * CHUNK);
     const s = this.seed;
+    const markets = this.marketsNear(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, CHUNK + 6);
     for (let ly = 0; ly < CHUNK; ly++) {
       for (let lx = 0; lx < CHUNK; lx++) {
         const x = cx * CHUNK + lx;
@@ -131,6 +211,13 @@ export class World {
         const d2 = x * x + y * y;
         if (d2 <= CAMP_RADIUS * CAMP_RADIUS) {
           ground[i] = T.CAMP;
+          continue;
+        }
+        // Market grounds: paved inside, cleared around the walls.
+        const market = markets.find((m) => (m.x - x) ** 2 + (m.y - y) ** 2 <= (m.r + 3) ** 2);
+        if (market) {
+          const inner = (market.x - x) ** 2 + (market.y - y) ** 2 <= (market.r - 0.5) ** 2;
+          ground[i] = inner ? (market.material === 'stone' ? T.CAMP : T.PATH) : GROUND_BY_NAME[b.ground] ?? T.GRASS;
           continue;
         }
         const detail = fbm(s ^ 0x4444, x / 6, y / 6);
@@ -181,7 +268,10 @@ export class World {
       const lx = 1 + (h % (CHUNK - 2));
       const ly = 1 + ((h >>> 8) % (CHUNK - 2));
       const i = ly * CHUNK + lx;
-      if (!chunk.block[i]) return { x: chunk.cx * CHUNK + lx + 0.5, y: chunk.cy * CHUNK + ly + 0.5 };
+      const x = chunk.cx * CHUNK + lx + 0.5;
+      const y = chunk.cy * CHUNK + ly + 0.5;
+      // Nothing spawns inside a market's walls.
+      if (!chunk.block[i] && !this.marketAt(x, y, 2)) return { x, y };
     }
     return null;
   }

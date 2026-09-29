@@ -567,6 +567,8 @@ export function updateSpawner(game, dt) {
   game.spawnTimer = 0.45;
   const safe = safeRadius(game);
   if (Math.hypot(p.x, p.y) < safe - 2) return;
+  // Markets are safe havens too.
+  if (game.world.marketAt(p.x, p.y, 6)) return;
   const wl = game.world.worldLevel(p.x, p.y);
   const bossActive = Boolean(game.boss);
   const quality = game.quality.enemyFactor;
@@ -578,7 +580,7 @@ export function updateSpawner(game, dt) {
     const d = 12 + Math.random() * 5;
     const x = p.x + Math.cos(a) * d;
     const y = p.y + Math.sin(a) * d;
-    if (Math.hypot(x, y) < safe || !game.world.isFree(x, y, 0.45, 'enemy')) continue;
+    if (Math.hypot(x, y) < safe || !game.world.isFree(x, y, 0.45, 'enemy') || game.world.marketAt(x, y, 8)) continue;
     const biome = game.world.biomeAt(Math.floor(x), Math.floor(y));
     const candidates = biome.enemies.map((id) => game.data.byId.enemies.get(id)).filter(Boolean);
     let total = 0;

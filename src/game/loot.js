@@ -4,6 +4,7 @@
 import { hashInts } from '../core/rng.js';
 import { dist2, normalize } from '../core/math.js';
 import { researchedComponents } from '../weapons/crafting.js';
+import { dropRarity, seededRoll } from './economy.js';
 
 const MAGNET_RADIUS = 2.6;
 const COLLECT_RADIUS = 0.6;
@@ -16,7 +17,10 @@ const SALVAGE = { common: [2, 0], uncommon: [4, 1], rare: [8, 3], epic: [14, 6],
 export function salvageValue(dna) {
   const [scrap, essence] = SALVAGE[dna.rarity] ?? [2, 0];
   const lvl = dna.ctx?.lvl ?? 1;
-  return { scrap: Math.round(scrap * (1 + lvl * 0.03)), essence: Math.round(essence * (1 + lvl * 0.03)) };
+  const out = { scrap: Math.round(scrap * (1 + lvl * 0.03)), essence: Math.round(essence * (1 + lvl * 0.03)) };
+  // Breaking down a legendary leaves a Star Shard behind.
+  if (dna.rarity === 'legendary') out.shards = 1;
+  return out;
 }
 
 /** Essence per orb grows slowly with the enemy's level. */
@@ -45,23 +49,37 @@ export function addPickup(game, kind, x, y, extra = {}) {
  * seed comes from the world seed + a persistent counter, so drops are
  * reproducible per save.
  */
-export function requestWeaponDrop(game, x, y, { level, source = 'drop', minRarity = null, theme = null, elementBias = [] }) {
+export function requestWeaponDrop(game, x, y, {
+  level, source = 'drop', minRarity = null, theme = null, elementBias = [], roll = source, reveal = 'ground',
+}) {
   const save = game.save;
-  const seed = hashInts(save.worldSeed, 0xd409, save.counters.drop);
+  const n = save.counters.drop;
+  const seed = hashInts(save.worldSeed, 0xd409, n);
   save.counters.drop += 1;
+  const luck = Math.floor(game.pstats.luck);
+  // Normal loot stops at epic; legendaries need a separate, tiny roll.
+  const limits = dropRarity({ source: roll, minRarity, luck, roll: seededRoll(save, 0x1e6d, n) });
   const request = {
     seed,
     level,
-    luck: Math.floor(game.pstats.luck),
+    luck,
     source,
     unlocked: researchedComponents(save),
-    minRarity,
+    minRarity: limits.minRarity,
+    maxRarity: limits.maxRarity,
     theme,
     elementBias,
   };
   game.pendingDrops += 1;
   return game.weapons.generate(request)
-    .then((dna) => announceDrop(game, dna, x, y))
+    .then((dna) => {
+      if (reveal === 'case') {
+        game.discoverWeapon(dna, { caseRoll: { min: minRarity ?? 'common', max: 'legendary', title: 'Opening chest…' } });
+      } else {
+        announceDrop(game, dna, x, y);
+      }
+      return dna;
+    })
     .catch((err) => console.error('[loot] weapon generation failed', err))
     .finally(() => {
       game.pendingDrops -= 1;
@@ -105,6 +123,9 @@ export function onEnemyKilledLoot(game, e) {
   for (let i = 0; i < orbs; i++) addPickup(game, 'essence', e.x, e.y, { value, color: '#7ae0ff' });
   if (Math.random() < (e.elite ? 0.8 : 0.15)) addPickup(game, 'scrap', e.x, e.y, { value: 1 + (e.elite ? 1 : 0), color: '#b8bcc8' });
   if (Math.random() < 0.04) addPickup(game, 'heart', e.x, e.y, { color: '#e8364a' });
+  // Gold (spent at markets) mostly comes from selling weapons; a little drops.
+  const coins = e.boss ? 40 + ((Math.random() * 40) | 0) : e.elite && Math.random() < 0.4 ? 1 + ((Math.random() * 3) | 0) : 0;
+  if (coins) addPickup(game, 'gold', e.x, e.y, { value: coins, color: '#ffd24a' });
 
   if (e.summoned) return;
   const weaponChance = e.boss ? 1 : (e.elite ? 0.3 : 0.035) + luck * 0.001;
@@ -114,12 +135,16 @@ export function onEnemyKilledLoot(game, e) {
       minRarity: e.boss ? e.bossDef.drop.minRarity : e.elite ? 'uncommon' : null,
       theme: e.boss ? e.bossDef.drop.theme : null,
       elementBias: biome.elements,
+      roll: e.boss ? 'boss' : e.elite ? 'elite' : 'drop',
     });
   }
   if (e.boss) {
     // A second guaranteed drop so bosses feel like a jackpot.
     requestWeaponDrop(game, e.x + 1, e.y, { level, minRarity: 'rare', elementBias: [e.element] });
     addPickup(game, 'component', e.x, e.y, { componentId: e.bossDef.drop.component, color: e.color });
+    // Star Shards (for the Golden Catalyst): first kill of each boss, then 25%.
+    const firstKill = !(game.save.bosses.defeated[e.bossDef.id] > 0);
+    if (firstKill || Math.random() < 0.25) addPickup(game, 'shard', e.x, e.y, { value: 1, color: '#ffd24a' });
     for (let i = 0; i < 6; i++) addPickup(game, 'scrap', e.x, e.y, { value: 2, color: '#b8bcc8' });
     return;
   }
@@ -139,10 +164,11 @@ export function componentColor(game, id) {
 export function openChestLoot(game, obj) {
   const level = Math.max(game.world.worldLevel(obj.x, obj.y), game.save.player.level);
   const biome = game.world.biomeAt(Math.floor(obj.x), Math.floor(obj.y));
-  requestWeaponDrop(game, obj.x, obj.y + 0.8, { level, source: 'chest', minRarity: 'uncommon', elementBias: biome.elements });
+  requestWeaponDrop(game, obj.x, obj.y + 0.8, { level, source: 'chest', minRarity: 'uncommon', elementBias: biome.elements, reveal: 'case' });
   const essence = 2 + ((Math.random() * 3) | 0);
   for (let i = 0; i < essence; i++) addPickup(game, 'essence', obj.x, obj.y + 0.5, { value: orbValue(level), color: '#7ae0ff' });
   for (let i = 0; i < 2; i++) addPickup(game, 'scrap', obj.x, obj.y + 0.5, { value: 1, color: '#b8bcc8' });
+  addPickup(game, 'gold', obj.x, obj.y + 0.5, { value: 3 + ((Math.random() * 6) | 0), color: '#ffd24a' });
   if (Math.random() < 0.35 + game.pstats.luck * 0.005) {
     const id = pickComponent(game, [...biome.components, 'bp_scythe', 'bp_gun', 'bp_cannon', 'bp_chakram', 'bp_warfan', 'bp_crossbow']);
     if (id && game.data.byId.components.has(id)) addPickup(game, 'component', obj.x, obj.y + 0.5, { componentId: id, color: componentColor(game, id) });

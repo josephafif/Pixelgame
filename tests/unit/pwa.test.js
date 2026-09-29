@@ -10,7 +10,9 @@ test('web app manifest has everything needed to install', () => {
   for (const key of ['name', 'short_name', 'start_url', 'scope', 'theme_color', 'background_color', 'description']) {
     assert.ok(m[key], key);
   }
-  assert.equal(m.display, 'standalone');
+  // Full screen on phones (no status/navigation bar bands around the game).
+  assert.equal(m.display, 'fullscreen');
+  assert.ok(m.display_override.includes('standalone'), 'falls back to standalone');
   assert.equal(m.orientation, 'any', 'supports portrait and landscape');
   const sizes = new Set(m.icons.map((i) => i.sizes));
   for (const s of ['192x192', '512x512']) assert.ok(sizes.has(s), s);

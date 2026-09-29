@@ -33,9 +33,12 @@ npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline 
 | Attack / Use | Svärdknappen (blir en hand nära kistor, byggnader m.m.) | Klick, Space, J (E/F = Use) | A / RT |
 | Sprint (ingen stamina) | Stövelknappen (växla eller håll, valbart) | Shift | LB / L3 |
 | Ability | Stjärnknappen (syns bara när vapnet har en) | Q, K eller högerklick | X |
-| Inventory / Forge / Research / Läger / Meny | Knapparna uppe till höger | I / C / R / B / Esc | Y / Start / B |
+| Byt plats: huvudvapen / sekundärt / hacka | Hotbaren ovanför knapparna | 1 / 2 / 3 eller mushjulet | RB |
+| Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
+| Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
 | Byggläge (i lägret) | Hammarknappen | G (1–9 väljer, X river, Esc klar) | – |
-| Hugga / bryta (med hacka) | Svärdknappen nära träd/sten | Space / E (håll inne) | A |
+| Hugga / bryta | Byt till hackan (3), sedan svärdknappen nära träd/sten | 3, sedan Space / E (håll inne) | A |
+| Handla på en marknad | Handknappen nära en handlare | E | A |
 
 **Auto-aim:** vapnet siktar alltid själv. Det låser på närmaste fiende inom räckvidd (bossar
 prioriteras, och låset släpper inte i onödan). Utan fiende pekar vapnet åt det håll du går.
@@ -60,8 +63,13 @@ Progressionen är medvetet långsammare än i första versionen:
 - **Skrotning** ger lite: från 2 scrap för ett vanligt vapen till 24 scrap och 12 essence för ett
   legendariskt.
 - **Crafting** kostar mer och blir dyrare med din nivå (+6 % per nivå); Forge-nivåer ger rabatt.
-- **Catalysts:** Azure kräver Forge 2, Violet Forge 4 och Golden (legendariskt) Forge 5, en
-  besegrad boss och 900 essence.
+- **Catalysts:** Azure kräver Forge 2 och Violet Forge 4. Golden (legendariskt) kräver Forge 5,
+  en besegrad boss, 2 500 essence, 1 200 scrap och **3 Star Shards**, så det tar lång tid.
+- **Guld** är marknadernas valuta. Det mesta kommer från att sälja vapen; bossar och ibland
+  elitfiender och kistor ger lite.
+- **Star Shards** är sällsynta. En boss ger en första gången du besegrar den, sedan 25 %
+  chans. Du får också en när du skrotar ett legendariskt vapen, och ibland säljer en
+  marknad en för 4 000 guld.
 - **Byggnader** kostar också trä och sten från nivå 2, så du behöver samla material.
 
 All balans ligger i `gamedata.json` (`crafting`, `catalysts`, `base`, `building`, `gathering`)
@@ -77,11 +85,68 @@ annonseras. När du plockar upp vapnet ringer en ring i rarity-färgen, och uppt
 rarity-band, ljusstrålar och (episk+) konfetti. I inventoryt har platserna rarity-kant; episka
 lyser och legendariska glimmar.
 
+## Legendariska vapen: som att öppna ett case
+
+Legendariska vapen ska kännas som att få en kniv i ett CS:GO-case: extremt sällsynta och värda
+mycket.
+
+- Vanlig loot stannar på **episk**. Ett legendariskt vapen kräver ett eget, litet slag
+  (`src/game/economy.js`, seedat per sparfil): ungefär 0,15 % per vanligt vapendropp, 0,5 % från
+  elitfiender, 0,4 % från kistor och 3 % från bossar. Luck höjer chansen lite.
+- **Kistor och Forge öppnas som ett case:** en remsa med vapen rullar förbi en markör och
+  saktar in. Legendariska syns bara som en gyllene ★ tills remsan stannar. Resultatet är bestämt
+  innan rullningen börjar, och *Skip* hoppar direkt till det.
+- Varje vapen har ett **värde i guld** som visas på vapenkortet. Ett legendariskt är värt
+  tusentals guld (över 20 gånger mer än ett episkt), och upptäcktsrutan visar det direkt.
+- Att smida ett legendariskt kräver Golden Catalyst (se ovan).
+
+## Loadout: tre platser
+
+Du har tre platser: **huvudvapen (1)**, **sekundärt vapen (2)** och **hackan (3)**, som har en
+egen reserverad plats. Byt med 1/2/3, mushjulet, RB på handkontrollen eller genom att trycka på
+hotbaren (på mobil ligger den ovanför knapparna). Ett nytt vapen kan läggas direkt som
+huvudvapen eller sekundärt, och inventoryt markerar vapnen med 1 och 2. Med hackan i handen
+hugger attackknappen träd och sten, och den gör lite skada på fiender också.
+
+## Marknader
+
+Ute i världen finns sällsynta, befästa **marknader** (ungefär en per tio 112×112-rutors
+områden, aldrig nära lägret eller en boss). Du får höra rykten om den första i en viss riktning
+när du når nivå 4.
+
+- Varje marknad är en egen bas med en av fyra planlösningar: **muromgärdad basar**, **rund
+  borg**, **palissadläger** eller **oas**. De har murar, grindar, torn, facklor och stånd, byggda
+  i trä eller sten beroende på plats. Monster föds aldrig inne på en marknad.
+- **Handlare** står bakom sina stånd (prata med dem över disken med E). De säljer tre vapen
+  (vanligen ovanliga till episka, mycket sällan ett legendariskt till överpris), trä, sten,
+  scrap, essence, en komponent och ibland en Star Shard. Sortimentet byts var 20:e minut.
+- **Sälj** vapen och material, eller **byt in** ett vapen mot deras. Inbytesvärdet dras av från
+  priset. Handlarna köper för 60 % av värdet och säljer för 170 %, så marknader hjälper dig men
+  bär dig inte.
+- **Skadar du någon** på marknaden vänds deras turrets mot dig i 3 minuter (5 minuter om du
+  dödar någon), och ingen handlar med dig så länge. Marknadens turrets skjuter över sina egna
+  murar.
+
+Logik: `src/game/markets.js`; placering: `World#marketForCell` i `src/game/world.js`; panelen:
+`src/ui/market.js`.
+
+## Karta
+
+Kartan (M eller kartknappen) visar allt du har upptäckt. Världen avslöjas i områden runt dig
+medan du går, och det sparas. Dra för att panorera, zooma med hjulet, nyp eller +/−. **Me** och
+**Camp** centrerar kartan.
+
+Markeringarna visar **hotspots**: lägret, bossar (bleka tills du har utforskat där, överkryssade
+när de är besegrade), marknader du har sett, helgedomar, kistor du inte har öppnat, Waystonens
+återvändarpunkt och dina egna **nålar** (tryck på *Pin* och sedan på kartan; tryck på en nål för
+att ta bort den). Kod: `src/ui/map.js`.
+
 ## Samla och bygga
 
 1. Bygg en **Forge** i lägret och smid en **hacka** (Forge → Tools). Det finns tre nivåer; högre
    nivå hugger snabbare och kan bryta kristaller.
-2. Gå fram till ett träd eller en sten och tryck Use (håll inne för att fortsätta). Träd ger
+2. Byt till hackan (plats 3), gå fram till ett träd eller en sten och tryck på attack eller Use
+   (håll inne för att fortsätta). Träd ger
    **trä** och stenar ger **sten**. Utanför lägret växer de tillbaka efter en stund; inne i lägret
    förblir marken röjd så att du kan bygga där.
 3. Tryck **G** (eller hammarknappen) i lägret för **byggläget**. Välj något i listan och klicka
@@ -123,7 +188,7 @@ Use, eller öppna lägerpanelen (B / hus-knappen). Varje byggnad har nivåer med
 | Vault | Fler platser i väskan och förrådet |
 | Library | Billigare research |
 | Training Grounds | Mer Attack Power och Defense |
-| Essence Well | Producerar essence i realtid, även när du inte spelar (med tak) |
+| Essence Well | Producerar essence i realtid, även när du inte spelar (med tak). Ger 15 essence/timme per nivå |
 | Waystone | Teleportera hem till lägret. Nivå 2: gå tillbaka dit du var |
 
 Logiken ligger i `src/game/base.js` (rena funktioner, testade i `tests/unit/base.test.js`),
@@ -141,6 +206,13 @@ panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src
 - **Forge:** fyra steg (typ, material, element, kvalitet) med klickbara rutor i stället för
   rullgardiner, tillval i en egen sektion och en live-förhandsvisning av vapnet på städet. På
   mobil ligger kostnad och Forge-knapp fast längst ned.
+- **Helskärm på mobil:** appen installeras med `display: fullscreen`, så systemfälten inte
+  ramar in spelet. Canvasen täcker hela skärmen (även bakom notch och rundade hörn, med safe
+  areas för gränssnittet). I webbläsaren på en telefon går spelet in i helskärm när du trycker
+  Play; det kan stängas av under *Settings → Full screen on phones*.
+- **Mobilgränssnitt:** en smal dock (Inventory, karta, bygg, meny), en hotbar med stora
+  tryckytor ovanför knapparna och kompakta paneler. Notiser flyttar ned till skärmens nederkant
+  när en panel är öppen, så de aldrig täcker stängknappen.
 - **Vapenanimationer** (`src/render/weapon-anim.js`): varje attack har upptakt, slag och
   efterföljning. Skadan landar på träffögonblicket, svingar växlar sida (kombokänsla), och slag
   ger släpspår, hit-stop och studs på fienden.
@@ -149,7 +221,7 @@ panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src
 
 | § | Krav | Implementation |
 | --- | --- | --- |
-| 1 | Installation, ikon, namn, splash, manifest | `manifest.webmanifest` (standalone, `orientation: any`, ikoner 72–512 + maskable), `icons/` (genereras av `scripts/make-icons.mjs`), splash i `index.html` |
+| 1 | Installation, ikon, namn, splash, manifest | `manifest.webmanifest` (fullscreen med standalone som reserv, `orientation: any`, ikoner 72–512 + maskable), `icons/` (genereras av `scripts/make-icons.mjs`), splash i `index.html` |
 | 1 | Responsivitet | `css/app.css` (safe areas, portrait/landscape, helskärmspaneler på mobil), `src/render/renderer.js` (heltalsskalad lågupplöst buffert för alla skärmar) |
 | 1 | Offline | `sw.js` + `precache-manifest.js`, statusindikator (`#net-status`, titelskärm, inställningar) |
 | 1 | Prestanda | Lazy-laddade paneler (`src/ui/panels.js`), chunk-förrendering, partikel- och fiendebudgetar, automatisk kvalitetsnivå (`Game#trackPerformance`) |
@@ -268,7 +340,8 @@ src/
   data/                       laddning, validering, klientens kapabiliteter
   weapons/                    generator, regler, namn, visuals, DNA, crafting, worker
   game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger,
-                              insamling (gathering.js), byggen (construction.js)
+                              insamling (gathering.js), byggen (construction.js),
+                              marknader (markets.js), ekonomi och vapenvärde (economy.js)
   render/                     renderer, pixelsprites, tiles, vapensprites, byggnader,
                               konstruktioner, animationer
   input/, audio/, storage/, pwa/, ui/
@@ -288,6 +361,8 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 - Ingen backend ingår. Synk-klienten och protokollet finns, men en server och
   kontohantering behöver byggas separat.
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
+- Marknadernas NPC:er är enkla (handlare står still, bybor strövar). Nästa steg kan vara
+  karavaner mellan marknader och uppdrag från handlarna.
 - Fiender attackerar inte lägret på egen hand ännu. Ett naturligt nästa steg är räder mot
   lägret (vågor av fiender) där väggar och turrets verkligen sätts på prov.
 - iOS saknar manifest-splash. Där används appens egen startskärm.

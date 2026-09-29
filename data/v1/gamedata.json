@@ -955,7 +955,7 @@
     { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
     { "id": "rare", "name": "Azure Catalyst", "minRarity": "rare", "maxRarity": "epic", "essence": 120, "scrap": 60, "requiresForge": 2 },
     { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 350, "scrap": 150, "requiresForge": 4 },
-    { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 900, "scrap": 400, "requiresForge": 5, "requiresBoss": true }
+    { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 2500, "scrap": 1200, "shards": 3, "requiresForge": 5, "requiresBoss": true }
   ],
   "crafting": { "scrapCost": 40, "essenceCost": 30, "runeCost": 40, "abilityCost": 150, "levelScalePct": 6 },
   "base": {
@@ -1027,7 +1027,7 @@
       {
         "id": "well", "name": "Essence Well", "x": 0.5, "y": -3.5,
         "desc": "Draws essence from the ground, even while you are away. Come back and collect it.",
-        "perLevel": { "essencePerHour": 5 },
+        "perLevel": { "essencePerHour": 15 },
         "levels": [
           { "scrap": 40, "essence": 10, "playerLevel": 3 },
           { "scrap": 120, "essence": 60, "stone": 40, "playerLevel": 6 },

@@ -17,11 +17,14 @@ const loaders = {
   crafting: () => import('./crafting.js'),
   research: () => import('./research.js'),
   base: () => import('./base.js'),
+  map: () => import('./map.js'),
+  market: () => import('./market.js'),
   settings: () => import('./settings.js'),
 };
 
 const DOCK = {
   'btn-inventory': 'inventory',
+  'btn-map': 'map',
   'btn-forge': 'crafting',
   'btn-research': 'research',
   'btn-base': 'base',
@@ -58,7 +61,6 @@ export class Panels {
       closeModal();
       return;
     }
-    if (name === 'map') return;
     if (name === 'build') {
       if (isModalOpen()) closeModal(true);
       this.game.toggleBuildMode();
@@ -125,14 +127,16 @@ export class Panels {
       : null;
     const body = h('div.menu',
       update,
-      h('button.btn-primary', { onclick: () => closeModal(), autofocus: true }, 'Resume'),
+      h('button.btn-primary', { onclick: () => { closeModal(); this.app.enterFullscreen?.(); }, autofocus: true }, 'Resume'),
       recall,
       back,
       h('div.menu-grid',
         item('bag', 'Inventory', go('inventory'), 'I'),
+        item('map', 'Map', go('map'), 'M'),
         item('anvil', 'Forge', go('crafting'), 'C'),
         item('book', 'Research', go('research'), 'R'),
-        item('home', 'Camp', go('base'), 'B')),
+        item('home', 'Camp', go('base'), 'B'),
+        item('hammer', 'Build', () => { closeModal(); g.toggleBuildMode(true); }, 'G')),
       item('gear', 'Settings & Save', go('settings')),
       h('p.menu-foot', this.app.statusLine()));
     openModal({ title: 'Paused', body, className: 'menu-panel', onClose: () => { this.open = null; } });
