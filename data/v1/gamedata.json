@@ -1,0 +1,974 @@
+{
+  "schemaVersion": 1,
+  "dataVersion": "1.0.0",
+  "player": {
+    "health": 100,
+    "moveSpeed": 4.4,
+    "attackPower": 0,
+    "defense": 4,
+    "critChance": 5,
+    "critDamage": 150,
+    "luck": 0,
+    "sprintMultiplier": 1.6,
+    "perLevel": { "health": 12, "attackPower": 3, "defense": 1.5, "luck": 0.5 },
+    "xp": { "base": 40, "growth": 1.32 },
+    "elementAttunement": 12
+  },
+  "balance": {
+    "levelDamageGrowth": 0.09,
+    "caps": {
+      "attackSpeed": 4,
+      "critChance": 75,
+      "critDamage": 400,
+      "projectiles": 7,
+      "pierce": 6,
+      "range": 12,
+      "damagePct": 90
+    },
+    "maxElements": 2
+  },
+  "rarities": [
+    {
+      "id": "common", "name": "Common", "color": "#c3c8cf", "weight": 560,
+      "modifiers": [1, 2], "effects": [0, 0], "effectChance": 0, "minBehavior": 0,
+      "budget": 24, "statMult": 1.0, "magnitude": [0.0, 0.6],
+      "abilityChance": 0, "drawbackChance": 0, "perfBudget": 3, "vfxBudget": 1, "ratingCap": 1.2
+    },
+    {
+      "id": "uncommon", "name": "Uncommon", "color": "#5fd35f", "weight": 260,
+      "modifiers": [2, 3], "effects": [0, 1], "effectChance": 0.35, "minBehavior": 1,
+      "budget": 38, "statMult": 1.04, "magnitude": [0.1, 0.7],
+      "abilityChance": 0, "drawbackChance": 0.06, "perfBudget": 4, "vfxBudget": 2, "ratingCap": 1.3
+    },
+    {
+      "id": "rare", "name": "Rare", "color": "#4aa3ff", "weight": 120,
+      "modifiers": [3, 4], "effects": [1, 1], "effectChance": 1, "minBehavior": 1,
+      "budget": 54, "statMult": 1.07, "magnitude": [0.2, 0.8],
+      "abilityChance": 0, "drawbackChance": 0.1, "perfBudget": 6, "vfxBudget": 2, "ratingCap": 1.4
+    },
+    {
+      "id": "epic", "name": "Epic", "color": "#b35cff", "weight": 48,
+      "modifiers": [4, 5], "effects": [1, 2], "effectChance": 0.5, "minBehavior": 2,
+      "budget": 74, "statMult": 1.1, "magnitude": [0.3, 0.9],
+      "abilityChance": 0.15, "drawbackChance": 0.15, "perfBudget": 8, "vfxBudget": 3, "ratingCap": 1.5
+    },
+    {
+      "id": "legendary", "name": "Legendary", "color": "#ffb020", "weight": 12,
+      "modifiers": [5, 7], "effects": [1, 2], "effectChance": 0.6, "minBehavior": 2,
+      "budget": 106, "statMult": 1.12, "magnitude": [0.4, 1.0],
+      "abilityChance": 1, "drawbackChance": 0.2, "perfBudget": 10, "vfxBudget": 4, "ratingCap": 1.65
+    }
+  ],
+  "elements": [
+    {
+      "id": "physical", "name": "Physical", "weight": 30, "status": null,
+      "palette": null, "glow": null, "particles": null, "edge": null, "opposes": [],
+      "abilityPrefix": "", "soundPitch": 1.0
+    },
+    {
+      "id": "fire", "name": "Fire", "weight": 10, "status": "burn",
+      "palette": ["#ffe08a", "#ff7b25", "#b8231a"], "glow": "#ff8a2a", "particles": "ember",
+      "edge": null, "opposes": ["ice"], "abilityPrefix": "Inferno", "soundPitch": 0.9
+    },
+    {
+      "id": "ice", "name": "Ice", "weight": 10, "status": "chill",
+      "palette": ["#f4fcff", "#8fd6ff", "#3a78cf"], "glow": "#a9e6ff", "particles": "frost",
+      "edge": "crystal", "opposes": ["fire"], "abilityPrefix": "Frost", "soundPitch": 1.25
+    },
+    {
+      "id": "lightning", "name": "Lightning", "weight": 9, "status": "shock",
+      "palette": ["#fffcd6", "#ffe45c", "#b98f10"], "glow": "#fff27a", "particles": "spark",
+      "edge": "jagged", "opposes": [], "abilityPrefix": "Storm", "soundPitch": 1.4
+    },
+    {
+      "id": "poison", "name": "Poison", "weight": 8, "status": "poison",
+      "palette": ["#e0ffae", "#79d23c", "#2d7228"], "glow": "#9dff5c", "particles": "toxic",
+      "edge": null, "opposes": [], "abilityPrefix": "Venom", "soundPitch": 0.8
+    },
+    {
+      "id": "bleed", "name": "Bleed", "weight": 8, "status": "bleed",
+      "palette": ["#ffb0b0", "#d0263a", "#651021"], "glow": "#ff3450", "particles": "blood",
+      "edge": "serrated", "opposes": [], "abilityPrefix": "Blood", "soundPitch": 0.95
+    },
+    {
+      "id": "void", "name": "Void", "weight": 6, "status": "rift",
+      "palette": ["#cdb2ff", "#6b3fc6", "#1f0e3a"], "glow": "#9a5cff", "particles": "void",
+      "edge": "jagged", "opposes": ["holy"], "abilityPrefix": "Void", "soundPitch": 0.7, "distortion": true
+    },
+    {
+      "id": "earth", "name": "Earth", "weight": 7, "status": "stagger",
+      "palette": ["#ead3a6", "#a8804a", "#553b20"], "glow": "#d9a45c", "particles": "dust",
+      "edge": null, "opposes": [], "abilityPrefix": "Stone", "soundPitch": 0.75
+    },
+    {
+      "id": "wind", "name": "Wind", "weight": 7, "status": "gust",
+      "palette": ["#effff9", "#9de8c8", "#3a9481"], "glow": "#bfffe6", "particles": "leaf",
+      "edge": null, "opposes": [], "abilityPrefix": "Gale", "soundPitch": 1.2
+    },
+    {
+      "id": "holy", "name": "Holy", "weight": 5, "status": "smite",
+      "palette": ["#fffef4", "#ffe9a3", "#cf9f30"], "glow": "#fff3b0", "particles": "holy",
+      "edge": null, "opposes": ["void"], "abilityPrefix": "Radiant", "soundPitch": 1.3
+    },
+    {
+      "id": "arcane", "name": "Arcane", "weight": 5, "status": "mark",
+      "palette": ["#ffd8fc", "#e05ce0", "#721d82"], "glow": "#ff8cf5", "particles": "arcane",
+      "edge": null, "opposes": [], "abilityPrefix": "Arcane", "soundPitch": 1.1
+    }
+  ],
+  "statuses": {
+    "burn": { "name": "Burning", "color": "#ff7b25", "duration": 3, "dotPct": 14 },
+    "chill": { "name": "Chilled", "color": "#8fd6ff", "duration": 2, "slow": 40, "freezeAt": 3 },
+    "freeze": { "name": "Frozen", "color": "#dff6ff", "duration": 1.2 },
+    "shock": { "name": "Shocked", "color": "#ffe45c", "duration": 3, "vulnerability": 20 },
+    "poison": { "name": "Poisoned", "color": "#79d23c", "duration": 4, "dotPct": 7, "maxStacks": 5 },
+    "bleed": { "name": "Bleeding", "color": "#d0263a", "duration": 4, "dotPct": 10, "maxStacks": 3 },
+    "rift": { "name": "Rifted", "color": "#9a5cff", "duration": 3, "dotPct": 9, "slow": 20 },
+    "stagger": { "name": "Staggered", "color": "#d9a45c", "duration": 0.5, "stun": true, "immunity": 2 },
+    "gust": { "name": "Buffeted", "color": "#bfffe6", "duration": 0.3, "knockback": 2 },
+    "smite": { "name": "Smitten", "color": "#fff3b0", "duration": 0.1, "bonusPct": 25 },
+    "mark": { "name": "Marked", "color": "#ff8cf5", "duration": 4 }
+  },
+  "materials": [
+    {
+      "id": "iron", "name": "Iron", "kinds": ["metal"], "weight": 14,
+      "palette": ["#eef1f5", "#a4abb6", "#565e6a"], "handle": ["#9a6a3d", "#5b3a21"],
+      "stats": { "damage": 1.0, "attackSpeed": 1.0, "range": 1.0, "crit": 0 }, "tags": []
+    },
+    {
+      "id": "steel", "name": "Steel", "kinds": ["metal"], "weight": 10,
+      "palette": ["#ffffff", "#c3cad6", "#687383"], "handle": ["#3c3f58", "#23243a"],
+      "stats": { "damage": 1.06, "attackSpeed": 1.0, "range": 1.0, "crit": 1 }, "tags": ["damage"]
+    },
+    {
+      "id": "bronze", "name": "Bronze", "kinds": ["metal"], "weight": 9,
+      "palette": ["#ffe0a8", "#cf8f45", "#74461d"], "handle": ["#6b3f28", "#40241a"],
+      "stats": { "damage": 0.97, "attackSpeed": 1.04, "range": 1.0, "crit": 0 }, "tags": ["speed"]
+    },
+    {
+      "id": "bone", "name": "Bone", "kinds": ["metal", "wood"], "weight": 7,
+      "palette": ["#fbf6e4", "#d8cfae", "#8a7f5e"], "handle": ["#7d5a45", "#4a3326"],
+      "stats": { "damage": 0.95, "attackSpeed": 1.06, "range": 1.0, "crit": 3 }, "tags": ["crit", "bleed"]
+    },
+    {
+      "id": "oak", "name": "Oak", "kinds": ["wood"], "weight": 12,
+      "palette": ["#e2b47a", "#a8743e", "#5f3d1c"], "handle": ["#5f3d1c", "#3a2410"],
+      "stats": { "damage": 1.0, "attackSpeed": 1.0, "range": 1.0, "crit": 0 }, "tags": []
+    },
+    {
+      "id": "yew", "name": "Yew", "kinds": ["wood"], "weight": 9,
+      "palette": ["#f0c9a0", "#b8683c", "#6a2f1a"], "handle": ["#4a2a18", "#2c170c"],
+      "stats": { "damage": 1.03, "attackSpeed": 1.03, "range": 1.05, "crit": 1 }, "tags": ["range"]
+    },
+    {
+      "id": "obsidian", "name": "Obsidian", "kinds": ["metal", "crystal"], "weight": 6,
+      "palette": ["#8f86a8", "#3d3550", "#15111e"], "handle": ["#5a2d2d", "#2e1414"],
+      "stats": { "damage": 1.1, "attackSpeed": 0.95, "range": 1.0, "crit": 2 }, "tags": ["fire", "damage"]
+    },
+    {
+      "id": "crystal", "name": "Crystal", "kinds": ["crystal", "metal"], "weight": 6,
+      "palette": ["#f2ffff", "#9fe7f2", "#3f8fb0"], "handle": ["#b0b8d8", "#6a7098"],
+      "stats": { "damage": 1.02, "attackSpeed": 1.05, "range": 1.02, "crit": 2 }, "tags": ["ice", "arcane"]
+    },
+    {
+      "id": "mythril", "name": "Mythril", "kinds": ["metal", "crystal"], "weight": 5,
+      "palette": ["#f4fbff", "#9fc7e8", "#4c6f9a"], "handle": ["#e8e8f0", "#9a9ab0"],
+      "stats": { "damage": 1.08, "attackSpeed": 1.08, "range": 1.0, "crit": 2 }, "tags": ["speed", "holy"]
+    },
+    {
+      "id": "dragonscale", "name": "Dragonscale", "kinds": ["metal", "wood"], "weight": 4,
+      "palette": ["#ffc38a", "#c2452d", "#5a1a16"], "handle": ["#3a2a1a", "#1e150c"],
+      "stats": { "damage": 1.12, "attackSpeed": 1.0, "range": 1.0, "crit": 3 }, "tags": ["fire", "crit"]
+    },
+    {
+      "id": "fang", "name": "Monster Fang", "kinds": ["metal", "wood"], "weight": 5,
+      "palette": ["#fff7e0", "#e3cf9a", "#8c6f3a"], "handle": ["#4d2e2e", "#2a1616"],
+      "stats": { "damage": 1.0, "attackSpeed": 1.04, "range": 1.0, "crit": 5 }, "tags": ["bleed", "crit"]
+    },
+    {
+      "id": "ancient", "name": "Ancient", "kinds": ["metal"], "weight": 4,
+      "palette": ["#e6f0d8", "#8fa37a", "#3d4a33"], "handle": ["#6a5a2a", "#3a3016"],
+      "stats": { "damage": 1.15, "attackSpeed": 0.93, "range": 1.05, "crit": 1 }, "tags": ["damage", "holy"]
+    },
+    {
+      "id": "shadowsteel", "name": "Shadowsteel", "kinds": ["metal", "crystal"], "weight": 4,
+      "palette": ["#b8a8d8", "#4e3f78", "#140f24"], "handle": ["#2a2a3a", "#101018"],
+      "stats": { "damage": 1.07, "attackSpeed": 1.06, "range": 1.0, "crit": 3 }, "tags": ["void", "crit"]
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "sword", "name": "Sword", "class": "melee", "weight": 14, "kinds": ["metal"],
+      "tags": ["melee", "blade"],
+      "attack": { "pattern": "swing", "arc": [110, 150] },
+      "base": { "damage": [24, 34], "attackSpeed": [1.25, 1.6], "range": [2.2, 2.9], "critChance": [5, 10], "critDamage": [150, 170] },
+      "sprite": { "template": "blade", "dims": { "length": [13, 17], "width": [3, 3], "guard": [5, 7], "handle": [4, 5] }, "choices": { "tip": ["point", "clip", "round"], "fuller": [true, false] } },
+      "sound": { "type": "swish", "pitch": [520, 700] },
+      "nouns": ["Edge", "Blade", "Brand", "Saber", "Oath", "Vow", "Sabre", "Glory", "Warden", "Promise"], "suffixes": ["edge", "brand", "bite", "cleaver"]
+    },
+    {
+      "id": "greatsword", "name": "Greatsword", "class": "melee", "weight": 8, "kinds": ["metal"],
+      "tags": ["melee", "blade", "heavy"],
+      "attack": { "pattern": "swing", "arc": [150, 190] },
+      "base": { "damage": [42, 58], "attackSpeed": [0.7, 0.95], "range": [2.8, 3.4], "critChance": [4, 8], "critDamage": [160, 190] },
+      "sprite": { "template": "blade", "dims": { "length": [18, 21], "width": [4, 5], "guard": [7, 9], "handle": [5, 6] }, "choices": { "tip": ["point", "round"], "fuller": [true] } },
+      "sound": { "type": "swish", "pitch": [300, 420] },
+      "nouns": ["Greatblade", "Colossus", "Oathkeeper", "Slab", "Cleaver", "Titanblade", "Behemoth", "Judgement", "Monolith"], "suffixes": ["breaker", "cleaver", "brand"]
+    },
+    {
+      "id": "dagger", "name": "Dagger", "class": "melee", "weight": 12, "kinds": ["metal"],
+      "tags": ["melee", "blade", "fast"],
+      "attack": { "pattern": "thrust", "width": [0.6, 0.8] },
+      "base": { "damage": [13, 19], "attackSpeed": [2.3, 3.0], "range": [1.5, 1.9], "critChance": [10, 18], "critDamage": [160, 200] },
+      "sprite": { "template": "blade", "dims": { "length": [7, 9], "width": [2, 3], "guard": [3, 5], "handle": [3, 4] }, "choices": { "tip": ["point", "clip", "curved"], "fuller": [false] } },
+      "sound": { "type": "swish", "pitch": [800, 1000] },
+      "nouns": ["Fang", "Needle", "Sting", "Kiss", "Tooth", "Whisper", "Shiv", "Talon", "Secret", "Thorn"], "suffixes": ["fang", "bite", "sting", "kiss"]
+    },
+    {
+      "id": "axe", "name": "Axe", "class": "melee", "weight": 11, "kinds": ["metal"],
+      "tags": ["melee", "heavy"],
+      "attack": { "pattern": "swing", "arc": [100, 130] },
+      "base": { "damage": [30, 42], "attackSpeed": [0.95, 1.2], "range": [2.0, 2.6], "critChance": [6, 11], "critDamage": [170, 200] },
+      "sprite": { "template": "axe", "dims": { "handle": [15, 19], "head": [4, 6] }, "choices": { "double": [true, false] } },
+      "sound": { "type": "chop", "pitch": [380, 520] },
+      "nouns": ["Axe", "Hewer", "Cleaver", "Splitter", "Widow", "Reaver", "Bearded Axe", "Headsman", "Chopper"], "suffixes": ["jaw", "hewer", "splitter", "cleaver"]
+    },
+    {
+      "id": "hammer", "name": "Hammer", "class": "melee", "weight": 9, "kinds": ["metal"],
+      "tags": ["melee", "heavy", "aoe"],
+      "attack": { "pattern": "slam", "radius": [1.4, 1.9] },
+      "base": { "damage": [44, 60], "attackSpeed": [0.6, 0.85], "range": [1.9, 2.3], "critChance": [3, 7], "critDamage": [150, 170] },
+      "sprite": { "template": "hammer", "dims": { "handle": [15, 19], "headW": [7, 9], "headH": [4, 6] }, "choices": { "spike": [true, false] } },
+      "sound": { "type": "thud", "pitch": [160, 240] },
+      "nouns": ["Maul", "Hammer", "Anvil", "Gavel", "Crusher", "Warhammer", "Thunderhead", "Mallet", "Quake"], "suffixes": ["breaker", "crusher", "maul", "fall"]
+    },
+    {
+      "id": "spear", "name": "Spear", "class": "melee", "weight": 10, "kinds": ["metal", "wood"],
+      "tags": ["melee", "reach"],
+      "attack": { "pattern": "thrust", "width": [0.7, 0.9] },
+      "base": { "damage": [26, 36], "attackSpeed": [1.1, 1.4], "range": [3.2, 4.0], "critChance": [5, 10], "critDamage": [150, 170] },
+      "sprite": { "template": "polearm", "dims": { "handle": [20, 24], "tipLength": [5, 7], "tipWidth": [3, 3] }, "choices": { "tassel": [true, false] } },
+      "sound": { "type": "swish", "pitch": [600, 780] },
+      "nouns": ["Lance", "Pike", "Spear", "Talon", "Spire", "Glaive", "Partisan", "Needle", "Halberd"], "suffixes": ["piercer", "lance", "spire", "talon"]
+    },
+    {
+      "id": "scythe", "name": "Scythe", "class": "melee", "weight": 7, "kinds": ["metal"],
+      "tags": ["melee", "blade", "wide"],
+      "attack": { "pattern": "swing", "arc": [200, 260] },
+      "base": { "damage": [32, 44], "attackSpeed": [0.85, 1.1], "range": [2.8, 3.4], "critChance": [8, 14], "critDamage": [170, 210] },
+      "sprite": { "template": "scythe", "dims": { "handle": [20, 24], "blade": [8, 11] }, "choices": { "hook": [true, false] } },
+      "sound": { "type": "swish", "pitch": [360, 480] },
+      "nouns": ["Reaper", "Harvester", "Scythe", "Requiem", "Crescent", "Sickle", "Last Rite", "Mourner", "Gravewind"], "suffixes": ["reaper", "harvest", "reap"]
+    },
+    {
+      "id": "mace", "name": "Mace", "class": "melee", "weight": 9, "kinds": ["metal"],
+      "tags": ["melee", "heavy"],
+      "attack": { "pattern": "swing", "arc": [90, 120] },
+      "base": { "damage": [32, 42], "attackSpeed": [0.95, 1.15], "range": [2.0, 2.4], "critChance": [3, 7], "critDamage": [150, 165] },
+      "sprite": { "template": "mace", "dims": { "handle": [12, 15], "head": [4, 6] }, "choices": { "spikes": [true, false] } },
+      "sound": { "type": "thud", "pitch": [220, 300] },
+      "nouns": ["Morningstar", "Mace", "Scepter", "Knell", "Bludgeon", "Flail", "Censer", "Scepter of Ruin", "Club"], "suffixes": ["breaker", "knell", "crusher"]
+    },
+    {
+      "id": "bow", "name": "Bow", "class": "ranged", "weight": 12, "kinds": ["wood"],
+      "tags": ["ranged", "projectile"],
+      "attack": { "pattern": "shoot", "projectile": "arrow", "speed": [14, 18], "count": 1, "spread": 0, "size": 2 },
+      "base": { "damage": [20, 28], "attackSpeed": [1.1, 1.5], "range": [7, 9], "critChance": [6, 12], "critDamage": [160, 190] },
+      "sprite": { "template": "bow", "dims": { "height": [20, 24], "curve": [4, 6] }, "choices": { "recurve": [true, false] } },
+      "sound": { "type": "twang", "pitch": [420, 560] },
+      "nouns": ["Longbow", "Bow", "Whisper", "Talon", "Heartseeker", "Recurve", "Shortbow", "Horizon", "Warbow"], "suffixes": ["song", "string", "shot", "wind"]
+    },
+    {
+      "id": "crossbow", "name": "Crossbow", "class": "ranged", "weight": 8, "kinds": ["wood", "metal"],
+      "tags": ["ranged", "projectile", "heavy"],
+      "attack": { "pattern": "shoot", "projectile": "bolt", "speed": [18, 22], "count": 1, "spread": 0, "size": 2, "pierce": 1 },
+      "base": { "damage": [34, 44], "attackSpeed": [0.7, 0.9], "range": [8, 10], "critChance": [8, 14], "critDamage": [170, 200] },
+      "sprite": { "template": "crossbow", "dims": { "stock": [16, 20], "arms": [11, 13] }, "choices": { "scope": [true, false] } },
+      "sound": { "type": "twang", "pitch": [300, 380] },
+      "nouns": ["Arbalest", "Crossbow", "Ballista", "Verdict", "Bolt", "Repeater", "Stinger", "Sentinel", "Latch"], "suffixes": ["bolt", "shot", "piercer"]
+    },
+    {
+      "id": "gun", "name": "Gun", "class": "ranged", "weight": 8, "kinds": ["metal"],
+      "tags": ["ranged", "projectile", "fast"],
+      "attack": { "pattern": "shoot", "projectile": "bullet", "speed": [22, 28], "count": 1, "spread": 6, "size": 1 },
+      "base": { "damage": [16, 22], "attackSpeed": [2.2, 3.0], "range": [7, 9], "critChance": [4, 8], "critDamage": [150, 170] },
+      "sprite": { "template": "gun", "dims": { "barrel": [9, 13], "grip": [5, 6] }, "choices": { "drum": [true, false] } },
+      "sound": { "type": "bang", "pitch": [180, 260] },
+      "nouns": ["Revolver", "Hand Cannon", "Repeater", "Barker", "Pistol", "Flintlock", "Blaster", "Musket", "Peacemaker"], "suffixes": ["shot", "barker", "fire"]
+    },
+    {
+      "id": "cannon", "name": "Cannon", "class": "ranged", "weight": 6, "kinds": ["metal"],
+      "tags": ["ranged", "projectile", "heavy", "aoe"],
+      "attack": { "pattern": "lob", "projectile": "ball", "speed": [8, 10], "count": 1, "spread": 0, "size": 3, "blast": [1.4, 2.0] },
+      "base": { "damage": [50, 66], "attackSpeed": [0.45, 0.65], "range": [6, 8], "critChance": [3, 6], "critDamage": [150, 160] },
+      "sprite": { "template": "cannon", "dims": { "barrel": [12, 16], "bore": [4, 5] }, "choices": { "bands": [true, false] } },
+      "sound": { "type": "boom", "pitch": [90, 140] },
+      "nouns": ["Cannon", "Mortar", "Thunderer", "Bombard", "Roar", "Howitzer", "Bombardier", "Siege", "Blunderbuss"], "suffixes": ["roar", "fall", "breaker"]
+    },
+    {
+      "id": "wand", "name": "Wand", "class": "ranged", "weight": 10, "kinds": ["wood", "crystal"],
+      "tags": ["ranged", "projectile", "magic", "fast"],
+      "attack": { "pattern": "shoot", "projectile": "spark", "speed": [13, 17], "count": 1, "spread": 3, "size": 2 },
+      "base": { "damage": [14, 20], "attackSpeed": [2.0, 2.6], "range": [6, 8], "critChance": [6, 10], "critDamage": [150, 170] },
+      "sprite": { "template": "wand", "dims": { "length": [11, 14], "gem": [2, 3] }, "choices": { "star": [true, false] } },
+      "sound": { "type": "zap", "pitch": [700, 900] },
+      "nouns": ["Wand", "Rod", "Spark", "Whisperwood", "Scepter", "Twig", "Baton", "Channel", "Focus"], "suffixes": ["spark", "song", "whisper"]
+    },
+    {
+      "id": "staff", "name": "Staff", "class": "ranged", "weight": 10, "kinds": ["wood", "crystal"],
+      "tags": ["ranged", "projectile", "magic"],
+      "attack": { "pattern": "shoot", "projectile": "orb", "speed": [9, 12], "count": 1, "spread": 0, "size": 4 },
+      "base": { "damage": [30, 40], "attackSpeed": [0.8, 1.05], "range": [6, 8], "critChance": [5, 9], "critDamage": [150, 170] },
+      "sprite": { "template": "staff", "dims": { "length": [22, 26], "head": [3, 5] }, "choices": { "headType": ["orb", "crystal", "crook"] } },
+      "sound": { "type": "zap", "pitch": [380, 520] },
+      "nouns": ["Staff", "Stave", "Rod", "Crook", "Pillar", "Scepter", "Warstaff", "Branch", "Conduit"], "suffixes": ["caller", "song", "weaver"]
+    },
+    {
+      "id": "boomerang", "name": "Boomerang", "class": "special", "weight": 8, "kinds": ["wood", "metal"],
+      "tags": ["special", "projectile", "thrown"],
+      "attack": { "pattern": "boomerang", "projectile": "boomerang", "speed": [10, 12], "count": 1, "spread": 0, "size": 4, "pierce": 99 },
+      "base": { "damage": [22, 30], "attackSpeed": [1.0, 1.3], "range": [5, 7], "critChance": [6, 10], "critDamage": [150, 170] },
+      "sprite": { "template": "boomerang", "dims": { "arm": [7, 9], "width": [2, 3] }, "choices": { "hooked": [true, false] } },
+      "sound": { "type": "whirl", "pitch": [300, 420] },
+      "nouns": ["Wing", "Returner", "Loop", "Swallow", "Crescent", "Kylie", "Arc", "Hookwing", "Glider"], "suffixes": ["wing", "loop", "return"]
+    },
+    {
+      "id": "chakram", "name": "Chakram", "class": "special", "weight": 6, "kinds": ["metal"],
+      "tags": ["special", "projectile", "thrown", "blade"],
+      "attack": { "pattern": "boomerang", "projectile": "chakram", "speed": [12, 14], "count": 1, "spread": 0, "size": 4, "pierce": 99 },
+      "base": { "damage": [24, 32], "attackSpeed": [1.1, 1.4], "range": [5, 6.5], "critChance": [8, 12], "critDamage": [160, 180] },
+      "sprite": { "template": "chakram", "dims": { "size": [9, 11] }, "choices": { "spikes": [true, false] } },
+      "sound": { "type": "whirl", "pitch": [520, 640] },
+      "nouns": ["Halo", "Chakram", "Disc", "Wheel", "Ring", "Sunwheel", "Orbit", "Spinner", "Cyclone"], "suffixes": ["wheel", "halo", "ring"]
+    },
+    {
+      "id": "orb", "name": "Magic Orb", "class": "special", "weight": 6, "kinds": ["crystal"],
+      "tags": ["special", "projectile", "magic"],
+      "attack": { "pattern": "shoot", "projectile": "globe", "speed": [6, 8], "count": 1, "spread": 0, "size": 5, "pierce": 3 },
+      "base": { "damage": [26, 34], "attackSpeed": [0.9, 1.2], "range": [6, 8], "critChance": [5, 9], "critDamage": [150, 170] },
+      "sprite": { "template": "orb", "dims": { "size": [8, 11] }, "choices": { "rings": [true, false] } },
+      "sound": { "type": "hum", "pitch": [240, 340] },
+      "nouns": ["Orb", "Eye", "Heart", "Moon", "Sphere", "Globe", "Pearl", "Oracle", "Iris"], "suffixes": ["eye", "heart", "light"]
+    },
+    {
+      "id": "whip", "name": "Whip", "class": "special", "weight": 6, "kinds": ["wood", "metal"],
+      "tags": ["special", "melee", "reach"],
+      "attack": { "pattern": "lash", "arc": [50, 70] },
+      "base": { "damage": [20, 28], "attackSpeed": [1.3, 1.7], "range": [3.6, 4.4], "critChance": [8, 14], "critDamage": [160, 190] },
+      "sprite": { "template": "whip", "dims": { "handle": [5, 6], "coils": [3, 4] }, "choices": { "barbed": [true, false] } },
+      "sound": { "type": "crack", "pitch": [900, 1100] },
+      "nouns": ["Lash", "Whip", "Tail", "Serpent", "Scourge", "Scourge", "Viper", "Coil", "Cat"], "suffixes": ["lash", "tail", "coil"]
+    },
+    {
+      "id": "throwing", "name": "Throwing Knives", "class": "special", "weight": 8, "kinds": ["metal"],
+      "tags": ["special", "projectile", "thrown", "multi", "fast"],
+      "attack": { "pattern": "volley", "projectile": "knife", "speed": [15, 18], "count": 3, "spread": 26, "size": 2 },
+      "base": { "damage": [11, 15], "attackSpeed": [1.4, 1.8], "range": [5, 6.5], "critChance": [8, 14], "critDamage": [160, 190] },
+      "sprite": { "template": "knives", "dims": { "length": [6, 8] }, "choices": { "curved": [true, false] } },
+      "sound": { "type": "swish", "pitch": [900, 1100] },
+      "nouns": ["Flurry", "Needles", "Hail", "Swarm", "Fans", "Darts", "Stars", "Kunai", "Shards"], "suffixes": ["flurry", "storm", "hail"]
+    },
+    {
+      "id": "lantern", "name": "Soul Lantern", "class": "special", "weight": 5, "kinds": ["metal"],
+      "tags": ["special", "projectile", "magic", "exotic"],
+      "attack": { "pattern": "wisp", "projectile": "wisp", "speed": [7, 9], "count": 2, "spread": 50, "size": 3, "homing": 1 },
+      "base": { "damage": [14, 20], "attackSpeed": [1.0, 1.3], "range": [6, 7], "critChance": [5, 9], "critDamage": [150, 170] },
+      "sprite": { "template": "lantern", "dims": { "size": [6, 8], "chain": [6, 9] }, "choices": { "horns": [true, false] } },
+      "sound": { "type": "hum", "pitch": [420, 520] },
+      "nouns": ["Lantern", "Beacon", "Soulkeeper", "Wick", "Vigil", "Lamp", "Candle", "Soulfire", "Brazier"], "suffixes": ["light", "wick", "keeper"]
+    },
+    {
+      "id": "warfan", "name": "Warfan", "class": "special", "weight": 5, "kinds": ["wood", "metal"],
+      "tags": ["special", "projectile", "multi", "exotic"],
+      "attack": { "pattern": "cone", "projectile": "leafblade", "speed": [11, 13], "count": 5, "spread": 60, "size": 2 },
+      "base": { "damage": [9, 13], "attackSpeed": [1.1, 1.4], "range": [3.5, 4.5], "critChance": [6, 10], "critDamage": [150, 170] },
+      "sprite": { "template": "fan", "dims": { "ribs": [5, 7], "size": [9, 11] }, "choices": { "tassel": [true, false] } },
+      "sound": { "type": "whirl", "pitch": [640, 760] },
+      "nouns": ["Fan", "Wing", "Petal", "Tempest", "Plume", "Tessen", "Fan", "Gust", "Petals"], "suffixes": ["wing", "plume", "wind"]
+    }
+  ],
+  "modifiers": [
+    { "id": "dmg", "name": "+Damage", "category": "offensive", "kind": "stat", "stat": "damagePct", "range": [8, 40], "step": 1, "cost": { "base": 0, "per": 0.6 }, "weight": 12, "tags": ["damage"], "label": "+{v}% Damage" },
+    { "id": "aspd", "name": "+Attack Speed", "category": "offensive", "kind": "stat", "stat": "attackSpeedPct", "range": [6, 30], "step": 1, "cost": { "base": 0, "per": 0.5 }, "weight": 12, "tags": ["speed"], "label": "+{v}% Attack Speed" },
+    { "id": "critc", "name": "+Critical Chance", "category": "offensive", "kind": "stat", "stat": "critChance", "range": [3, 15], "step": 1, "cost": { "base": 0, "per": 1.1 }, "weight": 10, "tags": ["crit"], "label": "+{v}% Critical Chance" },
+    { "id": "critd", "name": "+Critical Damage", "category": "offensive", "kind": "stat", "stat": "critDamage", "range": [15, 80], "step": 5, "cost": { "base": 0, "per": 0.2 }, "weight": 10, "tags": ["crit"], "label": "+{v}% Critical Damage" },
+    { "id": "pspeed", "name": "+Projectile Speed", "category": "offensive", "kind": "stat", "stat": "projectileSpeedPct", "range": [10, 50], "step": 5, "cost": { "base": 0, "per": 0.12 }, "weight": 6, "tags": ["projectile", "speed"], "requires": ["projectile"], "label": "+{v}% Projectile Speed" },
+    { "id": "range", "name": "+Range", "category": "offensive", "kind": "stat", "stat": "rangePct", "range": [8, 35], "step": 1, "cost": { "base": 0, "per": 0.3 }, "weight": 8, "tags": ["range"], "label": "+{v}% Range" },
+    { "id": "multishot", "name": "+Projectiles", "category": "offensive", "kind": "stat", "stat": "projectiles", "range": [1, 2], "step": 1, "cost": { "base": 1, "per": 9 }, "weight": 6, "tags": ["projectile", "multi"], "requires": ["projectile"], "minRarity": "uncommon", "perf": 2, "label": "+{v} Projectiles" },
+    { "id": "swift", "name": "Swiftness", "category": "offensive", "kind": "stat", "playerStat": "moveSpeedPct", "range": [4, 12], "step": 1, "cost": { "base": 0, "per": 0.8 }, "weight": 5, "tags": ["speed", "mobility"], "label": "+{v}% Movement Speed" },
+    { "id": "guard", "name": "Guard", "category": "offensive", "kind": "stat", "playerStat": "defense", "range": [3, 12], "step": 1, "cost": { "base": 0, "per": 0.8 }, "weight": 5, "tags": ["defense"], "label": "+{v} Defense" },
+    { "id": "fortune", "name": "Fortune", "category": "offensive", "kind": "stat", "playerStat": "luck", "range": [2, 8], "step": 1, "cost": { "base": 0, "per": 1 }, "weight": 4, "tags": ["luck"], "label": "+{v} Luck" },
+
+    { "id": "e_fire", "name": "Fire", "category": "elemental", "kind": "element", "element": "fire", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["fire", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "fire", "pct": "$v" }], "label": "+{v}% damage as Fire" },
+    { "id": "e_ice", "name": "Ice", "category": "elemental", "kind": "element", "element": "ice", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["ice", "elemental", "slow"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "ice", "pct": "$v" }], "label": "+{v}% damage as Ice" },
+    { "id": "e_lightning", "name": "Lightning", "category": "elemental", "kind": "element", "element": "lightning", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["lightning", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "lightning", "pct": "$v" }], "label": "+{v}% damage as Lightning" },
+    { "id": "e_poison", "name": "Poison", "category": "elemental", "kind": "element", "element": "poison", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 6, "tags": ["poison", "elemental", "dot"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "poison", "pct": "$v" }], "label": "+{v}% damage as Poison" },
+    { "id": "e_bleed", "name": "Bleed", "category": "elemental", "kind": "element", "element": "bleed", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 6, "tags": ["bleed", "elemental", "dot"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "bleed", "pct": "$v" }], "label": "+{v}% damage as Bleed" },
+    { "id": "e_void", "name": "Void", "category": "elemental", "kind": "element", "element": "void", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 5, "tags": ["void", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "void", "pct": "$v" }], "label": "+{v}% damage as Void" },
+    { "id": "e_earth", "name": "Earth", "category": "elemental", "kind": "element", "element": "earth", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 5, "tags": ["earth", "elemental", "control"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "earth", "pct": "$v" }], "label": "+{v}% damage as Earth" },
+    { "id": "e_wind", "name": "Wind", "category": "elemental", "kind": "element", "element": "wind", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 5, "tags": ["wind", "elemental", "knockback"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "wind", "pct": "$v" }], "label": "+{v}% damage as Wind" },
+    { "id": "e_holy", "name": "Holy", "category": "elemental", "kind": "element", "element": "holy", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 4, "tags": ["holy", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "holy", "pct": "$v" }], "label": "+{v}% damage as Holy" },
+    { "id": "e_arcane", "name": "Arcane", "category": "elemental", "kind": "element", "element": "arcane", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 4, "tags": ["arcane", "elemental", "crit"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "arcane", "pct": "$v" }], "label": "+{v}% damage as Arcane" },
+
+    { "id": "lifesteal", "name": "Lifesteal", "category": "special", "kind": "behavior", "range": [2, 8], "step": 1, "cost": { "base": 1, "per": 2 }, "weight": 8, "tags": ["lifesteal", "vampire", "sustain"], "hooks": [{ "on": "hit", "do": "heal", "pct": "$v" }], "label": "{v}% of damage restores Health" },
+    { "id": "chain", "name": "Chain Attack", "category": "special", "kind": "behavior", "range": [2, 4], "step": 1, "cost": { "base": 2, "per": 6 }, "weight": 7, "tags": ["chain", "lightning", "aoe"], "perf": 2, "vfx": 1, "hooks": [{ "on": "hit", "do": "chain", "chance": 30, "targets": "$v", "dmg": 45, "radius": 3.5 }], "label": "30% chance to chain to {v} enemies" },
+    { "id": "explosion", "name": "Explosion", "category": "special", "kind": "behavior", "range": [15, 40], "step": 5, "cost": { "base": 6, "per": 0.3 }, "weight": 7, "tags": ["explosion", "aoe", "fire"], "perf": 2, "vfx": 1, "hooks": [{ "on": "hit", "do": "explode", "chance": "$v", "radius": 1.4, "dmg": 50 }], "label": "{v}% chance to explode on hit" },
+    { "id": "pierce", "name": "Piercing", "category": "special", "kind": "behavior", "stat": "pierce", "range": [1, 3], "step": 1, "cost": { "base": 1, "per": 5 }, "weight": 7, "tags": ["pierce", "projectile"], "requires": ["projectile"], "excludesTags": ["returning"], "label": "Projectiles pierce {v} enemies" },
+    { "id": "homing", "name": "Homing", "category": "special", "kind": "behavior", "stat": "homing", "range": [1, 1], "step": 1, "cost": { "base": 12, "per": 0 }, "weight": 6, "tags": ["homing", "projectile"], "requires": ["projectile"], "excludesTags": ["returning", "homing"], "perf": 1, "label": "Projectiles seek enemies" },
+    { "id": "knockback", "name": "Knockback", "category": "special", "kind": "behavior", "stat": "knockback", "range": [1, 3], "step": 1, "cost": { "base": 0, "per": 3 }, "weight": 6, "tags": ["knockback", "control"], "excludesTags": ["pull"], "label": "Knockback +{v}" },
+    { "id": "split", "name": "Split Projectile", "category": "special", "kind": "behavior", "stat": "split", "range": [2, 4], "step": 1, "cost": { "base": 2, "per": 5 }, "weight": 5, "tags": ["split", "projectile", "multi"], "requires": ["projectile"], "excludesTags": ["returning"], "perf": 2, "vfx": 1, "label": "Projectiles split into {v} on hit" },
+    { "id": "burning", "name": "Burning", "category": "special", "kind": "behavior", "range": [15, 45], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 6, "tags": ["burn", "fire", "dot"], "excludes": ["freezing"], "statusElement": "fire", "hooks": [{ "on": "hit", "do": "status", "status": "burn", "chance": "$v" }], "label": "{v}% chance to Burn" },
+    { "id": "freezing", "name": "Freezing", "category": "special", "kind": "behavior", "range": [10, 35], "step": 5, "cost": { "base": 1, "per": 0.4 }, "weight": 6, "tags": ["freeze", "ice", "control"], "excludes": ["burning"], "statusElement": "ice", "hooks": [{ "on": "hit", "do": "status", "status": "freeze", "chance": "$v" }], "label": "{v}% chance to Freeze" },
+    { "id": "shock", "name": "Shock", "category": "special", "kind": "behavior", "range": [15, 45], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 6, "tags": ["shock", "lightning"], "statusElement": "lightning", "hooks": [{ "on": "hit", "do": "status", "status": "shock", "chance": "$v" }], "label": "{v}% chance to Shock" },
+    { "id": "execute", "name": "Execute", "category": "special", "kind": "behavior", "range": [5, 12], "step": 1, "cost": { "base": 4, "per": 2 }, "weight": 4, "tags": ["execute", "damage"], "minRarity": "epic", "hooks": [{ "on": "hit", "do": "execute", "threshold": "$v" }], "label": "Executes enemies below {v}% Health" },
+    { "id": "feast", "name": "Vampiric Kills", "category": "special", "kind": "behavior", "range": [3, 8], "step": 1, "cost": { "base": 0, "per": 1.5 }, "weight": 5, "tags": ["lifesteal", "vampire", "sustain"], "hooks": [{ "on": "kill", "do": "heal", "flat": "$v" }], "label": "Kills restore {v} Health" },
+    { "id": "momentum", "name": "Momentum", "category": "special", "kind": "behavior", "range": [10, 30], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 5, "tags": ["speed", "damage", "mobility"], "hooks": [{ "on": "attack", "do": "sprintBonus", "pct": "$v" }], "label": "+{v}% damage while sprinting" }
+  ],
+  "drawbacks": [
+    { "id": "fragile", "name": "Fragile", "playerStat": "defensePct", "range": [-40, -20], "step": 5, "refund": 10, "tags": ["glass"], "label": "{v}% Defense" },
+    { "id": "heavy", "name": "Heavy", "playerStat": "moveSpeedPct", "range": [-15, -8], "step": 1, "refund": 8, "tags": ["heavy"], "label": "{v}% Movement Speed" },
+    { "id": "bloodprice", "name": "Blood Price", "hooks": [{ "on": "attack", "do": "selfDamage", "flat": "$v" }], "range": [1, 2], "step": 1, "refund": 12, "tags": ["vampire", "glass"], "label": "Attacks cost {v} Health" },
+    { "id": "reckless", "name": "Reckless", "playerStat": "damageTakenPct", "range": [15, 30], "step": 5, "refund": 10, "tags": ["glass"], "label": "+{v}% damage taken" }
+  ],
+  "effects": [
+    { "id": "flame_arc", "name": "Flame Arc", "desc": "Attacks launch a fire projectile.", "element": "fire", "classes": ["melee"], "cost": 14, "weight": 10, "tags": ["fire", "projectile"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "attack", "do": "projectile", "sprite": "flame", "dmg": 60, "speed": 9, "range": 6, "size": 3, "element": "fire" }] },
+    { "id": "thunder_strike", "name": "Thunder Strike", "desc": "Hits arc lightning to nearby enemies.", "element": "lightning", "cost": 18, "weight": 10, "tags": ["lightning", "chain", "shock"], "perf": 2, "vfx": 1,
+      "hooks": [{ "on": "hit", "do": "chain", "chance": 35, "targets": 3, "dmg": 45, "radius": 4, "element": "lightning" }] },
+    { "id": "blood_feast", "name": "Blood Feast", "desc": "Part of the damage restores Health; kills heal more.", "cost": 16, "weight": 8, "tags": ["lifesteal", "vampire", "sustain", "bleed"], "perf": 0, "vfx": 0,
+      "hooks": [{ "on": "hit", "do": "heal", "pct": 4 }, { "on": "kill", "do": "heal", "flat": 6 }] },
+    { "id": "void_edge", "name": "Void Edge", "desc": "Attacks can open small portals that pull enemies in.", "element": "void", "cost": 20, "weight": 8, "tags": ["void", "pull", "portal", "control"], "perf": 2, "vfx": 1,
+      "hooks": [{ "on": "hit", "do": "portal", "chance": 18, "radius": 2.6, "duration": 2.2, "pull": 5, "dps": 25, "element": "void" }] },
+    { "id": "frost_nova", "affinity": "ice", "name": "Frost Nova", "desc": "Every 4th attack releases a freezing nova.", "element": "ice", "cost": 16, "weight": 9, "tags": ["ice", "freeze", "aoe", "control"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "nth", "n": 4, "do": "nova", "radius": 3, "dmg": 60, "element": "ice", "status": "freeze" }] },
+    { "id": "plague_bloom", "name": "Plague Bloom", "desc": "Kills leave a lingering poison cloud.", "element": "poison", "cost": 14, "weight": 9, "tags": ["poison", "dot", "aoe"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "kill", "do": "cloud", "radius": 2, "duration": 3, "dps": 30, "element": "poison" }] },
+    { "id": "ricochet", "name": "Ricochet", "desc": "Projectiles bounce to another enemy.", "requires": ["projectile"], "excludesTags": ["returning"], "cost": 14, "weight": 8, "tags": ["projectile", "multi"], "perf": 1, "vfx": 0,
+      "hooks": [{ "on": "static", "do": "projMod", "bounces": 2 }] },
+    { "id": "echo_strike", "name": "Echo Strike", "desc": "Attacks may echo a moment later as a phantom.", "cost": 16, "weight": 8, "tags": ["multi", "arcane"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "attack", "do": "echo", "chance": 30, "delay": 0.25, "dmg": 60 }] },
+    { "id": "whirlwind", "name": "Whirlwind", "desc": "Every 3rd attack becomes a spinning slash.", "classes": ["melee"], "cost": 16, "weight": 8, "tags": ["aoe", "melee", "speed"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "nth", "n": 3, "do": "spin", "dmg": 110 }] },
+    { "id": "gale", "name": "Gale", "desc": "Attacks send out a wind wave that knocks enemies back.", "element": "wind", "cost": 12, "weight": 9, "tags": ["wind", "knockback", "projectile", "control"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "attack", "do": "projectile", "sprite": "wave", "dmg": 35, "speed": 8, "range": 5, "size": 5, "pierce": 99, "knockback": 3, "element": "wind" }] },
+    { "id": "earthsplitter", "name": "Earthsplitter", "desc": "Every 2nd attack raises a line of stone spikes.", "element": "earth", "cost": 16, "weight": 9, "tags": ["earth", "aoe", "control"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "nth", "n": 2, "do": "spikes", "count": 4, "spacing": 0.9, "dmg": 55, "element": "earth" }] },
+    { "id": "phantom_blades", "name": "Phantom Blades", "desc": "Attacks conjure homing spectral blades.", "element": "arcane", "cost": 18, "weight": 8, "tags": ["arcane", "projectile", "homing", "multi"], "perf": 2, "vfx": 1,
+      "hooks": [{ "on": "attack", "do": "projectile", "chance": 50, "count": 2, "spread": 40, "sprite": "blade", "dmg": 35, "speed": 8, "range": 7, "size": 2, "homing": 1, "element": "arcane" }] },
+    { "id": "judgement", "name": "Judgement", "desc": "Critical hits call down a pillar of light.", "element": "holy", "cost": 16, "weight": 8, "tags": ["holy", "crit", "aoe"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "crit", "do": "strike", "radius": 1.6, "dmg": 90, "delay": 0.3, "element": "holy", "sprite": "pillar" }] },
+    { "id": "crit_detonation", "name": "Critical Detonation", "desc": "Critical hits explode.", "cost": 18, "weight": 8, "tags": ["crit", "explosion", "aoe"], "perf": 2, "vfx": 1,
+      "hooks": [{ "on": "crit", "do": "explode", "radius": 1.8, "dmg": 70 }] },
+    { "id": "phase_strike", "name": "Phase Strike", "desc": "Attacks teleport you to your target.", "classes": ["melee"], "minRarity": "epic", "cost": 20, "weight": 6, "tags": ["teleport", "mobility", "void"], "perf": 0, "vfx": 1,
+      "hooks": [{ "on": "attack", "do": "blink", "range": 5 }] },
+    { "id": "soul_harvest", "name": "Soul Harvest", "desc": "Kills grant a short attack speed frenzy.", "cost": 14, "weight": 8, "tags": ["speed", "vampire", "frenzy"], "perf": 0, "vfx": 0,
+      "hooks": [{ "on": "kill", "do": "buff", "stat": "attackSpeedPct", "value": 35, "duration": 3 }] },
+    { "id": "lava_burst", "name": "Lava Burst", "desc": "Attacks hurl lava that leaves burning pools.", "element": "fire", "cost": 20, "weight": 10, "tags": ["fire", "burn", "projectile", "aoe"], "perf": 2, "vfx": 1,
+      "hooks": [{ "on": "attack", "do": "projectile", "sprite": "lava", "dmg": 50, "speed": 7, "range": 6, "size": 3, "element": "fire", "pool": { "radius": 1.4, "duration": 2.5, "dps": 30 } }] },
+    { "id": "permafrost", "name": "Permafrost", "desc": "Chilled enemies shatter into ice shards when killed.", "element": "ice", "cost": 18, "weight": 10, "tags": ["ice", "freeze", "projectile", "aoe"], "perf": 2, "vfx": 1,
+      "hooks": [{ "on": "kill", "do": "shatter", "count": 6, "dmg": 40, "speed": 8, "range": 4, "element": "ice" }] },
+    { "id": "tempest", "name": "Tempest", "desc": "Hits may call down lightning strikes.", "element": "lightning", "cost": 20, "weight": 10, "tags": ["lightning", "aoe", "shock"], "perf": 1, "vfx": 1,
+      "hooks": [{ "on": "hit", "do": "strike", "chance": 25, "radius": 1.2, "dmg": 80, "delay": 0.15, "element": "lightning", "sprite": "bolt" }] },
+    { "id": "singularity", "name": "Singularity", "desc": "Kills collapse into small black holes.", "element": "void", "cost": 22, "weight": 10, "tags": ["void", "pull", "portal", "control"], "perf": 2, "vfx": 1,
+      "hooks": [{ "on": "kill", "do": "portal", "chance": 60, "radius": 3, "duration": 2.5, "pull": 6, "dps": 30, "element": "void" }] }
+  ],
+  "abilities": [
+    { "id": "meteor", "affinity": "fire", "name": "Meteor", "desc": "Calls down a meteor on the target area.", "do": "meteor", "cost": [20, 30], "cooldown": [9, 14], "damage": [250, 400], "radius": [2.4, 3.4], "duration": [0.6, 0.6], "words": ["Star", "Comet", "Skyfall"], "sound": "boom", "weight": 10 },
+    { "id": "blink", "affinity": "wind", "name": "Blink", "desc": "Teleport forward, damaging enemies where you land.", "do": "blink", "cost": [14, 22], "cooldown": [3.5, 6], "damage": [60, 120], "radius": [1.2, 1.8], "duration": [0, 0], "range": [4, 6.5], "words": ["Phase", "Shift", "Step"], "sound": "zap", "weight": 10 },
+    { "id": "black_hole", "affinity": "void", "name": "Black Hole", "desc": "Creates an area that pulls enemies in.", "do": "blackhole", "cost": [24, 34], "cooldown": [14, 20], "damage": [30, 55], "radius": [3.5, 5], "duration": [2.5, 4], "words": ["Abyss", "Maw", "Hunger"], "sound": "hum", "weight": 8 },
+    { "id": "clone", "affinity": "arcane", "name": "Clone", "desc": "Creates a copy of you that fights alongside you.", "do": "clone", "cost": [20, 30], "cooldown": [18, 26], "damage": [40, 70], "radius": [0, 0], "duration": [6, 10], "words": ["Mirror", "Twin", "Shade"], "sound": "zap", "weight": 8 },
+    { "id": "earthquake", "affinity": "earth", "name": "Earthquake", "desc": "Sends out a huge shockwave.", "do": "quake", "cost": [20, 28], "cooldown": [10, 15], "damage": [140, 220], "radius": [4, 5.5], "duration": [0.8, 0.8], "words": ["Quake", "Tremor", "Titan"], "sound": "boom", "weight": 10 },
+    { "id": "phoenix", "affinity": "fire", "name": "Phoenix", "desc": "Erupts in flame. While ready, revives you once on death.", "do": "phoenix", "cost": [26, 36], "cooldown": [45, 70], "damage": [180, 260], "radius": [2.8, 3.6], "duration": [0, 0], "words": ["Phoenix", "Rebirth", "Pyre"], "sound": "boom", "weight": 6 },
+    { "id": "storm_call", "affinity": "lightning", "name": "Storm Call", "desc": "Lightning strikes enemies around you.", "do": "storm", "cost": [20, 28], "cooldown": [10, 15], "damage": [90, 150], "radius": [6, 8], "duration": [0, 0], "count": [4, 7], "words": ["Storm", "Thunder", "Tempest"], "sound": "zap", "weight": 9 },
+    { "id": "frost_nova", "name": "Glacial Nova", "desc": "Freezes every enemy nearby.", "do": "frostnova", "cost": [18, 26], "cooldown": [9, 13], "damage": [80, 130], "radius": [3.5, 4.5], "duration": [1.6, 2.6], "words": ["Winter", "Glacier", "Rime"], "sound": "zap", "weight": 9 },
+    { "id": "blade_ring", "affinity": "physical", "name": "Blade Ring", "desc": "Summons blades that orbit you.", "do": "bladering", "cost": [18, 26], "cooldown": [14, 20], "damage": [40, 70], "radius": [1.8, 2.4], "duration": [5, 8], "count": [3, 5], "words": ["Halo", "Ring", "Crown"], "sound": "whirl", "weight": 9 },
+    { "id": "time_warp", "affinity": "arcane", "name": "Time Warp", "desc": "Slows enemies in a large area.", "do": "timewarp", "cost": [18, 26], "cooldown": [16, 22], "damage": [0, 0], "radius": [4.5, 6], "duration": [3, 5], "slow": [50, 70], "words": ["Chrono", "Hour", "Stasis"], "sound": "hum", "weight": 7 }
+  ],
+  "abilityTwists": [
+    { "id": "twin", "name": "Twin", "desc": "Casts twice.", "cost": 10, "weight": 10, "exclude": ["phoenix", "clone", "time_warp"] },
+    { "id": "vampiric", "name": "Vampiric", "desc": "Heals for 20% of ability damage.", "cost": 8, "weight": 10, "exclude": ["time_warp", "clone"] },
+    { "id": "seeking", "name": "Seeking", "desc": "Targets the nearest enemy.", "cost": 6, "weight": 8, "only": ["meteor", "black_hole", "earthquake", "blink"] },
+    { "id": "swift", "name": "Swift", "desc": "-25% cooldown.", "cost": 10, "weight": 10 }
+  ],
+  "themes": [
+    { "id": "critical", "name": "Critical", "label": "Critical Build", "tags": ["crit", "speed", "execute"], "weight": 10 },
+    { "id": "fire", "name": "Fire", "label": "Fire Build", "tags": ["fire", "burn", "explosion"], "elements": ["fire"], "weight": 10 },
+    { "id": "vampire", "name": "Vampire", "label": "Vampire Build", "tags": ["lifesteal", "vampire", "speed", "sustain"], "elements": ["physical", "bleed", "void"], "drawback": "bloodprice", "weight": 9 },
+    { "id": "freeze", "name": "Freeze", "label": "Freeze Build", "tags": ["ice", "freeze", "slow", "control"], "elements": ["ice"], "weight": 10 },
+    { "id": "glass_cannon", "name": "Glass Cannon", "label": "Glass Cannon", "tags": ["damage", "crit", "execute"], "drawback": "fragile", "forceDrawback": true, "minRarity": "uncommon", "weight": 6 },
+    { "id": "storm", "name": "Storm", "label": "Storm Build", "tags": ["lightning", "chain", "shock", "speed"], "elements": ["lightning"], "weight": 9 },
+    { "id": "plague", "name": "Plague", "label": "Plague Build", "tags": ["poison", "dot", "aoe"], "elements": ["poison"], "weight": 8 },
+    { "id": "void", "name": "Void", "label": "Void Build", "tags": ["void", "pull", "portal", "teleport"], "elements": ["void"], "weight": 7 },
+    { "id": "juggernaut", "name": "Juggernaut", "label": "Juggernaut Build", "tags": ["knockback", "damage", "aoe", "defense", "control"], "classes": ["melee"], "drawback": "heavy", "weight": 8 },
+    { "id": "barrage", "name": "Barrage", "label": "Barrage Build", "tags": ["projectile", "split", "multi", "homing"], "classes": ["ranged", "special"], "weight": 9 },
+    { "id": "hunter", "name": "Hunter", "label": "Hunter Build", "tags": ["pierce", "range", "crit", "projectile"], "classes": ["ranged"], "weight": 8 },
+    { "id": "bleeder", "name": "Bleeder", "label": "Bleed Build", "tags": ["bleed", "crit", "speed", "dot"], "elements": ["bleed"], "weight": 8 },
+    { "id": "tempo", "name": "Tempo", "label": "Speed Build", "tags": ["speed", "mobility", "frenzy", "teleport"], "weight": 8 },
+    { "id": "earthshaker", "name": "Earthshaker", "label": "Earthshaker Build", "tags": ["earth", "aoe", "control", "knockback"], "elements": ["earth"], "weight": 7 },
+    { "id": "tempest", "name": "Tempest", "label": "Wind Build", "tags": ["wind", "knockback", "projectile", "mobility"], "elements": ["wind"], "weight": 6 },
+    { "id": "radiant", "name": "Radiant", "label": "Holy Build", "tags": ["holy", "crit", "sustain", "aoe"], "elements": ["holy"], "weight": 6 },
+    { "id": "arcanist", "name": "Arcanist", "label": "Arcane Build", "tags": ["arcane", "multi", "homing", "crit"], "elements": ["arcane"], "weight": 6 }
+  ],
+  "names": {
+    "elementRoots": {
+      "physical": [
+        "Iron",
+        "Grim",
+        "Wolf",
+        "Raven",
+        "Ash",
+        "Night",
+        "Dread",
+        "Oath",
+        "Stone",
+        "Warden",
+        "Bear",
+        "Hawk",
+        "Oak",
+        "Skull",
+        "Thorn",
+        "Dusk"
+      ],
+      "fire": [
+        "Ember",
+        "Blaze",
+        "Cinder",
+        "Flame",
+        "Inferno",
+        "Scorch",
+        "Pyre",
+        "Sun"
+      ],
+      "ice": [
+        "Frost",
+        "Rime",
+        "Glacier",
+        "Winter",
+        "Hail",
+        "Snow",
+        "Frozen"
+      ],
+      "lightning": [
+        "Storm",
+        "Thunder",
+        "Spark",
+        "Volt",
+        "Tempest",
+        "Bolt"
+      ],
+      "poison": [
+        "Venom",
+        "Blight",
+        "Plague",
+        "Viper",
+        "Rot",
+        "Toxin"
+      ],
+      "bleed": [
+        "Blood",
+        "Crimson",
+        "Scarlet",
+        "Gore",
+        "Red",
+        "Thorn"
+      ],
+      "void": [
+        "Void",
+        "Abyss",
+        "Null",
+        "Shadow",
+        "Umbra",
+        "Eclipse"
+      ],
+      "earth": [
+        "Stone",
+        "Quake",
+        "Granite",
+        "Boulder",
+        "Terra",
+        "Iron"
+      ],
+      "wind": [
+        "Gale",
+        "Zephyr",
+        "Sky",
+        "Cyclone",
+        "Wind",
+        "Feather"
+      ],
+      "holy": [
+        "Dawn",
+        "Sun",
+        "Halo",
+        "Saint",
+        "Light",
+        "Radiant"
+      ],
+      "arcane": [
+        "Arcane",
+        "Star",
+        "Rune",
+        "Mystic",
+        "Astral",
+        "Hex"
+      ]
+    },
+    "elementAdjectives": {
+      "physical": [
+        "Keen",
+        "Grim",
+        "Iron",
+        "Silent",
+        "Old",
+        "Wicked",
+        "Loyal",
+        "Broken",
+        "Bitter",
+        "Faithful",
+        "Forgotten",
+        "Crooked",
+        "Stalwart",
+        "Hungry",
+        "Lonely",
+        "Jagged",
+        "Honest",
+        "Savage",
+        "Quiet"
+      ],
+      "fire": [
+        "Burning",
+        "Smoldering",
+        "Blazing",
+        "Molten",
+        "Scorched",
+        "Ashen",
+        "Searing",
+        "Kindled",
+        "Fervent",
+        "Cindered"
+      ],
+      "ice": [
+        "Frozen",
+        "Glacial",
+        "Frigid",
+        "Wintry",
+        "Shivering",
+        "Pale",
+        "Rimebound",
+        "Hoarfrost",
+        "Brittle",
+        "Numbing"
+      ],
+      "lightning": [
+        "Thundering",
+        "Crackling",
+        "Charged",
+        "Roaring",
+        "Restless",
+        "Storming",
+        "Flashing",
+        "Humming",
+        "Wild"
+      ],
+      "poison": [
+        "Venomous",
+        "Blighted",
+        "Rotting",
+        "Toxic",
+        "Festering",
+        "Noxious",
+        "Wilting",
+        "Sickly",
+        "Putrid"
+      ],
+      "bleed": [
+        "Bloody",
+        "Crimson",
+        "Thirsting",
+        "Savage",
+        "Weeping",
+        "Cruel",
+        "Ravenous",
+        "Gashing",
+        "Red"
+      ],
+      "void": [
+        "Hollow",
+        "Endless",
+        "Nameless",
+        "Shadowed",
+        "Starless",
+        "Silent",
+        "Unseen",
+        "Hungering",
+        "Forsaken"
+      ],
+      "earth": [
+        "Rooted",
+        "Mountain",
+        "Unyielding",
+        "Ancient",
+        "Heavy",
+        "Rumbling",
+        "Mossy",
+        "Granite",
+        "Steadfast"
+      ],
+      "wind": [
+        "Howling",
+        "Swift",
+        "Whistling",
+        "Restless",
+        "Soaring",
+        "Drifting",
+        "Keening",
+        "Airy",
+        "Singing"
+      ],
+      "holy": [
+        "Blessed",
+        "Radiant",
+        "Sacred",
+        "Gilded",
+        "Hallowed",
+        "Shining",
+        "Pure",
+        "Anointed",
+        "Dawnlit"
+      ],
+      "arcane": [
+        "Arcane",
+        "Eldritch",
+        "Twisted",
+        "Dreaming",
+        "Astral",
+        "Riddling",
+        "Shimmering",
+        "Uncanny",
+        "Starwoven"
+      ]
+    },
+    "themeWords": {
+      "critical": [
+        "Deadly",
+        "Precise",
+        "Lethal",
+        "Keen"
+      ],
+      "vampire": [
+        "Blood",
+        "Vampire",
+        "Hungry",
+        "Crimson"
+      ],
+      "glass_cannon": [
+        "Reckless",
+        "Brittle",
+        "Glass",
+        "Wild"
+      ],
+      "juggernaut": [
+        "Titan",
+        "Colossal",
+        "Mighty",
+        "Iron"
+      ],
+      "barrage": [
+        "Endless",
+        "Swarm",
+        "Many",
+        "Storm"
+      ],
+      "hunter": [
+        "Hunter",
+        "Hawk",
+        "Farseeing",
+        "Silent"
+      ],
+      "tempo": [
+        "Swift",
+        "Quick",
+        "Racing",
+        "Fleet"
+      ]
+    },
+    "celestial": [
+      "Moon",
+      "Sun",
+      "Star",
+      "Dawn",
+      "Dusk",
+      "Eclipse",
+      "Comet",
+      "Tide",
+      "Aurora",
+      "Nova",
+      "Tempest",
+      "Horizon"
+    ],
+    "titles": [
+      "King",
+      "Queen",
+      "Warden",
+      "Tyrant",
+      "Saint",
+      "Witch",
+      "Hunter",
+      "Titan",
+      "Herald",
+      "Wanderer",
+      "Duke",
+      "Oracle",
+      "Knight",
+      "Beast",
+      "Prophet"
+    ],
+    "epithets": [
+      "of the Last Dawn",
+      "of Endless Hunger",
+      "the Unbroken",
+      "of a Thousand Cuts",
+      "the Worldbreaker",
+      "of Fallen Stars",
+      "the Undying",
+      "of the Deep",
+      "the Oathless",
+      "of Ruin",
+      "the Patient",
+      "of Broken Crowns",
+      "the Last Word",
+      "of the Hollow Sun",
+      "the Merciless"
+    ],
+    "formats": [
+      {
+        "id": "adj_noun",
+        "weights": [
+          10,
+          8,
+          5,
+          3,
+          1
+        ]
+      },
+      {
+        "id": "root_noun",
+        "weights": [
+          6,
+          8,
+          8,
+          6,
+          4
+        ]
+      },
+      {
+        "id": "the_adj_noun",
+        "weights": [
+          2,
+          4,
+          6,
+          6,
+          5
+        ]
+      },
+      {
+        "id": "compound",
+        "weights": [
+          2,
+          4,
+          7,
+          8,
+          8
+        ]
+      },
+      {
+        "id": "celestial",
+        "weights": [
+          0,
+          2,
+          4,
+          5,
+          5
+        ]
+      },
+      {
+        "id": "title",
+        "weights": [
+          0,
+          1,
+          3,
+          6,
+          7
+        ]
+      },
+      {
+        "id": "compound_epithet",
+        "weights": [
+          0,
+          0,
+          0,
+          2,
+          7
+        ]
+      }
+    ]
+  },
+  "components": [
+    { "id": "fire_core", "name": "Fire Core", "type": "core", "rarity": "uncommon", "element": "fire", "research": 25, "desc": "Lets the forge craft Fire weapons.", "unlocks": {} },
+    { "id": "ice_core", "name": "Ice Core", "type": "core", "rarity": "uncommon", "element": "ice", "research": 25, "desc": "Lets the forge craft Ice weapons.", "unlocks": {} },
+    { "id": "lightning_core", "name": "Lightning Core", "type": "core", "rarity": "uncommon", "element": "lightning", "research": 25, "desc": "Lets the forge craft Lightning weapons.", "unlocks": {} },
+    { "id": "poison_core", "name": "Poison Core", "type": "core", "rarity": "uncommon", "element": "poison", "research": 25, "desc": "Lets the forge craft Poison weapons.", "unlocks": {} },
+    { "id": "blood_core", "name": "Blood Core", "type": "core", "rarity": "rare", "element": "bleed", "research": 35, "desc": "Lets the forge craft Bleed weapons.", "unlocks": {} },
+    { "id": "earth_core", "name": "Earth Core", "type": "core", "rarity": "uncommon", "element": "earth", "research": 25, "desc": "Lets the forge craft Earth weapons.", "unlocks": {} },
+    { "id": "wind_core", "name": "Wind Core", "type": "core", "rarity": "uncommon", "element": "wind", "research": 25, "desc": "Lets the forge craft Wind weapons.", "unlocks": {} },
+    { "id": "holy_core", "name": "Holy Core", "type": "core", "rarity": "rare", "element": "holy", "research": 40, "desc": "Lets the forge craft Holy weapons.", "unlocks": {} },
+    { "id": "void_core", "name": "Void Core", "type": "core", "rarity": "rare", "element": "void", "research": 45, "desc": "Void weapons, Void Edge, Phase Strike and the Soul Lantern.", "unlocks": { "effects": ["void_edge", "phase_strike"], "archetypes": ["lantern"] } },
+    { "id": "arcane_core", "name": "Arcane Core", "type": "core", "rarity": "rare", "element": "arcane", "research": 45, "desc": "Arcane weapons, Phantom Blades and the Clone ability.", "unlocks": { "effects": ["phantom_blades"], "abilities": ["clone"] } },
+    { "id": "monster_fang", "name": "Monster Fang", "type": "material", "rarity": "uncommon", "material": "fang", "research": 30, "desc": "A serrated material. Also teaches the Whip.", "unlocks": { "materials": ["fang"], "archetypes": ["whip"] } },
+    { "id": "dragon_scale", "name": "Dragon Scale", "type": "material", "rarity": "epic", "material": "dragonscale", "research": 70, "desc": "Dragonscale material and Critical Detonation.", "unlocks": { "materials": ["dragonscale"], "effects": ["crit_detonation"] } },
+    { "id": "crystal_heart", "name": "Crystal Heart", "type": "material", "rarity": "rare", "material": "crystal", "research": 45, "desc": "Crystal material and the Magic Orb.", "unlocks": { "materials": ["crystal"], "archetypes": ["orb"] } },
+    { "id": "ancient_blade", "name": "Ancient Blade", "type": "material", "rarity": "rare", "material": "ancient", "research": 50, "desc": "Ancient material, the Greatsword and Whirlwind.", "unlocks": { "materials": ["ancient"], "archetypes": ["greatsword"], "effects": ["whirlwind"] } },
+    { "id": "obsidian_shard", "name": "Obsidian Shard", "type": "material", "rarity": "uncommon", "material": "obsidian", "research": 30, "desc": "Heavy volcanic glass.", "unlocks": { "materials": ["obsidian"] } },
+    { "id": "mythril_ore", "name": "Mythril Ore", "type": "material", "rarity": "rare", "material": "mythril", "research": 45, "desc": "Light and fast Mythril.", "unlocks": { "materials": ["mythril"] } },
+    { "id": "shadow_ingot", "name": "Shadow Ingot", "type": "material", "rarity": "rare", "material": "shadowsteel", "research": 45, "desc": "Shadowsteel for fast, cruel weapons.", "unlocks": { "materials": ["shadowsteel"] } },
+    { "id": "bp_scythe", "name": "Blueprint: Scythe", "type": "blueprint", "rarity": "rare", "research": 35, "desc": "Teaches the Scythe.", "unlocks": { "archetypes": ["scythe"] } },
+    { "id": "bp_crossbow", "name": "Blueprint: Crossbow", "type": "blueprint", "rarity": "uncommon", "research": 25, "desc": "Teaches the Crossbow.", "unlocks": { "archetypes": ["crossbow"] } },
+    { "id": "bp_gun", "name": "Blueprint: Gun", "type": "blueprint", "rarity": "rare", "research": 35, "desc": "Teaches the Gun.", "unlocks": { "archetypes": ["gun"] } },
+    { "id": "bp_cannon", "name": "Blueprint: Cannon", "type": "blueprint", "rarity": "rare", "research": 40, "desc": "Teaches the Cannon.", "unlocks": { "archetypes": ["cannon"] } },
+    { "id": "bp_chakram", "name": "Blueprint: Chakram", "type": "blueprint", "rarity": "uncommon", "research": 30, "desc": "Teaches the Chakram.", "unlocks": { "archetypes": ["chakram"] } },
+    { "id": "bp_warfan", "name": "Blueprint: Warfan", "type": "blueprint", "rarity": "rare", "research": 35, "desc": "Teaches the exotic Warfan.", "unlocks": { "archetypes": ["warfan"] } },
+    { "id": "inferno_core", "name": "Inferno Core", "type": "core", "rarity": "legendary", "element": "fire", "boss": "inferno_titan", "research": 0, "rarityBonus": 1, "desc": "Boss core. Lava Burst, the Phoenix ability and fierce fire weapons.", "craftTags": ["fire", "burn", "explosion"], "unlocks": { "effects": ["lava_burst"], "abilities": ["phoenix"] } },
+    { "id": "glacial_heart", "name": "Glacial Heart", "type": "core", "rarity": "legendary", "element": "ice", "boss": "frost_warden", "research": 0, "rarityBonus": 1, "desc": "Boss core. Permafrost and unbreakable ice weapons.", "craftTags": ["ice", "freeze", "control"], "unlocks": { "effects": ["permafrost"] } },
+    { "id": "storm_heart", "name": "Storm Heart", "type": "core", "rarity": "legendary", "element": "lightning", "boss": "storm_colossus", "research": 0, "rarityBonus": 1, "desc": "Boss core. Tempest and roaring storm weapons.", "craftTags": ["lightning", "chain", "shock"], "unlocks": { "effects": ["tempest"] } },
+    { "id": "abyssal_crown", "name": "Abyssal Crown", "type": "core", "rarity": "legendary", "element": "void", "boss": "void_herald", "research": 0, "rarityBonus": 1, "desc": "Boss core. Singularity and the Black Hole ability.", "craftTags": ["void", "pull", "portal"], "unlocks": { "effects": ["singularity"], "abilities": ["black_hole"] } }
+  ],
+  "catalysts": [
+    { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
+    { "id": "rare", "name": "Azure Catalyst", "minRarity": "rare", "maxRarity": "epic", "essence": 60 },
+    { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 150, "requiresLevel": 6 },
+    { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 320, "requiresBoss": true }
+  ],
+  "crafting": { "unlockLevel": 3, "scrapCost": 20, "essenceCost": 15, "runeCost": 20, "abilityCost": 60 },
+  "biomes": [
+    { "id": "plains", "name": "Green Plains", "ground": "grass", "alt": "flowers", "blockers": { "tree": 0.05, "rock": 0.02 }, "water": 0.1, "enemies": ["slime", "bat", "skeleton", "brute"], "elements": ["physical", "earth", "wind"], "components": ["earth_core", "wind_core", "bp_crossbow", "bp_chakram"] },
+    { "id": "forest", "name": "Deepwood", "ground": "moss", "alt": "grass", "blockers": { "tree": 0.22, "rock": 0.02 }, "water": 0.12, "enemies": ["slime", "wisp", "brute", "bat"], "elements": ["poison", "earth", "physical"], "components": ["poison_core", "monster_fang", "earth_core", "bp_warfan"] },
+    { "id": "desert", "name": "Sunscar Desert", "ground": "sand", "alt": "sand2", "blockers": { "cactus": 0.04, "rock": 0.04 }, "water": 0.02, "enemies": ["skeleton", "brute", "bat"], "elements": ["fire", "earth", "physical"], "components": ["fire_core", "bp_gun", "bp_cannon", "ancient_blade"] },
+    { "id": "snow", "name": "Frostvale", "ground": "snow", "alt": "ice", "blockers": { "pine": 0.08, "rock": 0.03 }, "water": 0.06, "enemies": ["wisp", "brute", "skeleton"], "elements": ["ice", "physical", "wind"], "components": ["ice_core", "crystal_heart", "mythril_ore"], "boss": "frost_warden" },
+    { "id": "volcanic", "name": "Ashlands", "ground": "ash", "alt": "basalt", "blockers": { "rock": 0.07 }, "water": 0.0, "lava": 0.06, "enemies": ["slime", "wisp", "brute"], "elements": ["fire", "earth"], "components": ["fire_core", "obsidian_shard", "dragon_scale"], "boss": "inferno_titan" },
+    { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02 }, "water": 0.04, "enemies": ["bat", "wisp", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
+    { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06 }, "water": 0.0, "enemies": ["wisp", "bat", "brute"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" }
+  ],
+  "enemies": [
+    { "id": "slime", "name": "Slime", "hp": 30, "damage": 8, "speed": 1.7, "size": 0.7, "behavior": "chase", "xp": 6, "weight": 10, "color": "#6ad35a" },
+    { "id": "bat", "name": "Bat", "hp": 18, "damage": 6, "speed": 3.2, "size": 0.6, "behavior": "swoop", "xp": 6, "weight": 8, "color": "#8a6ad8" },
+    { "id": "skeleton", "name": "Skeleton", "hp": 34, "damage": 8, "speed": 1.5, "size": 0.7, "behavior": "ranged", "range": 6, "projSpeed": 6, "xp": 9, "weight": 7, "color": "#e8e4d4" },
+    { "id": "brute", "name": "Brute", "hp": 90, "damage": 16, "speed": 1.15, "size": 1.0, "behavior": "charger", "xp": 16, "weight": 4, "color": "#c07a4a" },
+    { "id": "wisp", "name": "Wisp", "hp": 24, "damage": 9, "speed": 2.2, "size": 0.6, "behavior": "caster", "range": 5, "projSpeed": 5, "xp": 10, "weight": 6, "color": "#7ad8ff", "elemental": true }
+  ],
+  "bosses": [
+    { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["ring", "charge", "slam", "summon"], "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "epic", "theme": "fire" } },
+    { "id": "frost_warden", "name": "Frost Warden", "biome": "snow", "element": "ice", "hp": 1700, "damage": 20, "speed": 1.2, "size": 2.1, "xp": 420, "patterns": ["ring", "spiral", "slam", "summon"], "color": "#8fd6ff", "drop": { "component": "glacial_heart", "minRarity": "epic", "theme": "freeze" } },
+    { "id": "storm_colossus", "name": "Storm Colossus", "biome": "highlands", "element": "lightning", "hp": 1800, "damage": 24, "speed": 1.6, "size": 2.3, "xp": 460, "patterns": ["spiral", "charge", "slam", "ring"], "color": "#ffe45c", "drop": { "component": "storm_heart", "minRarity": "epic", "theme": "storm" } },
+    { "id": "void_herald", "name": "Void Herald", "biome": "void", "element": "void", "hp": 2000, "damage": 26, "speed": 1.5, "size": 2.0, "xp": 520, "patterns": ["spiral", "ring", "blink", "summon"], "color": "#9a5cff", "drop": { "component": "abyssal_crown", "minRarity": "epic", "theme": "void" } }
+  ]
+}
