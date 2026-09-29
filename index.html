@@ -15,6 +15,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Pixelgame">
+  <link rel="preload" href="fonts/pixelify-sans-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/pixelify-sans-700.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/app.css">
   <link rel="modulepreload" href="src/main.js">
   <script type="module" src="src/main.js"></script>
@@ -35,8 +37,8 @@
 
   <div id="title" class="title-screen" hidden>
     <div class="title-card">
-      <img src="icons/icon-192.png" width="72" height="72" alt="" class="pixel">
-      <h1>Pixelgame<small>Infinite Arsenal</small></h1>
+      <img src="icons/icon-192.png" width="96" height="96" alt="" class="pixel">
+      <h1 class="title-text">Pixelgame<small>Infinite Arsenal</small></h1>
       <p class="tagline">Every weapon is one of a kind.</p>
       <button id="title-play" class="btn-primary big" autofocus>Play</button>
       <button id="title-install" hidden>Install app</button>
@@ -46,30 +48,45 @@
   </div>
 
   <div id="hud" class="hud" hidden>
-    <div class="hud-top-left">
-      <div class="hp-bar" aria-label="Health"><div id="hp-fill" class="fill"></div><span id="hp-text"></span></div>
-      <div class="xp-row"><span id="lvl">Lv 1</span><div class="xp-bar" aria-label="Experience"><div id="xp-fill" class="fill"></div></div></div>
-      <div id="hud-weapon" class="hud-weapon"></div>
-      <div id="compass" class="compass" hidden></div>
+    <div class="hud-player plate">
+      <div class="portrait sunken"><canvas id="portrait" width="10" height="13"></canvas><span id="lvl" class="lvl-badge">1</span></div>
+      <div class="bars">
+        <div class="bar hp" id="hp-bar" aria-label="Health"><div id="hp-fill" class="fill"></div><span id="hp-text"></span></div>
+        <div class="bar xp" aria-label="Experience"><div id="xp-fill" class="fill"></div></div>
+      </div>
     </div>
-    <div class="hud-top-right">
+    <div id="hud-weapon" class="hud-weapon"></div>
+    <div id="compass" class="compass" hidden></div>
+
+    <div class="hud-right">
+      <div class="dock">
+        <button id="btn-inventory" aria-label="Inventory"><i data-icon="bag"></i><span class="key">I</span></button>
+        <button id="btn-forge" aria-label="Forge"><i data-icon="anvil"></i><span class="key">C</span></button>
+        <button id="btn-research" aria-label="Research"><i data-icon="book"></i><span class="key">R</span></button>
+        <button id="btn-base" aria-label="Camp"><i data-icon="home"></i><span class="key">B</span></button>
+        <button id="btn-menu" aria-label="Menu"><i data-icon="gear"></i><span class="key">Esc</span></button>
+      </div>
+      <div class="res-row plate">
+        <span class="res essence" title="Essence"><i data-icon="essence" data-size="20"></i><b id="res-essence">0</b></span>
+        <span class="res scrap" title="Scrap"><i data-icon="scrap" data-size="20"></i><b id="res-scrap">0</b></span>
+      </div>
       <span id="net-status" class="net">● Online</span>
-      <span class="res" title="Essence"><i class="gem"></i><b id="res-essence">0</b></span>
-      <span class="res" title="Scrap"><i class="gear"></i><b id="res-scrap">0</b></span>
-      <button id="btn-menu" class="icon-btn" aria-label="Menu">☰</button>
     </div>
     <div id="fps" class="fps" hidden></div>
-    <div id="boss-bar" class="boss-bar" hidden><span id="boss-name"></span><div class="bar"><div id="boss-fill" class="fill"></div></div></div>
+    <div id="boss-bar" class="boss-bar" hidden>
+      <div class="title"><i data-icon="skull" data-size="20"></i><span id="boss-name"></span></div>
+      <div class="bar"><div id="boss-fill" class="fill"></div></div>
+    </div>
     <div id="interact-hint" class="interact-hint" hidden></div>
     <div id="death" class="death" hidden><h2>You fell</h2><p>Returning to your last shrine…</p></div>
 
     <div id="joystick" class="joystick" aria-hidden="true"><div id="knob" class="knob"></div></div>
     <div class="action-buttons">
-      <button id="btn-ability" class="btn ability" hidden aria-label="Ability"><span class="cd"></span><span class="glyph">★</span></button>
-      <button id="btn-sprint" class="btn sprint" aria-label="Sprint" aria-pressed="false"><span class="glyph">»</span></button>
-      <button id="btn-attack" class="btn attack" aria-label="Attack"><span class="glyph atk">⚔</span><span class="glyph use">✋</span></button>
+      <button id="btn-ability" class="btn ability" hidden aria-label="Ability"><span class="glyph"><i data-icon="star" data-size="36"></i></span><span class="cd"></span></button>
+      <button id="btn-sprint" class="btn sprint" aria-label="Sprint" aria-pressed="false"><span class="glyph"><i data-icon="boot" data-size="36"></i></span></button>
+      <button id="btn-attack" class="btn attack" aria-label="Attack"><span class="glyph atk"><i data-icon="sword" data-size="44"></i></span><span class="glyph use"><i data-icon="hand" data-size="44"></i></span></button>
     </div>
-    <div class="key-hints">WASD move · mouse aim · click/Space attack · Shift sprint · Q ability · E use · I inventory · C forge · R research · Esc menu</div>
+    <div class="key-hints">WASD move · Space/click attack (auto-aim) · Shift sprint · Q ability · E use · I bag · C forge · R research · B camp · Esc menu</div>
   </div>
 
   <div id="overlay-root"></div>

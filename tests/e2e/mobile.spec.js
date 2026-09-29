@@ -68,3 +68,26 @@ test('panels are full-screen and scrollable on phones', async ({ page }) => {
   const scrollable = await page.evaluate(() => getComputedStyle(document.querySelector('.panel-body')).overflowY);
   expect(scrollable).toBe('auto');
 });
+
+test('phone HUD: player plate and dock never overlap; forge button stays reachable', async ({ page }) => {
+  await startGame(page, { tap: true });
+  for (const size of [{ width: 360, height: 740 }, { width: 412, height: 839 }]) {
+    await page.setViewportSize(size);
+    await page.waitForTimeout(150);
+    const plate = await page.locator('.hud-player').boundingBox();
+    const dock = await page.locator('.dock').boundingBox();
+    expect(plate.x + plate.width).toBeLessThanOrEqual(dock.x);
+    expect(dock.x + dock.width).toBeLessThanOrEqual(size.width);
+  }
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.base.buildings.forge = 1;
+  });
+  await page.tap('#btn-forge');
+  await expect(page.locator('.forge-panel')).toBeVisible();
+  // The sticky bar keeps cost + Forge button on screen while picking.
+  const bar = page.locator('.forge-bar .btn-primary');
+  await expect(bar).toBeVisible();
+  const box = await bar.boundingBox();
+  expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize().height);
+});

@@ -6,8 +6,11 @@ import { hashInts } from '../core/rng.js';
 import { fbm, tileHash } from './noise.js';
 
 export const CHUNK = 16;
-const SAFE_RADIUS = 14;
-const CAMP_RADIUS = 3;
+const SAFE_RADIUS = 16;
+// The camp plaza (stone floor) and the open ground around it where the
+// base buildings stand.
+const CAMP_RADIUS = 6.5;
+const CAMP_CLEAR = 9;
 const LANDMARK_RADIUS = 22;
 const MAX_CHUNKS = 160;
 
@@ -120,7 +123,7 @@ export class World {
         }
         const detail = fbm(s ^ 0x4444, x / 6, y / 6);
         ground[i] = GROUND_BY_NAME[detail > this.q.detail ? b.alt : b.ground] ?? T.GRASS;
-        if (d2 < 36) continue; // keep the camp surroundings open
+        if (d2 < CAMP_CLEAR * CAMP_CLEAR) continue; // keep the camp surroundings open
         if (this.#nearLandmark(x, y, 4)) continue; // keep arenas open
         const w = fbm(s ^ 0x5555, x / 9, y / 9);
         if (b.water && w < noiseThreshold(b.water)) {
@@ -169,8 +172,10 @@ export class World {
     const key = `${cx},${cy}`;
     const r = hashInts(this.seed, cx, cy, 0xb0b) / 4294967296;
     const far = cx * cx + cy * cy > 1;
-    if (cx === 0 && cy === 0) {
-      chunk.objects.push({ type: 'camp', key: 'camp', x: 0.5, y: 0.5 });
+    for (const b of this.data.base?.buildings ?? []) {
+      if (Math.floor(b.x / CHUNK) === cx && Math.floor(b.y / CHUNK) === cy) {
+        chunk.objects.push({ type: 'building', key: `b:${b.id}`, buildingId: b.id, x: b.x, y: b.y });
+      }
     }
     for (const lm of this.landmarks) {
       if (Math.floor(lm.x / CHUNK) === cx && Math.floor(lm.y / CHUNK) === cy) {

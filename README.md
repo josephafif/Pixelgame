@@ -29,15 +29,54 @@ npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline 
 | Handling | Touch | Tangentbord / mus | Handkontroll |
 | --- | --- | --- | --- |
 | Rörelse (360°) | Vänster joystick | WASD / piltangenter | Vänster spak |
-| Sikta | Tryck på högra halvan / auto-aim | Mus | Höger spak / auto-aim |
-| Attack / Use | ⚔ (blir ✋ nära kistor, altare m.m.) | Klick, Space, J (E/F = Use) | A / RT |
-| Sprint (ingen stamina) | » (växla eller håll, valbart) | Shift | LB / L3 |
-| Ability | ★ (syns bara när vapnet har en) | Q, K eller högerklick | X |
-| Inventory / Forge / Research / Meny | ☰ | I / C / R / Esc | Y / Start / B |
+| Sikta | Automatiskt | Automatiskt | Automatiskt |
+| Attack / Use | Svärdknappen (blir en hand nära kistor, byggnader m.m.) | Klick, Space, J (E/F = Use) | A / RT |
+| Sprint (ingen stamina) | Stövelknappen (växla eller håll, valbart) | Shift | LB / L3 |
+| Ability | Stjärnknappen (syns bara när vapnet har en) | Q, K eller högerklick | X |
+| Inventory / Forge / Research / Läger / Meny | Knapparna uppe till höger | I / C / R / B / Esc | Y / Start / B |
+
+**Auto-aim:** vapnet siktar alltid själv. Det låser på närmaste fiende inom räckvidd (bossar
+prioriteras, och låset släpper inte i onödan). Utan fiende pekar vapnet åt det håll du går.
+Musen används bara för att klicka, så den drar aldrig vapnet åt fel håll.
 
 Joysticken skalas efter skärmstorleken och kan ställas in (storlek, fast/dynamisk, vänsterhänt
 layout). Spelytan har `touch-action: none`, så gester i spelet aldrig scrollar eller zoomar sidan.
 Menyer och paneler går däremot att scrolla som vanligt.
+
+## Läger (basen)
+
+Lägret mitt i världen byggs ut med scrap och essence. Gå fram till en byggnad och tryck
+Use, eller öppna lägerpanelen (B / hus-knappen). Varje byggnad har nivåer med krav på spelarnivå
+(och ibland en besegrad boss), och all data ligger i `gamedata.json` → `base`.
+
+| Byggnad | Gör |
+| --- | --- |
+| Hearth | Vila och läk, sätter återupplivningspunkt. Uppgraderingar ger mer max-HP |
+| Forge | Låser upp crafting. Uppgraderingar ger billigare crafting, högre item level och bättre catalysts |
+| Vault | Fler platser i väskan och förrådet |
+| Library | Billigare research |
+| Training Grounds | Mer Attack Power och Defense |
+| Essence Well | Producerar essence i realtid, även när du inte spelar (med tak) |
+| Waystone | Teleportera hem till lägret. Nivå 2: gå tillbaka dit du var |
+
+Logiken ligger i `src/game/base.js` (rena funktioner, testade i `tests/unit/base.test.js`),
+panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src/render/buildings.js`.
+
+## Gränssnitt och animationer
+
+- **Pixelgränssnitt:** typsnittet Pixelify Sans (OFL, ligger i `fonts/` så det fungerar offline),
+  pixelramar som 9-slice-SVG:er och egna pixelikoner (`src/ui/icons.js`), inga emoji.
+- **Inventory:** flikar med antal, sortering (nyast, rarity, styrka, typ), filter (närstrid,
+  distans, special, favoriter), märken för utrustat, NEW och favorit, jämförelse stat för stat mot
+  vapnet du håller i, och snabbskrotning som aldrig rör favoriter eller det utrustade vapnet.
+  Tangentbord: piltangenter väljer, Enter utrustar, T flyttar mellan väska och förråd, F favorit,
+  X skrotar, Q/E byter flik.
+- **Forge:** fyra steg (typ, material, element, kvalitet) med klickbara rutor i stället för
+  rullgardiner, tillval i en egen sektion och en live-förhandsvisning av vapnet på städet. På
+  mobil ligger kostnad och Forge-knapp fast längst ned.
+- **Vapenanimationer** (`src/render/weapon-anim.js`): varje attack har upptakt, slag och
+  efterföljning. Skadan landar på träffögonblicket, svingar växlar sida (kombokänsla), och slag
+  ger släpspår, hit-stop och studs på fienden.
 
 ## Kravspecifikationen och var den är implementerad
 
@@ -61,7 +100,7 @@ Menyer och paneler går däremot att scrolla som vanligt.
 | 14 | Pipeline | `generateWeapon()` följer stegen 1–10 i ordning |
 | 15, 20, 24 | Variation och identitet (builds) | `themes`: varje vapen får en tydlig spelstil ("Fire Build", "Glass Cannon" …) |
 | 16 | NEW WEAPON DISCOVERED | `src/ui/discovery.js`, codex i sparfilen |
-| 17 | Crafting | `src/weapons/crafting.js`, `src/ui/crafting.js` |
+| 17 | Crafting | `src/weapons/crafting.js`, `src/ui/crafting.js`. Kräver en Forge i lägret |
 | 18–19 | Research och bosskärnor | `components` i datat, `src/ui/research.js`, fyra bossar i `src/game/enemies.js` |
 | 21 | Balans / Power Budget | Kostnader per modifier/effekt/ability i datat, budget per rarity, taknivåer och en rating-gräns i `finalizeStats` |
 | 22 | Vapen som data | All vapenlogik läses från DNA; inget vapen har egen kod |
@@ -153,6 +192,7 @@ hook-actions, abilities). Därmed gäller:
 ```text
 index.html, manifest.webmanifest, sw.js, precache-manifest.js (genererad)
 css/app.css
+fonts/                        Pixelify Sans (OFL)
 data/v1/gamedata.json         allt spelinnehåll
 icons/                        genererade ikoner
 src/
@@ -160,8 +200,8 @@ src/
   core/                       deterministisk RNG, matematik
   data/                       laddning, validering, klientens kapabiliteter
   weapons/                    generator, regler, namn, visuals, DNA, crafting, worker
-  game/                       värld, fiender/bossar, strid, abilities, loot, status, fx
-  render/                     renderer, pixelsprites, tiles, vapensprites, font
+  game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger
+  render/                     renderer, pixelsprites, tiles, vapensprites, byggnader, animationer
   input/, audio/, storage/, pwa/, ui/
 scripts/                      dev-server, precache-byggare, ikongenerator
 tests/unit/, tests/e2e/

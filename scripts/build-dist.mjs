@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Copies exactly the files the app serves into dist/ (the deploy folder):
-// the Service Worker, its precache manifest, and every precached file.
-// Tests, scripts and node_modules never get published.
+// the Service Worker, its precache manifest, every precached file, and the
+// font license. Tests, scripts and node_modules never get published.
 //
 //   node scripts/build-dist.mjs
 
@@ -22,7 +22,7 @@ if (committed !== manifest.source) {
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist);
-const files = ['sw.js', 'precache-manifest.js', ...manifest.shell, ...manifest.data];
+const files = ['sw.js', 'precache-manifest.js', 'fonts/OFL.txt', ...manifest.shell, ...manifest.data];
 for (const file of files) {
   const from = join(root, file);
   if (!existsSync(from)) throw new Error(`Missing file: ${file}`);

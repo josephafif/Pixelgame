@@ -16,12 +16,12 @@ const KEYMAP = {
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyQ: 'ability', KeyK: 'ability',
   KeyE: 'interact', KeyF: 'interact',
-  KeyI: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyM: 'map',
+  KeyI: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyB: 'base', KeyM: 'map',
   Escape: 'menu', KeyP: 'menu',
 };
 
 const DEADZONE = 0.18;
-const UI_ACTIONS = new Set(['inventory', 'crafting', 'research', 'menu', 'map', 'back']);
+const UI_ACTIONS = new Set(['inventory', 'crafting', 'research', 'base', 'menu', 'map', 'back']);
 
 export class Input {
   /**

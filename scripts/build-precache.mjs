@@ -12,7 +12,7 @@ import { dirname, join, relative, sep } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(root, 'precache-manifest.js');
 
-const SHELL_ROOTS = ['index.html', 'manifest.webmanifest', 'css', 'src', 'icons'];
+const SHELL_ROOTS = ['index.html', 'manifest.webmanifest', 'css', 'fonts', 'src', 'icons'];
 const DATA_ROOTS = ['data'];
 const EXTENSIONS = new Set(['.html', '.webmanifest', '.css', '.js', '.png', '.svg', '.json', '.woff2', '.mp3', '.ogg', '.wav']);
 

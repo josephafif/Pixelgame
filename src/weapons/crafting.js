@@ -5,6 +5,7 @@
 import { hashInts } from '../core/rng.js';
 import { buildPool } from './pool.js';
 import { createRuleState, incompatibility } from './rules.js';
+import { buildingLevel, baseBonuses } from '../game/base.js';
 
 export function researchedComponents(save) {
   return Object.entries(save.components)
@@ -13,8 +14,9 @@ export function researchedComponents(save) {
     .sort();
 }
 
+/** Crafting needs a Forge at the base. */
 export function isCraftingUnlocked(data, save) {
-  return save.player.level >= data.crafting.unlockLevel;
+  return buildingLevel(data, save, 'forge') >= 1;
 }
 
 function anyBossDefeated(save) {
@@ -22,8 +24,8 @@ function anyBossDefeated(save) {
 }
 
 export function catalystAvailability(data, save, catalyst) {
-  if (catalyst.requiresLevel && save.player.level < catalyst.requiresLevel) {
-    return `Requires level ${catalyst.requiresLevel}`;
+  if (catalyst.requiresForge && buildingLevel(data, save, 'forge') < catalyst.requiresForge) {
+    return `Forge level ${catalyst.requiresForge}`;
   }
   if (catalyst.requiresBoss && !anyBossDefeated(save)) return 'Defeat a boss first';
   return null;
@@ -48,20 +50,22 @@ export function craftingOptions(data, save) {
   };
 }
 
-export function craftCost(data, choice) {
+/** Cost of a craft; the Forge's level discounts it when `save` is given. */
+export function craftCost(data, choice, save = null) {
   const catalyst = data.byId.catalysts.get(choice.catalyst ?? 'none');
   const cfg = data.crafting;
+  const keep = 1 - (save ? baseBonuses(data, save).craftDiscountPct : 0) / 100;
   return {
-    scrap: cfg.scrapCost + (catalyst ? data.catalysts.indexOf(catalyst) * 10 : 0),
-    essence: cfg.essenceCost + (catalyst?.essence ?? 0) + (choice.rune ? cfg.runeCost : 0)
-      + (choice.ability ? cfg.abilityCost : 0),
+    scrap: Math.ceil((cfg.scrapCost + (catalyst ? data.catalysts.indexOf(catalyst) * 10 : 0)) * keep),
+    essence: Math.ceil((cfg.essenceCost + (catalyst?.essence ?? 0) + (choice.rune ? cfg.runeCost : 0)
+      + (choice.ability ? cfg.abilityCost : 0)) * keep),
   };
 }
 
 /** Returns a list of reasons the choice can't be crafted (empty = ok). */
 export function validateCraft(data, save, choice) {
   const errors = [];
-  if (!isCraftingUnlocked(data, save)) errors.push(`Crafting unlocks at level ${data.crafting.unlockLevel}`);
+  if (!isCraftingUnlocked(data, save)) errors.push('Build a Forge at your camp first');
   const opts = craftingOptions(data, save);
   const archetype = opts.blueprints.find((a) => a.id === choice.archetype);
   if (!archetype) errors.push('Choose a known blueprint');
@@ -90,7 +94,7 @@ export function validateCraft(data, save, choice) {
     const minIdx = catalyst ? data.rarityIndex.get(catalyst.minRarity) : 0;
     if (minIdx < data.rarityIndex.get('epic')) errors.push('Abilities need a Violet or Golden catalyst');
   }
-  const cost = craftCost(data, choice);
+  const cost = craftCost(data, choice, save);
   if (save.resources.scrap < cost.scrap) errors.push(`Needs ${cost.scrap} scrap`);
   if (save.resources.essence < cost.essence) errors.push(`Needs ${cost.essence} essence`);
   return errors;
@@ -101,7 +105,7 @@ export function buildCraftRequest(data, save, choice, luck = 0) {
   const catalyst = data.byId.catalysts.get(choice.catalyst ?? 'none');
   return {
     seed: hashInts(save.worldSeed, 0xc4af7, save.counters.craft),
-    level: save.player.level,
+    level: save.player.level + baseBonuses(data, save).craftLevel,
     luck,
     source: 'craft',
     unlocked: researchedComponents(save),

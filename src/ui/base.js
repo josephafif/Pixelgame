@@ -1,0 +1,151 @@
+// Camp panel: every building of the base with its level, what it does now,
+// what the next level adds and what it costs. Buildings are upgraded here
+// and the Essence Well / Waystone are used from here too.
+
+import { h, pixelCanvas } from './dom.js';
+import { icon, costChip } from './icons.js';
+import { openModal, replaceModalBody, closeModal } from './modal.js';
+import { buildingSprite } from '../render/buildings.js';
+import {
+  buildingDefs, buildingLevel, maxLevel, nextLevelInfo, upgradeBlockers, describeBonus, campRank,
+  wellPending, baseBonuses,
+} from '../game/base.js';
+
+function pips(level, max) {
+  return h('div.pips', { 'aria-label': `Level ${level} of ${max}` },
+    Array.from({ length: max }, (_, i) => h('i', { class: i < level ? 'on' : null })));
+}
+
+export function open(game, app, { focus = null } = {}) {
+  const { data, save } = game;
+  let focusId = focus;
+  const rerender = () => {
+    const body = document.querySelector('.base-panel .panel-body');
+    const scroll = body?.scrollTop ?? 0;
+    replaceModalBody(build());
+    if (body) body.scrollTop = scroll;
+  };
+
+  function extraActions(def, level) {
+    if (level < 1) return [];
+    switch (def.id) {
+      case 'forge':
+        return [h('button', { onclick: () => app.panels.show('crafting') }, icon('anvil', 20), 'Craft')];
+      case 'vault':
+        return [h('button', { onclick: () => app.panels.show('inventory', { tab: 'storage' }) }, icon('chest', 20), 'Storage')];
+      case 'library':
+        return [h('button', { onclick: () => app.panels.show('research') }, icon('book', 20), 'Research')];
+      case 'well': {
+        const n = wellPending(data, save);
+        return [h('button', {
+          disabled: n <= 0,
+          onclick: () => {
+            game.collectWell();
+            rerender();
+          },
+        }, icon('essence', 20), n > 0 ? `Collect ${n}` : 'Filling…')];
+      }
+      case 'waystone': {
+        const far = Math.hypot(game.player.x, game.player.y) >= 8;
+        const out = [];
+        if (far) {
+          const left = Math.ceil(game.recallReadyIn());
+          out.push(h('button', {
+            disabled: left > 0,
+            onclick: () => {
+              closeModal();
+              game.recall();
+            },
+          }, icon('portal', 20), left > 0 ? `Recall (${left}s)` : 'Recall to camp'));
+        } else if (level >= 2 && save.base.recall) {
+          out.push(h('button', {
+            onclick: () => {
+              closeModal();
+              game.returnFromRecall();
+            },
+          }, icon('portal', 20), 'Return'));
+        }
+        return out;
+      }
+      default:
+        return [];
+    }
+  }
+
+  function wellMeter(level) {
+    if (level < 1) return null;
+    const rate = baseBonuses(data, save).essencePerHour;
+    const cap = Math.floor(rate * data.base.wellCapHours);
+    const n = wellPending(data, save);
+    return h('div',
+      h('div.meter', { role: 'meter', 'aria-valuemin': 0, 'aria-valuemax': cap, 'aria-valuenow': n },
+        h('div', { style: { width: `${Math.min(100, (100 * n) / Math.max(1, cap))}%` } })),
+      h('div.small.muted', `${n} / ${cap} essence stored`));
+  }
+
+  function card(def) {
+    const level = buildingLevel(data, save, def.id);
+    const max = maxLevel(def);
+    const next = nextLevelInfo(data, save, def.id);
+    const blockers = upgradeBlockers(data, save, def.id);
+    const hardBlockers = next ? blockers.filter((b) => !/more (scrap|essence)$/.test(b)) : [];
+    const canUpgrade = next && blockers.length === 0;
+    const art = pixelCanvas(buildingSprite(def.id, level));
+    art.style.width = '64px';
+    art.style.height = '72px';
+    return h('article.bcard', {
+      class: [focusId === def.id ? 'focus' : null, level === 0 ? 'unbuilt' : null].filter(Boolean).join(' ') || null,
+      'data-building': def.id,
+    },
+    h('div.bcard-top',
+      h('div.bcard-art', art),
+      h('div',
+        h('h3', def.name),
+        pips(level, max),
+        h('div.small.muted', level === 0 ? 'Not built' : `Level ${level} / ${max}`))),
+    h('p.desc', def.desc),
+    level > 0 ? h('div.now', icon('star', 16), ' ', describeBonus(data, def.id, level)) : null,
+    def.id === 'well' ? wellMeter(level) : null,
+    next ? h('div.next', icon('up', 16), ' ', level === 0 ? 'Build: ' : 'Next: ', describeBonus(data, def.id, next.level)) : null,
+    hardBlockers.length ? h('div.req', icon('lock', 16), ' ', hardBlockers.join(' · ')) : null,
+    h('div.row',
+      next ? costChip('scrap', next.scrap, save.resources.scrap) : null,
+      next && next.essence ? costChip('essence', next.essence, save.resources.essence) : null,
+      next
+        ? h(`button${canUpgrade ? '.btn-primary' : ''}`, {
+          disabled: !canUpgrade,
+          onclick: () => {
+            focusId = def.id;
+            game.upgradeBuilding(def.id);
+          },
+        }, level === 0 ? 'Build' : 'Upgrade')
+        : h('span.badge', 'Max level'),
+      ...extraActions(def, level)));
+  }
+
+  function build() {
+    const defs = buildingDefs(data);
+    const maxRank = defs.reduce((s, d) => s + maxLevel(d), 0);
+    return h('div.base',
+      h('div.base-head',
+        h('span.rank', `Camp rank ${campRank(data, save)} / ${maxRank}`),
+        h('span.spacer'),
+        h('span.cost', icon('scrap', 20), String(save.resources.scrap)),
+        h('span.cost', icon('essence', 20), String(save.resources.essence))),
+      h('p.small.muted', 'Upgrade buildings with scrap and essence from your adventures. Walk up to a building in camp to use it.'),
+      h('div.base-grid', defs.map(card)));
+  }
+
+  const offs = [game.on('base', rerender), game.on('inventory', rerender)];
+  openModal({
+    title: 'Camp', icon: 'home', body: build(), className: 'wide base-panel',
+    onDispose: () => offs.forEach((off) => off()),
+  });
+  if (focusId) {
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`.bcard[data-building="${focusId}"]`);
+      el?.scrollIntoView({ block: 'nearest' });
+      el?.querySelector('button.btn-primary, button:not([disabled])')?.focus({ preventScroll: true });
+    });
+  }
+}

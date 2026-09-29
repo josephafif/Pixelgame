@@ -15,19 +15,38 @@ function section(title, ...content) {
   return h('section.card-section', h('h4', title), ...content);
 }
 
+// Stat rows that can be compared numerically with the equipped weapon.
+const COMPARABLE = {
+  Damage: ['damage', 0],
+  'Attack Speed': ['attackSpeed', 2],
+  Range: ['range', 1],
+  'Critical Chance': ['critChance', 0],
+  'Critical Damage': ['critDamage', 0],
+};
+
+function statDelta(label, dna, other) {
+  const spec = COMPARABLE[label];
+  if (!spec || !other) return null;
+  const [key, digits] = spec;
+  const d = (dna.stats[key] ?? 0) - (other.stats[key] ?? 0);
+  if (Math.abs(d) < 10 ** -digits / 2) return null;
+  return h(`span.delta.${d > 0 ? 'up' : 'down'}`, `${d > 0 ? '+' : '−'}${Math.abs(d).toFixed(digits)}`);
+}
+
 export function weaponCard(data, dna, { compareTo = null, compact = false } = {}) {
   const rarity = rarityInfo(data, dna.rarity);
   const rows = statRows(data, dna);
   const dps = dpsEstimate(dna);
-  const cmp = compareTo && compareTo.id !== dna.id ? dps - dpsEstimate(compareTo) : null;
+  const other = compareTo && compareTo.id !== dna.id ? compareTo : null;
+  const cmp = other ? dps - dpsEstimate(other) : null;
 
-  const statTable = h('dl.stats', rows.map(([k, v]) => [h('dt', k), h('dd', v)]));
+  const statTable = h('dl.stats', rows.map(([k, v]) => [h('dt', k), h('dd', v, statDelta(k, dna, other))]));
   const mods = dna.modifiers.map((m) => h('li', { class: `mod mod-${m.category}` }, m.label));
   if (dna.drawback) mods.push(h('li.mod.mod-drawback', `${dna.drawback.name}: ${dna.drawback.label}`));
   const effects = dna.effects.map((e) => h('li.effect', h('b', e.name), ' — ', e.desc));
   const ab = dna.ability;
 
-  return h('article.weapon-card', { style: { '--rarity': rarity.color } },
+  return h(`article.weapon-card.r-${dna.rarity}`, { style: { '--rarity': rarity.color } },
     h('div.card-head',
       h('div.card-icon', weaponIconEl(dna, compact ? 56 : 80)),
       h('div.card-title',
@@ -48,5 +67,6 @@ export function weaponCard(data, dna, { compareTo = null, compact = false } = {}
     compact ? null : h('div.dna-row',
       h('span.seed', `Weapon Seed: ${formatSeed(dna.seed)}`),
       h('span.power', { title: 'Power budget used by modifiers, effects and ability' },
-        `Power ${dna.power.used}/${dna.power.budget}`)));
+        `Power ${dna.power.used}/${dna.power.budget}`,
+        h('div.power-bar', h('div', { style: { width: `${Math.min(100, (100 * dna.power.used) / Math.max(1, dna.power.budget))}%` } })))));
 }

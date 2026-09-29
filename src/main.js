@@ -18,6 +18,7 @@ import { Panels } from './ui/panels.js';
 import { initModals, openModal, closeModal } from './ui/modal.js';
 import { showDiscovery } from './ui/discovery.js';
 import { h, $ } from './ui/dom.js';
+import { hydrateIcons } from './ui/icons.js';
 import { registerServiceWorker, serviceWorkerSupported } from './pwa/register.js';
 import { canInstall, promptInstall, isStandalone, iosInstallHint, onInstallAvailabilityChange } from './pwa/install.js';
 import { detectSupport } from './pwa/support.js';
@@ -201,11 +202,13 @@ class App {
     const body = h('div.tutorial',
       h('p', 'Every weapon in this world is generated from its own Weapon DNA. No two are alike — find them, forge them, and build your own playstyle.'),
       h('ul',
-        touch ? h('li', 'Left thumb: move with the joystick.') : h('li', 'WASD / arrows to move, mouse to aim.'),
-        touch ? h('li', '⚔ attacks — and uses chests, shrines and altars when you stand next to them.') : h('li', 'Click, Space or J to attack. E or Space to use chests, shrines and altars.'),
-        touch ? h('li', '» toggles sprint (no stamina — sprint forever).') : h('li', 'Shift to sprint (no stamina — sprint forever).'),
-        touch ? h('li', '★ appears when your weapon grants an ability.') : h('li', 'Q or right-click casts your weapon\'s ability, when it has one.'),
-        h('li', 'Follow the arrow at the screen edge to find the bosses.')),
+        touch ? h('li', 'Left thumb: move with the joystick.') : h('li', 'WASD / arrows to move.'),
+        h('li', 'Your weapon aims itself at the nearest enemy — just attack.'),
+        touch ? h('li', 'The sword button attacks — and uses chests, shrines and buildings when you stand next to them.') : h('li', 'Click, Space or J to attack. E or Space to use chests, shrines and buildings.'),
+        touch ? h('li', 'The boot toggles sprint (no stamina — sprint forever).') : h('li', 'Shift to sprint (no stamina — sprint forever).'),
+        touch ? h('li', 'The star appears when your weapon grants an ability.') : h('li', 'Q or right-click casts your weapon\'s ability, when it has one.'),
+        h('li', 'Your camp is at the centre of the world. Upgrade its buildings with scrap and essence.'),
+        h('li', 'Follow the arrow at the top-left to find the bosses.')),
       h('button.btn-primary', {
         autofocus: true,
         onclick: async () => {
@@ -398,6 +401,7 @@ class App {
 
 const app = new App();
 // Module scripts run after the document is parsed, so the DOM is ready here.
+hydrateIcons();
 $('#update-now')?.addEventListener('click', () => app.applyUpdate());
 $('#update-later')?.addEventListener('click', () => app.laterUpdate());
 app.boot().catch((err) => {

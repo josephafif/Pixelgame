@@ -2,7 +2,9 @@
 // with essence; each one widens the pool the weapon generator draws from.
 
 import { h } from './dom.js';
+import { icon, costChip } from './icons.js';
 import { openModal, replaceModalBody } from './modal.js';
+import { researchCost, baseBonuses } from '../game/base.js';
 
 function unlockList(game, c) {
   const u = c.unlocks ?? {};
@@ -16,8 +18,15 @@ function unlockList(game, c) {
   return parts;
 }
 
+const TYPE_ICON = { core: 'essence', material: 'scrap', blueprint: 'sword', ability: 'star' };
+
 export function open(game) {
-  const rerender = () => replaceModalBody(build());
+  const rerender = () => {
+    const body = document.querySelector('.research-panel .panel-body');
+    const scroll = body?.scrollTop ?? 0;
+    replaceModalBody(build());
+    if (body) body.scrollTop = scroll;
+  };
 
   function build() {
     const found = Object.entries(game.save.components)
@@ -26,29 +35,39 @@ export function open(game) {
       .sort((a, b) => Number(a.entry.researched) - Number(b.entry.researched));
     const total = game.data.components.length;
     const essence = game.save.resources.essence;
+    const discount = Math.min(60, baseBonuses(game.data, game.save).researchDiscountPct);
     return h('div.research',
-      h('p', `Components discovered: ${found.length} / ${total} · Essence: ${essence} ◆`),
-      found.length ? null : h('p.muted', 'Defeat enemies, open chests and slay bosses to find cores, materials and blueprints.'),
+      h('div.base-head',
+        h('span.rank', `Discovered ${found.length} / ${total}`),
+        discount ? h('span.small.good', `Library: -${discount}% research cost`) : null,
+        h('span.spacer'),
+        h('span.cost', icon('essence', 20), String(essence))),
+      found.length ? null : h('div.empty-state', icon('book', 48),
+        h('p', 'Defeat enemies, open chests and slay bosses to find cores, materials and blueprints.')),
       h('ul.research-list', found.map(({ def, entry }) => {
         const color = game.data.byId.rarities.get(def.rarity)?.color;
-        return h('li.research-item', { class: entry.researched ? 'done' : '' },
+        const cost = researchCost(game.data, game.save, def);
+        return h('li.research-item', { class: entry.researched ? 'done' : null },
           h('div.research-head',
+            icon(TYPE_ICON[def.type] ?? 'book', 20),
             h('b', { style: { color } }, def.name),
-            h('span.muted', ` ${def.type}${def.boss ? ' · boss core' : ''}`)),
+            h('span.muted.small', ` ${def.type}${def.boss ? ' · boss core' : ''}`)),
           h('p', def.desc),
           h('ul.unlocks', unlockList(game, def).map((t) => h('li', t))),
           entry.researched
             ? h('span.badge', 'Researched')
-            : h('button.btn-primary', {
-              disabled: essence < def.research,
-              onclick: () => {
-                game.research(def.id);
-                rerender();
-              },
-            }, `Research (${def.research} ◆)`));
+            : h('div.row',
+              costChip('essence', cost, essence),
+              h('button.btn-primary', {
+                disabled: essence < cost,
+                onclick: () => {
+                  game.research(def.id);
+                  rerender();
+                },
+              }, 'Research')));
       })));
   }
 
   const off = game.on('components', () => rerender());
-  openModal({ title: 'Research', body: build(), className: 'wide research-panel', onClose: off });
+  openModal({ title: 'Research', icon: 'book', body: build(), className: 'wide research-panel', onDispose: off });
 }

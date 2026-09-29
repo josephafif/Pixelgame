@@ -21,6 +21,9 @@ import {
   onEnemyKilledLoot, updatePickups, openChestLoot, salvageValue, addPickup, componentColor, requestWeaponDrop,
 } from './loot.js';
 import { validateCraft, buildCraftRequest, craftCost, isCraftingUnlocked } from '../weapons/crafting.js';
+import {
+  syncInventoryCaps, upgradeBuilding, upgradeBlockers, buildingLevel, buildingDef, collectWell, wellPending, researchCost,
+} from './base.js';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 5;
@@ -84,6 +87,7 @@ export class Game {
       hp: 1, dead: false, invuln: 1, attackCd: 0, attackAnim: null, attackCount: 0, sprinting: false,
       moving: false, walkT: 0, hurtFlash: 0, respawnT: 0, statuses: {},
     };
+    syncInventoryCaps(data, save);
     this.pstats = computePlayerStats(data, save, null, []);
     this.#applySettings();
     this.#equipFromSave();
@@ -165,6 +169,8 @@ export class Game {
 
   resume(reason) {
     this.pauseReasons.delete(reason);
+    // Keys pressed inside panels (Q, E, …) must not fire once play resumes.
+    if (!this.paused) this.input.commands = [];
     // Never "catch up" on time that passed while paused/backgrounded.
     this.last = performance.now();
     this.acc = 0;
@@ -359,19 +365,62 @@ export class Game {
       this.toast("You can't salvage the weapon you are holding", 'warn');
       return null;
     }
+    const value = this.#salvageOne(id);
+    if (value) {
+      this.emit('inventory');
+      this.saveNow();
+    }
+    return value;
+  }
+
+  /** Salvages several weapons at once; skips the equipped weapon and favorites. */
+  salvageMany(ids) {
+    const inv = this.save.inventory;
+    const total = { scrap: 0, essence: 0, count: 0 };
+    for (const id of ids) {
+      if (id === inv.equipped || inv.favorites.includes(id)) continue;
+      const v = this.#salvageOne(id);
+      if (!v) continue;
+      total.scrap += v.scrap;
+      total.essence += v.essence;
+      total.count += 1;
+    }
+    if (total.count) {
+      this.toast(`Salvaged ${total.count} weapons for ${total.scrap} scrap and ${total.essence} essence`);
+      this.emit('inventory');
+      this.saveNow();
+    }
+    return total;
+  }
+
+  #salvageOne(id) {
+    const inv = this.save.inventory;
     for (const list of [inv.bag, inv.storage]) {
       const idx = list.findIndex((w) => w.id === id);
-      if (idx >= 0) {
-        const [dna] = list.splice(idx, 1);
-        const value = salvageValue(dna);
-        this.save.resources.scrap += value.scrap;
-        this.save.resources.essence += value.essence;
-        this.emit('inventory');
-        this.saveNow();
-        return value;
-      }
+      if (idx < 0) continue;
+      const [dna] = list.splice(idx, 1);
+      const value = salvageValue(dna);
+      this.save.resources.scrap += value.scrap;
+      this.save.resources.essence += value.essence;
+      inv.favorites = inv.favorites.filter((f) => f !== id);
+      inv.unseen = inv.unseen.filter((f) => f !== id);
+      return value;
     }
     return null;
+  }
+
+  toggleFavorite(id) {
+    const inv = this.save.inventory;
+    const on = !inv.favorites.includes(id);
+    inv.favorites = on ? [...inv.favorites, id] : inv.favorites.filter((f) => f !== id);
+    this.saveNow();
+    return on;
+  }
+
+  /** Clears the NEW badge. */
+  markSeen(id) {
+    const inv = this.save.inventory;
+    if (inv.unseen.includes(id)) inv.unseen = inv.unseen.filter((f) => f !== id);
   }
 
   // --- Discovery ------------------------------------------------------------------
@@ -429,9 +478,11 @@ export class Game {
       this.toast(`Salvaged for ${v.scrap} scrap and ${v.essence} essence`);
     } else if (choice === 'storage') {
       inv.storage.push(dna);
+      inv.unseen.push(dna.id);
       this.toast(`${dna.name.text} sent to storage`);
     } else {
       inv.bag.push(dna);
+      if (choice !== 'equip') inv.unseen.push(dna.id);
       if (choice === 'equip') {
         inv.equipped = dna.id;
         this.weapon = compileWeapon(dna);
@@ -473,11 +524,12 @@ export class Game {
     const def = this.data.byId.components.get(id);
     const entry = this.save.components[id];
     if (!def || !entry || entry.researched) return false;
-    if (this.save.resources.essence < def.research) {
-      this.toast(`Needs ${def.research} essence`, 'warn');
+    const cost = researchCost(this.data, this.save, def);
+    if (this.save.resources.essence < cost) {
+      this.toast(`Needs ${cost} essence`, 'warn');
       return false;
     }
-    this.save.resources.essence -= def.research;
+    this.save.resources.essence -= cost;
     entry.researched = true;
     this.toast(`Researched ${def.name}!`, 'component');
     this.audio.play('levelup');
@@ -491,7 +543,7 @@ export class Game {
   async craft(choice) {
     const errors = validateCraft(this.data, this.save, choice);
     if (errors.length) throw new Error(errors[0]);
-    const cost = craftCost(this.data, choice);
+    const cost = craftCost(this.data, choice, this.save);
     const request = buildCraftRequest(this.data, this.save, choice, Math.floor(this.pstats.luck));
     this.save.resources.scrap -= cost.scrap;
     this.save.resources.essence -= cost.essence;
@@ -512,8 +564,9 @@ export class Game {
       pl.xp -= xpToNext(this.data, pl.level);
       pl.level += 1;
       leveled = true;
-      if (pl.level === this.data.crafting.unlockLevel) {
-        this.toast('The Forge is unlocked! Craft your own weapons from the menu.', 'legendary');
+      const forge = buildingDef(this.data, 'forge');
+      if (forge && pl.level === forge.levels[0].playerLevel && buildingLevel(this.data, this.save, 'forge') === 0) {
+        this.toast('You can now build a Forge at your camp and craft your own weapons!', 'legendary');
       }
     }
     if (leveled) {
@@ -626,9 +679,104 @@ export class Game {
       case 'chest': return 'Open chest';
       case 'shrine': return 'Pray at shrine';
       case 'altar': return `Summon ${this.data.byId.bosses.get(o.bossId)?.name ?? 'boss'}`;
-      case 'camp': return 'Rest at camp';
+      case 'building': {
+        const def = buildingDef(this.data, o.buildingId);
+        const level = buildingLevel(this.data, this.save, o.buildingId);
+        if (level === 0) return `Build ${def.name}`;
+        if (o.buildingId === 'hearth') return 'Rest & manage camp';
+        if (o.buildingId === 'well') {
+          const n = wellPending(this.data, this.save);
+          return n > 0 ? `Collect ${n} essence` : 'Essence Well (filling…)';
+        }
+        return `Use ${def.name}`;
+      }
       default: return 'Use';
     }
+  }
+
+  // --- Base -------------------------------------------------------------------------
+
+  upgradeBuilding(id) {
+    const def = buildingDef(this.data, id);
+    try {
+      const level = upgradeBuilding(this.data, this.save, id);
+      this.recomputeStats();
+      this.audio.play('levelup');
+      this.fx.emit('sparkle', def.x, def.y - 0.5, 24, 1, 3);
+      this.fx.add({ type: 'ring', x: def.x, y: def.y, r0: 0.3, r1: 2, color: '#ffd24a', dur: 0.4 });
+      this.toast(level === 1 ? `${def.name} built!` : `${def.name} upgraded to level ${level}!`, 'level');
+      this.emit('base');
+      this.emit('inventory');
+      this.saveNow();
+      return level;
+    } catch (err) {
+      this.toast(err.message, 'warn');
+      return null;
+    }
+  }
+
+  collectWell() {
+    const n = collectWell(this.data, this.save);
+    if (n > 0) {
+      const well = buildingDef(this.data, 'well');
+      for (let i = 0; i < Math.min(20, n); i++) addPickup(this, 'essence', well.x, well.y, { value: 0, color: '#7ae0ff' });
+      this.toast(`Collected ${n} essence from the well`, 'component');
+      this.audio.play('pickup');
+      this.emit('base');
+      this.saveNow();
+    }
+    return n;
+  }
+
+  recallReadyIn() {
+    return Math.max(0, (this.recallReadyAt ?? 0) - this.time);
+  }
+
+  /** Waystone: teleport to camp (remembering where we were at level 2). */
+  recall() {
+    if (buildingLevel(this.data, this.save, 'waystone') < 1 || this.player.dead) return false;
+    if (this.recallReadyIn() > 0) {
+      this.toast(`The Waystone recharges in ${Math.ceil(this.recallReadyIn())}s`, 'warn');
+      return false;
+    }
+    const p = this.player;
+    if (Math.hypot(p.x, p.y) < 8) return false;
+    if (buildingLevel(this.data, this.save, 'waystone') >= 2) this.save.base.recall = { x: p.x, y: p.y };
+    this.#teleport(buildingDef(this.data, 'waystone').x, buildingDef(this.data, 'waystone').y + 1);
+    this.recallReadyAt = this.time + this.data.base.recallCooldown;
+    this.toast('Recalled to camp', 'component');
+    return true;
+  }
+
+  /** Waystone level 2: step back to where the last recall started. */
+  returnFromRecall() {
+    const back = this.save.base.recall;
+    if (!back || buildingLevel(this.data, this.save, 'waystone') < 2) return false;
+    this.save.base.recall = null;
+    this.#teleport(back.x, back.y);
+    this.toast('Back through the Waystone', 'component');
+    return true;
+  }
+
+  #teleport(x, y) {
+    const p = this.player;
+    this.fx.emit('arcane', p.x, p.y, 24, 0.6, 3);
+    if (this.boss) {
+      this.enemies = this.enemies.filter((e) => e !== this.boss);
+      this.boss = null;
+      this.emit('boss', { active: false, victory: false });
+    }
+    const spot = this.world.findFreeSpot(x, y, p.r);
+    p.x = spot.x;
+    p.y = spot.y;
+    p.invuln = 1;
+    this.enemies = this.enemies.filter((e) => Math.hypot(e.x - p.x, e.y - p.y) > 14);
+    this.projectiles.length = 0;
+    this.renderer.snapCamera?.();
+    this.fx.emit('arcane', p.x, p.y, 24, 0.6, 3);
+    this.audio.play('zap');
+    this.emit('interact', { label: null });
+    this.saveNow();
   }
 
   interact() {
@@ -662,12 +810,27 @@ export class Game {
         this.toast(`${def.name} awakens!`, 'boss');
         break;
       }
-      case 'camp':
-        this.player.hp = this.pstats.maxHp;
-        pl.spawnX = 0.5;
-        pl.spawnY = 1.5;
-        this.emit('ui', 'camp');
+      case 'building': {
+        const id = o.buildingId;
+        const level = buildingLevel(this.data, this.save, id);
+        if (id === 'hearth') {
+          this.player.hp = this.pstats.maxHp;
+          pl.spawnX = 0.5;
+          pl.spawnY = 1.6;
+          this.emit('ui', 'base');
+        } else if (level === 0 || id === 'training' || id === 'waystone') {
+          this.emit('ui', { name: 'base', focus: id });
+        } else if (id === 'forge') {
+          this.emit('ui', 'crafting');
+        } else if (id === 'vault') {
+          this.emit('ui', { name: 'inventory', tab: 'storage' });
+        } else if (id === 'library') {
+          this.emit('ui', 'research');
+        } else if (id === 'well') {
+          if (!this.collectWell()) this.emit('ui', { name: 'base', focus: id });
+        }
         break;
+      }
       default:
         break;
     }
@@ -823,8 +986,15 @@ export class Game {
       dead: this.player.dead,
       fps: Math.round(1000 / this.frameMs),
       craftingUnlocked: isCraftingUnlocked(this.data, this.save),
+      campAlert: this.#campAlert(),
       compass: (this.lastCompass = this.#compass()),
     };
+  }
+
+  /** Something to do at camp: essence waiting in the well or an affordable upgrade. */
+  #campAlert() {
+    if (wellPending(this.data, this.save) > 0) return true;
+    return this.data.base.buildings.some((b) => upgradeBlockers(this.data, this.save, b.id).length === 0);
   }
 
   #compass() {

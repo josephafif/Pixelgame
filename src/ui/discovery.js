@@ -1,6 +1,7 @@
 // "NEW WEAPON DISCOVERED" screen (spec §16).
 
 import { h } from './dom.js';
+import { icon } from './icons.js';
 import { openModal, closeModal } from './modal.js';
 import { weaponCard } from './weapon-card.js';
 
@@ -11,12 +12,13 @@ export function showDiscovery(game, { dna, canKeep, canStore, salvage, equipped 
   };
   const isFirst = !equipped;
   const body = h('div.discovery',
-    h('div.discovery-banner', { 'aria-live': 'assertive' }, 'NEW WEAPON DISCOVERED'),
+    h('div.discovery-banner', { class: `r-${dna.rarity}`, 'aria-live': 'assertive' }, 'NEW WEAPON DISCOVERED'),
     weaponCard(game.data, dna, { compareTo: equipped }),
     h('div.actions',
-      h('button.btn-primary', { onclick: () => choose('equip'), autofocus: true, disabled: !canKeep && !canStore }, 'Equip'),
-      isFirst ? null : h('button', { onclick: () => choose('keep'), disabled: !canKeep }, canKeep ? 'Keep in bag' : 'Bag full'),
-      isFirst ? null : h('button', { onclick: () => choose('storage'), disabled: !canStore }, 'Send to storage'),
-      isFirst ? null : h('button.btn-danger', { onclick: () => choose('salvage') }, `Salvage (+${salvage.scrap}⚙ +${salvage.essence}◆)`)));
+      h('button.btn-primary', { onclick: () => choose('equip'), autofocus: true, disabled: !canKeep && !canStore }, icon('sword', 20), 'Equip'),
+      isFirst ? null : h('button', { onclick: () => choose('keep'), disabled: !canKeep }, icon('bag', 20), canKeep ? 'Keep in bag' : 'Bag full'),
+      isFirst ? null : h('button', { onclick: () => choose('storage'), disabled: !canStore }, icon('chest', 20), 'Send to storage'),
+      isFirst ? null : h('button.btn-danger', { onclick: () => choose('salvage') },
+        'Salvage', h('span.gain', `+${salvage.scrap}`, icon('scrap', 16), `+${salvage.essence}`, icon('essence', 16)))));
   openModal({ body, className: 'discovery-panel', locked: true, label: 'New weapon discovered' });
 }

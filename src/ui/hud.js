@@ -1,14 +1,17 @@
-// Heads-up display: health/XP, resources, network status, equipped weapon,
-// boss bar, interaction hint, toasts, and the touch buttons' state.
+// Heads-up display: portrait with health/XP, resources, dock buttons,
+// network status, equipped weapon, boss bar, interaction hint, toasts, and
+// the touch buttons' state.
 
 import { $, clear, h } from './dom.js';
 import { weaponIconEl } from './weapon-card.js';
+import { playerSprites } from '../render/sprites.js';
 
 export class Hud {
   constructor(game) {
     this.game = game;
     this.el = {
       root: $('#hud'),
+      hpBar: $('#hp-bar'),
       hpFill: $('#hp-fill'),
       hpText: $('#hp-text'),
       level: $('#lvl'),
@@ -16,6 +19,7 @@ export class Hud {
       essence: $('#res-essence'),
       scrap: $('#res-scrap'),
       weapon: $('#hud-weapon'),
+      campBtn: $('#btn-base'),
       boss: $('#boss-bar'),
       bossName: $('#boss-name'),
       bossFill: $('#boss-fill'),
@@ -29,6 +33,7 @@ export class Hud {
       compass: $('#compass'),
       death: $('#death'),
     };
+    this.drawPortrait();
     game.on('hud', (s) => this.update(s));
     game.on('toast', (t) => this.toast(t.text, t.kind));
     game.on('interact', ({ label }) => this.setHint(label));
@@ -40,12 +45,22 @@ export class Hud {
     this.setWeapon(game.weapon?.dna ?? null);
   }
 
+  drawPortrait() {
+    const c = $('#portrait');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(playerSprites().right[0], 0, 0);
+  }
+
   setWeapon(dna) {
     const el = this.el.weapon;
     clear(el);
     if (!dna) return;
     const color = this.game.data.byId.rarities.get(dna.rarity)?.color;
-    el.append(weaponIconEl(dna, 28), h('span', { style: { color } }, dna.name.text));
+    el.append(
+      h('div.slot.framed', { style: { '--rarity': color } }, weaponIconEl(dna, 32)),
+      h('span.name', { style: { color } }, dna.name.text));
     el.title = `${dna.name.text} — ${dna.identity}`;
     this.el.ability.toggleAttribute('hidden', !dna.ability);
     if (dna.ability) this.el.ability.setAttribute('aria-label', `Ability: ${dna.ability.name}`);
@@ -67,12 +82,15 @@ export class Hud {
 
   update(s) {
     const e = this.el;
-    e.hpFill.style.width = `${(100 * s.hp) / s.maxHp}%`;
+    const hpFrac = s.hp / s.maxHp;
+    e.hpFill.style.width = `${100 * hpFrac}%`;
     e.hpText.textContent = `${s.hp} / ${s.maxHp}`;
-    e.level.textContent = `Lv ${s.level}`;
+    e.hpBar.classList.toggle('low', hpFrac < 0.3 && !s.dead);
+    e.level.textContent = s.level;
     e.xpFill.style.width = `${Math.min(100, (100 * s.xp) / s.xpNext)}%`;
     e.essence.textContent = s.essence;
     e.scrap.textContent = s.scrap;
+    e.campBtn?.classList.toggle('alert', Boolean(s.campAlert));
     const sprintOn = this.game.save.settings.sprintMode === 'hold' ? s.sprinting : this.game.input.sprintToggle;
     e.sprint.classList.toggle('on', sprintOn);
     e.sprint.setAttribute('aria-pressed', String(sprintOn));
@@ -93,7 +111,9 @@ export class Hud {
       e.fps.setAttribute('hidden', '');
     }
     if (s.compass && s.compass.dist > 18) {
-      e.compass.textContent = `${s.compass.name}: ${Math.round(s.compass.dist)}m`;
+      const arrows = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'];
+      const dir = arrows[((Math.round(s.compass.angle / (Math.PI / 4)) % 8) + 8) % 8];
+      e.compass.textContent = `${dir} ${s.compass.name} · ${Math.round(s.compass.dist)}m`;
       e.compass.style.color = s.compass.color;
       e.compass.removeAttribute('hidden');
     } else {

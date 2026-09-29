@@ -18,10 +18,15 @@ test('the world is deterministic per seed', () => {
   assert.notDeepEqual([...a.ground, ...a.block], [...c.ground, ...c.block]);
 });
 
-test('the camp is open ground with a campfire, and every boss has an arena', () => {
+test('the camp is open ground with every base building, and every boss has an arena', () => {
   const world = new World(data, 777);
-  assert.ok(world.isFree(0.5, 0.5, 0.4));
-  assert.ok(world.objectsNear(0, 0, 0).some((o) => o.type === 'camp'));
+  assert.ok(world.isFree(0.5, 1.6, 0.4));
+  for (const b of data.base.buildings) {
+    assert.ok(world.isFree(b.x, b.y, 0.4), `${b.id} stands on open ground`);
+    const cx = Math.floor(b.x / CHUNK);
+    const cy = Math.floor(b.y / CHUNK);
+    assert.ok(world.getChunk(cx, cy).objects.some((o) => o.type === 'building' && o.buildingId === b.id), b.id);
+  }
   assert.equal(world.landmarks.length, data.bosses.length);
   for (const lm of world.landmarks) {
     const cx = Math.floor(lm.x / CHUNK);

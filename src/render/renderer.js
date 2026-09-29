@@ -9,6 +9,8 @@ import { CHUNK } from '../game/world.js';
 import { playerSprites, objectSprite, pickupSprite, tintedSprite } from './sprites.js';
 import { weaponSprite, weaponIcon } from './weapon-sprite.js';
 import { weaponPose } from './weapon-anim.js';
+import { buildingSprite, BUILDING_W, BUILDING_H } from './buildings.js';
+import { buildingLevel, wellPending } from '../game/base.js';
 import { drawPixelText } from './font.js';
 
 const T = TILE_PX;
@@ -67,7 +69,12 @@ export class Renderer {
     this.v = ctx2d(this.view);
   }
 
-  /** World (tile units) → CSS pixels, used for mouse/touch aiming. */
+  /** Jump the camera to the player (after teleports). */
+  snapCamera() {
+    this.camInit = false;
+  }
+
+  /** World (tile units) → CSS pixels. */
   worldToScreen(x, y) {
     return {
       x: ((x * T - this.camX) * this.scale) / this.dpr,
@@ -357,13 +364,50 @@ export class Renderer {
         if (!game.boss && Math.random() < 0.15) game.fx.emit(game.data.byId.elements.get(boss.element)?.particles ?? 'sparkle', o.x, o.y - 0.3, 1, 0.8, 0.6);
         break;
       }
-      case 'camp': {
-        const s = objectSprite('campfire');
-        v.drawImage(s, x - 5, y - 6);
-        this.#glow(x, y - 3, '#ff9a3a', 18 + Math.sin(game.time * 9) * 2);
-        if (Math.random() < 0.3) game.fx.emit('ember', o.x, o.y - 0.3, 1, 0.2, 0.4);
+      case 'building': {
+        const level = buildingLevel(game.data, game.save, o.buildingId);
+        const s = buildingSprite(o.buildingId, level);
+        this.#shadow(x, y + 1, 12);
+        if (level === 0) v.globalAlpha = 0.85;
+        v.drawImage(s, x - (BUILDING_W >> 1), y - BUILDING_H + 3);
+        v.globalAlpha = 1;
+        if (level > 0) this.#buildingAmbience(game, o, level, x, y);
         break;
       }
+      default:
+        break;
+    }
+  }
+
+  #buildingAmbience(game, o, level, x, y) {
+    const v = this.v;
+    const flicker = Math.sin(game.time * 9) * 2;
+    switch (o.buildingId) {
+      case 'hearth':
+        this.#glow(x, y - 5, '#ff9a3a', 18 + level * 2 + flicker);
+        if (Math.random() < 0.3) game.fx.emit('ember', o.x, o.y - 0.4, 1, 0.2, 0.4);
+        break;
+      case 'forge':
+        this.#glow(x - 6, y - 8, '#ff7a2a', 10 + flicker);
+        if (Math.random() < 0.08) game.fx.emit('smoke', o.x + (level >= 5 ? 0.5 : -0.4), o.y - 1.6, 1, 0.2, 0.3);
+        break;
+      case 'well': {
+        this.#glow(x, y - 10, '#7ae0ff', 10 + level * 2);
+        if (wellPending(game.data, game.save) > 0) {
+          const gem = pickupSprite('essence', '#7ae0ff');
+          const bob = Math.round(Math.sin(game.time * 4) * 2);
+          v.drawImage(gem, x - 2, y - BUILDING_H - 4 + bob);
+          this.#glow(x, y - BUILDING_H - 1 + bob, '#7ae0ff', 8);
+        }
+        break;
+      }
+      case 'waystone':
+        this.#glow(x, y - 14, '#cdb2ff', 10 + level * 4 + flicker);
+        if (Math.random() < 0.1) game.fx.emit('arcane', o.x, o.y - 1, 1, 0.4, 0.4);
+        break;
+      case 'library':
+        if (level >= 5) this.#glow(x, y - 18, '#cdb2ff', 10);
+        break;
       default:
         break;
     }

@@ -45,12 +45,12 @@ test('weapons are generated in a Web Worker and drops open the discovery screen'
   expect(errors).toEqual([]);
 });
 
-test('inventory, research, forge and settings panels open', async ({ page }) => {
+test('inventory, research, camp, forge and settings panels open', async ({ page }) => {
   const errors = trackErrors(page);
   await startGame(page);
   await page.keyboard.press('KeyI');
   await expect(page.locator('.inventory-panel')).toBeVisible();
-  await page.click('.tab:has-text("Character")');
+  await page.click('.tab:has-text("Hero")');
   await expect(page.locator('.character')).toContainText('Critical Chance');
   await page.click('.tab:has-text("Codex")');
   await expect(page.locator('.codex')).toContainText('1 weapons discovered');
@@ -69,10 +69,21 @@ test('inventory, research, forge and settings panels open', async ({ page }) => 
   await expect(page.locator('.research-item .badge')).toHaveText('Researched');
   await page.keyboard.press('Escape');
 
+  // No Forge yet: C opens the camp with the Forge highlighted.
   await page.keyboard.press('KeyC');
+  await expect(page.locator('.base-panel')).toBeVisible();
+  const forgeCard = page.locator('.bcard[data-building="forge"]');
+  await expect(forgeCard).toHaveClass(/focus/);
+  await forgeCard.locator('button:has-text("Build")').click();
+  await expect(forgeCard).toContainText('Level 1');
+  await expect(forgeCard.locator('button:has-text("Craft")')).toBeVisible();
+  await forgeCard.locator('button:has-text("Craft")').click();
+
   await expect(page.locator('.forge-panel')).toBeVisible();
-  await page.selectOption('.forge-grid label:nth-child(3) select', 'fire_core');
-  await page.click('.forge .btn-primary');
+  await page.click('.forge .tile:has-text("Sword")');
+  await page.click('.forge .chip:has-text("Fire Core")');
+  await expect(page.locator('.forge-preview .result')).toContainText('Fire Sword');
+  await page.click('.forge-preview .btn-primary');
   await expect(page.locator('.discovery')).toBeVisible();
   await expect(page.locator('.weapon-card .subtitle')).toContainText('Fire');
   await page.click('.discovery button:has-text("Keep in bag")');
@@ -80,6 +91,114 @@ test('inventory, research, forge and settings panels open', async ({ page }) => 
   await page.keyboard.press('Escape');
   await page.click('.menu button:has-text("Settings")');
   await expect(page.locator('.settings-panel')).toContainText('Offline play');
+  expect(errors).toEqual([]);
+});
+
+test('inventory: keyboard navigation, favorites, filters and quick salvage', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    for (let i = 0; i < 4; i++) {
+      const dna = await g.weapons.generate({ seed: 500 + i, level: 3, luck: 0, source: 'drop', unlocked: [], maxRarity: 'uncommon' });
+      g.save.inventory.bag.push(dna);
+      g.save.inventory.unseen.push(dna.id);
+    }
+  });
+  await page.keyboard.press('KeyI');
+  await expect(page.locator('.inv-grid .slot:not(.empty)')).toHaveCount(5);
+  await expect(page.locator('.slot .badge-new')).toHaveCount(4);
+  // The equipped weapon leads and starts selected.
+  await expect(page.locator('.slot.selected .badge-e')).toBeVisible();
+  const equippedName = await page.locator('.inv-detail .weapon-name').textContent();
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.inv-detail .weapon-name')).not.toHaveText(equippedName);
+  await expect(page.locator('.slot .badge-new')).toHaveCount(3); // seen now
+  const picked = await page.locator('.inv-detail .weapon-name').textContent();
+
+  await page.keyboard.press('KeyF');
+  await expect(page.locator('.slot.selected .badge-fav')).toBeVisible();
+  await page.click('.inv-toolbar .chip:has-text("★")');
+  await expect(page.locator('.inv-grid .slot:not(.empty)')).toHaveCount(1);
+  await page.click('.inv-toolbar .chip:has-text("All")');
+
+  // Quick salvage keeps the equipped weapon and favorites.
+  await page.click('.inv-count .chip:has-text("Quick salvage")');
+  page.once('dialog', (d) => d.accept());
+  await page.click('.bulk button:has-text("Uncommon and below")');
+  await expect(page.locator('.inv-grid .slot:not(.empty)')).toHaveCount(2);
+  const left = await game(page, () => window.__pixelgame.game.save.inventory.bag.map((w) => w.name.text));
+  expect(left).toContain(equippedName);
+  expect(left).toContain(picked);
+
+  // Q/E switch tabs.
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('.tab.active')).toContainText('Storage');
+  await page.keyboard.press('KeyQ');
+  await expect(page.locator('.tab.active')).toContainText('Bag');
+  await page.keyboard.press('Escape');
+  // Keys pressed in the panel don't leak into the game afterwards.
+  expect(await game(page, () => window.__pixelgame.game.input.commands.length)).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('camp: buildings upgrade, the well pays out and the waystone recalls', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.player.level = 10;
+    g.save.resources.essence = 2000;
+    g.save.resources.scrap = 2000;
+  });
+  await expect(page.locator('#btn-base')).toHaveClass(/alert/);
+  await page.keyboard.press('KeyB');
+  await expect(page.locator('.base-panel')).toBeVisible();
+  const hpBefore = await game(page, () => window.__pixelgame.game.pstats.maxHp);
+  await page.click('.bcard[data-building="hearth"] button:has-text("Upgrade")');
+  await expect(page.locator('.bcard[data-building="hearth"]')).toContainText('Level 2');
+  expect(await game(page, () => window.__pixelgame.game.pstats.maxHp)).toBeGreaterThan(hpBefore);
+
+  await page.click('.bcard[data-building="well"] button:has-text("Build")');
+  await game(page, () => {
+    window.__pixelgame.game.save.base.wellAt = Date.now() - 2 * 3600 * 1000;
+    window.__pixelgame.game.emit('base');
+  });
+  const essence = await game(page, () => window.__pixelgame.game.save.resources.essence);
+  await page.click('.bcard[data-building="well"] button:has-text("Collect")');
+  expect(await game(page, () => window.__pixelgame.game.save.resources.essence)).toBe(essence + 16);
+
+  await page.click('.bcard[data-building="waystone"] button:has-text("Build")');
+  await page.keyboard.press('Escape');
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.player.x = 40;
+    g.player.y = 40;
+  });
+  await page.keyboard.press('Escape');
+  await page.click('.menu button:has-text("Recall to camp")');
+  const pos = await game(page, () => ({ x: window.__pixelgame.game.player.x, y: window.__pixelgame.game.player.y }));
+  expect(Math.hypot(pos.x, pos.y)).toBeLessThan(8);
+  expect(errors).toEqual([]);
+});
+
+test('auto-aim: the weapon turns to the nearest enemy by itself', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const aimed = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    g.player.x = 60;
+    g.player.y = 60;
+    g.enemies.length = 0;
+    const { spawnEnemy } = await import('/src/game/enemies.js');
+    const e = spawnEnemy(g, 'slime', 60, 57);
+    await new Promise((r) => setTimeout(r, 300));
+    return { locked: g.target === e, facing: g.player.facing };
+  });
+  expect(aimed.locked).toBe(true);
+  // Enemy straight "up" (negative y) → facing ≈ -π/2.
+  expect(Math.abs(Math.sin(aimed.facing) + 1)).toBeLessThan(0.05);
   expect(errors).toEqual([]);
 });
 
