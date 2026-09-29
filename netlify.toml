@@ -1,0 +1,40 @@
+# Netlify deploy settings. The app is static: no functions, no bundler.
+# `npm run build` refreshes precache-manifest.js; build-dist.mjs copies only
+# the served files into dist/.
+
+[build]
+  command = "node scripts/build-precache.mjs && node scripts/build-dist.mjs"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+
+# The Service Worker and its file list must always be revalidated so new
+# versions are found quickly (the app also registers with updateViaCache: 'none').
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/precache-manifest.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
