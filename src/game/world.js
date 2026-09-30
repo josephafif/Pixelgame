@@ -514,14 +514,18 @@ export class World {
   /**
    * Whether a tile blocks movement. Modes: 'player' (gates open for you),
    * 'enemy' (every solid structure blocks), 'fly' (flies over trees and
-   * rocks, but never over water, lava or walls), and 'boat' / 'raft'
-   * (water only; rafts not on deep sea).
+   * rocks, but never over water, lava or walls), 'boat' / 'raft'
+   * (water only; rafts not on deep sea) and 'swim' / 'deepswim' (sea
+   * creatures: the sea, or only the deep sea).
    */
   blockedFor(tx, ty, mode = 'player') {
     const b = this.blockAt(tx, ty);
     // Boats float on water only; a raft stays out of the deep sea.
     if (mode === 'boat') return !SAILABLE.has(b);
     if (mode === 'raft') return !SAILABLE.has(b) || b === T.DEEP;
+    // Sea creatures: sharks swim anywhere in the sea, serpents only in the deep.
+    if (mode === 'swim') return b !== T.SEA && b !== T.DEEP;
+    if (mode === 'deepswim') return b !== T.DEEP;
     if (b && (mode !== 'fly' || LIQUID.has(b))) return true;
     if (!this.structures.size) return false;
     const st = this.structures.get(tileKey(tx, ty));

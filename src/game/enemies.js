@@ -11,8 +11,12 @@ const DESPAWN_DIST = 34;
 const LEASH = 1.8;
 const PACK_RADIUS = 4;
 
-/** Collision mode: bats and wisps fly over trees and rocks, never over water. */
-function moveMode(e) {
+/**
+ * Collision mode: bats and wisps fly over trees and rocks (never over
+ * water); sharks swim anywhere in the sea, serpents only in the deep.
+ */
+export function moveMode(e) {
+  if (e.def?.swim) return e.def.swim === 'deep' ? 'deepswim' : 'swim';
   return e.kind === 'bat' || e.kind === 'wisp' ? 'fly' : 'enemy';
 }
 
@@ -78,6 +82,12 @@ export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite
     wanderY: y,
     wanderT: Math.random() * 2,
   };
+  if (def.swim) {
+    e.spin = Math.random() < 0.5 ? 1 : -1; // which way a shark circles
+    e.trail = []; // a serpent's body follows where its head has been
+    e.trailT = 0;
+    e.phaseT = 4 + Math.random() * 2;
+  }
   game.enemies.push(e);
   return e;
 }
@@ -338,6 +348,34 @@ function updateBehaviour(game, e, dt) {
       }
       break;
     }
+    case 'shark': {
+      // Circle the boat, then dart in for a bite and swing away again.
+      e.circleT = (e.circleT ?? 1.2 + Math.random()) - dt;
+      if (e.state === 'lunge') {
+        vx = e.chargeDir.x * speed * 2.4;
+        vy = e.chargeDir.y * speed * 2.4;
+        if (e.stateT > 0.5) {
+          e.state = 'move';
+          e.stateT = 0;
+          e.circleT = 1.6 + Math.random() * 1.6;
+        }
+      } else if (aggro) {
+        const orbit = 2.8;
+        const pull = Math.max(-1, Math.min(1, (d - orbit) * 0.7));
+        vx = (n.x * pull - n.y * e.spin) * speed;
+        vy = (n.y * pull + n.x * e.spin) * speed;
+        if (e.circleT <= 0 && d < 5.5 && game.sailing) {
+          e.state = 'lunge';
+          e.stateT = 0;
+          e.chargeDir = n;
+          game.fx.emit('splash', e.x, e.y, 6, 0.4, 1.5);
+        }
+      }
+      break;
+    }
+    case 'serpent':
+      ({ vx, vy } = serpent(game, e, d, n, speed, aggro, dt));
+      break;
     default:
       if (aggro) { vx = n.x * speed; vy = n.y * speed; }
   }
@@ -353,12 +391,86 @@ function updateBehaviour(game, e, dt) {
   e.vy = vy;
   if (Math.abs(vx) > 0.05) e.facing = vx > 0 ? 1 : -1;
 
-  // Contact damage.
+  // Contact damage (sea creatures only reach you out on the water).
   const reach = e.r + p.r;
-  if (!p.dead && d < reach && (e.contactCd ?? 0) <= game.time) {
+  const canReach = !e.def.sea || game.sailing;
+  if (!p.dead && canReach && !e.submerged && d < reach && (e.contactCd ?? 0) <= game.time) {
     e.contactCd = game.time + 0.9;
-    game.hurtPlayer(e.dmg * (e.state === 'charge' ? 1.5 : 1), { element: e.element, fromX: e.x, fromY: e.y });
+    const hard = e.state === 'charge' || e.state === 'lunge';
+    game.hurtPlayer(e.dmg * (hard ? 1.5 : 1), { element: e.element, fromX: e.x, fromY: e.y });
+    if (e.def.sea) game.fx.emit('splash', p.x, p.y, 8, 0.5, 2);
   }
+}
+
+/**
+ * Sea serpent: weaves around you at range spitting water, then dives
+ * (it can't be hit under water) and bursts up somewhere near you.
+ */
+function serpent(game, e, d, n, speed, aggro, dt) {
+  const p = game.player;
+  e.phaseT -= dt;
+  if (e.state === 'dive') {
+    const tx = e.surfaceX - e.x;
+    const ty = e.surfaceY - e.y;
+    const dd = Math.hypot(tx, ty);
+    if (e.stateT > 1.6) {
+      e.state = 'erupt';
+      e.stateT = 0;
+      const sx = e.surfaceX;
+      const sy = e.surfaceY;
+      game.spawnArea('telegraph', {
+        owner: 'enemy', shape: 'circle', x: sx, y: sy, r: 1.5, dur: 0.75, color: '#9ad8f4',
+        onEnd: () => {
+          if (e.dead) return;
+          e.submerged = false;
+          e.state = 'move';
+          e.stateT = 0;
+          e.phaseT = 5 + Math.random() * 2.5;
+          game.fx.emit('splash', sx, sy, 22, 1, 3.5);
+          game.fx.add({ type: 'ring', x: sx, y: sy, r0: 0.3, r1: 1.8, color: '#e8f8ff', dur: 0.35 });
+          game.audio.play('boom', { throttle: 120 });
+          if (game.sailing && (sx - p.x) ** 2 + (sy - p.y) ** 2 <= (1.5 + p.r) ** 2) {
+            game.hurtPlayer(e.dmg * 1.4, { element: 'physical', fromX: sx, fromY: sy });
+          }
+        },
+      });
+    }
+    return dd > 0.3 ? { vx: (tx / dd) * speed * 1.8, vy: (ty / dd) * speed * 1.8 } : { vx: 0, vy: 0 };
+  }
+  if (e.state === 'erupt') return { vx: 0, vy: 0 };
+  if (!aggro) return { vx: 0, vy: 0 };
+  // Keep about five tiles away, weaving from side to side.
+  const want = 5;
+  const dir = d > want + 1 ? 1 : d < want - 1 ? -0.6 : 0;
+  const weave = Math.sin(game.time * 2.6 + e.phase) * 0.9;
+  if (e.atkCd <= 0 && d < (e.def.range ?? 8) + 1) {
+    e.atkCd = 2.4;
+    const aim = angleTo(e.x, e.y, p.x, p.y);
+    for (const off of [-0.22, 0, 0.22]) {
+      game.spawnProjectile({
+        x: e.x, y: e.y, angle: aim + off, speed: e.def.projSpeed ?? 7, damage: e.dmg * 0.7, range: 11, size: 3,
+        sprite: 'orb', owner: 'enemy', element: 'physical', color: '#9ad8f4', depth: 0,
+      });
+    }
+    game.fx.emit('splash', e.x, e.y, 6, 0.4, 1.5);
+  }
+  if (e.phaseT <= 0) {
+    // Dive, and come up again a few tiles from you (in deep water).
+    const a = Math.random() * Math.PI * 2;
+    const r = 2.5 + Math.random() * 1.5;
+    const spot = game.world.findFreeSpot(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, 0.5, 'deepswim', null);
+    if (spot) {
+      e.state = 'dive';
+      e.stateT = 0;
+      e.submerged = true;
+      e.surfaceX = spot.x;
+      e.surfaceY = spot.y;
+      game.fx.emit('splash', e.x, e.y, 14, 0.8, 2.5);
+    } else {
+      e.phaseT = 2;
+    }
+  }
+  return { vx: (n.x * dir - n.y * weave) * speed, vy: (n.y * dir + n.x * weave) * speed };
 }
 
 // --- Bosses ---------------------------------------------------------------------
@@ -745,6 +857,14 @@ export function updateEnemies(game, dt) {
     const kx = e.kx;
     const ky = e.ky;
     moveEnemy(game, e, e.vx + kx, e.vy + ky, dt);
+    if (e.trail) {
+      e.trailT -= dt;
+      if (e.trailT <= 0) {
+        e.trailT = 0.05;
+        e.trail.unshift({ x: e.x, y: e.y });
+        if (e.trail.length > 30) e.trail.pop();
+      }
+    }
     const damp = Math.exp(-9 * dt);
     e.kx *= damp;
     e.ky *= damp;
@@ -787,12 +907,47 @@ export function updateEnemies(game, dt) {
   }
 }
 
+/** Out at sea: sharks everywhere, now and then a serpent in the deep. */
+function spawnAtSea(game) {
+  const p = game.player;
+  const wl = game.world.worldLevel(p.x, p.y);
+  const sea = game.enemies.filter((e) => !e.dead && e.def.sea);
+  const target = Math.round(Math.min(6, 2 + Math.floor(wl / 2)) * game.quality.enemyFactor);
+  if (sea.length >= target) return;
+  const serpents = sea.filter((e) => e.kind === 'serpent').length;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = 11 + Math.random() * 5;
+    const x = p.x + Math.cos(a) * d;
+    const y = p.y + Math.sin(a) * d;
+    if (!game.world.isFree(x, y, 0.5, 'swim')) continue;
+    const deep = game.world.isFree(x, y, 0.6, 'deepswim');
+    const level = Math.max(wl, game.save.player.level - 1);
+    if (deep && serpents === 0 && wl >= 3 && Math.random() < 0.22) {
+      spawnEnemy(game, 'serpent', x, y, { level });
+      game.toast('Something huge moves beneath the waves…', 'boss');
+      return;
+    }
+    const group = Math.random() < 0.3 ? 2 : 1;
+    for (let g = 0; g < group; g++) {
+      const gx = x + (Math.random() - 0.5) * 2;
+      const gy = y + (Math.random() - 0.5) * 2;
+      if (game.world.isFree(gx, gy, 0.45, 'swim')) spawnEnemy(game, 'shark', gx, gy, { level });
+    }
+    return;
+  }
+}
+
 export function updateSpawner(game, dt) {
   const p = game.player;
   if (p.dead) return;
   game.spawnTimer -= dt;
   if (game.spawnTimer > 0) return;
   game.spawnTimer = 0.45;
+  if (game.sailing) {
+    spawnAtSea(game);
+    return;
+  }
   const safe = safeRadius(game);
   if (Math.hypot(p.x, p.y) < safe - 2) return;
   // Markets are safe havens too.

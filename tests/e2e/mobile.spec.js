@@ -174,3 +174,33 @@ test('phone: loot odds and boats fit the screen', async ({ page }) => {
   await expect(page.locator('.tool-card', { hasText: 'Log Raft' })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('phone HUD stays out of the way: compact notices, a quiet resource line, a wider view', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page, { tap: true });
+  // Upright phones see more of the world than the desktop default.
+  const tilesWide = await game(page, () => window.__pixelgame.game.renderer.view.width / 16);
+  expect(tilesWide).toBeGreaterThanOrEqual(16);
+  // Notices: at most two, and repeats count up instead of stacking.
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.toast('You found a market!', 'component');
+    g.toast('+3 wood');
+    g.toast('+3 wood');
+    g.toast('Level 2! You feel stronger.', 'level');
+  });
+  const toasts = page.locator('#toasts .toast');
+  await expect(toasts).toHaveCount(2);
+  await expect(toasts.first()).toContainText('market');
+  // The HUD plate is small.
+  const plate = await page.locator('.hud-player').boundingBox();
+  expect(plate.height).toBeLessThan(56);
+  expect(plate.width).toBeLessThanOrEqual(200);
+  // The weapon name only shows for a moment.
+  await page.waitForTimeout(2600);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#hud-weapon')).opacity)).toBe('0');
+  // The resource line lights up when something changes.
+  await game(page, () => { window.__pixelgame.game.save.resources.essence += 5; });
+  await expect(page.locator('.res-row')).toHaveClass(/\blit\b/);
+  expect(errors).toEqual([]);
+});

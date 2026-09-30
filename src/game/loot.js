@@ -33,8 +33,10 @@ export function addPickup(game, kind, x, y, extra = {}) {
     const idx = game.pickups.findIndex((p) => p.kind === 'essence' || p.kind === 'scrap');
     if (idx >= 0) game.pickups.splice(idx, 1);
   }
-  // Loot must land where the player can walk (never in a lake or a rock).
-  if (!game.world.isFree(x, y, 0.3)) ({ x, y } = game.world.findFreeSpot(x, y, 0.3, 'player', { x, y }));
+  // Loot must land where the player can walk (never in a lake or a rock) —
+  // except out at sea, where it floats so you can scoop it up from the boat.
+  const afloat = game.sailing && game.world.isSea(x, y);
+  if (!afloat && !game.world.isFree(x, y, 0.3)) ({ x, y } = game.world.findFreeSpot(x, y, 0.3, 'player', { x, y }));
   const a = Math.random() * Math.PI * 2;
   game.pickups.push({
     kind, x, y, t: 0,
@@ -113,7 +115,26 @@ function pickComponent(game, list) {
   return list[(Math.random() * list.length) | 0];
 }
 
+/** Sharks and serpents: essence, scrap and coins; serpents are a real catch. */
+function seaLoot(game, e) {
+  const big = Boolean(e.def.bigLoot);
+  const value = orbValue(e.level);
+  for (let i = 0; i < (big ? 8 : 2); i++) addPickup(game, 'essence', e.x, e.y, { value, color: '#7ae0ff' });
+  for (let i = 0; i < (big ? 5 : Math.random() < 0.5 ? 1 : 0); i++) addPickup(game, 'scrap', e.x, e.y, { value: 1 + (big ? 1 : 0), color: '#b8bcc8' });
+  const coins = big ? 20 + ((Math.random() * 26) | 0) : Math.random() < 0.35 ? 1 + ((Math.random() * 4) | 0) : 0;
+  if (coins) addPickup(game, 'gold', e.x, e.y, { value: coins, color: '#ffd24a' });
+  if (big && Math.random() < 0.08) addPickup(game, 'shard', e.x, e.y, { value: 1, color: '#ffd24a' });
+  const source = big ? 'elite' : 'drop';
+  if (Math.random() < (big ? 0.35 : WEAPON_DROP_CHANCE.drop) * (1 + game.pstats.luck * 0.01)) {
+    requestWeaponDrop(game, e.x, e.y, { level: e.level, minRarity: big ? 'uncommon' : null, roll: source });
+  }
+}
+
 export function onEnemyKilledLoot(game, e) {
+  if (e.def?.sea) {
+    seaLoot(game, e);
+    return;
+  }
   const luck = game.pstats.luck;
   const level = e.level;
   const biome = game.world.biomeAt(Math.floor(e.x), Math.floor(e.y));

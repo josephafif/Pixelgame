@@ -231,6 +231,7 @@ export class Game {
     this.fx.damageNumbers = s.damageNumbers;
     const level = s.quality === 'low' ? 'low' : s.quality === 'high' ? 'high' : this.qualityLevel;
     this.setQuality(level);
+    this.renderer.setViewSize?.(s.viewSize ?? 'auto');
   }
 
   updateSettings(patch) {

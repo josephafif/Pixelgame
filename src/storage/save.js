@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   damageNumbers: true,
   showFps: false,
   autoFullscreen: true, // phones/tablets: go full screen when you press Play
+  viewSize: 'auto', // 'auto' | 'close' | 'normal' | 'wide' (how much of the world you see)
 });
 
 export class NewerSaveError extends Error {

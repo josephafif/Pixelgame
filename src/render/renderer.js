@@ -20,7 +20,23 @@ import { currentPickaxe } from '../game/gathering.js';
 import { drawPixelText } from './font.js';
 
 const T = TILE_PX;
+const shadeCache = new Map();
+/** A lighter shade of a colour (cached; used for serpent scales). */
+function shadeColor(hex) {
+  let c = shadeCache.get(hex);
+  if (!c) {
+    const n = parseInt(hex.slice(1), 16);
+    const lift = (v) => Math.min(255, Math.round(v + (255 - v) * 0.35));
+    c = `rgb(${lift(n >> 16)},${lift((n >> 8) & 255)},${lift(n & 255)})`;
+    shadeCache.set(hex, c);
+  }
+  return c;
+}
+
 const TARGET_SHORT_SIDE = 230; // game pixels on the shorter screen side
+// View size setting → game pixels across the shorter side. 'auto' shows a
+// little more on phones held upright, where the screen is narrow.
+const VIEW_TARGETS = { close: 190, normal: TARGET_SHORT_SIDE, wide: 300 };
 const NEW_CHUNKS_PER_FRAME = 4;
 const TAU = Math.PI * 2;
 
@@ -66,6 +82,7 @@ export class Renderer {
     this.view = createCanvas(1, 1);
     this.v = ctx2d(this.view);
     this.resolution = 1;
+    this.viewSize = 'auto';
     this.camX = 0;
     this.camY = 0;
     this.camInit = false;
@@ -80,6 +97,12 @@ export class Renderer {
     this.resize();
   }
 
+  setViewSize(size) {
+    if (size === this.viewSize) return;
+    this.viewSize = size;
+    this.resize();
+  }
+
   resize() {
     const cssW = this.canvas.clientWidth || innerWidth;
     const cssH = this.canvas.clientHeight || innerHeight;
@@ -87,7 +110,9 @@ export class Renderer {
     this.dpr = dpr;
     this.canvas.width = Math.max(1, Math.round(cssW * dpr));
     this.canvas.height = Math.max(1, Math.round(cssH * dpr));
-    this.scale = Math.max(2, Math.round(Math.min(this.canvas.width, this.canvas.height) / TARGET_SHORT_SIDE));
+    const phonePortrait = cssW <= 640 && cssH > cssW;
+    const target = VIEW_TARGETS[this.viewSize] ?? (phonePortrait ? 270 : TARGET_SHORT_SIDE);
+    this.scale = Math.max(2, Math.round(Math.min(this.canvas.width, this.canvas.height) / target));
     this.view.width = Math.ceil(this.canvas.width / this.scale);
     this.view.height = Math.ceil(this.canvas.height / this.scale);
     this.ctx = ctx2d(this.canvas);
@@ -825,8 +850,69 @@ export class Renderer {
     v.fillRect(x - (w >> 1), y, Math.max(1, Math.round(w * frac)), 2);
   }
 
+  /** Sharks and serpents: half under water, with a wake; serpents trail a body. */
+  #drawSeaCreature(game, e, x, y) {
+    const v = this.v;
+    const t = game.time;
+    const right = e.facing >= 0;
+    if (e.kind === 'serpent') {
+      // Body segments along the path the head has taken, tail first.
+      const segs = 8;
+      for (let k = segs; k >= 1; k--) {
+        const pt = e.trail[Math.min(e.trail.length - 1, k * 3)];
+        if (!pt) continue;
+        const sx = this.#sx(pt.x);
+        const sy = this.#sy(pt.y) + Math.round(Math.sin(t * 5 - k * 0.8) * 1.5);
+        const r = Math.max(2, 6.5 - k * 0.55);
+        if (e.submerged) {
+          this.#circle(sx, sy, r + 1, '#0e2a50', null, 0.35);
+          continue;
+        }
+        this.#circle(sx, sy, r + 1, '#161622', null, 1);
+        this.#circle(sx, sy, r, e.flash > 0 ? '#ffffff' : e.color, null, 1);
+        this.#circle(sx - 1, sy - 1, Math.max(1, r * 0.45), shadeColor(e.color), null, 0.9);
+        if (k % 2 === 0) {
+          v.fillStyle = '#e8364a';
+          v.fillRect(Math.round(sx), Math.round(sy - r - 2), 1, 2);
+        }
+      }
+      if (e.submerged) {
+        this.#circle(x, y, 7, '#0e2a50', null, 0.4);
+        if (Math.random() < 0.3) game.fx.emit('splash', e.x, e.y, 1, 0.5, 0.6);
+        return;
+      }
+    }
+    const set = e.sprites;
+    let img = right ? set.right : set.left;
+    if (e.flash > 0) img = set.flash;
+    const scale = e.kind === 'serpent' ? 1.5 : 1.3;
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const bob = Math.round(Math.sin(t * 3 + e.phase) * 1);
+    const top = y - h + 3 + bob;
+    v.drawImage(img, x - (w >> 1), top, w, h);
+    // The water line: everything below it is seen through the waves.
+    const line = e.kind === 'shark' ? top + Math.round(h * 0.55) : top + Math.round(h * 0.75);
+    v.globalAlpha = 0.45;
+    v.fillStyle = '#2a78b8';
+    v.fillRect(x - (w >> 1) - 1, line, w + 2, top + h - line);
+    v.globalAlpha = 0.7;
+    v.fillStyle = '#e8f8ff';
+    const foam = Math.floor(t * 6) % 2;
+    v.fillRect(x - (w >> 1) + foam, line, w - 1, 1);
+    v.globalAlpha = 1;
+    if (Math.abs(e.vx) + Math.abs(e.vy) > 0.5 && Math.random() < 0.35) {
+      game.fx.emit('splash', e.x - (right ? 0.5 : -0.5), e.y, 1, 0.2, 0.4);
+    }
+    if (e.hp < e.maxHp) this.#healthBar(x, top - 3, e.kind === 'serpent' ? 22 : 12, e.hp / e.maxHp, '#ff5050');
+  }
+
   #drawEnemy(game, e, x, y) {
     const v = this.v;
+    if (e.def?.sea) {
+      this.#drawSeaCreature(game, e, x, y);
+      return;
+    }
     const set = e.sprites;
     let img = e.facing < 0 ? set.left : set.right;
     if (e.flash > 0) img = set.flash;

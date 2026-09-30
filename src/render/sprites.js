@@ -73,6 +73,31 @@ const MAPS = {
     '...orro.orro..',
     '...ooo...ooo..',
   ],
+  // Shark cutting through the water (head right): fin up, body just under the surface.
+  shark: [
+    '........o..........',
+    '........oFo........',
+    '........oFFo.......',
+    '........oFFFo......',
+    'oo..oooooFFFooooo..',
+    'oBooBBBBBBBBBBBBBo.',
+    'oBBBbbbbbbbbbbbbbBo',
+    'oBoBBbbbbbbbWbbbBo.',
+    'oo..ooooooooooooo..',
+  ],
+  // Sea serpent head (right-facing): a crest of spines, jaw with teeth.
+  serpent: [
+    '..o.o.o.......',
+    '.oCoCoCo......',
+    '.oSSSSSSoo....',
+    'oSSSSSSSSSoo..',
+    'oSSeSSSSSSSSo.',
+    'oSSSSSSSSSSSSo',
+    'osssssSSSSStto',
+    '.osssssSSSSSo.',
+    '..oosssssoo...',
+    '....ooooo.....',
+  ],
   wisp: [
     '...oo...',
     '..owwo..',
@@ -418,6 +443,8 @@ const ENEMY_PALETTES = {
   skeleton: (c) => ({ o: OUTLINE, w: c, k: shadeHex(c, -0.55), e: '#ff5050' }),
   brute: (c) => ({ o: OUTLINE, r: c, R: shadeHex(c, -0.3), t: '#fff4d8', e: '#ffe040', b: '#5a3a22' }),
   wisp: (c) => ({ o: OUTLINE, w: c, W: shadeHex(c, -0.25), e: '#ffffff' }),
+  shark: (c) => ({ o: OUTLINE, F: shadeHex(c, 0.12), B: shadeHex(c, -0.35), b: shadeHex(c, -0.12), W: '#ffffff' }),
+  serpent: (c) => ({ o: OUTLINE, S: c, s: shadeHex(c, 0.45), C: '#e8364a', e: '#ffe040', t: '#fff4d8' }),
 };
 
 /** Enemy sprite set { right, left, flash } tinted with `color`. */

@@ -181,8 +181,21 @@ du laddar spelet.
 | Sailing Sloop | 180 trä, 40 sten, 90 scrap, 200 essence (Forge 3) | 5,4 | Allt vatten, även öppet hav |
 | War Galleon | 420 trä, 150 sten, 300 scrap, 650 essence (Forge 5 + besegrad boss) | 7,2 | Allt vatten; skrovet tar 40 % av skadan du får till sjöss |
 
+**Havets faror:** ute på havet dyker det upp havsdjur (bara när du seglar, och de kan aldrig gå
+upp på land).
+
+| Djur | Var | Hur det slåss |
+| --- | --- | --- |
+| Haj | Allt havsvatten, även kustvattnet | Cirklar runt båten och gör plötsliga utfall för att bita. Syns som en fena i vattnet |
+| Sjöorm | Bara djupt, öppet hav | Slingrar sig runt dig på avstånd och spottar vattenkaskader. Dyker sedan (då går den inte att träffa) och bryter upp ur vattnet nära dig med en markering först. Ger mycket essence, scrap och guld, ibland ett vapen eller en Star Shard |
+
+Fler hajar dyker upp ju längre ut du seglar. En flotte kan bara segla i kustvattnet, så där är det
+bara hajar. Galeonens skrov tar en del av skadan. Loot från havsdjur flyter på vattnet, så du kan
+plocka upp den från båten.
+
 Kod: `src/game/sailing.js` (båtar, sjösättning, landstigning), `World#seaAt` i
-`src/game/world.js` (hav och öar), `src/render/boats.js` (grafik).
+`src/game/world.js` (hav och öar), `src/render/boats.js` (grafik), hajar och sjöormar i
+`src/game/enemies.js`.
 
 ## Småsaker att hitta
 
@@ -290,9 +303,16 @@ panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src
   ramar in spelet. Canvasen täcker hela skärmen (även bakom notch och rundade hörn, med safe
   areas för gränssnittet). I webbläsaren på en telefon går spelet in i helskärm när du trycker
   Play; det kan stängas av under *Settings → Full screen on phones*.
-- **Mobilgränssnitt:** en smal dock (Inventory, karta, bygg, meny), en hotbar med stora
-  tryckytor ovanför knapparna och kompakta paneler. Notiser flyttar ned till skärmens nederkant
-  när en panel är öppen, så de aldrig täcker stängknappen.
+- **Mobilgränssnitt:** HUD:en är kompakt så att du ser mer av världen: en liten hälsoplatta, en
+  smal dock (Inventory, karta, bygg, meny) och en tunn resursrad som lyser upp när något ändras.
+  Vapnets namn syns bara en kort stund när du byter. Hotbaren sitter ovanför knapparna, och
+  panelerna är kompakta. Samma kompakta HUD används när telefonen hålls på tvären.
+- **Notiser på mobil:** små och korta, högst två samtidigt. Viktiga notiser (fynd, bossar, loot)
+  går före vanliga, och samma notis igen räknas upp ("+3 wood ×3") i stället för att staplas.
+  Notiser flyttar ned till skärmens nederkant när en panel är öppen, så de aldrig täcker
+  stängknappen.
+- **Synfält:** *Settings → View* väljer hur mycket av världen du ser (Close, Normal, Wide). Auto,
+  som är standard, visar ungefär 30 % mer i bredd på en telefon som hålls upprätt.
 - **Vapenanimationer** (`src/render/weapon-anim.js`): varje attack har upptakt, slag och
   efterföljning. Skadan landar på träffögonblicket, svingar växlar sida (kombokänsla), och slag
   ger släpspår, hit-stop och studs på fienden.
@@ -444,7 +464,8 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
 - Marknadernas NPC:er är enkla (handlare står still, bybor strövar). Nästa steg kan vara
   karavaner mellan marknader och uppdrag från handlarna.
-- Havet har inga egna monster ännu (hajar eller sjöormar vore ett naturligt nästa steg).
+- Havsdjuren är enkla (hajar och sjöormar). Fler sorter, och boss-sjömonster, vore ett naturligt
+  nästa steg.
 - Fiender attackerar inte lägret på egen hand ännu. Ett naturligt nästa steg är räder mot
   lägret (vågor av fiender) där väggar och turrets verkligen sätts på prov.
 - iOS saknar manifest-splash. Där används appens egen startskärm.

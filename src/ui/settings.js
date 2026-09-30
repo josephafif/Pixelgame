@@ -43,6 +43,7 @@ export function open(game, app) {
         range('Volume', 'volume', 0, 1, 0.05),
         toggle('Sound effects', 'sfx'),
         choice('Quality', 'quality', [['auto', 'Auto (adapts to your device)'], ['high', 'High'], ['low', 'Low (battery saver)']]),
+        choice('View', 'viewSize', [['auto', 'Auto (wider on phones held upright)'], ['close', 'Close'], ['normal', 'Normal'], ['wide', 'Wide (see more)']]),
         toggle('Screen shake', 'screenShake'),
         toggle('Damage numbers', 'damageNumbers'),
         toggle('Show FPS', 'showFps'),

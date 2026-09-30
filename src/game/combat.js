@@ -52,7 +52,7 @@ export function nearestEnemy(game, x, y, maxDist, exclude = null) {
   let best = null;
   let bestD = maxDist * maxDist;
   for (const e of game.enemies) {
-    if (e.dead || (exclude && exclude.has(e))) continue;
+    if (e.dead || e.submerged || (exclude && exclude.has(e))) continue;
     const d = dist2(x, y, e.x, e.y);
     if (d < bestD) {
       bestD = d;
@@ -65,7 +65,7 @@ export function nearestEnemy(game, x, y, maxDist, exclude = null) {
 export function enemiesInRadius(game, x, y, r) {
   const out = [];
   for (const e of game.enemies) {
-    if (e.dead) continue;
+    if (e.dead || e.submerged) continue;
     const rr = r + e.r;
     if (dist2(x, y, e.x, e.y) <= rr * rr) out.push(e);
   }
@@ -83,7 +83,7 @@ export function acquireTarget(game, current) {
   let best = null;
   let bestScore = Infinity;
   for (const e of game.enemies) {
-    if (e.dead) continue;
+    if (e.dead || e.submerged) continue;
     const d = Math.sqrt(dist2(p.x, p.y, e.x, e.y)) - e.r;
     if (d > reach) continue;
     // Bosses (and their mirror images, so the lock never gives the real one away) come first.
@@ -104,7 +104,8 @@ export function acquireTarget(game, current) {
  *         knockback, fromX, fromY, status, color }
  */
 export function dealDamage(game, e, amount, opts = {}) {
-  if (e.dead || amount <= 0) return 0;
+  // A diving serpent can't be hit until it surfaces.
+  if (e.dead || e.submerged || amount <= 0) return 0;
   const data = game.data;
   const depth = opts.depth ?? 0;
   const element = opts.element ?? 'physical';

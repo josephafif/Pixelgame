@@ -407,8 +407,9 @@ test('loadout: main, secondary and a reserved pickaxe slot on the hotbar', async
   await expect(page.locator('#slot-secondary')).toHaveClass(/\bon\b/);
   expect(await game(page, () => window.__pixelgame.game.weapon.dna.id)).toBe(secId);
 
-  // No pickaxe yet: slot 3 is locked.
+  // No pickaxe yet: slot 3 is locked (wait until the game has handled the key).
   await page.keyboard.press('Digit3');
+  await expect(page.locator('#toasts')).toContainText('No pickaxe');
   expect(await game(page, () => window.__pixelgame.game.toolActive)).toBe(false);
   await game(page, () => {
     const g = window.__pixelgame.game;
@@ -697,4 +698,77 @@ test('map: zooms far out and frames everything explored', async ({ page }) => {
   });
   expect(painted).toBeGreaterThan(20);
   expect(errors).toEqual([]);
+});
+
+test('the sea has sharks and serpents: they stay in the water, dive, and their loot floats', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const spot = await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.tools.boat = 2;
+    g.pstats.maxHp = 100000;
+    g.player.hp = 100000;
+    const w = g.world;
+    for (let r = 200; r < 1600; r += 4) {
+      for (let a = 0; a < 128; a++) {
+        const x = Math.round(Math.cos((a / 128) * Math.PI * 2) * r);
+        const y = Math.round(Math.sin((a / 128) * Math.PI * 2) * r);
+        if (w.isFree(x + 0.5, y + 0.5, 3, 'deepswim')) {
+          g.enemies.length = 0;
+          g.save.player.sailing = true;
+          g.player.x = x + 0.5;
+          g.player.y = y + 0.5;
+          g.renderer.snapCamera();
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  });
+  expect(spot).not.toBeNull();
+  // The spawner fills the sea around you with sharks.
+  await expect.poll(() => game(page, () => window.__pixelgame.game.enemies.filter((e) => e.kind === 'shark').length), { timeout: 8000 }).toBeGreaterThan(0);
+  const serpent = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { spawnEnemy } = await import('/src/game/enemies.js');
+    const p = g.player;
+    const at = g.world.findFreeSpot(p.x, p.y - 4, 0.6, 'deepswim', null);
+    const e = spawnEnemy(g, 'serpent', at.x, at.y, { level: 5 });
+    e.alert = true;
+    e.phaseT = 0.5;
+    e.underTest = true; // the spawner may add a serpent of its own
+    return Boolean(e);
+  });
+  expect(serpent).toBe(true);
+  await expect.poll(() => game(page, () => window.__pixelgame.game.enemies.find((e) => e.underTest)?.submerged ?? false), { timeout: 5000 }).toBe(true);
+  const underWater = await game(page, () => {
+    const g = window.__pixelgame.game;
+    const s = g.enemies.find((e) => e.underTest);
+    return { hit: g.damageEnemy(s, 50, {}), wet: g.enemies.filter((e) => e.def.sea).every((e) => g.world.isSea(e.x, e.y)) };
+  });
+  expect(underWater.hit).toBe(0);
+  expect(underWater.wet).toBe(true);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    const shark = g.enemies.find((e) => e.kind === 'shark');
+    g.damageEnemy(shark, 99999, {});
+  });
+  await expect.poll(() => game(page, () => window.__pixelgame.game.pickups.length)).toBeGreaterThan(0);
+  expect(await game(page, () => {
+    const g = window.__pixelgame.game;
+    return g.pickups.every((p) => g.world.isSea(p.x, p.y) || g.world.isFree(p.x, p.y, 0.2));
+  })).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('settings: the view size changes how much of the world you see', async ({ page }) => {
+  await startGame(page);
+  const tiles = () => game(page, () => window.__pixelgame.game.renderer.view.width);
+  const normal = await tiles();
+  await game(page, () => window.__pixelgame.game.updateSettings({ viewSize: 'wide' }));
+  const wide = await tiles();
+  await game(page, () => window.__pixelgame.game.updateSettings({ viewSize: 'close' }));
+  const close = await tiles();
+  expect(wide).toBeGreaterThan(normal);
+  expect(close).toBeLessThan(normal);
 });

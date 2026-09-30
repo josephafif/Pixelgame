@@ -39,7 +39,10 @@ export class Hud {
       compass: $('#compass'),
       death: $('#death'),
       hotbar: $('#hotbar'),
+      resRow: document.querySelector('.res-row'),
     };
+    // Phones get a compact HUD: fewer, shorter notices and a quieter resource bar.
+    this.compact = globalThis.matchMedia?.('(max-width: 640px), (max-height: 520px)');
     for (const btn of this.el.hotbar?.querySelectorAll('.hslot') ?? []) {
       btn.addEventListener('pointerdown', (e) => {
         // Don't let the tap reach the game or keep focus.
@@ -77,9 +80,19 @@ export class Hud {
     ctx.drawImage(playerSprites().right[0], 0, 0);
   }
 
+  /** Adds a class for a while (restarting the timer if already set). */
+  #light(el, cls, ms) {
+    if (!el) return;
+    el.classList.add(cls);
+    clearTimeout(el[`_${cls}`]);
+    el[`_${cls}`] = setTimeout(() => el.classList.remove(cls), ms);
+  }
+
   setWeapon(dna) {
     const el = this.el.weapon;
     clear(el);
+    // On phones the weapon name only shows for a moment after you switch.
+    this.#light(el, 'show', 2200);
     this.renderHotbar();
     const g = this.game;
     this.el.attack.classList.toggle('unarmed', g.handsEmpty);
@@ -171,6 +184,12 @@ export class Hud {
     e.scrap.textContent = s.scrap;
     if (e.wood) e.wood.textContent = s.wood;
     if (e.stone) e.stone.textContent = s.stone;
+    // The resource bar lights up for a few seconds whenever something changes.
+    const res = `${s.essence}|${s.scrap}|${s.wood}|${s.stone}`;
+    if (res !== this.lastRes) {
+      if (this.lastRes !== undefined) this.#light(e.resRow, 'lit', 4000);
+      this.lastRes = res;
+    }
     e.buildBtn?.toggleAttribute('hidden', !s.nearCamp && !s.building);
     e.campBtn?.classList.toggle('alert', Boolean(s.campAlert));
     const sprintOn = this.game.save.settings.sprintMode === 'hold' ? s.sprinting : this.game.input.sprintToggle;
@@ -204,10 +223,32 @@ export class Hud {
   }
 
   toast(text, kind = 'info') {
-    const t = h(`div.toast.toast-${kind}`, { role: 'status' }, text);
-    this.el.toasts.append(t);
-    while (this.el.toasts.children.length > 4) this.el.toasts.firstChild.remove();
-    setTimeout(() => t.classList.add('out'), 3200);
-    setTimeout(() => t.remove(), 3700);
+    const box = this.el.toasts;
+    const compact = this.compact?.matches;
+    const life = compact ? 2600 : 3200;
+    // The same message again just counts up ("×3") instead of stacking.
+    const last = box.lastElementChild;
+    if (last && last.dataset.text === text && !last.classList.contains('out')) {
+      last.dataset.count = String(Number(last.dataset.count ?? 1) + 1);
+      last.querySelector('.count').textContent = ` ×${last.dataset.count}`;
+      this.#expire(last, life);
+      return;
+    }
+    const t = h(`div.toast.toast-${kind}`, { role: 'status' }, text, h('span.count'));
+    t.dataset.text = text;
+    box.append(t);
+    // Too many: plain notices give way before important ones (finds, bosses, loot).
+    while (box.children.length > (compact ? 2 : 4)) {
+      const plain = [...box.children].find((c) => c.classList.contains('toast-info') || c.classList.contains('toast-warn'));
+      (plain ?? box.firstChild).remove();
+    }
+    this.#expire(t, life);
+  }
+
+  #expire(t, life) {
+    clearTimeout(t._out);
+    clearTimeout(t._rm);
+    t._out = setTimeout(() => t.classList.add('out'), life);
+    t._rm = setTimeout(() => t.remove(), life + 500);
   }
 }

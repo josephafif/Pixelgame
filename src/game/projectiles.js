@@ -205,7 +205,7 @@ export function updateProjectiles(game, dt) {
         remove = true;
       } else if (p.owner === 'player') {
         for (const e of game.enemies) {
-          if (e.dead || p.hit.has(e)) continue;
+          if (e.dead || e.submerged || p.hit.has(e)) continue;
           const rr = e.r + p.r;
           if (dist2(p.x, p.y, e.x, e.y) <= rr * rr) {
             if (onPlayerProjectileHit(game, p, e)) {

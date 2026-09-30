@@ -184,3 +184,31 @@ test('curiosities are scattered around the world, and a bottle leads to real tre
   assert.equal(direction(0, 0, 10, 0), 'east');
   assert.equal(direction(0, 0, 0, -10), 'north');
 });
+
+test('sharks swim anywhere in the sea, serpents only in the deep', async () => {
+  const { moveMode } = await import('../../src/game/enemies.js');
+  const shark = data.byId.enemies.get('shark');
+  const serpent = data.byId.enemies.get('serpent');
+  assert.ok(shark && serpent);
+  assert.equal(moveMode({ def: shark, kind: 'shark' }), 'swim');
+  assert.equal(moveMode({ def: serpent, kind: 'serpent' }), 'deepswim');
+  assert.equal(moveMode({ def: data.byId.enemies.get('bat'), kind: 'bat' }), 'fly');
+  assert.ok(serpent.hp > shark.hp * 3 && serpent.bigLoot, 'a serpent is a real fight and a real catch');
+  for (const b of data.biomes) {
+    assert.ok(!b.enemies.includes('shark') && !b.enemies.includes('serpent'), 'sea creatures never spawn on land');
+  }
+  const w = new World(data, 12345);
+  let shallow = null;
+  let deep = null;
+  for (let y = -1400; y <= 1400 && !(shallow && deep); y += 9) {
+    for (let x = -1400; x <= 1400; x += 9) {
+      const s = w.seaAt(x + 0.5, y + 0.5);
+      if (s === SEA.SHALLOW && !shallow) shallow = { x, y };
+      if (s === SEA.DEEP && !deep) deep = { x, y };
+    }
+  }
+  assert.equal(w.blockedFor(shallow.x, shallow.y, 'swim'), false);
+  assert.equal(w.blockedFor(shallow.x, shallow.y, 'deepswim'), true, 'serpents stay out of the shallows');
+  assert.equal(w.blockedFor(deep.x, deep.y, 'deepswim'), false);
+  assert.equal(w.blockedFor(0, 0, 'swim'), true, 'no swimming on land');
+});
