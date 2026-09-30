@@ -204,3 +204,33 @@ test('phone HUD stays out of the way: compact notices, a quiet resource line, a 
   await expect(page.locator('.res-row')).toHaveClass(/\blit\b/);
   expect(errors).toEqual([]);
 });
+
+test('phone: the pal chip sits under your health bar, clear of notices; the pals panel fits', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page, { tap: true });
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { addEgg } = await import('/src/game/pals.js');
+    g.save.base.buildings.den = 1;
+    const egg = addEgg(g.data, g.save, 'glimmerfox');
+    egg.hatchAt = Date.now() - 1;
+    g.checkHatch();
+  });
+  const chip = page.locator('#hud-pal');
+  await expect(chip).toBeVisible();
+  const box = await chip.boundingBox();
+  const plate = await page.locator('.hud-player').boundingBox();
+  expect(box.y).toBeGreaterThanOrEqual(plate.y + plate.height - 2);
+  expect(box.y + box.height).toBeLessThanOrEqual(70);
+  await page.tap('#btn-menu');
+  await page.tap('.menu button:has-text("Pals")');
+  const panel = page.locator('.pals-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('.pal-card.active')).toContainText('Glimmerfox');
+  const fits = await page.evaluate(() => {
+    const body = document.querySelector('.pals-panel .panel-body');
+    return body.scrollWidth <= body.clientWidth + 1;
+  });
+  expect(fits).toBe(true);
+  expect(errors).toEqual([]);
+});

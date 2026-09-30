@@ -32,6 +32,9 @@ import { Construction, buildRadius, structureDef, structureDefs, structureLock }
 import { Markets } from './markets.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
 import { POI, isPoi, poiFound, interactPoi } from './discoveries.js';
+import {
+  updatePal, syncPalEntity, hatchReady, rollEgg, addEgg, startHatch, upgradePal, palSpecies, findPal, PAL_MODES,
+} from './pals.js';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 5;
@@ -65,6 +68,8 @@ export class Game {
     this.areas = [];
     this.pickups = [];
     this.allies = [];
+    this.pal = null;
+    this.hatchT = 1;
     this.timers = [];
     this.buffs = [];
     this.boss = null;
@@ -122,6 +127,9 @@ export class Game {
       Object.assign(this.player, this.world.findFreeSpot(this.player.x, this.player.y));
     }
     restoreCooldowns(this);
+    // Eggs keep warming while you are away.
+    hatchReady(data, save).forEach((pal) => this.#announcePal(pal));
+    syncPalEntity(this);
   }
 
   // --- Events ----------------------------------------------------------------
@@ -767,6 +775,9 @@ export class Game {
     this.fx.emit('hit', e.x, e.y, 4, e.r, 3);
     this.audio.play('kill');
     onEnemyKilledLoot(this, e);
+    const eggSource = e.boss ? (this.save.bosses.defeated[e.bossDef.id] ? 'boss' : 'bossFirst')
+      : e.kind === 'serpent' ? 'serpent' : e.elite ? 'elite' : null;
+    if (eggSource) this.dropEgg(eggSource, e.x, e.y);
     if (e.boss) {
       const id = e.bossDef.id;
       this.save.bosses.defeated[id] = (this.save.bosses.defeated[id] ?? 0) + 1;
@@ -856,9 +867,96 @@ export class Game {
         this.discoverComponent(it.componentId);
         this.audio.play('discover');
         break;
+      case 'egg': {
+        addEgg(this.data, this.save, it.species);
+        this.audio.play('discover', { rarity: 3 });
+        this.flash('#9cf07a', 0.3);
+        const den = buildingLevel(this.data, this.save, 'den');
+        this.toast(den ? 'A Pal Egg! Warm it at the Pal Den in your camp to hatch it.' : 'A Pal Egg! Build a Pal Den at your camp to hatch it.', 'legendary');
+        this.emit('pals');
+        this.saveNow();
+        break;
+      }
       default:
         break;
     }
+  }
+
+  // --- Pals ------------------------------------------------------------------------------
+
+  /** Rolls for a pal egg from a source and drops it on the ground. */
+  dropEgg(source, x, y) {
+    const species = rollEgg(this.data, source);
+    if (!species) return false;
+    const sp = palSpecies(this.data, species);
+    addPickup(this, 'egg', x, y, { species, color: sp?.color ?? '#9cf07a' });
+    this.fx.emit('sparkle', x, y, 16, 0.6, 2.5);
+    return true;
+  }
+
+  #announcePal(pal) {
+    const sp = palSpecies(this.data, pal.species);
+    this.toast(`Your egg hatched: ${pal.name} the ${sp?.role ?? 'pal'}!`, 'legendary');
+    this.audio?.play('levelup');
+    this.emit('pals');
+  }
+
+  /** Hatches eggs whose time has come (also called while the pals panel is open). */
+  checkHatch() {
+    const born = hatchReady(this.data, this.save);
+    if (!born.length) return;
+    born.forEach((pal) => this.#announcePal(pal));
+    syncPalEntity(this);
+    this.saveNow();
+  }
+
+  hatchEgg(eggId) {
+    try {
+      startHatch(this.data, this.save, eggId);
+    } catch (err) {
+      this.toast(err.message, 'warn');
+      return false;
+    }
+    this.toast(`The egg is warming in the Den — it hatches in ${Math.round(this.data.pals.hatchSeconds)}s.`);
+    this.emit('pals');
+    this.emit('inventory');
+    this.saveNow();
+    return true;
+  }
+
+  upgradePal(id) {
+    let level;
+    try {
+      level = upgradePal(this.data, this.save, id);
+    } catch (err) {
+      this.toast(err.message, 'warn');
+      return false;
+    }
+    const pal = findPal(this.save, id);
+    this.toast(`${pal.name} grew to level ${level}!`, 'level');
+    this.audio.play('levelup');
+    if (this.pal?.id === id) this.fx.emit('holy', this.pal.x, this.pal.y, 14, 0.5, 2);
+    syncPalEntity(this);
+    this.emit('pals');
+    this.emit('inventory');
+    this.saveNow();
+    return true;
+  }
+
+  /** Takes a pal along (or none with null). */
+  setActivePal(id) {
+    this.save.pals.active = id && findPal(this.save, id) ? id : null;
+    syncPalEntity(this);
+    this.emit('pals');
+    this.saveNow();
+  }
+
+  setPalMode(mode) {
+    if (!PAL_MODES.includes(mode)) return;
+    this.save.pals.mode = mode;
+    if (this.pal) this.pal.think = 0;
+    this.emit('pals');
+    this.requestSave();
   }
 
   onPlayerDeath() {
@@ -971,6 +1069,7 @@ export class Game {
         const level = buildingLevel(this.data, this.save, o.buildingId);
         if (level === 0) return `Build ${def.name}`;
         if (o.buildingId === 'hearth') return 'Rest & manage camp';
+        if (o.buildingId === 'den') return 'Visit your pals';
         if (o.buildingId === 'well') {
           const n = wellPending(this.data, this.save);
           return n > 0 ? `Collect ${n} essence` : 'Essence Well (filling…)';
@@ -1035,17 +1134,22 @@ export class Game {
       this.fx.emit(wood ? 'wood' : 'stone', o.x, o.y - 0.2, 5, 0.5, 2);
       this.audio.play(wood ? 'chop' : 'mine', { throttle: 50 });
       this.shake = Math.max(this.shake, 0.05);
-      if (dmg >= o.info.hp) this.#fell(o);
+      if (dmg >= o.info.hp) this.fellBlock(o);
     });
   }
 
-  #fell(o) {
+  /**
+   * Fells a tree or rock. Its wood/stone drop on the ground, or with
+   * `direct` (your pal did the work) go straight into your pack.
+   */
+  fellBlock(o, { direct = false } = {}) {
     this.world.removeBlock(o.tx, o.ty);
     this.harvestDamage.delete(`${o.tx},${o.ty}`);
     const drops = rollDrops(o.info);
     const color = { wood: '#b07a48', stone: '#b8bcc8', essence: '#7ae0ff' };
     for (const [kind, n] of Object.entries(drops)) {
-      for (let i = 0; i < n; i++) addPickup(this, kind, o.x, o.y, { value: 1, color: color[kind] ?? '#ffffff' });
+      if (direct) this.save.resources[kind] = (this.save.resources[kind] ?? 0) + n;
+      else for (let i = 0; i < n; i++) addPickup(this, kind, o.x, o.y, { value: 1, color: color[kind] ?? '#ffffff' });
     }
     const label = Object.entries(drops).map(([k, n]) => `+${n} ${k}`).join(' ');
     this.fx.text(o.x, o.y - 1, label.toUpperCase(), '#ffe890', 1.2);
@@ -1441,6 +1545,8 @@ export class Game {
           this.emit('ui', { name: 'inventory', tab: 'storage' });
         } else if (id === 'library') {
           this.emit('ui', 'research');
+        } else if (id === 'den') {
+          this.emit('ui', 'pals');
         } else if (id === 'well') {
           if (!this.collectWell()) this.emit('ui', { name: 'base', focus: id });
         }
@@ -1626,6 +1732,12 @@ export class Game {
     updateProjectiles(this, dt);
     updateAreas(this, dt);
     updateAllies(this, dt);
+    updatePal(this, dt);
+    this.hatchT -= dt;
+    if (this.hatchT <= 0) {
+      this.hatchT = 1;
+      this.checkHatch();
+    }
     updatePickups(this, dt);
     this.construction.update(dt);
     this.markets.update(dt);
@@ -1656,7 +1768,9 @@ export class Game {
     const target = this.build.active ? null : this.#findInteractable();
     if (target !== this.interactTarget) {
       this.interactTarget = target;
-      this.emit('interact', { label: this.interactLabel(target) });
+      // Trees and rocks just get an outline (drawn by the renderer): a text
+      // box on every tile you chop would only cover the view.
+      this.emit('interact', { label: target?.type === 'harvest' ? null : this.interactLabel(target) });
     }
 
     if (this.frame % 120 === 0) this.world.prune(this.frame);
@@ -1689,7 +1803,19 @@ export class Game {
       fps: Math.round(1000 / this.frameMs),
       craftingUnlocked: isCraftingUnlocked(this.data, this.save),
       campAlert: this.#campAlert(),
+      pal: this.#palHud(),
       compass: (this.lastCompass = this.#compass()),
+    };
+  }
+
+  #palHud() {
+    const pal = this.pal;
+    if (!pal) return null;
+    const owned = findPal(this.save, pal.id);
+    return {
+      name: owned?.name ?? '', species: pal.species, level: pal.level, mode: this.save.pals.mode,
+      hp: Math.ceil(pal.hp), maxHp: pal.stats.maxHp, down: pal.state === 'down',
+      downLeft: pal.state === 'down' ? Math.ceil(pal.downUntil - this.time) : 0,
     };
   }
 

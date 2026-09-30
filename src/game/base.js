@@ -177,6 +177,8 @@ export function describeBonus(data, id, level) {
       return `${p.essencePerHour * n} essence per hour`;
     case 'waystone':
       return ['', 'Recall to camp', 'Recall + return'][level] ?? '';
+    case 'den':
+      return `Hatch pal eggs · pals up to level ${Math.min(data.pals?.maxLevel ?? 10, (p.palLevelCap ?? 2) * n)}`;
     default:
       return '';
   }

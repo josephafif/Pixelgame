@@ -255,6 +255,56 @@ const DRAW = {
       for (let j = 0; j < 7; j++) p.rect(15 - Math.floor(j / 3), 1 + j, 2 + Math.floor(j / 3) * 2, 1, j % 2 ? C.essence : '#bff4ff');
     }
   },
+  den(p, tier) {
+    const nest = (cx, w) => {
+      for (let i = 0; i < w; i++) p.rect(cx - (w >> 1) + i, GROUND - 3, 1, 3, i % 2 ? C.straw : C.strawDark);
+      p.rect(cx - (w >> 1) + 1, GROUND - 4, w - 2, 1, C.straw);
+    };
+    const egg = (cx, spot) => {
+      p.rect(cx - 1, GROUND - 10, 3, 7, C.paper);
+      p.rect(cx - 2, GROUND - 8, 5, 4, C.paper);
+      p.set(cx - 1, GROUND - 8, spot);
+      p.set(cx + 1, GROUND - 6, spot);
+      p.set(cx, GROUND - 9, '#ffffff');
+    };
+    if (tier === 1) {
+      // A lean-to of leafy branches over a straw nest.
+      for (let i = 0; i < 15; i++) {
+        p.set(5 + i, GROUND - 3 - i, C.woodDark);
+        p.set(27 - i, GROUND - 3 - i, C.woodDark);
+      }
+      for (const [x, y] of [[9, 22], [12, 19], [22, 21], [19, 18], [15, 16], [17, 15]]) p.disc(x, y, 1, C.book3);
+      nest(16, 14);
+      egg(16, '#6ad35a');
+      return;
+    }
+    if (tier === 2) {
+      // A round hut with a straw roof and a burrow door.
+      p.box(5, 17, 22, GROUND - 17, WOOD);
+      p.roof(2, 29, 17, 11, [C.straw, C.strawDark]);
+      p.disc(16, GROUND - 7, 5, '#2a1a12');
+      p.rect(11, GROUND - 7, 11, 7, '#2a1a12');
+      nest(16, 10);
+      egg(16, '#ff7a3a');
+      // A paw print on the sign.
+      p.box(22, 20, 5, 5, WOOD);
+      p.set(24, 22, C.woodDark);
+      p.set(23, 21, C.woodDark);
+      p.set(25, 21, C.woodDark);
+      return;
+    }
+    // A mossy stone burrow with a glowing rune.
+    p.box(3, 15, 26, GROUND - 15, STONE);
+    p.roof(1, 30, 15, 11, ['#5fa84a', '#3a7a3a']);
+    p.disc(16, GROUND - 7, 6, '#1a1422');
+    p.rect(10, GROUND - 7, 13, 7, '#1a1422');
+    nest(16, 12);
+    egg(16, '#7ad8ff');
+    p.disc(16, 9, 2, C.rune);
+    p.set(16, 9, '#ffffff');
+    banner(p, 1, '#6ad35a');
+    banner(p, 25, '#ff7a3a');
+  },
   waystone(p, tier) {
     if (tier >= 2) {
       p.box(4, 8, 5, GROUND - 8, STONE);

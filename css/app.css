@@ -185,6 +185,29 @@ h1, h2, h3, h4 { font-weight: 700; letter-spacing: 1px; }
   animation: rise 0.4s ease-out;
 }
 .tagline { margin: 0; color: var(--muted); font-size: 18px; }
+/* Main menu: one column of big, equal-width buttons. */
+.menu-list { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: min(320px, 100%); }
+.menu-list button { justify-content: center; gap: 10px; min-height: 50px; font-size: 18px; position: relative; }
+.menu-list .btn-primary { min-height: 60px; font-size: 22px; }
+.menu-list .soon {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  padding: 0 6px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--ink); background: var(--gold); box-shadow: 0 0 0 2px var(--ink);
+}
+.save-line { margin: -2px 0 2px; }
+@media (max-height: 700px) {
+  .title-logo { width: 64px; height: 64px; }
+  .title-card { gap: 8px; padding: 14px 20px; }
+  .menu-list button { min-height: 44px; font-size: 16px; }
+  .menu-list .btn-primary { min-height: 52px; font-size: 20px; }
+}
+@media (max-height: 520px) {
+  .title-logo, .tagline { display: none; }
+  .title-card h1 { font-size: 28px; }
+  .menu-list { display: grid; grid-template-columns: 1fr 1fr; width: min(520px, 100%); }
+  .menu-list .btn-primary, .menu-list .save-line { grid-column: 1 / -1; }
+  .menu-list .soon { position: static; transform: none; }
+}
 @keyframes rise { from { transform: translateY(12px); opacity: 0; } }
 
 /* ---------- HUD ---------- */
@@ -811,6 +834,50 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 .bcard .row button { flex: 1; }
 .meter { height: 12px; background: var(--sunken); box-shadow: 0 0 0 2px var(--ink); }
 .meter div { height: 100%; background: linear-gradient(#bff4ff 0 35%, #7ae0ff 35%); }
+
+/* ---------- Pals ---------- */
+
+.pals { display: grid; gap: 10px; }
+.pals > p { margin: 0; }
+.pal-card.active { box-shadow: 0 0 0 2px var(--good); }
+.pal-art {
+  flex: none; width: 80px; height: 72px; display: grid; place-items: end center; padding-bottom: 6px;
+  border: 6px solid transparent; border-image: var(--frame-slot) 3 fill / 6px / 0 stretch;
+  background: linear-gradient(transparent 55%, rgba(106, 211, 90, 0.18)); background-clip: padding-box;
+}
+.pal-art.egg.warming { animation: egg-wobble 0.9s steps(2) infinite; }
+@keyframes egg-wobble { 50% { transform: rotate(4deg); } }
+.pal-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: 14px; }
+.pal-stat { display: flex; gap: 6px; align-items: baseline; }
+.pal-stat .muted { min-width: 72px; }
+.pal-stat .next { color: var(--good); }
+.pal-modes { display: flex; gap: 6px; }
+.pal-modes .chip { flex: 1; justify-content: center; gap: 6px; }
+.pals .notice { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: #ffb070; }
+.pals .notice button { margin-left: auto; }
+.empty-pals { display: grid; place-items: center; text-align: center; color: var(--muted); padding: 12px; }
+.egg-odds summary { cursor: pointer; color: var(--brass-light); font-size: 15px; }
+.egg-odds table { margin-top: 6px; width: 100%; }
+
+/* The pal chip under the health bar. */
+.hud-pal {
+  position: absolute; top: calc(142px + var(--safe-t)); left: calc(8px + var(--safe-l)); min-height: 0; border: 0;
+  display: flex; align-items: center; gap: 6px; padding: 2px 8px 2px 4px;
+  font-size: 13px; color: var(--text); pointer-events: auto; cursor: pointer;
+  background: rgba(22, 22, 34, 0.72); box-shadow: 0 0 0 2px var(--ink);
+}
+.hud-pal[hidden] { display: none; }
+.hud-pal .bar { width: 44px; height: 5px; background: var(--sunken); box-shadow: 0 0 0 1px var(--ink); }
+.hud-pal .bar i { display: block; height: 100%; background: #7ad85a; }
+.hud-pal.down { color: var(--muted); }
+.hud-pal.down .bar i { background: #6a6a7a; }
+@media (max-width: 640px), (max-height: 520px) {
+  /* Phones: the pal chip shares the row under your health with the compass. */
+  .hud-pal { top: calc(44px + var(--safe-t)); gap: 4px; padding: 1px 6px 1px 3px; font-size: 11px; }
+  .hud-pal .icon { width: 12px; height: 12px; }
+  .hud-pal .bar { width: 26px; height: 4px; }
+  .hud-pal:not([hidden]) + .compass { left: calc(90px + var(--safe-l)); }
+}
 
 /* ---------- Research / settings / misc ---------- */
 

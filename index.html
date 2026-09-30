@@ -36,12 +36,19 @@
   <div id="surface" class="surface" aria-hidden="true"></div>
 
   <div id="title" class="title-screen" hidden>
-    <div class="title-card">
-      <img src="icons/icon-192.png" width="96" height="96" alt="" class="pixel">
+    <div class="title-card main-menu">
+      <img src="icons/icon-192.png" width="96" height="96" alt="" class="pixel title-logo">
       <h1 class="title-text">Pixelgame<small>Infinite Arsenal</small></h1>
       <p class="tagline">Every weapon is one of a kind.</p>
-      <button id="title-play" class="btn-primary big" autofocus>Play</button>
-      <button id="title-install" hidden>Install app</button>
+      <nav class="menu-list" aria-label="Main menu">
+        <button id="title-play" class="btn-primary big" autofocus>Play</button>
+        <p id="title-save" class="save-line small muted" hidden></p>
+        <button id="title-new" hidden><i data-icon="portal" data-size="20"></i>New world</button>
+        <button id="title-multiplayer"><i data-icon="players" data-size="20"></i>Multiplayer<span class="soon">Soon</span></button>
+        <button id="title-settings"><i data-icon="gear" data-size="20"></i>Settings</button>
+        <button id="title-howto"><i data-icon="book" data-size="20"></i>How to play</button>
+        <button id="title-install" hidden><i data-icon="home" data-size="20"></i>Install app</button>
+      </nav>
       <p id="title-ios" class="small" hidden>Install: tap Share → “Add to Home Screen”.</p>
       <p id="title-status" class="small muted"></p>
     </div>
@@ -56,6 +63,7 @@
       </div>
     </div>
     <div id="hud-weapon" class="hud-weapon"></div>
+    <button id="hud-pal" class="hud-pal" type="button" aria-label="Your pal" hidden><i data-icon="pal" data-size="16"></i><span class="pal-lvl"></span><span class="bar"><i></i></span></button>
     <div id="compass" class="compass" hidden></div>
 
     <div class="hud-right">
@@ -96,7 +104,7 @@
       <button id="slot-tool" class="hslot" data-slot="tool" aria-label="Pickaxe"><span class="art"></span><span class="num">3</span></button>
     </div>
     <div id="build-bar" class="build-bar" hidden></div>
-    <div class="key-hints">WASD move · Space/click attack · 1 2 3 / wheel switch · Shift sprint · Q ability · E use · I bag · M map · C forge · B camp · G build · Esc menu</div>
+    <div class="key-hints">WASD move · Space/click attack · 1 2 3 / wheel switch · Shift sprint · Q ability · E use · I bag · M map · C forge · B camp · H pals · G build · Esc menu</div>
   </div>
 
   <div id="overlay-root"></div>

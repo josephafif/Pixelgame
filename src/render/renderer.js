@@ -17,6 +17,8 @@ import {
 } from './structures.js';
 import { structureDef } from '../game/construction.js';
 import { currentPickaxe } from '../game/gathering.js';
+import { palSpecies } from '../game/pals.js';
+import { palSprites } from './creatures.js';
 import { drawPixelText } from './font.js';
 
 const T = TILE_PX;
@@ -83,6 +85,7 @@ export class Renderer {
     this.v = ctx2d(this.view);
     this.resolution = 1;
     this.viewSize = 'auto';
+    this.pan = { x: 0, y: 0 };
     this.camX = 0;
     this.camY = 0;
     this.camInit = false;
@@ -157,9 +160,10 @@ export class Renderer {
     const H = this.view.height;
     const p = game.player;
 
-    // Camera follows the player smoothly; shake is cosmetic only.
-    const tx = p.x * T - W / 2;
-    const ty = p.y * T - H / 2;
+    // Camera follows the player smoothly; shake is cosmetic only. `pan`
+    // offsets it (the main menu drifts slowly across the world).
+    const tx = (p.x + this.pan.x) * T - W / 2;
+    const ty = (p.y + this.pan.y) * T - H / 2;
     if (!this.camInit) {
       this.camX = tx;
       this.camY = ty;
@@ -401,6 +405,7 @@ export class Renderer {
     for (const n of game.markets.npcs) if (!n.dead) list.push({ y: n.y, kind: 'npc', o: n });
     for (const e of game.enemies) if (!e.dead) list.push({ y: e.y, kind: 'enemy', o: e });
     for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
+    if (game.pal && !game.pal.hidden) list.push({ y: game.pal.y, kind: 'pal', o: game.pal });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
     list.sort((a, b) => a.y - b.y);
     const W = this.view.width;
@@ -416,6 +421,7 @@ export class Renderer {
         case 'pickup': this.#drawPickup(game, d.o, x, y); break;
         case 'enemy': this.#drawEnemy(game, d.o, x, y); break;
         case 'ally': this.#drawCharacter(game, d.o, x, y, true); break;
+        case 'pal': this.#drawPal(game, d.o, x, y); break;
         case 'player': this.#drawCharacter(game, p, x, y, false); break;
         default: break;
       }
@@ -527,8 +533,10 @@ export class Renderer {
     const x = this.#sx(o.tx);
     const y = this.#sy(o.ty);
     const pulse = Math.floor(game.time * 4) % 2;
-    // Corner brackets around the tile.
-    v.fillStyle = pulse ? '#ffe890' : '#ffffff';
+    // Corner brackets around the tile (red when your pickaxe is too weak).
+    const tier = currentPickaxe(game.data, game.save)?.tier ?? 0;
+    const tooHard = o.info.tier > tier;
+    v.fillStyle = tooHard ? (pulse ? '#ff6a6a' : '#b83a3a') : pulse ? '#ffe890' : '#ffffff';
     for (const [cx, cy] of [[0, 0], [15, 0], [0, 15], [15, 15]]) {
       v.fillRect(x + cx - (cx ? 2 : 0), y + cy, 3, 1);
       v.fillRect(x + cx, y + cy - (cy ? 2 : 0), 1, 3);
@@ -755,6 +763,10 @@ export class Renderer {
     this.#shadow(x, y + 2, 2);
     v.drawImage(s, x - (s.width >> 1), y - s.height - 1 + bob);
     if (it.kind === 'component') this.#glow(x, y - 4 + bob, it.color, 10);
+    if (it.kind === 'egg') {
+      this.#glow(x, y - 4 + bob, it.color, 14 + Math.sin(game.time * 4) * 2);
+      if (Math.random() < 0.08) game.fx.emit('glint', it.x, it.y - 0.4, 1, 0.4, 0.6, [it.color, '#ffffff']);
+    }
     if (it.kind === 'shard') {
       this.#glow(x, y - 4 + bob, '#ffd24a', 16 + Math.sin(game.time * 5) * 3);
       if (Math.random() < 0.1) game.fx.emit('glint', it.x, it.y - 0.4, 1, 0.4, 0.6, ['#ffd24a', '#ffffff']);
@@ -913,25 +925,143 @@ export class Renderer {
       this.#drawSeaCreature(game, e, x, y);
       return;
     }
+    const t = game.time;
     const set = e.sprites;
-    let img = e.facing < 0 ? set.left : set.right;
-    if (e.flash > 0) img = set.flash;
+    const right = e.facing >= 0;
+    const body = e.def?.body ?? 'walk';
+    const moving = !e.stunned && Math.hypot(e.vx, e.vy) > 0.15;
+    const attacking = e.state === 'windup' || e.state === 'charge' || (e.castT !== undefined && t - e.castT < 0.35);
+    let img;
+    let lift = 0; // pixels above the ground (flyers, hops)
+    let sx = 1; // squash and stretch
+    let sy = 1;
+    let jx = 0;
+    let alpha = 1;
+    if (set.walk) {
+      // Animated creature: pick attack, walk or idle frames.
+      const airborne = body === 'fly' || body === 'float';
+      const frames = attacking ? set.attack : moving || airborne ? set.walk : set.idle;
+      const list = right ? frames.right : frames.left;
+      const rate = e.stunned ? 0 : body === 'fly' ? 11 : body === 'float' ? 5 : moving ? 7 : 2;
+      img = list[Math.floor(t * rate + e.phase) % list.length];
+      if (body === 'hop') {
+        // Slimes hop along, squashing as they land; idle ones breathe.
+        if (moving) {
+          const h = (t * 2.6 + e.phase) % 1;
+          lift = Math.round(Math.sin(h * Math.PI) * 4);
+          const land = h > 0.85 || h < 0.1 ? 1 : 0;
+          sx = 1 + land * 0.18 - (lift > 2 ? 0.08 : 0);
+          sy = 1 - land * 0.16 + (lift > 2 ? 0.1 : 0);
+        } else {
+          const b = Math.sin(t * 3 + e.phase) * 0.05;
+          sx = 1 + b;
+          sy = 1 - b;
+        }
+      } else if (body === 'fly') {
+        lift = 5 + Math.round(Math.sin(t * 7 + e.phase) * 2);
+      } else if (body === 'float') {
+        lift = 4 + Math.round(Math.sin(t * 2.4 + e.phase) * 1.5);
+      } else if (moving && !attacking) {
+        lift = Math.floor(t * 7 + e.phase) % 2; // a step bounce
+      }
+      if (e.state === 'windup') {
+        // Telegraph: crouch and shiver before the charge.
+        sx *= 1.08;
+        sy *= 0.9;
+        jx = Math.floor(t * 30) % 2 ? 1 : -1;
+      } else if (e.state === 'charge') {
+        sx *= 1.12;
+        sy *= 0.94;
+      }
+      if (e.state === 'fade') alpha = Math.max(0.08, 1 - e.stateT / 0.6);
+      else if (e.def?.behavior === 'blinker') alpha = 0.88;
+    } else {
+      img = right ? set.right : set.left;
+      lift = e.boss ? Math.round(Math.sin(t * 3) * 1.5) : e.stunned ? 0 : Math.round(Math.sin(t * 8 + e.phase) * 1);
+    }
+    if (e.flash > 0) img = set.walk ? tintedSprite(img, '#ffffff', 1) : set.flash;
     else if (e.tint) img = tintedSprite(img, e.tint, e.frozen ? 0.7 : 0.4);
     else if (e.elite) img = tintedSprite(img, '#ffd24a', 0.18);
-    const bob = e.boss ? Math.round(Math.sin(game.time * 3) * 1.5) : e.stunned ? 0 : Math.round(Math.sin(game.time * 8 + e.phase) * 1);
     const scale = e.scale ?? 1;
     const squash = e.squash ?? 0;
-    const w = Math.round(img.width * scale * (1 + 0.22 * squash));
-    const h = Math.round(img.height * scale * (1 - 0.18 * squash));
-    this.#shadow(x, y + 1, Math.max(4, w * 0.4));
-    if (e.state === 'windup' && Math.floor(game.time * 16) % 2) v.globalAlpha = 0.6;
-    v.drawImage(img, x - (w >> 1), y - h + 2 + bob, w, h);
+    const w = Math.round(img.width * scale * sx * (1 + 0.22 * squash));
+    const h = Math.round(img.height * scale * sy * (1 - 0.18 * squash));
+    const airborne = body === 'fly' || body === 'float';
+    this.#shadow(x, y + 1, Math.max(3, w * (airborne ? 0.28 : 0.4)) * (alpha < 0.5 ? 0.5 : 1));
+    if (e.state === 'windup' && !set.walk && Math.floor(t * 16) % 2) alpha *= 0.6;
+    v.globalAlpha = alpha;
+    const top = y - h + 2 - lift;
+    v.drawImage(img, x - (w >> 1) + jx, top, w, h);
     v.globalAlpha = 1;
+    if (e.state === 'windup' && set.walk) {
+      // A "!" flicker over chargers about to dash.
+      v.fillStyle = Math.floor(t * 12) % 2 ? '#ffd24a' : '#ff5050';
+      v.fillRect(Math.round(x) - 1, top - 7, 2, 4);
+      v.fillRect(Math.round(x) - 1, top - 2, 2, 1);
+    }
     if (e.boss || e.elite || (e.element && e.element !== 'physical')) {
       const glow = game.data.byId.elements.get(e.element)?.glow;
-      if (glow && (e.boss || e.elite)) this.#glow(x, y - h / 2, glow, e.boss ? 30 : 10);
+      if (glow && (e.boss || e.elite)) this.#glow(x, top + h / 2, glow, e.boss ? 30 : 10);
     }
-    if (!e.boss && e.hp < e.maxHp) this.#healthBar(x, y - h - 2, e.elite ? 16 : 12, e.hp / e.maxHp, e.elite ? '#ffd24a' : '#ff5050');
+    // Shades carry a faint halo so they stand out on dark ground.
+    if (e.def?.behavior === 'blinker' && alpha > 0.3) this.#glow(x, top + h / 2, '#b48cff', 9);
+    if (!e.boss && e.hp < e.maxHp && alpha > 0.5) this.#healthBar(x, top - 4, e.elite ? 16 : 12, e.hp / e.maxHp, e.elite ? '#ffd24a' : '#ff5050');
+  }
+
+  /** Your pal: trots along, bites or zaps, chops, and naps when knocked out. */
+  #drawPal(game, pal, x, y) {
+    const v = this.v;
+    const t = game.time;
+    const set = palSprites(pal.species, palSpecies(game.data, pal.species)?.color ?? '#6ad35a');
+    const right = pal.facing >= 0;
+    const down = pal.state === 'down';
+    const moving = !down && Math.hypot(pal.vx, pal.vy) > 0.2;
+    const busy = t - pal.attackT < 0.22 || t - pal.workT < 0.22;
+    let frames = set.idle;
+    let rate = 1.6;
+    if (down) {
+      frames = set.sleep;
+      rate = 0;
+    } else if (busy) {
+      frames = set.attack;
+      rate = 0;
+    } else if (moving) {
+      frames = set.walk;
+      rate = 8;
+    }
+    const list = right ? frames.right : frames.left;
+    let img = list[Math.floor(t * rate + pal.phase) % list.length];
+    if (pal.flash > 0) img = tintedSprite(img, '#ffffff', 1);
+    const hop = moving ? Math.floor(t * 8 + pal.phase) % 2 : 0;
+    const lunge = t - pal.attackT < 0.12 || t - pal.workT < 0.12 ? (right ? 2 : -2) : 0;
+    this.#shadow(x, y + 1, 4);
+    // A friendly ring on the ground tells your pal apart from the monsters.
+    v.globalAlpha = 0.6;
+    v.strokeStyle = '#bff4ff';
+    v.beginPath();
+    v.ellipse(x, y + 1.5, 7, 3, 0, 0, TAU);
+    v.stroke();
+    v.globalAlpha = 1;
+    if (down) v.globalAlpha = 0.8;
+    v.drawImage(img, x - (img.width >> 1) + lunge, y - img.height + 2 - hop);
+    v.globalAlpha = 1;
+    const top = y - img.height - hop;
+    if (down) {
+      // Zz: little letters drifting up.
+      v.fillStyle = '#e8f0ff';
+      for (let i = 0; i < 2; i++) {
+        const k = (t * 0.8 + i * 0.5) % 1;
+        const zx = Math.round(x + 3 + k * 5);
+        const zy = Math.round(top - 2 - k * 8);
+        v.globalAlpha = 1 - k;
+        v.fillRect(zx, zy, 3, 1);
+        v.fillRect(zx + 1, zy + 1, 1, 1);
+        v.fillRect(zx, zy + 2, 3, 1);
+      }
+      v.globalAlpha = 1;
+    } else if (pal.hp < pal.stats.maxHp) {
+      this.#healthBar(x, top - 2, 10, pal.hp / pal.stats.maxHp, '#7ad85a');
+    }
   }
 
   #drawCharacter(game, c, x, y, isClone) {

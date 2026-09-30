@@ -1037,6 +1037,18 @@
         ]
       },
       {
+        "id": "den", "name": "Pal Den", "x": -6.5, "y": 1.5,
+        "desc": "A cosy nest for pals. Hatch pal eggs here; every upgrade lets your pals grow two levels stronger.",
+        "perLevel": { "palLevelCap": 2 },
+        "levels": [
+          { "scrap": 150, "essence": 150, "wood": 80, "stone": 40, "playerLevel": 6 },
+          { "scrap": 260, "essence": 260, "wood": 120, "stone": 90, "playerLevel": 10 },
+          { "scrap": 420, "essence": 420, "wood": 180, "stone": 160, "playerLevel": 14 },
+          { "scrap": 640, "essence": 640, "wood": 240, "stone": 240, "playerLevel": 18, "boss": true },
+          { "scrap": 900, "essence": 900, "wood": 320, "stone": 340, "playerLevel": 22, "boss": true }
+        ]
+      },
+      {
         "id": "waystone", "name": "Waystone", "x": 0.5, "y": 4.5,
         "desc": "Level 1: recall to camp from anywhere. Level 2: step back through to where you left.",
         "perLevel": {},
@@ -1089,24 +1101,51 @@
       { "tier": 3, "id": "galleon", "name": "War Galleon", "speed": 7.2, "openSea": true, "armor": 0.4, "requiresForge": 5, "requiresBoss": true, "cost": { "wood": 420, "stone": 150, "scrap": 300, "essence": 650 }, "color": "#c8364a", "desc": "Fast, and its armoured hull takes 40% of the damage you'd take at sea." }
     ]
   },
+  "pals": {
+    "maxLevel": 10,
+    "hatchEssence": 120,
+    "hatchSeconds": 90,
+    "reviveSeconds": 30,
+    "eggChance": { "bossFirst": 1, "boss": 0.3, "serpent": 0.15, "treasure": 0.3, "elite": 0.006 },
+    "base": { "hp": 60, "damage": 8, "speed": 4.2, "attackInterval": 1.0, "gatherPower": 0.8 },
+    "perLevel": { "hp": 22, "damage": 3.5, "speed": 0.08, "attackInterval": -0.035, "gatherPower": 0.14 },
+    "upgrade": { "essence": 80, "scrap": 50, "wood": 25, "stone": 25, "growth": 1.45 },
+    "species": [
+      { "id": "mossling", "name": "Mossling", "role": "Gatherer", "color": "#6ad35a", "weight": 4, "gather": 1.7, "damage": 0.6, "hp": 1.0, "attack": "bite", "mode": "gather", "desc": "Loves chopping trees and breaking rocks, and brings you every log. A timid fighter." },
+      { "id": "emberpup", "name": "Emberpup", "role": "Fighter", "color": "#ff7a3a", "weight": 3, "gather": 0.6, "damage": 1.5, "hp": 1.25, "element": "fire", "attack": "bite", "mode": "fight", "desc": "A fierce little fire hound. Its bites burn, and it never leaves your side in a fight." },
+      { "id": "glimmerfox", "name": "Glimmerfox", "role": "All-rounder", "color": "#7ad8ff", "weight": 2, "gather": 1.1, "damage": 1.05, "hp": 0.9, "element": "lightning", "attack": "zap", "range": 4.5, "mode": "fight", "desc": "Zaps enemies with lightning from afar and happily helps with the chores." }
+    ]
+  },
   "biomes": [
-    { "id": "plains", "name": "Green Plains", "ground": "grass", "alt": "flowers", "blockers": { "tree": 0.05, "rock": 0.02 }, "water": 0.1, "enemies": ["slime", "bat", "skeleton", "brute"], "elements": ["physical", "earth", "wind"], "components": ["earth_core", "wind_core", "bp_crossbow", "bp_chakram"] },
-    { "id": "forest", "name": "Deepwood", "ground": "moss", "alt": "grass", "blockers": { "tree": 0.22, "rock": 0.02 }, "water": 0.12, "enemies": ["slime", "wisp", "brute", "bat"], "elements": ["poison", "earth", "physical"], "components": ["poison_core", "monster_fang", "earth_core", "bp_warfan"] },
-    { "id": "desert", "name": "Sunscar Desert", "ground": "sand", "alt": "sand2", "blockers": { "cactus": 0.04, "rock": 0.04 }, "water": 0.02, "enemies": ["skeleton", "brute", "bat"], "elements": ["fire", "earth", "physical"], "components": ["fire_core", "bp_gun", "bp_cannon", "ancient_blade"] },
-    { "id": "snow", "name": "Frostvale", "ground": "snow", "alt": "ice", "blockers": { "pine": 0.08, "rock": 0.03 }, "water": 0.06, "enemies": ["wisp", "brute", "skeleton"], "elements": ["ice", "physical", "wind"], "components": ["ice_core", "crystal_heart", "mythril_ore"], "boss": "frost_warden" },
-    { "id": "volcanic", "name": "Ashlands", "ground": "ash", "alt": "basalt", "blockers": { "rock": 0.07 }, "water": 0.0, "lava": 0.06, "enemies": ["slime", "wisp", "brute"], "elements": ["fire", "earth"], "components": ["fire_core", "obsidian_shard", "dragon_scale"], "boss": "inferno_titan" },
-    { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02 }, "water": 0.04, "enemies": ["bat", "wisp", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
-    { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06 }, "water": 0.0, "enemies": ["wisp", "bat", "brute"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" },
-    { "id": "isles", "name": "Sunken Isles", "ground": "grass", "alt": "flowers", "blockers": { "palm": 0.08, "rock": 0.02 }, "water": 0.0, "enemies": ["slime", "bat", "skeleton"], "elements": ["wind", "holy", "physical"], "components": ["wind_core", "holy_core", "bp_chakram"] }
+    { "id": "plains", "name": "Green Plains", "ground": "grass", "alt": "flowers", "blockers": { "tree": 0.05, "rock": 0.02 }, "water": 0.1, "enemies": ["slime", "boar", "bat", "skeleton", "brute"], "elements": ["physical", "earth", "wind"], "components": ["earth_core", "wind_core", "bp_crossbow", "bp_chakram"] },
+    { "id": "forest", "name": "Deepwood", "ground": "moss", "alt": "grass", "blockers": { "tree": 0.22, "rock": 0.02 }, "water": 0.12, "enemies": ["slime", "spider", "wisp", "bat"], "elements": ["poison", "earth", "physical"], "components": ["poison_core", "monster_fang", "earth_core", "bp_warfan"] },
+    { "id": "desert", "name": "Sunscar Desert", "ground": "sand", "alt": "sand2", "blockers": { "cactus": 0.04, "rock": 0.04 }, "water": 0.02, "enemies": ["scorpion", "mummy", "skeleton", "bat"], "elements": ["fire", "earth", "physical"], "components": ["fire_core", "bp_gun", "bp_cannon", "ancient_blade"] },
+    { "id": "snow", "name": "Frostvale", "ground": "snow", "alt": "ice", "blockers": { "pine": 0.08, "rock": 0.03 }, "water": 0.06, "enemies": ["wolf", "yeti", "wisp"], "elements": ["ice", "physical", "wind"], "components": ["ice_core", "crystal_heart", "mythril_ore"], "boss": "frost_warden" },
+    { "id": "volcanic", "name": "Ashlands", "ground": "ash", "alt": "basalt", "blockers": { "rock": 0.07 }, "water": 0.0, "lava": 0.06, "enemies": ["slime", "imp", "brute"], "elements": ["fire", "earth"], "components": ["fire_core", "obsidian_shard", "dragon_scale"], "boss": "inferno_titan" },
+    { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02 }, "water": 0.04, "enemies": ["harpy", "golem", "bat", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
+    { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06 }, "water": 0.0, "enemies": ["eye", "shade", "wisp", "bat"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" },
+    { "id": "isles", "name": "Sunken Isles", "ground": "grass", "alt": "flowers", "blockers": { "palm": 0.08, "rock": 0.02 }, "water": 0.0, "enemies": ["crab", "slime", "bat"], "elements": ["wind", "holy", "physical"], "components": ["wind_core", "holy_core", "bp_chakram"] }
   ],
   "enemies": [
     { "id": "shark", "name": "Shark", "hp": 70, "damage": 12, "speed": 3.8, "size": 0.9, "sight": 9, "behavior": "shark", "xp": 20, "weight": 10, "color": "#7a8ca6", "swim": "sea", "sea": true },
     { "id": "serpent", "name": "Sea Serpent", "hp": 320, "damage": 20, "speed": 3.1, "size": 1.3, "sight": 13, "behavior": "serpent", "range": 8, "projSpeed": 7, "xp": 150, "weight": 1, "color": "#2fa89a", "swim": "deep", "sea": true, "bigLoot": true },
-    { "id": "slime", "name": "Slime", "hp": 30, "damage": 8, "speed": 1.7, "size": 0.7, "sight": 6, "behavior": "chase", "xp": 6, "weight": 10, "color": "#6ad35a" },
-    { "id": "bat", "name": "Bat", "hp": 18, "damage": 6, "speed": 3.2, "size": 0.6, "sight": 7, "behavior": "swoop", "xp": 6, "weight": 8, "color": "#8a6ad8" },
+    { "id": "slime", "name": "Slime", "hp": 30, "damage": 8, "speed": 1.7, "size": 0.7, "sight": 6, "behavior": "chase", "body": "hop", "xp": 6, "weight": 10, "color": "#6ad35a" },
+    { "id": "bat", "name": "Bat", "hp": 18, "damage": 6, "speed": 3.2, "size": 0.6, "sight": 7, "behavior": "swoop", "body": "fly", "xp": 6, "weight": 8, "color": "#8a6ad8" },
     { "id": "skeleton", "name": "Skeleton", "hp": 34, "damage": 8, "speed": 1.5, "size": 0.7, "sight": 8, "behavior": "ranged", "range": 6, "projSpeed": 6, "xp": 9, "weight": 7, "color": "#e8e4d4" },
-    { "id": "brute", "name": "Brute", "hp": 90, "damage": 16, "speed": 1.15, "size": 1.0, "sight": 6.5, "behavior": "charger", "xp": 16, "weight": 4, "color": "#c07a4a" },
-    { "id": "wisp", "name": "Wisp", "hp": 24, "damage": 9, "speed": 2.2, "size": 0.6, "sight": 8, "behavior": "caster", "range": 5, "projSpeed": 5, "xp": 10, "weight": 6, "color": "#7ad8ff", "elemental": true }
+    { "id": "brute", "name": "Brute", "hp": 90, "damage": 16, "speed": 1.15, "size": 1.0, "sight": 6.5, "behavior": "charger", "group": [1, 1], "xp": 16, "weight": 4, "color": "#c07a4a" },
+    { "id": "wisp", "name": "Wisp", "hp": 24, "damage": 9, "speed": 2.2, "size": 0.6, "sight": 8, "behavior": "caster", "range": 5, "projSpeed": 5, "body": "float", "xp": 10, "weight": 6, "color": "#7ad8ff", "elemental": true },
+    { "id": "boar", "name": "Tusk Boar", "hp": 45, "damage": 11, "speed": 2.0, "size": 0.85, "sight": 7, "behavior": "charger", "windup": 0.5, "dash": 4.6, "dashTime": 0.55, "trigger": 6, "cooldown": 2.2, "group": [1, 2], "xp": 10, "weight": 7, "color": "#9a6a48" },
+    { "id": "spider", "name": "Thornback Spider", "hp": 28, "damage": 9, "speed": 2.6, "size": 0.7, "sight": 7, "behavior": "charger", "windup": 0.3, "dash": 4.2, "dashTime": 0.28, "trigger": 3.5, "cooldown": 1.6, "xp": 9, "weight": 9, "color": "#5a4a6a" },
+    { "id": "scorpion", "name": "Dune Scorpion", "hp": 55, "damage": 12, "speed": 1.8, "size": 0.8, "sight": 7, "behavior": "charger", "windup": 0.45, "dash": 3.4, "dashTime": 0.3, "trigger": 2.6, "cooldown": 1.8, "sting": "poison", "group": [1, 2], "xp": 12, "weight": 8, "color": "#c8923a" },
+    { "id": "mummy", "name": "Mummy", "hp": 80, "damage": 14, "speed": 1.1, "size": 0.8, "sight": 6, "behavior": "chase", "group": [1, 2], "xp": 13, "weight": 5, "color": "#d8ccaa" },
+    { "id": "wolf", "name": "Frost Wolf", "hp": 40, "damage": 10, "speed": 3.0, "size": 0.8, "sight": 9, "behavior": "pack", "windup": 0.25, "dash": 3.2, "dashTime": 0.3, "trigger": 3.2, "cooldown": 1.6, "group": [2, 4], "xp": 11, "weight": 9, "color": "#b8c4d4" },
+    { "id": "yeti", "name": "Yeti", "hp": 140, "damage": 20, "speed": 1.4, "size": 1.2, "sight": 7, "behavior": "charger", "windup": 0.7, "dash": 4.0, "dashTime": 0.5, "trigger": 4.5, "cooldown": 3.0, "group": [1, 1], "xp": 24, "weight": 3, "color": "#eef4fa" },
+    { "id": "imp", "name": "Fire Imp", "hp": 30, "damage": 10, "speed": 2.6, "size": 0.6, "sight": 8, "behavior": "caster", "range": 6, "projSpeed": 6, "body": "fly", "xp": 11, "weight": 7, "color": "#e0503a", "elemental": true },
+    { "id": "golem", "name": "Stone Golem", "hp": 170, "damage": 22, "speed": 1.1, "size": 1.2, "sight": 6, "behavior": "charger", "windup": 0.8, "dash": 3.8, "dashTime": 0.5, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 26, "weight": 3, "color": "#8a8f9a" },
+    { "id": "harpy", "name": "Harpy", "hp": 34, "damage": 9, "speed": 3.4, "size": 0.7, "sight": 9, "behavior": "swoop", "body": "fly", "xp": 10, "weight": 7, "color": "#8a6a4a" },
+    { "id": "eye", "name": "Void Eye", "hp": 36, "damage": 10, "speed": 1.8, "size": 0.7, "sight": 9, "behavior": "caster", "range": 7, "projSpeed": 5.5, "body": "float", "xp": 12, "weight": 7, "color": "#8a4ad8", "elemental": true },
+    { "id": "shade", "name": "Shade", "hp": 42, "damage": 13, "speed": 2.2, "size": 0.75, "sight": 8, "behavior": "blinker", "body": "float", "xp": 14, "weight": 6, "color": "#4a3a78" },
+    { "id": "crab", "name": "Reef Crab", "hp": 38, "damage": 9, "speed": 2.2, "size": 0.75, "sight": 6, "behavior": "scuttle", "windup": 0.3, "dash": 2.6, "dashTime": 0.22, "trigger": 1.8, "cooldown": 1.4, "xp": 9, "weight": 10, "color": "#e0603a" }
   ],
   "bosses": [
     { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["meteors", "charge", "slam", "ring", "meteors", "summon"], "trail": "fire", "tip": "Meteors fall where you stand, and its charge leaves the ground burning.", "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "rare", "theme": "fire" } },

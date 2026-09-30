@@ -35,6 +35,8 @@ export function open(game, app, { focus = null } = {}) {
         return [h('button', { onclick: () => app.panels.show('inventory', { tab: 'storage' }) }, icon('chest', 20), 'Storage')];
       case 'library':
         return [h('button', { onclick: () => app.panels.show('research') }, icon('book', 20), 'Research')];
+      case 'den':
+        return [h('button', { onclick: () => app.panels.show('pals') }, icon('pal', 20), 'Pals')];
       case 'well': {
         const n = wellPending(data, save);
         return [h('button', {

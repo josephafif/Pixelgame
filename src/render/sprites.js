@@ -395,6 +395,16 @@ const MAPS = {
     'okkkkko',
     '.ooooo.',
   ],
+  egg: [
+    '..ooo..',
+    '.owwwo.',
+    'owGwwwo',
+    'owwwGwo',
+    'oGwwwwo',
+    'owwGwgo',
+    '.owwwo.',
+    '..ooo..',
+  ],
   heart: [
     '.oo.oo.',
     'orrorro',
@@ -501,6 +511,7 @@ export function pickupSprite(kind, color) {
     if (kind === 'scrap') pal.w = '#b8bcc8';
     if (kind === 'wood') Object.assign(pal, { b: '#b07a48', B: '#7a4a28', w: '#e8c890' });
     if (kind === 'stone') Object.assign(pal, { w: '#b8bcc8', k: '#7d7a8e' });
+    if (kind === 'egg') Object.assign(pal, { w: '#f4ecd8', g: '#d8ccb0' });
     return spriteFromMap(MAPS[kind], pal);
   });
 }

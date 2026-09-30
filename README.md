@@ -38,6 +38,7 @@ npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline 
 | Segla ut / gå i land | Handknappen vid vattnet / nära land | E | A |
 | Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
 | Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
+| Pals | I menyn, eller tryck på pal-chippen under hälsan | H | – |
 | Byggläge (i lägret) | Hammarknappen | G (1–9 väljer, X river, Esc klar) | – |
 | Hugga / bryta | Byt till hackan (3), sedan svärdknappen nära träd/sten | 3, sedan Space / E (håll inne) | A |
 | Handla på en marknad | Handknappen nära en handlare | E | A |
@@ -258,7 +259,35 @@ den, och turrets som skjuter drar till sig fiender. Skadade konstruktioner lagar
 lägret är lugnt. Logik: `src/game/construction.js` och `src/game/gathering.js`; grafik:
 `src/render/structures.js`; byggpanelen: `src/ui/build.js`.
 
+## Huvudmeny
+
+Innan du kommer in i världen visas en huvudmeny: **Play** (med en rad om din sparfil: nivå,
+antal vapen och speltid), **New world**, **Settings** (samma inställningar som i spelet),
+**How to play** och **Multiplayer**. Multiplayer är inte byggt än; knappen visar bara ett
+meddelande om att det är under utveckling. Bakom menyn driver världen sakta förbi.
+
 ## Fiender
+
+Varje biom har sina egna monster, och alla är animerade: de har gång-, vilo- och attackrutor, och
+renderaren lägger till rörelse ovanpå (slimes hoppar och trycks ihop när de landar, flygare
+flaxar och guppar, svävare svajar, och den som laddar en attack hukar sig och darrar med ett
+blinkande "!" innan den rusar). Grafiken finns i `src/render/creatures.js` och beteendena i
+`src/game/enemies.js`.
+
+| Biom | Monster |
+| --- | --- |
+| Green Plains | Slime, **Tusk Boar** (rusar från långt håll), Bat, Skeleton, Brute |
+| Deepwood | Slime, **Thornback Spider** (hoppar på dig från nära håll), Wisp, Bat |
+| Sunscar Desert | **Dune Scorpion** (sticket kan förgifta), **Mummy**, Skeleton, Bat |
+| Frostvale | **Frost Wolf** (jagar i flock och cirklar in från sidan), **Yeti**, Wisp |
+| Ashlands | Slime, **Fire Imp** (flygande eldkastare), Brute |
+| Stormpeaks | **Harpy** (dyker), **Stone Golem** (tung laddning), Bat, Skeleton |
+| Voidreach | **Void Eye** (svävar och skjuter), **Shade** (bleknar bort och dyker upp bakom dig), Wisp, Bat |
+| Sunken Isles | **Reef Crab** (går i sidled och nyper), Slime, Bat |
+
+Elementvarianter färgas i elementets färg men behåller en ton av sin egen, så de går att känna
+igen. Hur många som dyker upp tillsammans styrs av `group` (vargar kommer 2–4 åt gången, golems
+och yetis ensamma).
 
 Fiender ser dig bara inom sitt synfält (6–8 rutor beroende på typ, `sight` i datat). Annars
 strövar de runt där de föddes. När en fiende får syn på dig visas ett "!", och flocken runt den
@@ -266,6 +295,32 @@ vaknar också. Springer du tillräckligt långt bort ger de upp ("?"). Blir en f
 den dig även på längre avstånd. Fiender går runt sjöar, träd och väggar i stället för att fastna.
 Flygande fiender kan flyga över träd men aldrig över vatten. Loot hamnar alltid på mark du kan gå
 på.
+
+## Pals
+
+En pal är en liten följeslagare som går med dig och antingen slåss vid din sida eller hugger ved
+och bryter sten åt dig (och lämnar över det direkt). Den är inte lätt att få:
+
+1. **Hitta ett Pal Egg.** Du får alltid ett första gången du besegrar varje boss. Annars finns
+   de ibland i nedgrävda skatter på öar (30 %), hos sjöormar (15 %), när du besegrar en boss igen
+   (30 %) och mycket sällan hos elitfiender (0,6 %). Vanliga monster tappar aldrig ägg.
+2. **Bygg en Pal Den** i lägret (kräver nivå 6 och en del material).
+3. **Värm ägget** i Den (120 essence). Det kläcks efter 90 sekunder, även om du inte spelar.
+
+Det finns tre sorter: **Mossling** (samlare, hugger snabbt, svag i strid), **Emberpup** (kämpe,
+biter hårt och bränner) och **Glimmerfox** (allroundare, zappar fiender med blixtar på avstånd).
+I pal-panelen (H) väljer du vad den gör: *Fight*, *Gather* eller *Follow*. En samlare försvarar
+sig bara om något kommer för nära.
+
+Pals uppgraderas med essence, scrap, trä och sten (dyrare för varje nivå) upp till nivå 10.
+Varje nivå ger mer hälsa, skada, insamlingskraft och fart, och från nivå 5 kan de bryta
+kristaller. Pal Den bestämmer taket: varje Den-nivå låter pals växa två nivåer till. Blir din
+pal nedslagen tar den en tupplur i 30 sekunder och kommer sedan tillbaka. På havet åker den med i
+båten.
+
+Logiken ligger i `src/game/pals.js` (rena funktioner för ägg, kläckning och uppgraderingar, plus
+palens beteende i spelet), panelen i `src/ui/pals.js`, datat i `gamedata.json` → `pals` och
+testerna i `tests/unit/pals.test.js`.
 
 ## Läger (basen)
 
@@ -281,6 +336,7 @@ Use, eller öppna lägerpanelen (B / hus-knappen). Varje byggnad har nivåer med
 | Library | Billigare research |
 | Training Grounds | Mer Attack Power och Defense |
 | Essence Well | Producerar essence i realtid, även när du inte spelar (med tak). Ger 15 essence/timme per nivå |
+| Pal Den | Kläck pal-ägg. Varje nivå låter dina pals växa två nivåer till |
 | Waystone | Teleportera hem till lägret. Nivå 2: gå tillbaka dit du var |
 
 Logiken ligger i `src/game/base.js` (rena funktioner, testade i `tests/unit/base.test.js`),
@@ -311,6 +367,10 @@ panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src
   går före vanliga, och samma notis igen räknas upp ("+3 wood ×3") i stället för att staplas.
   Notiser flyttar ned till skärmens nederkant när en panel är öppen, så de aldrig täcker
   stängknappen.
+- **Hacka utan textrutor:** när du håller hackan får trädet eller stenen du kan hugga bara en
+  ram runt sig (röd om hackan är för svag), ingen textruta som skymmer vyn.
+- **Pal-chip:** har du en pal med dig visas en liten chip under hälsan med nivå och hälsa (på
+  telefon på samma rad som kompassen). Tryck på den för att öppna pal-panelen.
 - **Synfält:** *Settings → View* väljer hur mycket av världen du ser (Close, Normal, Wide). Auto,
   som är standard, visar ungefär 30 % mer i bredd på en telefon som hålls upprätt.
 - **Vapenanimationer** (`src/render/weapon-anim.js`): varje attack har upptakt, slag och
@@ -442,9 +502,9 @@ src/
   game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger,
                               insamling (gathering.js), byggen (construction.js),
                               marknader (markets.js), ekonomi och vapenvärde (economy.js),
-                              segling (sailing.js), småfynd (discoveries.js)
-  render/                     renderer, pixelsprites, tiles, vapensprites, byggnader,
-                              konstruktioner, båtar, animationer
+                              segling (sailing.js), småfynd (discoveries.js), pals (pals.js)
+  render/                     renderer, pixelsprites, animerade monster och pals (creatures.js),
+                              tiles, vapensprites, byggnader, konstruktioner, båtar, animationer
   input/, audio/, storage/, pwa/, ui/
 scripts/                      dev-server, precache-byggare, ikongenerator
 tests/unit/, tests/e2e/
@@ -460,7 +520,10 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 ## Kända begränsningar och nästa steg
 
 - Ingen backend ingår. Synk-klienten och protokollet finns, men en server och
-  kontohantering behöver byggas separat.
+  kontohantering behöver byggas separat. Multiplayer finns bara som en knapp i huvudmenyn än så
+  länge.
+- Du kan bara ha en pal med dig åt gången, och pals har inga egna förmågor utöver bett, zap och
+  insamling. Fler sorter och specialförmågor vore ett naturligt nästa steg.
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
 - Marknadernas NPC:er är enkla (handlare står still, bybor strövar). Nästa steg kan vara
   karavaner mellan marknader och uppdrag från handlarna.

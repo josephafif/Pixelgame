@@ -37,6 +37,7 @@ export class Hud {
       sprint: $('#btn-sprint'),
       fps: $('#fps'),
       compass: $('#compass'),
+      pal: $('#hud-pal'),
       death: $('#death'),
       hotbar: $('#hotbar'),
       resRow: document.querySelector('.res-row'),
@@ -51,6 +52,11 @@ export class Hud {
         game.switchSlot(btn.dataset.slot);
       });
     }
+    this.el.pal?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      game.emit('ui', 'pals');
+    });
     this.drawPortrait();
     game.on('hud', (s) => this.update(s));
     game.on('toast', (t) => this.toast(t.text, t.kind));
@@ -211,6 +217,7 @@ export class Hud {
     } else {
       e.fps.setAttribute('hidden', '');
     }
+    this.#palChip(s.pal);
     if (s.compass && s.compass.dist > 18) {
       const arrows = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'];
       const dir = arrows[((Math.round(s.compass.angle / (Math.PI / 4)) % 8) + 8) % 8];
@@ -220,6 +227,20 @@ export class Hud {
     } else {
       e.compass.setAttribute('hidden', '');
     }
+  }
+
+  /** The little pal chip: level and health, tap to open the pals panel. */
+  #palChip(pal) {
+    const el = this.el.pal;
+    if (!el) return;
+    el.toggleAttribute('hidden', !pal);
+    if (!pal) return;
+    const text = pal.down ? `Zz ${pal.downLeft}s` : `Lv ${pal.level}`;
+    const lvl = el.querySelector('.pal-lvl');
+    if (lvl.textContent !== text) lvl.textContent = text;
+    el.querySelector('.bar i').style.width = `${pal.down ? 100 * (1 - pal.downLeft / this.game.data.pals.reviveSeconds) : (100 * pal.hp) / pal.maxHp}%`;
+    el.classList.toggle('down', pal.down);
+    el.title = `${pal.name} (${pal.mode})`;
   }
 
   toast(text, kind = 'info') {

@@ -1,5 +1,5 @@
 // UI controller: routes game UI commands to panels. Heavy panels
-// (inventory, forge, research, camp, settings) are lazy-loaded the first
+// (inventory, forge, research, camp, pals, settings) are lazy-loaded the first
 // time they're opened and prefetched when the browser is idle.
 //
 // A command is either a panel name ('inventory') or an object
@@ -20,6 +20,7 @@ const loaders = {
   map: () => import('./map.js'),
   market: () => import('./market.js'),
   odds: () => import('./odds.js'),
+  pals: () => import('./pals.js'),
   settings: () => import('./settings.js'),
 };
 
@@ -137,6 +138,7 @@ export class Panels {
         item('anvil', 'Forge', go('crafting'), 'C'),
         item('book', 'Research', go('research'), 'R'),
         item('home', 'Camp', go('base'), 'B'),
+        item('pal', 'Pals', go('pals'), 'H'),
         item('hammer', 'Build', () => { closeModal(); g.toggleBuildMode(true); }, 'G')),
       h('div.menu-grid',
         item('star', 'Loot odds', go('odds')),

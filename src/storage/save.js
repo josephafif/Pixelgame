@@ -55,6 +55,8 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     settings: { ...DEFAULT_SETTINGS },
     base: { buildings: {}, wellAt: null, recall: null, structures: [] },
     tools: { pickaxe: 0, boat: 0 },
+    // Pals: eggs waiting (hatchAt = when the Den hatches it), owned pals, the one with you.
+    pals: { eggs: [], owned: [], active: null, mode: 'fight', nextId: 1 },
     flags: { tutorialSeen: false, craftingAnnounced: false },
     sync: { lastSyncedRev: 0, accountId: null },
   };
@@ -92,7 +94,7 @@ function structuredCloneSafe(v) {
 export function fillDefaults(save) {
   const def = createNewSave({ worldSeed: save.worldSeed ?? 1, now: save.createdAt ?? Date.now() });
   const out = { ...def, ...save };
-  for (const key of ['player', 'inventory', 'codex', 'resources', 'bosses', 'world', 'abilityState', 'counters', 'flags', 'sync', 'base', 'tools']) {
+  for (const key of ['player', 'inventory', 'codex', 'resources', 'bosses', 'world', 'abilityState', 'counters', 'flags', 'sync', 'base', 'tools', 'pals']) {
     out[key] = { ...def[key], ...(save[key] ?? {}) };
   }
   out.settings = { ...DEFAULT_SETTINGS, ...(save.settings ?? {}) };
@@ -100,6 +102,8 @@ export function fillDefaults(save) {
   out.base.buildings = { ...(save.base?.buildings ?? {}) };
   out.base.structures = Array.isArray(save.base?.structures) ? save.base.structures.map((st) => ({ ...st })) : [];
   out.world.harvested = { ...(save.world?.harvested ?? {}) };
+  out.pals.eggs = Array.isArray(save.pals?.eggs) ? save.pals.eggs.map((e) => ({ ...e })) : [];
+  out.pals.owned = Array.isArray(save.pals?.owned) ? save.pals.owned.map((pal) => ({ ...pal })) : [];
   return out;
 }
 

@@ -164,11 +164,35 @@ class App {
     $('#title-play').textContent = this.isNewGame ? 'New adventure' : 'Continue';
     $('#title-play').addEventListener('click', () => this.#play(), { once: true });
     $('#title-install').addEventListener('click', () => this.install());
+    // The rest of the main menu.
+    $('#title-new')?.toggleAttribute('hidden', this.isNewGame);
+    $('#title-new')?.addEventListener('click', () => this.resetSave());
+    $('#title-settings')?.addEventListener('click', () => import('./ui/settings.js').then((m) => m.open(this.game, this)));
+    $('#title-howto')?.addEventListener('click', () => this.#howToPlay());
+    $('#title-multiplayer')?.addEventListener('click', () => this.#multiplayer());
+    const line = $('#title-save');
+    if (line && !this.isNewGame) {
+      const pl = this.save.player;
+      const inv = this.save.inventory;
+      const mins = Math.floor((pl.playTime ?? 0) / 60);
+      line.textContent = `Level ${pl.level} · ${inv.bag.length + inv.storage.length} weapons · ${mins >= 60 ? `${Math.floor(mins / 60)} h ` : ''}${mins % 60} min played`;
+      line.removeAttribute('hidden');
+    }
     onInstallAvailabilityChange(() => this.#renderTitleStatus());
     this.#renderTitleStatus();
     if (this.bootWarning) this.game.toast(this.bootWarning, 'warn');
-    // Draw the world behind the title screen.
-    this.renderer.draw(this.game);
+    // The world lives behind the menu: redraw it (so every chunk fills in)
+    // while the camera drifts slowly across the landscape.
+    const t0 = performance.now();
+    const frame = (now) => {
+      if (this.started) return;
+      const t = (now - t0) / 1000;
+      this.renderer.pan.x = Math.sin(t * 0.05) * 14 + t * 0.35;
+      this.renderer.pan.y = Math.cos(t * 0.04) * 6;
+      this.renderer.draw(this.game);
+      this.titleRaf = requestAnimationFrame(frame);
+    };
+    this.titleRaf = requestAnimationFrame(frame);
   }
 
   #renderTitleStatus() {
@@ -194,6 +218,10 @@ class App {
   async #play() {
     this.enterFullscreen();
     this.started = true;
+    cancelAnimationFrame(this.titleRaf);
+    this.renderer.pan.x = 0;
+    this.renderer.pan.y = 0;
+    this.renderer.snapCamera();
     this.audio.unlock();
     $('#title').setAttribute('hidden', '');
     $('#hud').removeAttribute('hidden');
@@ -229,9 +257,10 @@ class App {
     return 'handled';
   }
 
-  #tutorial() {
+  /** Controls and first steps (shown on a new game and from the main menu). */
+  #howToList() {
     const touch = this.input.mode === 'touch';
-    const body = h('div.tutorial',
+    return [
       h('p', 'Every weapon in this world is generated from its own Weapon DNA. No two are alike — find them, forge them, and build your own playstyle.'),
       h('ul',
         touch ? h('li', 'Left thumb: move with the joystick.') : h('li', 'WASD / arrows to move.'),
@@ -241,7 +270,32 @@ class App {
         touch ? h('li', 'The star appears when your weapon grants an ability.') : h('li', 'Q or right-click casts your weapon\'s ability, when it has one.'),
         h('li', 'Your camp is at the centre of the world. Build a Forge, forge a pickaxe, and gather wood and stone to upgrade your camp and raise walls and turrets (G / hammer button).'),
         h('li', 'Enemies only notice you when you get close. Rarer weapons shine brighter on the ground.'),
-        h('li', 'Follow the arrow at the top-left to find the bosses.')),
+        h('li', 'Follow the arrow at the top-left to find the bosses.'),
+        h('li', 'Press 1, 2 and 3 (or tap the hotbar) for your main weapon, second weapon and pickaxe; press the same one again to put it away.'),
+        h('li', 'Far out lie seas and islands: build a boat at the Forge to sail there — but beware of what swims beneath.'),
+        h('li', touch
+          ? 'Rare Pal Eggs hatch at the Pal Den into pals that fight with you or gather wood and stone (menu → Pals).'
+          : 'Rare Pal Eggs hatch at the Pal Den into pals that fight with you or gather wood and stone (H).'))];
+  }
+
+  #howToPlay() {
+    const body = h('div.tutorial', this.#howToList(),
+      h('button.btn-primary', { autofocus: true, onclick: () => closeModal() }, 'Got it'));
+    openModal({ title: 'How to play', icon: 'book', body, className: 'tutorial-panel' });
+  }
+
+  #multiplayer() {
+    const body = h('div.tutorial',
+      h('p', h('b', 'Multiplayer is in development.')),
+      h('p', 'Soon you will be able to explore the world with friends, trade weapons and take on bosses together.'),
+      h('p.muted', 'Until then the adventure is single-player, and it works fully offline.'),
+      h('button.btn-primary', { autofocus: true, onclick: () => closeModal() }, 'OK'));
+    openModal({ title: 'Multiplayer', icon: 'players', body, className: 'tutorial-panel' });
+  }
+
+  #tutorial() {
+    const body = h('div.tutorial',
+      this.#howToList(),
       h('button.btn-primary', {
         autofocus: true,
         onclick: async () => {

@@ -4,6 +4,8 @@
 import { dist2, normalize, angleTo } from '../core/math.js';
 import { tickStatuses } from './status.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
+import { creatureSprites, hasCreature } from '../render/creatures.js';
+import { mixHex } from '../weapons/visuals.js';
 
 let nextId = 1;
 const DESPAWN_DIST = 34;
@@ -12,12 +14,14 @@ const LEASH = 1.8;
 const PACK_RADIUS = 4;
 
 /**
- * Collision mode: bats and wisps fly over trees and rocks (never over
- * water); sharks swim anywhere in the sea, serpents only in the deep.
+ * Collision mode: flyers and floaters (bats, wisps, imps, harpies, eyes,
+ * shades) pass over trees and rocks (never over water); sharks swim
+ * anywhere in the sea, serpents only in the deep.
  */
 export function moveMode(e) {
   if (e.def?.swim) return e.def.swim === 'deep' ? 'deepswim' : 'swim';
-  return e.kind === 'bat' || e.kind === 'wisp' ? 'fly' : 'enemy';
+  const body = e.def?.body;
+  return body === 'fly' || body === 'float' || e.kind === 'bat' || e.kind === 'wisp' ? 'fly' : 'enemy';
 }
 
 /** No spawning inside the camp's build area (plus a margin). */
@@ -39,7 +43,10 @@ export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite
   }
   el ??= 'physical';
   const elDef = game.data.byId.elements.get(el);
-  const color = el !== 'physical' && elDef?.palette ? elDef.palette[1] : def.color;
+  // Elemental variants take the element's colour; creatures that aren't
+  // elemental by nature keep a hint of their own so they stay recognisable.
+  const elColor = el !== 'physical' ? elDef?.palette?.[1] : null;
+  const color = !elColor ? def.color : def.elemental ? elColor : mixHex(def.color, elColor, 0.55);
   const s = scaleFor(level);
   const hp = Math.round(def.hp * s.hp * (elite ? 2.4 : 1));
   const e = {
@@ -68,7 +75,7 @@ export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite
     stateT: 0,
     facing: 1,
     phase: Math.random() * 10,
-    sprites: enemySprites(def.id, color),
+    sprites: hasCreature(def.id) ? creatureSprites(def.id, color) : enemySprites(def.id, color),
     color,
     boss: false,
     dead: false,
@@ -82,8 +89,8 @@ export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite
     wanderY: y,
     wanderT: Math.random() * 2,
   };
+  e.spin = Math.random() < 0.5 ? 1 : -1; // which way it circles or flanks
   if (def.swim) {
-    e.spin = Math.random() < 0.5 ? 1 : -1; // which way a shark circles
     e.trail = []; // a serpent's body follows where its head has been
     e.trailT = 0;
     e.phaseT = 4 + Math.random() * 2;
@@ -278,6 +285,11 @@ function updateBehaviour(game, e, dt) {
   e.atkCd -= dt;
   perceive(game, e, d);
   if (!e.alert && e.state !== 'charge') {
+    // Lost you mid-attack: calm down (a fading shade comes back).
+    if (e.state === 'windup' || e.state === 'fade') {
+      e.state = 'move';
+      e.submerged = false;
+    }
     // Idle, or besieging the turret that shot it.
     const st = e.siege && !e.siege.dead ? e.siege : null;
     if (st) {
@@ -324,6 +336,7 @@ function updateBehaviour(game, e, dt) {
         vy = n.y * speed * dir + n.x * speed * 0.3 * Math.sin(e.phase + game.time);
         if (e.atkCd <= 0 && d < (e.def.range ?? 6) + 1) {
           e.atkCd = e.def.behavior === 'caster' ? 2.2 : 1.8;
+          e.castT = game.time;
           enemyShoot(game, e, angleTo(e.x, e.y, p.x, p.y), {
             speed: e.def.projSpeed ?? 6, damage: e.dmg, sprite: e.def.behavior === 'caster' ? 'orb' : 'bone',
           });
@@ -331,23 +344,14 @@ function updateBehaviour(game, e, dt) {
       }
       break;
     }
-    case 'charger': {
-      if (e.state === 'move') {
-        if (aggro) { vx = n.x * speed; vy = n.y * speed; }
-        if (d < 4.5 && e.atkCd <= 0) {
-          e.state = 'windup';
-          e.stateT = 0;
-          e.chargeDir = n;
-        }
-      } else if (e.state === 'windup') {
-        if (e.stateT > 0.6) { e.state = 'charge'; e.stateT = 0; }
-      } else if (e.state === 'charge') {
-        vx = e.chargeDir.x * speed * 4.5;
-        vy = e.chargeDir.y * speed * 4.5;
-        if (e.stateT > 0.45) { e.state = 'move'; e.atkCd = 2.5; }
-      }
+    case 'charger':
+    case 'pack':
+    case 'scuttle':
+      ({ vx, vy } = charger(game, e, d, n, speed, aggro));
       break;
-    }
+    case 'blinker':
+      ({ vx, vy } = blinker(game, e, d, n, speed, aggro));
+      break;
     case 'shark': {
       // Circle the boat, then dart in for a bite and swing away again.
       e.circleT = (e.circleT ?? 1.2 + Math.random()) - dt;
@@ -389,7 +393,9 @@ function updateBehaviour(game, e, dt) {
   }
   e.vx = vx;
   e.vy = vy;
-  if (Math.abs(vx) > 0.05) e.facing = vx > 0 ? 1 : -1;
+  if ((e.state === 'windup' || e.state === 'charge') && e.chargeDir) e.facing = e.chargeDir.x >= 0 ? 1 : -1;
+  else if (e.def.behavior === 'scuttle' || e.def.behavior === 'blinker') e.facing = dx >= 0 ? 1 : -1;
+  else if (Math.abs(vx) > 0.05) e.facing = vx > 0 ? 1 : -1;
 
   // Contact damage (sea creatures only reach you out on the water).
   const reach = e.r + p.r;
@@ -397,9 +403,113 @@ function updateBehaviour(game, e, dt) {
   if (!p.dead && canReach && !e.submerged && d < reach && (e.contactCd ?? 0) <= game.time) {
     e.contactCd = game.time + 0.9;
     const hard = e.state === 'charge' || e.state === 'lunge';
-    game.hurtPlayer(e.dmg * (hard ? 1.5 : 1), { element: e.element, fromX: e.x, fromY: e.y });
+    const hit = game.hurtPlayer(e.dmg * (hard ? 1.5 : 1), { element: e.element, fromX: e.x, fromY: e.y });
     if (e.def.sea) game.fx.emit('splash', p.x, p.y, 8, 0.5, 2);
+    if (hit && e.def.sting && Math.random() < 0.5) game.applyPlayerStatus?.(e.def.sting);
   }
+}
+
+/**
+ * Chargers wind up, then dash at you: boars from far off, spiders leap from
+ * close by, golems and yetis barrel in. Wolves circle round to your side
+ * first (so a pack surrounds you) and crabs scuttle sideways, then pinch.
+ */
+function charger(game, e, d, n, speed, aggro) {
+  const def = e.def;
+  const trigger = def.trigger ?? 4.5;
+  if (e.state === 'windup') {
+    if (e.stateT > (def.windup ?? 0.6)) {
+      e.state = 'charge';
+      e.stateT = 0;
+      game.fx.emit('dust', e.x, e.y + e.r * 0.6, 4, 0.3, 1.2);
+    }
+    return { vx: 0, vy: 0 };
+  }
+  if (e.state === 'charge') {
+    const k = def.dash ?? 4.5;
+    if (e.stateT > (def.dashTime ?? 0.45)) {
+      e.state = 'move';
+      e.atkCd = (def.cooldown ?? 2.5) * (0.85 + Math.random() * 0.3);
+    }
+    return { vx: e.chargeDir.x * speed * k, vy: e.chargeDir.y * speed * k };
+  }
+  if (!aggro) return { vx: 0, vy: 0 };
+  let ax = n.x;
+  let ay = n.y;
+  if (def.behavior === 'pack' && d > trigger * 0.8) {
+    const side = Math.min(1.2, (d - trigger * 0.8) / 3);
+    ax = n.x - n.y * e.spin * side;
+    ay = n.y + n.x * e.spin * side;
+  } else if (def.behavior === 'scuttle') {
+    const wob = Math.sin(game.time * 3 + e.phase) * 1.1;
+    ax = n.x * 0.6 - n.y * wob;
+    ay = n.y * 0.6 + n.x * wob;
+  }
+  const len = Math.hypot(ax, ay) || 1;
+  if (d < trigger && e.atkCd <= 0) {
+    e.state = 'windup';
+    e.stateT = 0;
+    e.chargeDir = n;
+  }
+  return { vx: (ax / len) * speed, vy: (ay / len) * speed };
+}
+
+/**
+ * Shades drift towards you, fade out (nothing can hit them while they are
+ * gone) and reappear right behind you for a quick strike.
+ */
+function blinker(game, e, d, n, speed, aggro) {
+  const p = game.player;
+  if (e.state === 'fade') {
+    if (e.stateT > 0.6) {
+      const r = Math.min(e.r, 0.45);
+      let spot = null;
+      for (const turn of [0, 0.7, -0.7, 1.4, -1.4, Math.PI]) {
+        const a = (p.facing ?? 0) + Math.PI + turn;
+        const x = p.x + Math.cos(a) * 1.9;
+        const y = p.y + Math.sin(a) * 1.9;
+        if (game.world.isFree(x, y, r, 'fly')) {
+          spot = { x, y };
+          break;
+        }
+      }
+      if (spot) {
+        game.fx.emit('void', e.x, e.y, 6, 0.4, 1);
+        e.x = spot.x;
+        e.y = spot.y;
+        game.fx.emit('void', e.x, e.y, 8, 0.4, 1.4);
+      }
+      e.submerged = false;
+      e.state = 'windup';
+      e.stateT = 0;
+      e.chargeDir = normalize(p.x - e.x, p.y - e.y);
+    }
+    return { vx: 0, vy: 0 };
+  }
+  if (e.state === 'windup') {
+    if (e.stateT > 0.4) {
+      e.state = 'charge';
+      e.stateT = 0;
+    }
+    return { vx: 0, vy: 0 };
+  }
+  if (e.state === 'charge') {
+    if (e.stateT > 0.25) {
+      e.state = 'move';
+      e.atkCd = 3.2 + Math.random();
+    }
+    return { vx: e.chargeDir.x * speed * 3.4, vy: e.chargeDir.y * speed * 3.4 };
+  }
+  if (!aggro) return { vx: 0, vy: 0 };
+  if (d < 7 && d > 1.6 && e.atkCd <= 0) {
+    e.state = 'fade';
+    e.stateT = 0;
+    e.submerged = true;
+    game.fx.emit('void', e.x, e.y, 6, 0.4, 1);
+    return { vx: 0, vy: 0 };
+  }
+  const sway = Math.sin(game.time * 2 + e.phase) * 0.5;
+  return { vx: (n.x - n.y * sway) * speed * 0.7, vy: (n.y + n.x * sway) * speed * 0.7 };
 }
 
 /**
@@ -975,7 +1085,8 @@ export function updateSpawner(game, dt) {
       r -= c.weight;
     }
     const level = Math.max(game.world.worldLevel(x, y), game.save.player.level - 1);
-    const group = def.id === 'brute' ? 1 : 1 + ((Math.random() * 3) | 0);
+    const [gMin, gMax] = def.group ?? [1, 3];
+    const group = gMin + ((Math.random() * (gMax - gMin + 1)) | 0);
     const element = null;
     for (let g = 0; g < group && alive + g < target; g++) {
       const gx = x + (Math.random() - 0.5) * 1.5;

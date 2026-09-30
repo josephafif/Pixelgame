@@ -273,10 +273,13 @@ test('gathering: forge a pickaxe, chop a tree, collect the wood', async ({ page 
   await expect(page.locator('.tool-card').first()).toContainText('Equipped');
   await page.keyboard.press('Escape');
   // The pickaxe lives in slot 3: switch to it before chopping.
-  await expect(page.locator('#interact-hint')).not.toContainText('Chop tree');
+  const target = () => game(page, () => window.__pixelgame.game.interactTarget?.type ?? null);
+  expect(await target()).not.toBe('harvest');
   await page.keyboard.press('Digit3');
   await expect(page.locator('#slot-tool')).toHaveClass(/\bon\b/);
-  await expect(page.locator('#interact-hint')).toContainText('Chop tree');
+  // The tree is outlined, but no text box covers the view.
+  await expect.poll(target).toBe('harvest');
+  await expect(page.locator('#interact-hint')).toBeHidden();
   await page.keyboard.down('Space');
   await expect.poll(() => game(page, (s) => window.__pixelgame.game.world.blockAt(s.x, s.y), spot), { timeout: 8000 }).toBe(0);
   await page.keyboard.up('Space');
@@ -771,4 +774,136 @@ test('settings: the view size changes how much of the world you see', async ({ p
   const close = await tiles();
   expect(wide).toBeGreaterThan(normal);
   expect(close).toBeLessThan(normal);
+});
+
+test('main menu: settings and how to play before you start; multiplayer is announced, not playable yet', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/?debug=1');
+  await expect(page.locator('#title')).toBeVisible();
+  for (const id of ['#title-play', '#title-multiplayer', '#title-settings', '#title-howto']) await expect(page.locator(id)).toBeVisible();
+  await page.click('#title-multiplayer');
+  const modal = page.locator('.modal, [role="dialog"]').last();
+  await expect(modal).toContainText('Multiplayer is in development');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('text=Multiplayer is in development')).toBeHidden();
+  await page.click('#title-settings');
+  await expect(page.locator('.settings')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.settings')).toBeHidden();
+  await page.click('#title-howto');
+  await expect(page.locator('.tutorial')).toContainText('Pal Den');
+  await page.click('.tutorial button');
+  // Still on the title: nothing started behind the menus.
+  await expect(page.locator('#title')).toBeVisible();
+  expect(await game(page, () => window.__pixelgame.app.started)).toBeFalsy();
+  expect(errors).toEqual([]);
+});
+
+test('monsters differ per biome and are animated', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const result = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { spawnEnemy } = await import('/src/game/enemies.js');
+    g.spawnTimer = 1e9;
+    g.enemies.length = 0;
+    const out = {};
+    for (const kind of ['wolf', 'scorpion', 'shade', 'crab']) {
+      const spot = g.world.findFreeSpot(g.player.x + 4, g.player.y, 0.4, 'enemy', null);
+      const e = spawnEnemy(g, kind, spot.x, spot.y, { level: 1 });
+      out[kind] = { frames: e.sprites.walk.right.length, attack: e.sprites.attack.right.length };
+    }
+    return out;
+  });
+  for (const r of Object.values(result)) expect(r.frames).toBeGreaterThanOrEqual(2);
+  expect(result.wolf.attack).toBe(1);
+  // A charger winds up, then dashes.
+  const states = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const wolf = g.enemies.find((e) => e.kind === 'wolf');
+    wolf.x = g.player.x + 2;
+    wolf.y = g.player.y;
+    wolf.alert = true;
+    wolf.atkCd = 0;
+    const seen = new Set();
+    for (let i = 0; i < 90; i++) {
+      g.update(1 / 60);
+      seen.add(wolf.state);
+    }
+    return [...seen];
+  });
+  expect(states).toContain('windup');
+  expect(states).toContain('charge');
+  expect(errors).toEqual([]);
+});
+
+test('pals: an egg hatches at the Pal Den, the pal gathers and fights, and upgrades make it stronger', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.godMode = true;
+    g.save.player.level = 20;
+    Object.assign(g.save.resources, { scrap: 9000, essence: 9000, wood: 9000, stone: 9000 });
+    g.data.pals.eggChance.elite = 1;
+    g.dropEgg('elite', g.player.x + 1, g.player.y);
+  });
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.pals.eggs.length)).toBe(1);
+  await expect(page.locator('#toasts')).toContainText('Pal Egg');
+  // No den yet: the panel says so.
+  await page.keyboard.press('KeyH');
+  await expect(page.locator('.pals-panel')).toBeVisible();
+  await expect(page.locator('.pals-panel .notice')).toContainText('Pal Den');
+  await game(page, () => window.__pixelgame.game.upgradeBuilding('den'));
+  await page.click('.pals-panel [data-action="hatch"]');
+  await expect(page.locator('.pals-panel .egg-card')).toContainText('hatches in');
+  await game(page, () => { for (const e of window.__pixelgame.game.save.pals.eggs) e.hatchAt = Date.now() - 1; });
+  await expect(page.locator('.pals-panel .pal-card.active')).toBeVisible({ timeout: 4000 });
+  const palId = await game(page, () => window.__pixelgame.game.save.pals.active);
+  expect(palId).toBeTruthy();
+  const hp = await game(page, () => window.__pixelgame.game.pal.stats.maxHp);
+  await page.click('.pals-panel [data-action="upgrade"]');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.pals.owned[0].level)).toBe(2);
+  expect(await game(page, () => window.__pixelgame.game.pal.stats.maxHp)).toBeGreaterThan(hp);
+  // The Den (level 1) stops it at level 2.
+  await expect(page.locator('.pals-panel [data-action="upgrade"]')).toBeDisabled();
+  await page.click('.pals-panel [data-mode="gather"]');
+  expect(await game(page, () => window.__pixelgame.game.save.pals.mode)).toBe('gather');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pals-panel')).toBeHidden();
+  await expect(page.locator('#hud-pal')).toBeVisible();
+  // Out among the trees your pal chops wood and hands it over.
+  const wood = await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.enemies.length = 0;
+    g.spawnTimer = 1e9;
+    const w = g.world;
+    for (let r = 20; r < 200; r += 2) {
+      for (let a = 0; a < 32; a++) {
+        const x = Math.round(Math.cos((a / 32) * 6.283) * r);
+        const y = Math.round(Math.sin((a / 32) * 6.283) * r);
+        if (w.blockAt(x + 2, y) === 22 && w.isFree(x + 0.5, y + 0.5, 0.4, 'player')) {
+          g.player.x = x + 0.5;
+          g.player.y = y + 0.5;
+          g.renderer.snapCamera();
+          return g.save.resources.wood;
+        }
+      }
+    }
+    return null;
+  });
+  expect(wood).not.toBeNull();
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.resources.wood), { timeout: 15000 }).toBeGreaterThan(wood);
+  // In fight mode it bites the monsters around you.
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { spawnEnemy } = await import('/src/game/enemies.js');
+    g.setPalMode('fight');
+    const spot = g.world.findFreeSpot(g.player.x + 2, g.player.y, 0.4, 'enemy', null);
+    const e = spawnEnemy(g, 'slime', spot.x, spot.y, { level: 1 });
+    e.alert = true;
+    window.__slime = e;
+  });
+  await expect.poll(() => game(page, () => window.__slime.hp < window.__slime.maxHp || window.__slime.dead), { timeout: 10000 }).toBe(true);
+  expect(errors).toEqual([]);
 });

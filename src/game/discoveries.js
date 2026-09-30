@@ -7,7 +7,8 @@
 //   bottle     – a message in a bottle on a beach: a treasure map (pinned)
 //   wreck      – a shipwreck: wood, scrap and coins
 //   idol       – an island idol: +2 max health, once per idol
-//   treasure   – buried treasure on an island: dig it up (needs a pickaxe)
+//   treasure   – buried treasure on an island: dig it up (needs a pickaxe);
+//                sometimes a pal egg is buried with it
 
 import { hashInts } from '../core/rng.js';
 import { CHUNK } from './world.js';
@@ -166,6 +167,7 @@ export function interactPoi(game, o) {
       }
       openChestLoot(game, o, { richness: 2.5 });
       if (Math.random() < 0.1) addPickup(game, 'shard', o.x, o.y, { value: 1, color: '#ffd24a' });
+      game.dropEgg?.('treasure', o.x, o.y);
       fx.emit('sparkle', o.x, o.y, 24, 0.8, 3);
       game.shake = Math.max(game.shake, 0.2);
       game.toast('Buried treasure!', 'legendary');

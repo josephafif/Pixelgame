@@ -267,6 +267,38 @@ const ICONS = {
     ],
     pal: { o: O, g: '#6cd66c' },
   },
+  // Two adventurers side by side (multiplayer).
+  players: {
+    map: [
+      '.ooo....ooo.',
+      'obbbo..orrro',
+      'offfo..offfo',
+      'offfo..offfo',
+      '.ooo....ooo.',
+      'obbbo..orrro',
+      'obbbo..orrro',
+      'obbbo..orrro',
+      '.o.o....o.o.',
+      '.o.o....o.o.',
+    ],
+    pal: { o: O, b: '#3f6fd8', r: '#c8364a', f: '#f0c8a0' },
+  },
+  // A small round creature with big eyes (pals).
+  pal: {
+    map: [
+      '..o......o..',
+      '.oGo....oGo.',
+      '.oGGooooGGo.',
+      'oGGGGGGGGGGo',
+      'oGwwGGGGwwGo',
+      'oGwkGGGGwkGo',
+      'oGGGGrrGGGGo',
+      '.oGGGGGGGGo.',
+      '.ogGGGGGGgo.',
+      '..oooooooo..',
+    ],
+    pal: { o: O, G: '#7ad86a', g: '#4f9a44', w: '#ffffff', k: '#161622', r: '#e8364a' },
+  },
   skull: {
     map: [
       '..oooooo..',
