@@ -34,6 +34,8 @@ npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline 
 | Sprint (ingen stamina) | Stövelknappen (växla eller håll, valbart) | Shift | LB / L3 |
 | Ability | Stjärnknappen (syns bara när vapnet har en) | Q, K eller högerklick | X |
 | Byt plats: huvudvapen / sekundärt / hacka | Hotbaren ovanför knapparna | 1 / 2 / 3 eller mushjulet | RB |
+| Lägg undan (tomma händer) | Tryck på platsen du redan håller | Samma siffra igen | – |
+| Segla ut / gå i land | Handknappen vid vattnet / nära land | E | A |
 | Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
 | Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
 | Byggläge (i lägret) | Hammarknappen | G (1–9 väljer, X river, Esc klar) | – |
@@ -60,10 +62,20 @@ Progressionen är medvetet långsammare än i första versionen:
 
 - **Essence** droppar bara ibland från vanliga fiender (40 % chans, mer från elitfiender och
   bossar). Värdet växer långsamt med fiendens nivå.
+- **Vapen är sällsynta fynd:** 1,8 % av vanliga fiender, 15 % av elitfiender och 25 % av kistorna
+  släpper ett vapen. Bossar ger alltid ett (och ibland ett till).
+- **Kistor** ger mest essence och scrap (plus lite guld); bara var fjärde har ett vapen.
+- **Episka vapen** kommer från ett eget litet slag, precis som legendariska: 1,2 % av vapnen från
+  vanliga fiender, 4 % från elitfiender, 3 % från kistor och 30 % från bossar. Allt annat är
+  vanligt till sällsynt (rare).
+- **Loot odds** i pausmenyn visar exakt chans för varje rarity, per källa (fiende, elitfiende,
+  kista, boss och varje catalyst i Forge), för din nivå och luck just nu. Tabellen räknas fram
+  med samma siffror som spelet slår med (`rarityOdds` i `src/game/economy.js`).
 - **Skrotning** ger lite: från 2 scrap för ett vanligt vapen till 24 scrap och 12 essence för ett
   legendariskt.
 - **Crafting** kostar mer och blir dyrare med din nivå (+6 % per nivå); Forge-nivåer ger rabatt.
-- **Catalysts:** Azure kräver Forge 2 och Violet Forge 4. Golden (legendariskt) kräver Forge 5,
+- **Catalysts:** Azure kräver Forge 2 och Violet (garanterat episkt, 600 essence och 300 scrap)
+  Forge 4. Golden (legendariskt) kräver Forge 5,
   en besegrad boss, 2 500 essence, 1 200 scrap och **3 Star Shards**, så det tar lång tid.
 - **Guld** är marknadernas valuta. Det mesta kommer från att sälja vapen; bossar och ibland
   elitfiender och kistor ger lite.
@@ -90,7 +102,7 @@ lyser och legendariska glimmar.
 Legendariska vapen ska kännas som att få en kniv i ett CS:GO-case: extremt sällsynta och värda
 mycket.
 
-- Vanlig loot stannar på **episk**. Ett legendariskt vapen kräver ett eget, litet slag
+- Vanlig loot stannar på **rare**. Ett legendariskt vapen kräver ett eget, litet slag
   (`src/game/economy.js`, seedat per sparfil): ungefär 0,15 % per vanligt vapendropp, 0,5 % från
   elitfiender, 0,4 % från kistor och 3 % från bossar. Luck höjer chansen lite.
 - **Kistor och Forge öppnas som ett case:** en remsa med vapen rullar förbi en markör och
@@ -108,6 +120,10 @@ hotbaren (på mobil ligger den ovanför knapparna). Ett nytt vapen kan läggas d
 huvudvapen eller sekundärt, och inventoryt markerar vapnen med 1 och 2. Med hackan i handen
 hugger attackknappen träd och sten, och den gör lite skada på fiender också.
 
+Tryck på platsen du redan håller (samma siffra eller samma ruta i hotbaren) för att **lägga
+undan** den. Då håller du ingenting: attackknappen blir en hand som bara används för att prata,
+öppna och plocka upp, så du slår inte någon av misstag (bra på marknader).
+
 ## Marknader
 
 Ute i världen finns sällsynta, befästa **marknader** (ungefär en per tio 112×112-rutors
@@ -118,7 +134,7 @@ när du når nivå 4.
   borg**, **palissadläger** eller **oas**. De har murar, grindar, torn, facklor och stånd, byggda
   i trä eller sten beroende på plats. Monster föds aldrig inne på en marknad.
 - **Handlare** står bakom sina stånd (prata med dem över disken med E). De säljer tre vapen
-  (vanligen ovanliga till episka, mycket sällan ett legendariskt till överpris), trä, sten,
+  (vanligen ovanliga eller sällsynta, ibland episka, mycket sällan ett legendariskt till överpris), trä, sten,
   scrap, essence, en komponent och ibland en Star Shard. Sortimentet byts var 20:e minut.
 - **Sälj** vapen och material, eller **byt in** ett vapen mot deras. Inbytesvärdet dras av från
   priset. Handlarna köper för 60 % av värdet och säljer för 170 %, så marknader hjälper dig men
@@ -134,12 +150,75 @@ Logik: `src/game/markets.js`; placering: `World#marketForCell` i `src/game/world
 
 Kartan (M eller kartknappen) visar allt du har upptäckt. Världen avslöjas i områden runt dig
 medan du går, och det sparas. Dra för att panorera, zooma med hjulet, nyp eller +/−. **Me** och
-**Camp** centrerar kartan.
+**Camp** centrerar kartan, och **All** zoomar ut så att allt du har utforskat syns. Kartan kan
+zoomas mycket långt ut (tusentals rutor); då ritas varje område som en färg, så det går snabbt
+även när du har seglat över halva världen. Hav och öar syns i blått och grönt.
 
 Markeringarna visar **hotspots**: lägret, bossar (bleka tills du har utforskat där, överkryssade
 när de är besegrade), marknader du har sett, helgedomar, kistor du inte har öppnat, Waystonens
 återvändarpunkt och dina egna **nålar** (tryck på *Pin* och sedan på kartan; tryck på en nål för
 att ta bort den). Kod: `src/ui/map.js`.
+
+## Hav, öar och båtar
+
+Världen har nu **stora hav**. Närmast lägret är det alltid fast mark (drygt 170 rutor åt alla
+håll, med en naturligt oregelbunden kust), men längre ut breder hav och ö-världar ut sig.
+
+- **Grunt kustvatten** (turkos) och **öppet hav** (mörkblått). Stränderna är sandiga.
+- **Öar** (Sunken Isles) med palmer, egna fiender, rikare kistor, **idoler** (+2 max-HP för alltid,
+  en gång per idol), **skeppsvrak** och **nedgrävda skatter** som grävs upp med hackan.
+- **Flaskpost** flyter i land på stränderna: öppna den så får du en skattkarta, och skatten
+  markeras med en nål på kartan.
+
+**Båtar** byggs i Forge → Tools (under hackorna) av trä, sten, scrap och essence. Du bär båten
+med dig: gå fram till vattnet och tryck Use för att segla ut, och Use nära land för att gå i land.
+Du styr som när du går, kan slåss från båten, och sparar du ute på havet fortsätter du segla när
+du laddar spelet.
+
+| Båt | Kostnad | Fart | Kan |
+| --- | --- | --- | --- |
+| Log Raft | 60 trä, 40 essence (Forge 1) | 3,6 | Sjöar och grunt kustvatten, inte öppet hav |
+| Sailing Sloop | 180 trä, 40 sten, 90 scrap, 200 essence (Forge 3) | 5,4 | Allt vatten, även öppet hav |
+| War Galleon | 420 trä, 150 sten, 300 scrap, 650 essence (Forge 5 + besegrad boss) | 7,2 | Allt vatten; skrovet tar 40 % av skadan du får till sjöss |
+
+Kod: `src/game/sailing.js` (båtar, sjösättning, landstigning), `World#seaAt` i
+`src/game/world.js` (hav och öar), `src/render/boats.js` (grafik).
+
+## Småsaker att hitta
+
+Utspritt i världen finns små saker som inte ändrar spelet mycket, men som gör det roligare att
+utforska (`src/game/discoveries.js`):
+
+| Fynd | Var | Vad händer |
+| --- | --- | --- |
+| Kvarlevor | Överallt | Lite scrap och guld, och en lapp med ett tips eller en liten historia |
+| Vägskylt | Överallt | Pekar mot närmaste obesegrade boss eller marknad, med avstånd |
+| Glödsvampar | Skog, slätt, snö, Voidreach | Läker lite och ger +25 % fart i 45 sekunder |
+| Övergivet läger | Överallt | Vila (full hälsa) och ett litet förråd |
+| Flaskpost | Stränder | En skattkarta: skatten nålas fast på kartan |
+| Skeppsvrak | Stränder och öar | Trä, scrap och guld |
+| Idol | Öar | +2 max-HP, permanent |
+| Nedgrävd skatt | Öar | Grävs upp med hackan: som en mycket rik kista, ibland en Star Shard |
+
+Dessutom finns det liv runt omkring dig: fjärilar på ängarna, eldflugor i skogen och fiskar som
+hoppar ute på havet.
+
+## Bossar
+
+Bossarnas arenor ligger nu **långt ifrån varandra**: den första cirka 150 rutor från lägret och
+de följande ungefär 290, 430 och 570 rutor bort, åt olika håll. De tre första står alltid på
+fastlandet; den sista kan hamna på en ö, så då behöver du en båt. Alla bossar har egen grafik
+och egna attacker, och när du väcker en får du ett tips om hur den slåss.
+
+| Boss | Signatur |
+| --- | --- |
+| Inferno Titan | Meteorer faller där du står, och laddningen lämnar brinnande mark efter sig |
+| Frost Warden | Riddare i isrustning: frostandedräkt i en kon, isspikar i linjer, en isring som sluter sig (hitta luckan) och en kylande aura |
+| Storm Colossus | Svävande stengolem: blixtnedslag där du står, snabba blixtrusningar, statiska klot som cirklar runt den och en solfjäder av blixtar |
+| Void Herald | Gömmer sig bland spegelbilder (auto-aim avslöjar inte vilken som är äkta) och öppnar singulariteter som drar in dig |
+
+Bossar släpper alltid ett vapen, minst sällsynt (rare), med 30 % chans till episkt och 3 % till
+legendariskt.
 
 ## Samla och bygga
 
@@ -196,7 +275,8 @@ panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src
 
 ## Gränssnitt och animationer
 
-- **Pixelgränssnitt:** typsnittet Pixelify Sans (OFL, ligger i `fonts/` så det fungerar offline),
+- **Pixelgränssnitt:** typsnittet Pixelify Sans (OFL, ligger i `fonts/` så det fungerar offline;
+  siffran 5 är omritad eftersom originalet var lätt att förväxla med 8 och S),
   pixelramar som 9-slice-SVG:er och egna pixelikoner (`src/ui/icons.js`), inga emoji.
 - **Inventory:** flikar med antal, sortering (nyast, rarity, styrka, typ), filter (närstrid,
   distans, special, favoriter), märken för utrustat, NEW och favorit, jämförelse stat för stat mot
@@ -341,9 +421,10 @@ src/
   weapons/                    generator, regler, namn, visuals, DNA, crafting, worker
   game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger,
                               insamling (gathering.js), byggen (construction.js),
-                              marknader (markets.js), ekonomi och vapenvärde (economy.js)
+                              marknader (markets.js), ekonomi och vapenvärde (economy.js),
+                              segling (sailing.js), småfynd (discoveries.js)
   render/                     renderer, pixelsprites, tiles, vapensprites, byggnader,
-                              konstruktioner, animationer
+                              konstruktioner, båtar, animationer
   input/, audio/, storage/, pwa/, ui/
 scripts/                      dev-server, precache-byggare, ikongenerator
 tests/unit/, tests/e2e/
@@ -363,6 +444,7 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
 - Marknadernas NPC:er är enkla (handlare står still, bybor strövar). Nästa steg kan vara
   karavaner mellan marknader och uppdrag från handlarna.
+- Havet har inga egna monster ännu (hajar eller sjöormar vore ett naturligt nästa steg).
 - Fiender attackerar inte lägret på egen hand ännu. Ett naturligt nästa steg är räder mot
   lägret (vågor av fiender) där väggar och turrets verkligen sätts på prov.
 - iOS saknar manifest-splash. Där används appens egen startskärm.

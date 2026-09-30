@@ -104,6 +104,57 @@ function drawBlocker(ctx, id, rng) {
       for (let i = 0; i < 2; i++) ctx.fillRect(rng.int(0, 12), rng.int(0, 15), 3, 1);
       break;
     }
+    case T.SEA: {
+      // Shallow coastal sea: bright turquoise with glints.
+      ctx.fillStyle = '#2f8fc4';
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.fillStyle = '#3aa2d4';
+      for (let i = 0; i < 5; i++) ctx.fillRect(rng.int(0, 12), rng.int(0, 15), rng.int(2, 5), 1);
+      ctx.fillStyle = '#9ad8f4';
+      for (let i = 0; i < 2; i++) ctx.fillRect(rng.int(0, 13), rng.int(0, 15), 2, 1);
+      break;
+    }
+    case T.DEEP: {
+      // Open sea: dark blue with long, slow swells.
+      ctx.fillStyle = '#1d4e8c';
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.fillStyle = '#255da0';
+      for (let i = 0; i < 3; i++) ctx.fillRect(rng.int(0, 10), rng.int(0, 15), rng.int(4, 7), 1);
+      if (rng.next() < 0.5) {
+        ctx.fillStyle = '#5a8ed0';
+        ctx.fillRect(rng.int(1, 12), rng.int(1, 14), 3, 1);
+      }
+      break;
+    }
+    case T.PALM: {
+      // A curved trunk with drooping fronds and coconuts.
+      ctx.fillStyle = '#161622';
+      ctx.fillRect(6, 6, 4, 10);
+      ctx.fillStyle = '#9a6a3a';
+      for (let y = 6; y < 16; y++) ctx.fillRect(7 + (y < 10 ? 1 : 0), y, 2, 1);
+      ctx.fillStyle = '#7a4e28';
+      for (let y = 7; y < 16; y += 2) ctx.fillRect(7 + (y < 10 ? 1 : 0), y, 2, 1);
+      const frond = (pts, dark) => {
+        for (const [x, y] of pts) {
+          ctx.fillStyle = '#161622';
+          ctx.fillRect(x - 1, y - 1, 3, 3);
+        }
+        for (const [x, y] of pts) {
+          ctx.fillStyle = dark ? '#2f8a3c' : '#4fb04f';
+          ctx.fillRect(x, y, 2, 1);
+        }
+      };
+      frond([[1, 5], [3, 4], [5, 3], [7, 3]], true);
+      frond([[14, 5], [12, 4], [10, 3], [8, 3]], true);
+      frond([[2, 2], [4, 2], [6, 2], [8, 2]], false);
+      frond([[13, 2], [11, 2], [9, 2]], false);
+      frond([[3, 7], [5, 5]], false);
+      frond([[13, 7], [11, 5]], false);
+      ctx.fillStyle = '#5a3a1a';
+      ctx.fillRect(7, 5, 1, 1);
+      ctx.fillRect(9, 5, 1, 1);
+      break;
+    }
     case T.LAVA: {
       ctx.fillStyle = '#c8381a';
       ctx.fillRect(0, 0, 16, 16);

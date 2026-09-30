@@ -547,3 +547,154 @@ test('map: shows explored areas, hotspots and your own pins', async ({ page }) =
   await expect(page.locator('.map-panel')).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test('empty hands: pressing your slot again puts it away', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  // Away from the camp, so Space has nothing to use.
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.enemies.length = 0;
+    const spot = g.world.findFreeSpot(60.5, 60.5);
+    g.player.x = spot.x;
+    g.player.y = spot.y;
+    g.renderer.snapCamera();
+  });
+  await page.keyboard.press('Digit1');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.activeSlot)).toBe('none');
+  await expect(page.locator('#hud-weapon')).toContainText('Empty hands');
+  await expect(page.locator('#hotbar .hslot.on')).toHaveCount(0);
+  const before = await game(page, () => window.__pixelgame.game.player.attackCount);
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(500);
+  await page.keyboard.up('Space');
+  expect(await game(page, () => window.__pixelgame.game.player.attackCount)).toBe(before);
+  await page.keyboard.press('Digit1');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.activeSlot)).toBe('main');
+  await expect(page.locator('#slot-main')).toHaveClass(/\bon\b/);
+  expect(errors).toEqual([]);
+});
+
+test('loot odds: the menu shows the chance of every rarity', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await page.keyboard.press('Escape');
+  await page.click('.menu button:has-text("Loot odds")');
+  const table = page.locator('.odds-table');
+  await expect(table).toBeVisible();
+  for (const r of ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary']) await expect(table.locator('thead')).toContainText(r);
+  const monster = table.locator('tbody tr', { hasText: 'Monster' }).first();
+  await expect(monster).toContainText('%');
+  await expect(table.locator('tbody tr', { hasText: 'Golden Catalyst' })).toContainText('100%');
+  expect(errors).toEqual([]);
+});
+
+test('sailing: build a raft, set sail from the beach and go ashore again', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const beach = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { T } = await import('/src/game/world.js');
+    g.godMode = true;
+    Object.assign(g.save.resources, { wood: 500, essence: 500 });
+    g.save.base.buildings.forge = 1;
+    const w = g.world;
+    for (let r = 175; r < 900; r += 3) {
+      for (let a = 0; a < 96; a++) {
+        const x = Math.round(Math.cos((a / 96) * Math.PI * 2) * r);
+        const y = Math.round(Math.sin((a / 96) * Math.PI * 2) * r);
+        if (w.blockAt(x, y) !== 0 || !w.isFree(x + 0.5, y + 0.5, 0.35)) continue;
+        // Nothing else to use nearby (a find would take the prompt).
+        if (w.objectsNear(x, y, 1).some((o) => Math.hypot(o.x - x - 0.5, o.y - y - 0.5) < 3)) continue;
+        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => w.blockAt(x + dx, y + dy) === T.SEA)) {
+          g.enemies.length = 0;
+          g.player.x = x + 0.5;
+          g.player.y = y + 0.5;
+          g.renderer.snapCamera();
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  });
+  expect(beach).not.toBeNull();
+  await expect(page.locator('#interact-hint')).toContainText('Build a boat');
+  await page.keyboard.press('KeyC');
+  await page.click('.forge-panel .tab:has-text("Tools")');
+  await page.click('.tool-card:has-text("Log Raft") button:has-text("Build")');
+  await expect(page.locator('.tool-card', { hasText: 'Log Raft' })).toContainText('Yours');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#interact-hint')).toContainText('Set sail');
+  await page.keyboard.press('KeyE');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.sailing)).toBe(true);
+  expect(await game(page, () => {
+    const g = window.__pixelgame.game;
+    return g.world.blockedFor(Math.floor(g.player.x), Math.floor(g.player.y), 'player');
+  })).toBe(true);
+  await expect(page.locator('#interact-hint')).toContainText('Go ashore');
+  await page.keyboard.press('KeyE');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.sailing)).toBe(false);
+  expect(await game(page, () => {
+    const g = window.__pixelgame.game;
+    return g.world.isFree(g.player.x, g.player.y, g.player.r);
+  })).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('bosses fight differently: ice rings, meteors and mirror images', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const result = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    g.godMode = true;
+    const { spawnBoss } = await import('/src/game/enemies.js');
+    const out = {};
+    for (const [id, pat] of [['frost_warden', 'icering'], ['inferno_titan', 'meteors'], ['void_herald', 'clones']]) {
+      g.enemies.length = 0;
+      g.areas.length = 0;
+      g.projectiles.length = 0;
+      const lm = g.world.landmarks.find((l) => l.bossId === id);
+      g.player.x = lm.x;
+      g.player.y = lm.y + 1;
+      const b = spawnBoss(g, id, lm.x, lm.y - 4);
+      b.bossDef = { ...b.bossDef, patterns: [pat] };
+      b.patternCd = 0;
+      await new Promise((r) => setTimeout(r, 900));
+      out[pat] = {
+        projectiles: g.projectiles.length,
+        telegraphs: g.areas.filter((a) => a.kind === 'telegraph').length,
+        clones: g.enemies.filter((e) => e.cloneOf === b && !e.dead).length,
+      };
+      g.enemies.length = 0;
+    }
+    return out;
+  });
+  expect(result.icering.projectiles).toBeGreaterThan(10);
+  expect(result.meteors.telegraphs).toBeGreaterThan(2);
+  expect(result.clones.clones).toBeGreaterThanOrEqual(2);
+  expect(errors).toEqual([]);
+});
+
+test('map: zooms far out and frames everything explored', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    for (let x = -60; x <= 60; x++) g.save.world.explored.push(`${x},0`);
+    g.explored = new Set(g.save.world.explored);
+  });
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('.map-panel')).toBeVisible();
+  await page.click('.map-tools button:has-text("All")');
+  for (let i = 0; i < 12; i++) await page.click('.map-tools button[aria-label="Zoom out"]');
+  await page.waitForTimeout(200);
+  const painted = await page.evaluate(() => {
+    const c = document.querySelector('.map-canvas');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 120) lit++;
+    return lit;
+  });
+  expect(painted).toBeGreaterThan(20);
+  expect(errors).toEqual([]);
+});

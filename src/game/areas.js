@@ -121,6 +121,43 @@ export function updateAreas(game, dt) {
       case 'telegraph':
         if (a.t >= a.dur) a.onEnd?.();
         break;
+      case 'orbit': {
+        // Enemy orbs circling their caster; touching one hurts.
+        if (a.follow) {
+          if (a.follow.dead) a.t = a.dur;
+          a.x = a.follow.x;
+          a.y = a.follow.y;
+        }
+        const n = a.count ?? 3;
+        for (let k = 0; k < n; k++) {
+          const ang = a.t * 2.2 + (k / n) * Math.PI * 2;
+          const bx = a.x + Math.cos(ang) * a.r;
+          const by = a.y + Math.sin(ang) * a.r;
+          if (player.dead || (a.hitCd ?? 0) > game.time) continue;
+          if (dist2(bx, by, player.x, player.y) <= (0.45 + player.r) ** 2) {
+            a.hitCd = game.time + 0.6;
+            game.hurtPlayer(a.hit, { element: a.element, fromX: bx, fromY: by });
+          }
+        }
+        break;
+      }
+      case 'gravity': {
+        // A singularity: drags you towards its heart, which burns.
+        if (!player.dead) {
+          const d2 = dist2(a.x, a.y, player.x, player.y);
+          const reach = a.r * 1.6;
+          if (d2 < reach * reach && d2 > 0.01) {
+            const n = normalize(a.x - player.x, a.y - player.y);
+            const step = a.pull * dt;
+            const mode = game.moveMode ?? 'player';
+            if (game.world.isFree(player.x + n.x * step, player.y, player.r, mode)) player.x += n.x * step;
+            if (game.world.isFree(player.x, player.y + n.y * step, player.r, mode)) player.y += n.y * step;
+          }
+          if (tick && d2 <= 1.1 * 1.1) game.hurtPlayer(a.dps * TICK, { element: a.element });
+        }
+        if (Math.random() < 0.6) game.fx.emit('void', a.x, a.y, 1, a.r * 1.4, 0.5);
+        break;
+      }
       case 'hazard':
         if (tick && !player.dead && dist2(a.x, a.y, player.x, player.y) <= (a.r + player.r) * (a.r + player.r)) {
           game.hurtPlayer(a.dps * TICK, { element: a.element });

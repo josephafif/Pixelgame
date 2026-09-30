@@ -363,6 +363,13 @@ function updateBehaviour(game, e, dt) {
 
 // --- Bosses ---------------------------------------------------------------------
 
+/** Removes an enemy without loot or XP (mirror images, expired summons). */
+function vanish(game, e) {
+  e.dead = true;
+  e.hp = 0;
+  game.fx.emit('void', e.x, e.y, 14, e.r * 2);
+}
+
 function bossPattern(game, b, pattern) {
   const p = game.player;
   const dmg = b.dmg * 0.8;
@@ -448,8 +455,209 @@ function bossPattern(game, b, pattern) {
       b.x = tx;
       b.y = ty;
       game.fx.emit('void', tx, ty, 16, b.r * 2);
+      // Mirror images vanish when the real Herald moves.
+      for (const e of game.enemies) if (e.cloneOf === b && !e.dead) vanish(game, e);
       game.schedule(0.4, () => !b.dead && bossPattern(game, b, 'ring'));
       return 2.4;
+    }
+
+    // --- Inferno Titan: meteors rain on the arena --------------------------------
+    case 'meteors': {
+      const n = b.phase === 2 ? 9 : 6;
+      for (let i = 0; i < n; i++) {
+        game.schedule(i * 0.14, () => {
+          if (b.dead) return;
+          const a = Math.random() * Math.PI * 2;
+          const d = i === 0 ? 0 : 1 + Math.random() * 4;
+          const tx = p.x + Math.cos(a) * d;
+          const ty = p.y + Math.sin(a) * d;
+          game.spawnArea('telegraph', {
+            owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 1.3, dur: 1.05, color,
+            onEnd: () => {
+              if (b.dead) return;
+              game.fx.add({ type: 'pillar', x: tx, y: ty, r: 0.5, color: '#ff9a3a', dur: 0.3 });
+              game.fx.add({ type: 'ring', x: tx, y: ty, r0: 0.2, r1: 1.4, color: '#ff6a2a', dur: 0.3, fill: true });
+              game.fx.emit('ember', tx, ty, 12, 0.8, 3);
+              game.audio.play('boom', { throttle: 90 });
+              game.shake = Math.max(game.shake, 0.15);
+              if (dist2(tx, ty, p.x, p.y) <= (1.3 + p.r) ** 2) game.hurtPlayer(b.dmg * 1.1, { element: 'fire', fromX: tx, fromY: ty });
+              game.spawnArea('hazard', { owner: 'enemy', x: tx, y: ty, r: 0.8, dur: 2.2, dps: b.dmg * 0.35, element: 'fire' });
+            },
+          });
+        });
+      }
+      return 2.6;
+    }
+
+    // --- Frost Warden: breath, a closing ring of ice, spike lines ----------------
+    case 'breath': {
+      const aim = Math.atan2(p.y - b.y, p.x - b.x);
+      const shots = b.phase === 2 ? 30 : 22;
+      b.state = 'windup';
+      game.fx.emit('frost', b.x + Math.cos(aim) * b.r, b.y + Math.sin(aim) * b.r, 14, 0.6, 1.5);
+      for (let i = 0; i < shots; i++) {
+        game.schedule(0.45 + i * 0.05, () => {
+          if (b.dead) return;
+          const sweep = -0.55 + (i / (shots - 1)) * 1.1;
+          enemyShoot(game, b, aim + sweep + (Math.random() - 0.5) * 0.12, { speed: 5.5, damage: dmg * 0.55, size: 2 });
+          if (i === shots - 1) b.state = 'move';
+        });
+      }
+      return 0.45 + shots * 0.05 + 1;
+    }
+    case 'icering': {
+      const cx = p.x;
+      const cy = p.y;
+      const n = 22;
+      const gap = Math.floor(Math.random() * n);
+      const gapSize = b.phase === 2 ? 3 : 4;
+      game.fx.add({ type: 'ring', x: cx, y: cy, r0: 7, r1: 6.6, color: '#bfeaff', dur: 0.6 });
+      for (let i = 0; i < n; i++) {
+        if ((i - gap + n) % n < gapSize) continue;
+        const a = (i / n) * Math.PI * 2;
+        const sx = cx + Math.cos(a) * 7;
+        const sy = cy + Math.sin(a) * 7;
+        game.schedule(0.5, () => {
+          if (b.dead) return;
+          game.spawnProjectile({
+            x: sx, y: sy, angle: a + Math.PI, speed: 3.4, damage: dmg * 0.8, range: 8, size: 3, sprite: 'orb',
+            owner: 'enemy', element: 'ice', color: '#bfeaff', status: 'chill', depth: 0,
+          });
+        });
+      }
+      return 3;
+    }
+    case 'spikes': {
+      const dirs = b.phase === 2 ? 8 : 4;
+      const base = Math.atan2(p.y - b.y, p.x - b.x);
+      for (let k = 0; k < dirs; k++) {
+        const a = base + (k / dirs) * Math.PI * 2;
+        for (let j = 0; j < 7; j++) {
+          const d = b.r + 0.8 + j * 1.35;
+          const tx = b.x + Math.cos(a) * d;
+          const ty = b.y + Math.sin(a) * d;
+          game.schedule(j * 0.09, () => {
+            if (b.dead) return;
+            game.spawnArea('telegraph', {
+              owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 0.75, dur: 0.7, color: '#bfeaff',
+              onEnd: () => {
+                game.fx.add({ type: 'spike', x: tx, y: ty, color: '#bfeaff', dur: 0.35 });
+                game.fx.emit('frost', tx, ty, 5, 0.4, 1.5);
+                if (dist2(tx, ty, p.x, p.y) <= (0.75 + p.r) ** 2) {
+                  game.hurtPlayer(b.dmg * 0.9, { element: 'ice', fromX: tx, fromY: ty });
+                  game.applyPlayerStatus('chill');
+                }
+              },
+            });
+          });
+        }
+      }
+      return 2.4;
+    }
+
+    // --- Storm Colossus: lightning where you stand, dashes, static orbs ----------
+    case 'strikes': {
+      const n = b.phase === 2 ? 8 : 5;
+      for (let i = 0; i < n; i++) {
+        game.schedule(i * 0.38, () => {
+          if (b.dead || p.dead) return;
+          const tx = p.x + p.vx * 0.2;
+          const ty = p.y + p.vy * 0.2;
+          game.spawnArea('telegraph', {
+            owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 1.1, dur: 0.72, color: '#ffe45c',
+            onEnd: () => {
+              if (b.dead) return;
+              game.fx.add({ type: 'line', points: [[tx + (Math.random() - 0.5) * 2, ty - 7], [tx, ty]], color: '#fffbd0', dur: 0.22, jagged: true });
+              game.fx.add({ type: 'ring', x: tx, y: ty, r0: 0.2, r1: 1.2, color: '#ffe45c', dur: 0.25, fill: true });
+              game.fx.emit('spark', tx, ty, 10, 0.6, 3);
+              game.audio.play('zap', { throttle: 60 });
+              if (dist2(tx, ty, p.x, p.y) <= (1.1 + p.r) ** 2) game.hurtPlayer(b.dmg * 1.05, { element: 'lightning', fromX: tx, fromY: ty });
+            },
+          });
+        });
+      }
+      return n * 0.38 + 1.2;
+    }
+    case 'dash': {
+      const dashes = b.phase === 2 ? 4 : 3;
+      const one = (k) => {
+        if (b.dead || k >= dashes) {
+          if (!b.dead) b.state = 'move';
+          return;
+        }
+        const n = normalize(p.x - b.x, p.y - b.y);
+        const len = 7;
+        b.state = 'windup';
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'line', x: b.x, y: b.y, x2: b.x + n.x * len, y2: b.y + n.y * len,
+          r: b.r * 0.8, dur: 0.38, color: '#ffe45c',
+          onEnd: () => {
+            if (b.dead) return;
+            b.state = 'charge';
+            b.stateT = 0.2; // a short, fast dash
+            b.chargeDir = n;
+            b.chargeSpeed = 17;
+            game.schedule(0.42, () => one(k + 1));
+          },
+        });
+      };
+      one(0);
+      return dashes * 0.8 + 1.4;
+    }
+    case 'orbs': {
+      game.spawnArea('orbit', {
+        owner: 'enemy', x: b.x, y: b.y, r: 2.8, dur: 7, count: b.phase === 2 ? 4 : 3, follow: b,
+        hit: b.dmg * 0.7, element: 'lightning', color: '#ffe45c',
+      });
+      game.audio.play('zap');
+      return 2.2;
+    }
+    case 'chain': {
+      const aim = Math.atan2(p.y - b.y, p.x - b.x);
+      const n = b.phase === 2 ? 7 : 5;
+      for (let i = 0; i < n; i++) {
+        const a = aim + (i - (n - 1) / 2) * 0.16;
+        enemyShoot(game, b, a, { speed: 11, damage: dmg * 0.7, size: 2 });
+      }
+      game.audio.play('zap');
+      return 1.6;
+    }
+
+    // --- Void Herald: mirror images and a pulling singularity --------------------
+    case 'clones': {
+      const n = b.phase === 2 ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const spot = game.world.findFreeSpot(p.x + Math.cos(a) * 5, p.y + Math.sin(a) * 5, 0.5, 'fly', { x: b.x, y: b.y });
+        const c = spawnEnemy(game, 'wisp', spot.x, spot.y, { level: b.level, element: 'void' });
+        if (!c) continue;
+        Object.assign(c, {
+          sprites: b.sprites, r: b.r * 0.9, hp: Math.round(b.maxHp * 0.05), maxHp: Math.round(b.maxHp * 0.05),
+          summoned: true, xp: 0, cloneOf: b, expireAt: game.time + 10, color: b.color, sight: 30,
+        });
+        game.fx.emit('void', spot.x, spot.y, 16, 1);
+      }
+      // The real Herald slips to a new spot too, so you have to look.
+      game.schedule(0.2, () => !b.dead && bossPattern(game, b, 'blinkQuiet'));
+      return 3.2;
+    }
+    case 'blinkQuiet': {
+      const a = Math.random() * Math.PI * 2;
+      game.fx.emit('void', b.x, b.y, 12, b.r * 2);
+      const spot = game.world.findFreeSpot(p.x + Math.cos(a) * 5, p.y + Math.sin(a) * 5, 0.5, 'fly', { x: b.x, y: b.y });
+      b.x = spot.x;
+      b.y = spot.y;
+      return 1;
+    }
+    case 'gravity': {
+      const tx = (b.x + p.x) / 2;
+      const ty = (b.y + p.y) / 2;
+      game.spawnArea('gravity', {
+        owner: 'enemy', x: tx, y: ty, r: 3.4, dur: 3.6, pull: b.phase === 2 ? 3.2 : 2.5,
+        dps: b.dmg * 0.9, element: 'void', color: '#9a5cff',
+      });
+      game.audio.play('whirl');
+      return 3;
     }
     default:
       return 1.5;
@@ -468,11 +676,19 @@ function updateBoss(game, b, dt) {
   const d = Math.sqrt(dist2(b.x, b.y, p.x, p.y)) || 1;
   const n = { x: (p.x - b.x) / d, y: (p.y - b.y) / d };
   if (b.state === 'charge') {
-    b.vx = b.chargeDir.x * 13;
-    b.vy = b.chargeDir.y * 13;
+    const cs = b.chargeSpeed ?? 13;
+    b.vx = b.chargeDir.x * cs;
+    b.vy = b.chargeDir.y * cs;
+    // The Titan's charge leaves burning ground; the Colossus leaves sparks.
+    const trail = b.bossDef.trail;
+    if (trail && (b.trailT = (b.trailT ?? 0) - dt) <= 0) {
+      b.trailT = 0.09;
+      game.spawnArea('hazard', { owner: 'enemy', x: b.x, y: b.y, r: 0.8, dur: trail === 'fire' ? 3 : 1.2, dps: b.dmg * 0.4, element: trail });
+    }
     if (b.stateT > 0.55) {
       b.state = 'move';
       b.vx = b.vy = 0;
+      b.chargeSpeed = null;
     }
   } else if (b.state === 'windup') {
     b.vx = b.vy = 0;
@@ -490,6 +706,14 @@ function updateBoss(game, b, dt) {
     }
   }
   if (Math.abs(b.vx) > 0.05) b.facing = b.vx > 0 ? 1 : -1;
+  // The Frost Warden's aura chills anyone who stays close.
+  if (b.bossDef.aura === 'chill') {
+    if (Math.random() < 0.3) game.fx.emit('frost', b.x, b.y, 1, b.r * 3, 0.5);
+    if (!p.dead && d < 4.5 && (b.auraCd ?? 0) <= game.time) {
+      b.auraCd = game.time + 1;
+      game.applyPlayerStatus('chill');
+    }
+  }
   if (!p.dead && d < b.r + p.r && (b.contactCd ?? 0) <= game.time) {
     b.contactCd = game.time + 0.8;
     game.hurtPlayer(b.dmg * (b.state === 'charge' ? 1.6 : 1), { element: b.element, fromX: b.x, fromY: b.y });
@@ -507,6 +731,10 @@ export function updateEnemies(game, dt) {
     if (e.dead) continue;
     e.flash = Math.max(0, e.flash - dt);
     if (e.squash) e.squash = Math.max(0, e.squash - dt * 7);
+    if (e.expireAt && game.time >= e.expireAt) {
+      vanish(game, e);
+      continue;
+    }
     if (e.stunned) {
       e.vx = e.vy = 0;
     } else if (e.boss) {

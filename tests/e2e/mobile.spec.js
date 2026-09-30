@@ -152,3 +152,25 @@ test('phone hotbar: tap to switch weapon slots and the pickaxe; the map opens fr
   await expect(page.locator('.map-panel')).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test('phone: loot odds and boats fit the screen', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page, { tap: true });
+  await page.tap('#btn-menu');
+  await page.tap('.menu button:has-text("Loot odds")');
+  await expect(page.locator('.odds-table')).toBeVisible();
+  const fit = await page.evaluate(() => ({
+    panel: document.querySelector('.odds-panel').offsetWidth,
+    page: document.documentElement.scrollWidth,
+    w: innerWidth,
+  }));
+  expect(fit.panel).toBe(fit.w);
+  expect(fit.page).toBeLessThanOrEqual(fit.w);
+  await page.tap('.odds-panel .close');
+  await game(page, () => { window.__pixelgame.game.save.base.buildings.forge = 1; });
+  await page.tap('#btn-menu');
+  await page.tap('.menu button:has-text("Forge")');
+  await page.tap('.forge-panel .tab:has-text("Tools")');
+  await expect(page.locator('.tool-card', { hasText: 'Log Raft' })).toBeVisible();
+  expect(errors).toEqual([]);
+});

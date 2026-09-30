@@ -4,7 +4,7 @@
 import { hashInts } from '../core/rng.js';
 import { dist2, normalize } from '../core/math.js';
 import { researchedComponents } from '../weapons/crafting.js';
-import { dropRarity, seededRoll } from './economy.js';
+import { dropRarity, seededRoll, WEAPON_DROP_CHANCE } from './economy.js';
 
 const MAGNET_RADIUS = 2.6;
 const COLLECT_RADIUS = 0.6;
@@ -128,19 +128,21 @@ export function onEnemyKilledLoot(game, e) {
   if (coins) addPickup(game, 'gold', e.x, e.y, { value: coins, color: '#ffd24a' });
 
   if (e.summoned) return;
-  const weaponChance = e.boss ? 1 : (e.elite ? 0.3 : 0.035) + luck * 0.001;
+  // Weapons are a find, not a given: most kills drop none.
+  const source = e.boss ? 'boss' : e.elite ? 'elite' : 'drop';
+  const weaponChance = WEAPON_DROP_CHANCE[source] * (1 + luck * 0.01);
   if (Math.random() < weaponChance) {
     requestWeaponDrop(game, e.x, e.y, {
       level,
-      minRarity: e.boss ? e.bossDef.drop.minRarity : e.elite ? 'uncommon' : null,
+      minRarity: e.boss ? e.bossDef.drop.minRarity ?? 'rare' : e.elite ? 'uncommon' : null,
       theme: e.boss ? e.bossDef.drop.theme : null,
       elementBias: biome.elements,
       roll: e.boss ? 'boss' : e.elite ? 'elite' : 'drop',
     });
   }
   if (e.boss) {
-    // A second guaranteed drop so bosses feel like a jackpot.
-    requestWeaponDrop(game, e.x + 1, e.y, { level, minRarity: 'rare', elementBias: [e.element] });
+    // Sometimes a second weapon, so bosses still feel like a jackpot.
+    if (Math.random() < 0.35) requestWeaponDrop(game, e.x + 1, e.y, { level, minRarity: 'uncommon', elementBias: [e.element], roll: 'elite' });
     addPickup(game, 'component', e.x, e.y, { componentId: e.bossDef.drop.component, color: e.color });
     // Star Shards (for the Golden Catalyst): first kill of each boss, then 25%.
     const firstKill = !(game.save.bosses.defeated[e.bossDef.id] > 0);
@@ -161,14 +163,19 @@ export function componentColor(game, id) {
   return game.data.byId.rarities.get(c?.rarity)?.color ?? '#ffffff';
 }
 
-export function openChestLoot(game, obj) {
+export function openChestLoot(game, obj, { richness = 1 } = {}) {
   const level = Math.max(game.world.worldLevel(obj.x, obj.y), game.save.player.level);
   const biome = game.world.biomeAt(Math.floor(obj.x), Math.floor(obj.y));
-  requestWeaponDrop(game, obj.x, obj.y + 0.8, { level, source: 'chest', minRarity: 'uncommon', elementBias: biome.elements, reveal: 'case' });
-  const essence = 2 + ((Math.random() * 3) | 0);
+  // Chests are mostly essence and scrap; now and then a weapon (opened like a case).
+  const weapon = Math.random() < WEAPON_DROP_CHANCE.chest * richness * (1 + game.pstats.luck * 0.01);
+  if (weapon) {
+    requestWeaponDrop(game, obj.x, obj.y + 0.8, { level, source: 'chest', minRarity: 'uncommon', elementBias: biome.elements, reveal: 'case' });
+  }
+  const essence = Math.round((5 + ((Math.random() * 5) | 0)) * richness);
   for (let i = 0; i < essence; i++) addPickup(game, 'essence', obj.x, obj.y + 0.5, { value: orbValue(level), color: '#7ae0ff' });
-  for (let i = 0; i < 2; i++) addPickup(game, 'scrap', obj.x, obj.y + 0.5, { value: 1, color: '#b8bcc8' });
-  addPickup(game, 'gold', obj.x, obj.y + 0.5, { value: 3 + ((Math.random() * 6) | 0), color: '#ffd24a' });
+  const scrap = Math.round((3 + ((Math.random() * 4) | 0)) * richness);
+  for (let i = 0; i < scrap; i++) addPickup(game, 'scrap', obj.x, obj.y + 0.5, { value: 1 + (level >= 10 ? 1 : 0), color: '#b8bcc8' });
+  addPickup(game, 'gold', obj.x, obj.y + 0.5, { value: Math.round((3 + ((Math.random() * 6) | 0)) * richness), color: '#ffd24a' });
   if (Math.random() < 0.35 + game.pstats.luck * 0.005) {
     const id = pickComponent(game, [...biome.components, 'bp_scythe', 'bp_gun', 'bp_cannon', 'bp_chakram', 'bp_warfan', 'bp_crossbow']);
     if (id && game.data.byId.components.has(id)) addPickup(game, 'component', obj.x, obj.y + 0.5, { componentId: id, color: componentColor(game, id) });

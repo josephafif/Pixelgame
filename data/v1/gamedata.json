@@ -954,7 +954,7 @@
   "catalysts": [
     { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
     { "id": "rare", "name": "Azure Catalyst", "minRarity": "rare", "maxRarity": "epic", "essence": 120, "scrap": 60, "requiresForge": 2 },
-    { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 350, "scrap": 150, "requiresForge": 4 },
+    { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 600, "scrap": 300, "requiresForge": 4 },
     { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 2500, "scrap": 1200, "shards": 3, "requiresForge": 5, "requiresBoss": true }
   ],
   "crafting": { "scrapCost": 40, "essenceCost": 30, "runeCost": 40, "abilityCost": 150, "levelScalePct": 6 },
@@ -1058,6 +1058,7 @@
       "pine": { "name": "Pine", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 15, "chips": "#6b4a2a" },
       "cactus": { "name": "Cactus", "verb": "Cut", "hp": 3, "tier": 1, "drops": { "wood": [1, 3] }, "regrowMinutes": 10, "chips": "#5fb050" },
       "rock": { "name": "Rock", "verb": "Mine", "hp": 7, "tier": 1, "drops": { "stone": [3, 5] }, "regrowMinutes": 30, "chips": "#8d8a9e" },
+      "palm": { "name": "Palm", "verb": "Chop", "hp": 4, "tier": 1, "drops": { "wood": [2, 4] }, "regrowMinutes": 15, "chips": "#9a6a3a" },
       "crystal": { "name": "Crystal", "verb": "Mine", "hp": 10, "tier": 2, "drops": { "stone": [2, 3], "essence": [2, 4] }, "regrowMinutes": 45, "chips": "#cdb2ff" }
     }
   },
@@ -1081,6 +1082,13 @@
       { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 1 }, "desc": "Decorative paving." }
     ]
   },
+  "sailing": {
+    "boats": [
+      { "tier": 1, "id": "raft", "name": "Log Raft", "speed": 3.6, "openSea": false, "armor": 0, "requiresForge": 1, "cost": { "wood": 60, "essence": 40 }, "color": "#b07a48", "desc": "Floats on lakes and shallow coastal water. Too flimsy for the open sea." },
+      { "tier": 2, "id": "sloop", "name": "Sailing Sloop", "speed": 5.4, "openSea": true, "armor": 0.15, "requiresForge": 3, "cost": { "wood": 180, "stone": 40, "scrap": 90, "essence": 200 }, "color": "#e8e0c8", "desc": "A real sail: crosses deep, open sea to far islands." },
+      { "tier": 3, "id": "galleon", "name": "War Galleon", "speed": 7.2, "openSea": true, "armor": 0.4, "requiresForge": 5, "requiresBoss": true, "cost": { "wood": 420, "stone": 150, "scrap": 300, "essence": 650 }, "color": "#c8364a", "desc": "Fast, and its armoured hull takes 40% of the damage you'd take at sea." }
+    ]
+  },
   "biomes": [
     { "id": "plains", "name": "Green Plains", "ground": "grass", "alt": "flowers", "blockers": { "tree": 0.05, "rock": 0.02 }, "water": 0.1, "enemies": ["slime", "bat", "skeleton", "brute"], "elements": ["physical", "earth", "wind"], "components": ["earth_core", "wind_core", "bp_crossbow", "bp_chakram"] },
     { "id": "forest", "name": "Deepwood", "ground": "moss", "alt": "grass", "blockers": { "tree": 0.22, "rock": 0.02 }, "water": 0.12, "enemies": ["slime", "wisp", "brute", "bat"], "elements": ["poison", "earth", "physical"], "components": ["poison_core", "monster_fang", "earth_core", "bp_warfan"] },
@@ -1088,7 +1096,8 @@
     { "id": "snow", "name": "Frostvale", "ground": "snow", "alt": "ice", "blockers": { "pine": 0.08, "rock": 0.03 }, "water": 0.06, "enemies": ["wisp", "brute", "skeleton"], "elements": ["ice", "physical", "wind"], "components": ["ice_core", "crystal_heart", "mythril_ore"], "boss": "frost_warden" },
     { "id": "volcanic", "name": "Ashlands", "ground": "ash", "alt": "basalt", "blockers": { "rock": 0.07 }, "water": 0.0, "lava": 0.06, "enemies": ["slime", "wisp", "brute"], "elements": ["fire", "earth"], "components": ["fire_core", "obsidian_shard", "dragon_scale"], "boss": "inferno_titan" },
     { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02 }, "water": 0.04, "enemies": ["bat", "wisp", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
-    { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06 }, "water": 0.0, "enemies": ["wisp", "bat", "brute"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" }
+    { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06 }, "water": 0.0, "enemies": ["wisp", "bat", "brute"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" },
+    { "id": "isles", "name": "Sunken Isles", "ground": "grass", "alt": "flowers", "blockers": { "palm": 0.08, "rock": 0.02 }, "water": 0.0, "enemies": ["slime", "bat", "skeleton"], "elements": ["wind", "holy", "physical"], "components": ["wind_core", "holy_core", "bp_chakram"] }
   ],
   "enemies": [
     { "id": "slime", "name": "Slime", "hp": 30, "damage": 8, "speed": 1.7, "size": 0.7, "sight": 6, "behavior": "chase", "xp": 6, "weight": 10, "color": "#6ad35a" },
@@ -1098,9 +1107,9 @@
     { "id": "wisp", "name": "Wisp", "hp": 24, "damage": 9, "speed": 2.2, "size": 0.6, "sight": 8, "behavior": "caster", "range": 5, "projSpeed": 5, "xp": 10, "weight": 6, "color": "#7ad8ff", "elemental": true }
   ],
   "bosses": [
-    { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["ring", "charge", "slam", "summon"], "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "epic", "theme": "fire" } },
-    { "id": "frost_warden", "name": "Frost Warden", "biome": "snow", "element": "ice", "hp": 1700, "damage": 20, "speed": 1.2, "size": 2.1, "xp": 420, "patterns": ["ring", "spiral", "slam", "summon"], "color": "#8fd6ff", "drop": { "component": "glacial_heart", "minRarity": "epic", "theme": "freeze" } },
-    { "id": "storm_colossus", "name": "Storm Colossus", "biome": "highlands", "element": "lightning", "hp": 1800, "damage": 24, "speed": 1.6, "size": 2.3, "xp": 460, "patterns": ["spiral", "charge", "slam", "ring"], "color": "#ffe45c", "drop": { "component": "storm_heart", "minRarity": "epic", "theme": "storm" } },
-    { "id": "void_herald", "name": "Void Herald", "biome": "void", "element": "void", "hp": 2000, "damage": 26, "speed": 1.5, "size": 2.0, "xp": 520, "patterns": ["spiral", "ring", "blink", "summon"], "color": "#9a5cff", "drop": { "component": "abyssal_crown", "minRarity": "epic", "theme": "void" } }
+    { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["meteors", "charge", "slam", "ring", "meteors", "summon"], "trail": "fire", "tip": "Meteors fall where you stand, and its charge leaves the ground burning.", "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "rare", "theme": "fire" } },
+    { "id": "frost_warden", "name": "Frost Warden", "biome": "snow", "element": "ice", "hp": 1700, "damage": 20, "speed": 1.2, "size": 2.1, "xp": 420, "patterns": ["breath", "spikes", "icering", "summon", "breath", "spikes"], "aura": "chill", "tip": "Its frost breath sweeps a cone, ice spikes run out in lines, and a ring of ice closes in: find the gap.", "color": "#8fd6ff", "drop": { "component": "glacial_heart", "minRarity": "rare", "theme": "freeze" } },
+    { "id": "storm_colossus", "name": "Storm Colossus", "biome": "highlands", "element": "lightning", "hp": 1800, "damage": 24, "speed": 1.6, "size": 2.3, "xp": 460, "patterns": ["strikes", "dash", "orbs", "chain", "strikes"], "trail": "lightning", "tip": "Lightning strikes where you are: keep moving. Static orbs circle it.", "color": "#ffe45c", "drop": { "component": "storm_heart", "minRarity": "rare", "theme": "storm" } },
+    { "id": "void_herald", "name": "Void Herald", "biome": "void", "element": "void", "hp": 2000, "damage": 26, "speed": 1.5, "size": 2.0, "xp": 520, "patterns": ["clones", "gravity", "spiral", "blink", "gravity"], "tip": "It hides among mirror images and opens singularities that drag you in.", "color": "#9a5cff", "drop": { "component": "abyssal_crown", "minRarity": "rare", "theme": "void" } }
   ]
 }

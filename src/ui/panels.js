@@ -19,6 +19,7 @@ const loaders = {
   base: () => import('./base.js'),
   map: () => import('./map.js'),
   market: () => import('./market.js'),
+  odds: () => import('./odds.js'),
   settings: () => import('./settings.js'),
 };
 
@@ -137,7 +138,9 @@ export class Panels {
         item('book', 'Research', go('research'), 'R'),
         item('home', 'Camp', go('base'), 'B'),
         item('hammer', 'Build', () => { closeModal(); g.toggleBuildMode(true); }, 'G')),
-      item('gear', 'Settings & Save', go('settings')),
+      h('div.menu-grid',
+        item('star', 'Loot odds', go('odds')),
+        item('gear', 'Settings & Save', go('settings'))),
       h('p.menu-foot', this.app.statusLine()));
     openModal({ title: 'Paused', body, className: 'menu-panel', onClose: () => { this.open = null; } });
   }

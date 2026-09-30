@@ -60,6 +60,9 @@ html, body {
   font-family: var(--font);
   font-size: 16px;
   line-height: 1.35;
+  /* The pixel font's "fi"/"fl" ligatures read as a single odd glyph. */
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "clig" 0;
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
@@ -345,6 +348,8 @@ body[data-input="touch"] .build-bar { top: calc(158px + var(--safe-t)); bottom: 
   flex: none; width: 64px; height: 64px; display: grid; place-items: center;
   border: 6px solid transparent; border-image: var(--frame-slot) 3 fill / 6px / 0 stretch;
 }
+.tool-art.boat-art { width: 88px; height: 72px; }
+.tool-art.boat-art canvas { image-rendering: pixelated; }
 .base-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
 .base-actions .small { flex: 1 1 260px; }
 
@@ -401,6 +406,10 @@ body[data-input="keyboard"] .key-hints { display: block; }
 .btn.attack.build { background: linear-gradient(#6cd66c, #2f6e2f); }
 .btn.attack.build .bld { display: grid; }
 .btn.attack.build .atk, .btn.attack.build .use { display: none; }
+/* Empty hands: the button only uses things (shown as a dimmed hand). */
+.btn.attack.unarmed:not(.use):not(.build) .atk { display: none; }
+.btn.attack.unarmed:not(.use):not(.build) .use { display: grid; opacity: 0.45; }
+.hud-weapon .empty-hands { display: grid; place-items: center; }
 .btn.sprint { right: calc(var(--btn) * 1.12); bottom: 4px; width: calc(var(--btn) * 0.72); height: calc(var(--btn) * 0.72); }
 .btn.sprint.on { background: linear-gradient(#3a8ab0, #1c4a68); }
 .btn.ability {
@@ -880,6 +889,7 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 .lg.shrine { background: #7ae0ff; transform: rotate(45deg); }
 .lg.chest { background: #e0b040; }
 .lg.pin { background: #e8364a; border-radius: 50%; }
+.lg.sea { background: #2f8fc4; }
 @media (max-width: 640px) {
   .map-panel { height: 100%; }
   .map-status { flex-basis: 100%; margin: 0; }
@@ -888,4 +898,26 @@ body:not([data-input="keyboard"]) .keys { display: none; }
   .map-legend { font-size: 13px; gap: 2px 10px; }
   /* The case roll is a compact strip in the middle of the screen, not a full page. */
   .panel.case-panel { align-self: center; border-width: 9px; border-image: var(--frame-panel) 3 fill / 9px / 0 stretch; }
+}
+
+/* ---------- Loot odds ---------- */
+
+.odds { display: flex; flex-direction: column; gap: 10px; }
+.odds p { margin: 0; }
+.odds-scroll { overflow-x: auto; touch-action: pan-x pan-y; }
+.odds-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.odds-table th, .odds-table td { padding: 6px 8px; text-align: left; white-space: nowrap; }
+.odds-table .num { text-align: right; }
+.odds-table thead th { border-bottom: 3px solid var(--ink); color: var(--brass-light); font-size: 13px; letter-spacing: 1px; }
+.odds-table tbody tr:nth-child(odd) { background: rgba(255, 255, 255, 0.03); }
+.odds-table tbody th { font-weight: 400; color: var(--text); }
+.odds-table tr.forge-row th { color: var(--muted); }
+.odds-table td { color: var(--muted); }
+.odds-table .short { display: none; }
+@media (max-width: 640px) {
+  .odds-table { font-size: 13px; }
+  .odds-table th, .odds-table td { padding: 5px 3px; }
+  .odds-table .long { display: none; }
+  .odds-table .short { display: inline; }
+  .odds-table tr.forge-row th .short::before { content: "Forge "; color: var(--muted); }
 }

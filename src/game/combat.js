@@ -86,7 +86,8 @@ export function acquireTarget(game, current) {
     if (e.dead) continue;
     const d = Math.sqrt(dist2(p.x, p.y, e.x, e.y)) - e.r;
     if (d > reach) continue;
-    const score = d - (e === current ? 1.2 : 0) - (e.boss ? 0.8 : 0);
+    // Bosses (and their mirror images, so the lock never gives the real one away) come first.
+    const score = d - (e === current ? 1.2 : 0) - (e.boss || e.cloneOf ? 0.8 : 0);
     if (score < bestScore) {
       bestScore = score;
       best = e;
@@ -196,6 +197,8 @@ export function hurtPlayer(game, amount, { element = 'physical', fromX, fromY, s
     dmg *= 100 / (100 + s.defense * 4);
     dmg *= 1 - (s.resist[element] ?? 0) / 100;
     dmg *= s.damageTaken;
+    // A sturdy hull takes part of the hit while you are at sea.
+    if (game.sailing) dmg *= 1 - (game.boat?.armor ?? 0);
   }
   dmg = Math.max(1, Math.round(dmg));
   if (selfInflicted) dmg = Math.min(dmg, Math.max(0, Math.ceil(p.hp) - 1));

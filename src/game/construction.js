@@ -160,7 +160,7 @@ export class Construction {
     if (dist2(player.x, player.y, tx + 0.5, ty + 0.5) > (data.building.reach + 0.5) ** 2) return 'Too far away';
     if (reservedTile(data, tx, ty)) return 'Too close to a camp building';
     const block = world.blockAt(tx, ty);
-    if (block) return block === T.WATER || block === T.LAVA ? 'Can’t build on water' : 'Clear the tree or rock first (pickaxe)';
+    if (block) return [T.WATER, T.LAVA, T.SEA, T.DEEP].includes(block) ? 'Can’t build on water' : 'Clear the tree or rock first (pickaxe)';
     if (this.at(tx, ty)) return 'Something is already built here';
     if (!def.walkable) {
       const inside = (x, y, r) => x + r > tx && x - r < tx + 1 && y + r > ty && y - r < ty + 1;

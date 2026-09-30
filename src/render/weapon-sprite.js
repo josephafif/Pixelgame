@@ -181,7 +181,8 @@ const TEMPLATES = {
     for (let i = 0; i <= h; i++) g.set(10, y0 + i, '#e8e8e8');
     g.rect(9 - c, 15, 2, 3, pal.handle[0]);
     if (pal.gem) g.set(9 - c, 16, pal.gem);
-    return { gripY: 16 };
+    // Held across the aim: limbs up and down, string towards the archer.
+    return { gripY: 16, gripX: 9 - c, hold: 'across' };
   },
   crossbow(g, v, pal) {
     const s = v.dims.stock;
@@ -403,8 +404,10 @@ function gridToCanvas(g) {
 const spriteCache = new Map();
 
 /**
- * @returns {{ canvas: HTMLCanvasElement, pivotX: number, pivotY: number }}
+ * @returns {{ canvas: HTMLCanvasElement, pivotX: number, pivotY: number, hold: string }}
  * The sprite points up; pivot is the grip, used for in-hand rotation.
+ * `hold` is 'along' (tip points where you aim) or 'across' (bows: the
+ * weapon's length lies across the aim and its belly faces forward).
  */
 export function weaponSprite(dna) {
   const key = dna.id;
@@ -413,10 +416,10 @@ export function weaponSprite(dna) {
   const v = dna.visual;
   const g = new Grid();
   const draw = TEMPLATES[v.template] ?? TEMPLATES.blade;
-  const { gripY } = draw(g, v, v.palette);
+  const { gripY, gripX = 8, hold = 'along' } = draw(g, v, v.palette);
   outlinePass(g, v.glow && v.palette.glow ? v.palette.glow : v.palette.outline);
   if (v.glow && v.palette.glow) outlinePass(g, shadeHex(v.palette.glow, -0.5));
-  s = { canvas: gridToCanvas(g), pivotX: 8, pivotY: gripY };
+  s = { canvas: gridToCanvas(g), pivotX: gripX, pivotY: gripY, hold };
   spriteCache.set(key, s);
   if (spriteCache.size > 300) spriteCache.delete(spriteCache.keys().next().value);
   return s;

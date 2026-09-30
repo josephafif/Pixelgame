@@ -82,6 +82,7 @@ export class Hud {
     clear(el);
     this.renderHotbar();
     const g = this.game;
+    this.el.attack.classList.toggle('unarmed', g.handsEmpty);
     if (g.toolActive) {
       const tool = currentPickaxe(g.data, g.save);
       const art = pixelCanvas(pickaxeSprite(tool.color));
@@ -89,6 +90,12 @@ export class Hud {
       art.style.height = '28px';
       el.append(h('div.slot.framed', art), h('span.name', tool.name));
       el.title = `${tool.name}: chop trees and break rocks`;
+      this.el.ability.setAttribute('hidden', '');
+      return;
+    }
+    if (g.handsEmpty) {
+      el.append(h('div.slot.framed.empty-hands', icon('hand', 22)), h('span.name.muted', 'Empty hands'));
+      el.title = 'Nothing in hand: press 1, 2 or 3 to take something out';
       this.el.ability.setAttribute('hidden', '');
       return;
     }

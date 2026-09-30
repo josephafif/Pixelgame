@@ -128,6 +128,49 @@ const MAPS = {
     '...ohoHhoHhoHo....',
     '....o.oo.oo.oo....',
   ],
+  // Frost Warden: a crowned knight in ice armour with a great shield.
+  warden: [
+    '.......oooo.......',
+    '......ohhhho......',
+    '.....ohHHHHho.....',
+    '....oHHHHHHHHo....',
+    '....oHooooooHo....',
+    '....oHoeeoeeHo....',
+    '....oHHHHHHHHo....',
+    '.....oHHHHHHo.....',
+    '..oooorrrrrroooo..',
+    '.ohhhorrrrrrohhhho',
+    'ohhhhorrRRrrohggho',
+    '.oooorrrrrrrohggho',
+    '...orrrrrrrrohhhho',
+    '...orrRRRRrrohhhho',
+    '...orrrrrrrro.oo..',
+    '...oRRRRRRRRo.....',
+    '....orrro.orrro...',
+    '....orrro.orrro...',
+    '...ohhhho.ohhhho..',
+    '...oooooo.oooooo..',
+  ],
+  // Storm Colossus: a floating stone golem with a lightning core.
+  colossus: [
+    '......oooooo......',
+    '....oohhhhhhoo....',
+    '...ohhHhhhhHhho...',
+    '...ohheehheehho...',
+    '...ohhhhhhhhhho...',
+    '....oHHggggHHo....',
+    '.oo..oooooooo..oo.',
+    'ohho.ohhrrhho.ohho',
+    'ohgo.ohrggrho.ogho',
+    'ohho.ohrggrho.ohho',
+    '.oo..ohhrrhho..oo.',
+    '.....ohhhhhho.....',
+    '......ohhhho......',
+    '.......oggo.......',
+    '........og........',
+    '.......go.........',
+    '........g.........',
+  ],
   chest: [
     '.oooooooooo.',
     'owwwwwwwwwwo',
@@ -175,6 +218,94 @@ const MAPS = {
     'owwwwwGggGwwwwwo',
     'owkwwwwGGwwwwkwo',
     'oooooooooooooooo',
+  ],
+  bones: [
+    '....ooo.....',
+    '...oWWWo....',
+    '...oWoWo....',
+    '....oWo.....',
+    '.oo..o...oo.',
+    'oWWoooooooWo',
+    '.ooWWWWWWoo.',
+    '...oooooo...',
+  ],
+  signpost: [
+    '.oooooooo..',
+    'obbbbbbbbo.',
+    'obBBbBBBbbo',
+    'obbbbbbbbo.',
+    '.oooobooo..',
+    '....obo....',
+    '....obo....',
+    '....obo....',
+    '...ooboo...',
+    '...ooooo...',
+  ],
+  mushrooms: [
+    '.ooo....ooo.',
+    'oGgGo..oGgGo',
+    'ooWoo..ooWoo',
+    '.oWo.oo.oWo.',
+    '..o.oGGo.o..',
+    '....ooWo....',
+    '.....oo.....',
+  ],
+  bottle: [
+    '.ooooo..',
+    'ouuuuuoo',
+    'ouWWuuob',
+    'ouuuuuoo',
+    '.ooooo..',
+  ],
+  wreck: [
+    '.........o..........',
+    '........obo.........',
+    '........obo..oo.....',
+    '...o....obo.oWWo....',
+    '..oboooooboooWWo....',
+    '.obbbbbbbbbbbooo..o.',
+    'obBbBbBbBbBbBbbo.obo',
+    'oBbBbBbBbBbBboo..oo.',
+    '.oooooooooooo.......',
+  ],
+  idol: [
+    '..oooooo..',
+    '.owwwwwwo.',
+    '.owGwwGwo.',
+    '.owwwwwwo.',
+    '.owkkkkwo.',
+    '.owkwwkwo.',
+    '..owwwwo..',
+    '.oowwwwoo.',
+    'owwwwwwwwo',
+    'owkwwwwkwo',
+    'owwwwwwwwo',
+    '.owwkkwwo.',
+    '.owwwwwwo.',
+    'oooooooooo',
+  ],
+  treasure: [
+    'rr.....rr',
+    '.rr...rr.',
+    '..rr.rr..',
+    '...rrr...',
+    '..rr.rr..',
+    '.rr...rr.',
+    'rr.....rr',
+  ],
+  hole: [
+    '..ooooo..',
+    '.obbbbbo.',
+    'obkkkkkbo',
+    '.obbbbbo.',
+    '..ooooo..',
+  ],
+  campOut: [
+    '....kk....',
+    '...kkkk...',
+    '.okbbbbko.',
+    'owwbwwbwwo',
+    '.oooooooo.',
   ],
   campfire: [
     '....oo....',
@@ -301,8 +432,8 @@ export function enemySprites(kind, color) {
 
 const BOSS_SHAPES = {
   inferno_titan: 'titan',
-  storm_colossus: 'titan',
-  frost_warden: 'specter',
+  storm_colossus: 'colossus',
+  frost_warden: 'warden',
   void_herald: 'specter',
 };
 
@@ -313,6 +444,9 @@ export function bossSprites(bossId, color) {
       o: OUTLINE, r: color, R: shadeHex(color, -0.35), h: shape === 'titan' ? '#f4e8c8' : shadeHex(color, -0.15),
       H: shadeHex(color, -0.45), e: '#ffffff', t: '#fff4d8', g: shadeHex(color, 0.5),
     };
+    // Ice-silver armour for the Warden, weathered stone for the Colossus.
+    if (shape === 'warden') Object.assign(pal, { h: '#e8f4ff', H: '#6a8aa8', r: '#9fd8f4', R: '#5a8ab0', e: '#7affff', g: '#ffffff' });
+    if (shape === 'colossus') Object.assign(pal, { h: '#9a9aa8', H: '#5d5d6e', r: color, g: '#fffbd0', e: '#ffe45c' });
     const base = spriteFromMap(MAPS[shape], pal);
     const right = scaled(base, 2);
     return { right, left: flipped(right), flash: silhouette(right) };
@@ -323,8 +457,10 @@ export function objectSprite(kind, accent = '#ffd24a') {
   return build(`obj:${kind}:${accent}`, () => {
     const pal = {
       o: OUTLINE, w: '#8d8a9e', k: '#5d5a6e', y: '#e0b040', G: accent, g: shadeHex(accent, 0.5),
-      r: '#ff6a2a', b: '#6b4a2a',
+      r: '#ff6a2a', b: '#6b4a2a', B: '#4a3018', W: '#ece4d0', u: '#7ac8e8',
     };
+    if (kind === 'treasure') pal.r = '#d8342a';
+    if (kind === 'wreck' || kind === 'signpost') Object.assign(pal, { b: '#8a5a33', B: '#5a3a1e' });
     if (kind === 'chest' || kind === 'chestOpen') {
       Object.assign(pal, { w: '#a8743e', k: '#6a4424', y: '#e0b040', G: '#ffd24a' });
     }

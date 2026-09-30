@@ -30,6 +30,8 @@ import {
 } from './gathering.js';
 import { Construction, buildRadius, structureDef, structureDefs, structureLock } from './construction.js';
 import { Markets } from './markets.js';
+import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
+import { POI, isPoi, poiFound, interactPoi } from './discoveries.js';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 5;
@@ -112,7 +114,11 @@ export class Game {
     this.#applySettings();
     this.#equipFromSave();
     this.player.hp = save.player.hp ?? this.pstats.maxHp;
-    if (!this.world.isFree(this.player.x, this.player.y, this.player.r)) {
+    // Saved at sea: keep sailing if the boat still floats there.
+    if (save.player.sailing && !(currentBoat(data, save) && this.world.isFree(this.player.x, this.player.y, this.player.r, this.moveMode))) {
+      save.player.sailing = false;
+    }
+    if (!this.world.isFree(this.player.x, this.player.y, this.player.r, this.moveMode)) {
       Object.assign(this.player, this.world.findFreeSpot(this.player.x, this.player.y));
     }
     restoreCooldowns(this);
@@ -345,6 +351,26 @@ export class Game {
     return this.activeSlot === 'tool' && Boolean(currentPickaxe(this.data, this.save));
   }
 
+  /** True when you have put everything away (press your slot again). */
+  get handsEmpty() {
+    return this.activeSlot === 'none';
+  }
+
+  /** True while you are out on the water in your boat. */
+  get sailing() {
+    return Boolean(this.save.player.sailing);
+  }
+
+  /** The boat you are sailing (or would launch). */
+  get boat() {
+    return currentBoat(this.data, this.save);
+  }
+
+  /** Collision mode for the player right now (on foot or afloat). */
+  get moveMode() {
+    return this.sailing ? boatMode(this.boat) : 'player';
+  }
+
   #slotDna(slot) {
     const inv = this.save.inventory;
     const id = slot === 'secondary' ? inv.secondary : inv.equipped;
@@ -387,10 +413,19 @@ export class Game {
     return true;
   }
 
-  /** Switches what you hold: 'main' | 'secondary' | 'tool'. */
+  /**
+   * Switches what you hold: 'main' | 'secondary' | 'tool' | 'none'.
+   * Choosing the slot you already hold puts it away (empty hands).
+   */
   switchSlot(slot) {
     const inv = this.save.inventory;
-    if (slot === inv.activeSlot && slot !== 'tool') return true;
+    if (slot === inv.activeSlot || slot === 'none') {
+      if (inv.activeSlot === 'none') return true;
+      inv.activeSlot = 'none';
+      this.#applySlot();
+      this.audio.play('swish');
+      return true;
+    }
     if (slot === 'tool' && !currentPickaxe(this.data, this.save)) {
       this.toast('No pickaxe yet: forge one at the Forge (Tools)', 'warn');
       return false;
@@ -400,7 +435,6 @@ export class Game {
       return false;
     }
     if (slot === 'main' && !inv.equipped) return false;
-    if (slot === 'tool' && inv.activeSlot === 'tool') return true;
     inv.activeSlot = slot;
     this.#applySlot();
     this.audio.play('ui');
@@ -626,7 +660,8 @@ export class Game {
       if (choice === 'equip' || choice === 'secondary') {
         const key = choice === 'secondary' ? 'secondary' : 'equipped';
         inv[key] = dna.id;
-        inv.activeSlot = choice === 'secondary' ? 'secondary' : 'main';
+        // Equip puts it in your hands; a new secondary waits in slot 2.
+        if (choice === 'equip') inv.activeSlot = 'main';
         this.#applySlot();
       } else {
         inv.unseen.push(dna.id);
@@ -848,6 +883,7 @@ export class Game {
     const spot = this.world.findFreeSpot(pl.spawnX, pl.spawnY, p.r);
     p.x = spot.x;
     p.y = spot.y;
+    pl.sailing = false;
     p.dead = false;
     p.hp = this.pstats.maxHp;
     p.invuln = 2;
@@ -862,12 +898,19 @@ export class Game {
 
   #findInteractable() {
     const p = this.player;
+    // Afloat you can only go ashore.
+    if (this.sailing) {
+      const land = findLanding(this);
+      const prev = this.interactTarget;
+      return land && prev?.type === 'land' && prev.tx === land.tx && prev.ty === land.ty ? prev : land;
+    }
     let best = null;
     let bestD = INTERACT_RADIUS * INTERACT_RADIUS;
     for (const o of this.world.objectsNear(p.x, p.y, 1)) {
       if (o.type === 'chest' && this.save.world.chests.includes(o.key)) continue;
       if (o.type === 'shrine' && this.save.world.shrines.includes(o.key)) continue;
       if (o.type === 'altar' && this.boss) continue;
+      if (isPoi(o.type) && POI[o.type].once && poiFound(this.save, o)) continue;
       const d = dist2(p.x, p.y, o.x, o.y);
       if (d < bestD) {
         bestD = d;
@@ -892,12 +935,24 @@ export class Game {
         return prev?.type === 'harvest' && prev.tx === h.tx && prev.ty === h.ty ? prev : h;
       }
     }
+    // At the water's edge: launch your boat (or learn why you can't).
+    if (!best && !this.build.active) {
+      const w = findLaunch(this);
+      if (w) {
+        const prev = this.interactTarget;
+        return prev?.type === w.type && prev.x === w.x && prev.y === w.y && prev.reason === w.reason ? prev : w;
+      }
+    }
     return best;
   }
 
   interactLabel(o) {
     if (!o) return null;
     switch (o.type) {
+      case 'launch': return `Set sail (${o.boat.name})`;
+      case 'treasure': return currentPickaxe(this.data, this.save) ? POI.treasure.label : 'Something is buried here (needs a pickaxe)';
+      case 'shore': return o.reason;
+      case 'land': return 'Go ashore';
       case 'merchant': {
         const left = this.markets.hostileSecondsLeft(o.npc.marketId);
         return left > 0 ? `${o.npc.name} won't trade with you (${Math.ceil(left / 60)} min)` : `Trade with ${o.npc.name}`;
@@ -921,7 +976,7 @@ export class Game {
         }
         return `Use ${def.name}`;
       }
-      default: return 'Use';
+      default: return isPoi(o.type) ? POI[o.type].label : 'Use';
     }
   }
 
@@ -1000,6 +1055,56 @@ export class Game {
     this.requestSave();
   }
 
+  // --- Sailing ---------------------------------------------------------------------
+
+  #setSail(spot) {
+    const p = this.player;
+    const boat = this.boat;
+    if (!boat || this.sailing) return;
+    if (this.build.active) this.toggleBuildMode(false);
+    this.fx.emit('glint', spot.x, spot.y, 14, 0.6, 2, ['#e8f8ff', '#9ad8f4']);
+    p.x = spot.x;
+    p.y = spot.y;
+    this.save.player.sailing = true;
+    this.target = null;
+    this.audio.play('swish');
+    if (!this.save.flags.sailed) {
+      this.save.flags.sailed = true;
+      this.toast(`All aboard the ${boat.name}! Steer like walking; Use next to land to go ashore.`, 'component');
+    }
+    this.interactTarget = null;
+    this.emit('interact', { label: null });
+    this.emit('sailing', { on: true });
+  }
+
+  #goAshore(spot) {
+    const p = this.player;
+    this.fx.emit('glint', p.x, p.y, 10, 0.5, 2, ['#e8f8ff', '#9ad8f4']);
+    p.x = spot.x;
+    p.y = spot.y;
+    this.save.player.sailing = false;
+    this.audio.play('swish');
+    this.interactTarget = null;
+    this.emit('interact', { label: null });
+    this.emit('sailing', { on: false });
+  }
+
+  /** Builds the next boat at the Forge (Tools). */
+  buildBoat(tier) {
+    try {
+      const def = buildBoat(this.data, this.save, tier);
+      this.audio.play('levelup');
+      this.toast(`${def.name} built! Walk up to the water and press Use to set sail.`, 'level');
+      this.emit('inventory');
+      this.emit('tools');
+      this.saveNow();
+      return def;
+    } catch (err) {
+      this.toast(err.message, 'warn');
+      return null;
+    }
+  }
+
   forgePickaxe(tier) {
     try {
       const def = forgePickaxe(this.data, this.save, tier);
@@ -1063,6 +1168,10 @@ export class Game {
     if (on) {
       const p = this.player;
       if (p.dead) return;
+      if (this.sailing) {
+        this.toast('Go ashore to build.', 'warn');
+        return;
+      }
       if (Math.hypot(p.x - 0.5, p.y - 0.5) > this.buildRadius() + 6) {
         this.toast('Go back to your camp to build.', 'warn');
         return;
@@ -1253,6 +1362,7 @@ export class Game {
     const spot = this.world.findFreeSpot(x, y, p.r);
     p.x = spot.x;
     p.y = spot.y;
+    this.save.player.sailing = false;
     p.invuln = 1;
     this.enemies = this.enemies.filter((e) => Math.hypot(e.x - p.x, e.y - p.y) > 14);
     this.projectiles.length = 0;
@@ -1271,6 +1381,15 @@ export class Game {
       case 'harvest':
         this.#swingPickaxe(o);
         return true;
+      case 'launch':
+        this.#setSail(o);
+        return true;
+      case 'land':
+        this.#goAshore(o);
+        return true;
+      case 'shore':
+        this.toast(o.reason, 'warn');
+        return true;
       case 'merchant':
         if (this.markets.isHostile(o.npc.marketId)) {
           this.toast(`${o.npc.name} backs away from you.`, 'warn');
@@ -1280,7 +1399,7 @@ export class Game {
         return true;
       case 'chest':
         this.save.world.chests.push(o.key);
-        openChestLoot(this, o);
+        openChestLoot(this, o, { richness: o.rich ? 2 : 1 });
         this.audio.play('chest');
         this.fx.emit('sparkle', o.x, o.y, 16, 0.6, 3);
         break;
@@ -1302,6 +1421,7 @@ export class Game {
         this.audio.play('boss');
         this.emit('boss', { active: true, name: def.name });
         this.toast(`${def.name} awakens!`, 'boss');
+        if (def.tip) this.toast(def.tip);
         break;
       }
       case 'building': {
@@ -1326,6 +1446,7 @@ export class Game {
         break;
       }
       default:
+        if (isPoi(o.type)) return interactPoi(this, o);
         break;
     }
     this.saveNow();
@@ -1333,6 +1454,30 @@ export class Game {
   }
 
   // --- Simulation -------------------------------------------------------------------
+
+  /** Little signs of life around you: butterflies, fireflies, jumping fish. */
+  #ambience(dt) {
+    this.ambienceT = (this.ambienceT ?? 0) - dt;
+    if (this.ambienceT > 0 || !this.quality.glow) return;
+    this.ambienceT = 0.35 + Math.random() * 0.4;
+    const p = this.player;
+    const x = p.x + (Math.random() - 0.5) * 16;
+    const y = p.y + (Math.random() - 0.5) * 10;
+    if (this.world.isSea(x, y)) {
+      if (Math.random() < 0.35) {
+        this.fx.emit('splash', x, y, 6, 0.2, 1.2);
+        this.fx.add({ type: 'ring', x, y, r0: 0.1, r1: 0.6, color: '#e8f8ff', dur: 0.4 });
+      }
+      return;
+    }
+    if (this.world.isSolid(Math.floor(x), Math.floor(y))) return;
+    const biome = this.world.biomeAt(Math.floor(x), Math.floor(y)).id;
+    if (['plains', 'isles', 'forest', 'highlands'].includes(biome) && Math.random() < 0.5) {
+      this.fx.emit('butterfly', x, y - 0.5, 1, 0.3, 0.4);
+    } else if (['forest', 'void', 'snow'].includes(biome) && Math.random() < 0.6) {
+      this.fx.emit('firefly', x, y - 0.4, 2, 0.8, 0.25);
+    }
+  }
 
   /** Where the weapon points: the locked target if any, else where we walk. */
   #aim(sample) {
@@ -1387,22 +1532,36 @@ export class Game {
     // Movement (sprint has no stamina cost and can be held indefinitely).
     const moving = Math.abs(sample.moveX) + Math.abs(sample.moveY) > 0.01;
     p.sprinting = sample.sprint && moving;
-    const speed = this.pstats.moveSpeed * (p.sprinting ? this.data.player.sprintMultiplier : 1) * slow;
+    const sailing = this.sailing;
+    const speed = sailing
+      ? (this.boat?.speed ?? 3.5) * (p.sprinting ? 1.2 : 1) * slow
+      : this.pstats.moveSpeed * (p.sprinting ? this.data.player.sprintMultiplier : 1) * slow;
     const vx = sample.moveX * speed + p.kx;
     const vy = sample.moveY * speed + p.ky;
+    p.vx = vx; // bosses lead their shots with this
+    p.vy = vy;
     const damp = Math.exp(-10 * dt);
     p.kx *= damp;
     p.ky *= damp;
     const nx = p.x + vx * dt;
     const ny = p.y + vy * dt;
-    if (this.world.isFree(nx, p.y, p.r)) p.x = nx;
-    if (this.world.isFree(p.x, ny, p.r)) p.y = ny;
+    const mode = this.moveMode;
+    if (this.world.isFree(nx, p.y, p.r, mode)) p.x = nx;
+    if (this.world.isFree(p.x, ny, p.r, mode)) p.y = ny;
     p.moving = moving;
     if (moving) p.walkT += dt * (p.sprinting ? 14 : 9);
-    if (p.sprinting && Math.random() < 0.3) this.fx.emit('dust', p.x, p.y + 0.3, 1, 0.2, 0.5);
+    if (sailing) {
+      // Foam in the wake.
+      if (moving && Math.random() < 0.6) {
+        this.fx.emit('glint', p.x - Math.cos(p.facing) * 0.8, p.y + 0.25, 1, 0.3, 0.6, ['#e8f8ff', '#9ad8f4']);
+      }
+    } else if (p.sprinting && Math.random() < 0.3) {
+      this.fx.emit('dust', p.x, p.y + 0.3, 1, 0.2, 0.5);
+    }
 
     // Aiming is automatic on every device: the weapon locks onto an enemy.
-    this.target = acquireTarget(this, this.target);
+    // With empty hands there is nothing to aim.
+    this.target = this.handsEmpty ? null : acquireTarget(this, this.target);
     const aim = this.#aim(sample);
     if (!p.attackAnim) p.facing = aim;
 
@@ -1416,13 +1575,13 @@ export class Game {
         this.suppressAttack = true;
         this.#swingPickaxe(h);
       }
-    } else if (sample.attack && !this.suppressAttack) {
+    } else if (sample.attack && !this.suppressAttack && !this.handsEmpty) {
       tryAttack(this, aim);
     }
     p.swapT = Math.max(0, (p.swapT ?? 0) - dt);
 
     // Weapon ambience particles from the DNA's visual parameters.
-    const part = this.weapon?.particles;
+    const part = this.handsEmpty ? null : this.weapon?.particles;
     if (part && Math.random() < part.rate * 0.25 * (this.quality.glow ? 1 : 0.4)) {
       this.fx.emit(part.kind, p.x + Math.cos(p.facing) * 0.6, p.y - 0.4 + Math.sin(p.facing) * 0.6, 1, 0.3, 0.6);
     }
@@ -1442,9 +1601,9 @@ export class Game {
       }
       if (c === 'interact' || c === 'interact-or-attack') {
         if (this.interact()) this.suppressAttack = true;
-        else if (c === 'interact-or-attack') tryAttack(this, this.#aim(sample));
+        else if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample));
       } else if (c === 'ability') {
-        if (!this.toolActive) castAbility(this, this.#aim(sample));
+        if (!this.toolActive && !this.handsEmpty) castAbility(this, this.#aim(sample));
       } else if (c === 'slot1' || c === 'slot2' || c === 'slot3') {
         if (!this.build.active) this.switchSlot({ slot1: 'main', slot2: 'secondary', slot3: 'tool' }[c]);
       } else if (c === 'slotNext' || c === 'slotPrev') {
@@ -1469,6 +1628,7 @@ export class Game {
     updatePickups(this, dt);
     this.construction.update(dt);
     this.markets.update(dt);
+    this.#ambience(dt);
     this.exploreT -= dt;
     if (this.exploreT <= 0) {
       this.exploreT = 0.5;

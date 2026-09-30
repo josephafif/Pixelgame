@@ -10,7 +10,7 @@
 import { createRng, hashInts } from '../core/rng.js';
 import { tileKey } from './world.js';
 import { structureDef, runTurret } from './construction.js';
-import { buyPrice, sellPrice, weaponValue } from './economy.js';
+import { buyPrice, sellPrice, weaponValue, EPIC_CHANCE } from './economy.js';
 import { researchedComponents } from '../weapons/crafting.js';
 import { researchCost } from './base.js';
 
@@ -185,12 +185,14 @@ export function marketStock(data, save, m, now = Date.now()) {
   for (let i = 0; i < 3; i++) {
     // Now and then a trader has a legendary on display, at a fortune.
     const legendary = i === 0 && rng.next() < 0.04;
-    const minRarity = legendary ? 'legendary' : rng.next() < 0.35 ? 'rare' : 'uncommon';
+    // Epics are a rare sight too; most stock is uncommon or rare.
+    const epic = !legendary && rng.next() < EPIC_CHANCE.market;
+    const minRarity = legendary ? 'legendary' : epic ? 'epic' : rng.next() < 0.35 ? 'rare' : 'uncommon';
     items.push({
       kind: 'weapon',
       request: {
         seed: hashInts(seed, 0x3e11, i), level, luck: 0, source: 'market',
-        unlocked: researchedComponents(save), minRarity, maxRarity: legendary ? 'legendary' : 'epic',
+        unlocked: researchedComponents(save), minRarity, maxRarity: legendary ? 'legendary' : epic ? 'epic' : 'rare',
       },
       markup: legendary ? 2.2 : 1,
     });

@@ -19,6 +19,10 @@ const PARTICLE_KINDS = {
   wood: { colors: ['#b07a48', '#7a4a28', '#d8a870'], rise: 1.2, life: 0.5 },
   stone: { colors: ['#b8bcc8', '#8d8a9e', '#5d5a6e'], rise: 1.4, life: 0.45 },
   glint: { colors: ['#ffffff'], rise: -0.9, life: 0.8 },
+  // Ambient life (see Game#ambience).
+  butterfly: { colors: ['#ffd84a', '#ff7ab0', '#ffffff', '#8ab8ff', '#ffa040'], rise: -0.15, life: 3.2, jitter: 3, drift: 1 },
+  firefly: { colors: ['#e8ff8a', '#fff7b0', '#b8ff9a'], rise: -0.08, life: 2.6, jitter: 1.2, drift: 0.6 },
+  splash: { colors: ['#e8f8ff', '#9ad8f4', '#ffffff'], rise: 2.2, life: 0.55 },
 };
 
 export class Fx {

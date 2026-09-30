@@ -5,7 +5,7 @@ import { dist2, normalize, angleTo, angleDiff } from '../core/math.js';
 import { T } from './world.js';
 
 const MAX_PROJECTILES = 260;
-const PASS_THROUGH = new Set([T.WATER, T.LAVA]);
+const PASS_THROUGH = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
 
 export function spawnProjectile(game, o) {
   if (game.projectiles.length >= MAX_PROJECTILES) {

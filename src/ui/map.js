@@ -5,18 +5,43 @@
 import { h } from './dom.js';
 import { icon } from './icons.js';
 import { openModal } from './modal.js';
-import { CHUNK, T } from '../game/world.js';
+import { CHUNK, T, SEA } from '../game/world.js';
 
 const COLORS = {
   [T.GRASS]: '#4f9a44', [T.FLOWERS]: '#58a24a', [T.MOSS]: '#3c7437', [T.SAND]: '#e3c886', [T.SAND2]: '#dcbf7a',
   [T.SNOW]: '#eef4fa', [T.ICE]: '#b8e0f4', [T.ASH]: '#4a4450', [T.BASALT]: '#3a3640', [T.ROCKGRASS]: '#6e8f5a',
   [T.VOIDSTONE]: '#2e2440', [T.VOIDMOSS]: '#3a2a52', [T.CAMP]: '#8a7f70', [T.PATH]: '#b89a6a',
   [T.WATER]: '#3f7fd0', [T.LAVA]: '#ff6a2a', [T.TREE]: '#2f6e2c', [T.PINE]: '#2a5a3a', [T.ROCK]: '#8d8a9e',
-  [T.CACTUS]: '#5f9a40', [T.CRYSTAL]: '#9a5cff',
+  [T.CACTUS]: '#5f9a40', [T.CRYSTAL]: '#9a5cff', [T.SEA]: '#2f8fc4', [T.DEEP]: '#1d4e8c', [T.PALM]: '#3f9a44',
 };
 
 // Chunk images (1 px per tile), kept for the session.
 const chunkImages = new Map();
+// One colour per chunk for far zoom (cheap: sampled, no chunk generated).
+const chunkColors = new Map();
+const BIOME_COLORS = {
+  plains: '#4f9a44', forest: '#3c7437', desert: '#e3c886', snow: '#eef4fa', volcanic: '#4a4450',
+  highlands: '#6e8f5a', void: '#3a2a52', isles: '#5fb050',
+};
+const FAR_ZOOM = 1.25;
+
+function chunkColor(world, cx, cy) {
+  const key = `${world.seed}:${cx},${cy}`;
+  let c = chunkColors.get(key);
+  if (c) return c;
+  const votes = new Map();
+  for (const [fx, fy] of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+    const x = (cx + fx) * CHUNK;
+    const y = (cy + fy) * CHUNK;
+    const sea = world.seaAt(x, y);
+    const col = sea === SEA.DEEP ? COLORS[T.DEEP] : sea === SEA.SHALLOW ? COLORS[T.SEA]
+      : sea === SEA.BEACH || sea === SEA.ISLE_BEACH ? COLORS[T.SAND] : BIOME_COLORS[world.biomeAt(x, y).id] ?? '#4f9a44';
+    votes.set(col, (votes.get(col) ?? 0) + 1);
+  }
+  c = [...votes.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  chunkColors.set(key, c);
+  return c;
+}
 
 function chunkImage(world, cx, cy) {
   const key = `${world.seed}:${cx},${cy}`;
@@ -53,7 +78,7 @@ export function open(game) {
   const legend = h('div.map-legend.small',
     h('span', h('i.lg.you'), 'You'), h('span', h('i.lg.camp'), 'Camp'), h('span', h('i.lg.boss'), 'Boss'),
     h('span', h('i.lg.market'), 'Market'), h('span', h('i.lg.shrine'), 'Shrine'), h('span', h('i.lg.chest'), 'Chest'),
-    h('span', h('i.lg.pin'), 'Your pins'));
+    h('span', h('i.lg.pin'), 'Your pins'), h('span', h('i.lg.sea'), 'Sea'));
 
   const markers = () => {
     const out = [{ kind: 'camp', x: 0.5, y: 0.5, label: 'Camp' }];
@@ -83,6 +108,11 @@ export function open(game) {
 
   let pending = [];
   let raf = 0;
+  let parsed = [];
+  const exploredList = () => {
+    if (parsed.length !== game.explored.size) parsed = [...game.explored].map((k) => k.split(',').map(Number));
+    return parsed;
+  };
 
   function draw() {
     raf = 0;
@@ -106,16 +136,32 @@ export function open(game) {
     const r1 = Math.floor((cy + hgt / 2 / zoom) / CHUNK) + 1;
     let built = 0;
     pending = [];
-    for (let ry = r0; ry <= r1; ry++) {
-      for (let rx = c0; rx <= c1; rx++) {
-        if (!game.explored.has(`${rx},${ry}`)) continue;
-        const cached = chunkImages.get(`${world.seed}:${rx},${ry}`);
-        if (!cached && built >= 12) {
-          pending.push(1);
-          continue;
+    const far = zoom < FAR_ZOOM;
+    const size = CHUNK * zoom + 0.5;
+    const drawChunk = (rx, ry) => {
+      if (far) {
+        g.fillStyle = chunkColor(world, rx, ry);
+        g.fillRect(toX(rx * CHUNK), toY(ry * CHUNK), Math.max(1, size), Math.max(1, size));
+        return;
+      }
+      const cached = chunkImages.get(`${world.seed}:${rx},${ry}`);
+      if (!cached && built >= 12) {
+        pending.push(1);
+        return;
+      }
+      if (!cached) built += 1;
+      g.drawImage(chunkImage(world, rx, ry), toX(rx * CHUNK), toY(ry * CHUNK), size, size);
+    };
+    if ((c1 - c0 + 1) * (r1 - r0 + 1) > game.explored.size) {
+      // Zoomed far out: walk the explored list instead of the whole view.
+      for (const [rx, ry] of exploredList()) {
+        if (rx >= c0 && rx <= c1 && ry >= r0 && ry <= r1) drawChunk(rx, ry);
+      }
+    } else {
+      for (let ry = r0; ry <= r1; ry++) {
+        for (let rx = c0; rx <= c1; rx++) {
+          if (game.explored.has(`${rx},${ry}`)) drawChunk(rx, ry);
         }
-        if (!cached) built += 1;
-        g.drawImage(chunkImage(world, rx, ry), toX(rx * CHUNK), toY(ry * CHUNK), CHUNK * zoom + 0.5, CHUNK * zoom + 0.5);
       }
     }
     // Your camp's structures.
@@ -261,9 +307,23 @@ export function open(game) {
       y: cy + ((ey - rect.top - rect.height / 2) * sy) / zoom,
     };
   };
+  // Frame everything explored (plus the boss arenas you know of).
+  const fitAll = () => {
+    let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
+    for (const [rx, ry] of exploredList()) {
+      x0 = Math.min(x0, rx * CHUNK); x1 = Math.max(x1, (rx + 1) * CHUNK);
+      y0 = Math.min(y0, ry * CHUNK); y1 = Math.max(y1, (ry + 1) * CHUNK);
+    }
+    if (!Number.isFinite(x0)) return;
+    cx = (x0 + x1) / 2;
+    cy = (y0 + y1) / 2;
+    const w = canvas.clientWidth || 300;
+    const hh = canvas.clientHeight || 300;
+    setZoom(Math.min(w / (x1 - x0 + 32), hh / (y1 - y0 + 32)));
+  };
   const setZoom = (z, ax, ay) => {
     const before = ax !== undefined ? worldAt(ax, ay) : null;
-    zoom = Math.max(0.75, Math.min(10, z));
+    zoom = Math.max(0.06, Math.min(10, z));
     if (before) {
       const after = worldAt(ax, ay);
       cx += before.x - after.x;
@@ -336,6 +396,7 @@ export function open(game) {
       h('button.icon-btn', { 'aria-label': 'Zoom in', onclick: () => setZoom(zoom * 1.4) }, '+'),
       h('button', { onclick: () => { cx = p.x; cy = p.y; schedule(); } }, icon('portal', 20), 'Me'),
       h('button', { onclick: () => { cx = 0.5; cy = 0.5; schedule(); } }, icon('home', 20), 'Camp'),
+      h('button', { onclick: fitAll, title: 'Zoom out to everything you have explored' }, icon('map', 20), 'All'),
       pinBtn,
       status),
     canvas,

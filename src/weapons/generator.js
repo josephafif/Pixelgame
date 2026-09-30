@@ -176,16 +176,26 @@ function rollBase(data, archetype, material, ctx, seed) {
   return { base, attack, levelMult };
 }
 
-function rollRarity(data, ctx, coreDef, seed) {
+/**
+ * The rarities a request can roll and their weights (luck and level tilt
+ * them towards rarer tiers). Exported so the game can show the real odds.
+ */
+export function rarityWeights(data, { min = null, max = null, luck = 0, lvl = 1, rarityBonus = 0 } = {}) {
   const last = data.rarities.length - 1;
-  let minIdx = ctx.min ? data.rarityIndex.get(ctx.min) : 0;
-  const maxIdx = ctx.max ? data.rarityIndex.get(ctx.max) : last;
-  if (coreDef?.rarityBonus) minIdx += coreDef.rarityBonus;
+  let minIdx = min ? data.rarityIndex.get(min) : 0;
+  const maxIdx = max ? data.rarityIndex.get(max) : last;
+  if (rarityBonus) minIdx += rarityBonus;
   minIdx = clamp(minIdx, 0, maxIdx);
-  const luckFactor = ctx.luck * 0.03 + (ctx.lvl - 1) * 0.02;
-  const candidates = data.rarities.slice(minIdx, maxIdx + 1);
-  return stageRng(seed, 'rarity').weighted(candidates, (r) =>
-    r.weight * (1 + luckFactor * data.rarityIndex.get(r.id)));
+  const luckFactor = luck * 0.03 + (lvl - 1) * 0.02;
+  return data.rarities.slice(minIdx, maxIdx + 1).map((r) => ({
+    rarity: r,
+    weight: r.weight * (1 + luckFactor * data.rarityIndex.get(r.id)),
+  }));
+}
+
+function rollRarity(data, ctx, coreDef, seed) {
+  const list = rarityWeights(data, { min: ctx.min, max: ctx.max, luck: ctx.luck, lvl: ctx.lvl, rarityBonus: coreDef?.rarityBonus });
+  return stageRng(seed, 'rarity').weighted(list, (c) => c.weight).rarity;
 }
 
 function pickTheme(data, archetype, rarityIdx, elementId, ctx, craftTags, seed) {

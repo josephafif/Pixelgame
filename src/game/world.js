@@ -3,7 +3,7 @@
 // stays flat no matter how far the player walks.
 
 import { hashInts } from '../core/rng.js';
-import { fbm, tileHash } from './noise.js';
+import { fbm, tileHash, valueNoise } from './noise.js';
 
 export const CHUNK = 16;
 const SAFE_RADIUS = 16;
@@ -23,12 +23,21 @@ const MARKET_NAMES = [
 ];
 const MARKET_COLORS = ['#c8364a', '#3f9ad8', '#e0a030', '#4fb04f', '#9a5cff', '#e86a2a'];
 const MARKET_LAYOUTS = ['bazaar', 'fort', 'palisade', 'oasis'];
+// Seas: big oceans far from camp, with shallow coasts, deep open water and
+// islands. Everything within LAND_SAFE of the camp is always dry land.
+const LAND_SAFE = 170;
+const LAND_FADE = 220;
+/** What a spot is, seen from the sea. */
+export const SEA = { LAND: 0, BEACH: 1, ISLE: 2, ISLE_BEACH: 3, SHALLOW: 4, DEEP: 5 };
+// Boss arenas at growing distances (the first is always reachable on foot).
+const BOSS_DISTANCES = [150, 290, 430, 570];
 
 // Tile ids. Ground tiles are walkable; blockers sit on top of ground.
 export const T = {
   GRASS: 1, FLOWERS: 2, MOSS: 3, SAND: 4, SAND2: 5, SNOW: 6, ICE: 7, ASH: 8, BASALT: 9,
   ROCKGRASS: 10, VOIDSTONE: 11, VOIDMOSS: 12, CAMP: 13, PATH: 14,
   WATER: 20, LAVA: 21, TREE: 22, PINE: 23, ROCK: 24, CACTUS: 25, CRYSTAL: 26,
+  SEA: 27, DEEP: 28, PALM: 29,
 };
 
 const GROUND_BY_NAME = {
@@ -36,10 +45,12 @@ const GROUND_BY_NAME = {
   ice: T.ICE, ash: T.ASH, basalt: T.BASALT, rockgrass: T.ROCKGRASS, voidstone: T.VOIDSTONE,
   voidmoss: T.VOIDMOSS,
 };
-const BLOCKER_BY_NAME = { tree: T.TREE, pine: T.PINE, rock: T.ROCK, cactus: T.CACTUS, crystal: T.CRYSTAL };
+const BLOCKER_BY_NAME = { tree: T.TREE, pine: T.PINE, rock: T.ROCK, cactus: T.CACTUS, crystal: T.CRYSTAL, palm: T.PALM };
 /** Blocker tile id → name used by game data (gathering.harvest). */
 export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).map(([k, v]) => [v, k]));
-const LIQUID = new Set([T.WATER, T.LAVA]);
+const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
+/** Water a boat can float on (lakes, coastal sea, open sea). */
+export const SAILABLE = new Set([T.WATER, T.SEA, T.DEEP]);
 
 /** Numeric key for a tile (fast Map lookups for structures). */
 export function tileKey(tx, ty) {
@@ -85,14 +96,40 @@ export class World {
       wet: noiseThreshold(0.75),
       dry: noiseThreshold(0.18),
       detail: noiseThreshold(0.7),
+      ocean: noiseThreshold(0.4),
+      deep: noiseThreshold(0.22),
+      isle: noiseThreshold(0.92),
     };
-    // One guaranteed boss arena per boss, in different compass directions at
-    // growing distances, so every boss can be found.
+    // One boss arena per boss, spread around the compass and far apart: the
+    // first a good walk away, the last deep in the world (sometimes out at
+    // sea, where its arena becomes an island).
     const start = hashInts(this.seed, 71) % 8;
+    const last = data.bosses.length - 1;
     this.landmarks = data.bosses.map((boss, i) => {
-      const [dx, dy] = COMPASS[(start + i * 2 + (i >= 2 ? 1 : 0)) % 8];
-      const dist = 70 + 50 * i;
-      return { bossId: boss.id, biome: boss.biome, x: Math.round(dx * dist) + 0.5, y: Math.round(dy * dist) + 0.5 };
+      const jitter = ((hashInts(this.seed, 72, i) % 1000) / 1000 - 0.5) * 0.5;
+      const angle0 = ((start + i * 2 + (i >= 2 ? 1 : 0)) % 8) * (Math.PI / 4) + jitter;
+      const dist = BOSS_DISTANCES[i] ?? 150 + 140 * i;
+      // Every arena but the last stands on the mainland: nudge it around
+      // the circle (and a little in or out) until it is on dry ground. The
+      // last one may end up on an island.
+      let angle = angle0;
+      let r = dist;
+      if (i < last && !this.#dryArena(Math.cos(angle) * r, Math.sin(angle) * r)) {
+        search: for (const dd of [0, 30, -30, 60]) {
+          for (let k = 1; k < 50; k++) {
+            const a = angle0 + Math.ceil(k / 2) * 0.13 * (k % 2 ? 1 : -1);
+            if (this.#dryArena(Math.cos(a) * (dist + dd), Math.sin(a) * (dist + dd))) {
+              angle = a;
+              r = dist + dd;
+              break search;
+            }
+          }
+        }
+      }
+      return {
+        bossId: boss.id, biome: boss.biome,
+        x: Math.round(Math.cos(angle) * r) + 0.5, y: Math.round(Math.sin(angle) * r) + 0.5,
+      };
     });
     // One market is guaranteed within reach, in a direction no boss uses.
     this.marketCache = new Map();
@@ -131,7 +168,9 @@ export class World {
         const y = my * MARKET_CELL + 20 + ((h >>> 20) % (MARKET_CELL - 40));
         const farFromCamp = x * x + y * y > 150 * 150;
         const clear = !this.landmarks.some((lm) => (lm.x - x) ** 2 + (lm.y - y) ** 2 < 50 * 50);
-        if (farFromCamp && clear) m = this.#makeMarket(`m:${key}`, x, y, h);
+        // Markets stand on solid ground, never on a beach or an island.
+        const dry = clear && [[0, 0], ...COMPASS].every(([dx, dy]) => this.seaAt(x + dx * 12, y + dy * 12) === SEA.LAND);
+        if (farFromCamp && dry) m = this.#makeMarket(`m:${key}`, x, y, h);
       }
     }
     this.marketCache.set(key, m);
@@ -173,6 +212,8 @@ export class World {
       const dy = y - lm.y;
       if (dx * dx + dy * dy < LANDMARK_RADIUS * LANDMARK_RADIUS) return this.biomeById.get(lm.biome);
     }
+    const sea = this.seaAt(Math.floor(x) + 0.5, Math.floor(y) + 0.5);
+    if (sea === SEA.ISLE || sea === SEA.ISLE_BEACH) return this.biomeById.get('isles') ?? this.biomes[0];
     const s = this.seed;
     const t = fbm(s ^ 0x1111, x / 80, y / 80);
     const m = fbm(s ^ 0x2222, x / 70, y / 70);
@@ -189,6 +230,58 @@ export class World {
     else if (m < q.dry) id = 'highlands';
     else id = 'plains';
     return this.biomeById.get(id) ?? this.biomes[0];
+  }
+
+  /**
+   * Land or sea at (x, y): see SEA. Oceans are low-frequency blobs that
+   * fade in beyond LAND_SAFE; islands dot the water; boss arenas stay dry.
+   */
+  seaAt(x, y) {
+    const d2 = x * x + y * y;
+    if (d2 < LAND_SAFE * LAND_SAFE) return SEA.LAND;
+    let arena = Infinity;
+    for (const lm of this.landmarks) arena = Math.min(arena, (x - lm.x) ** 2 + (y - lm.y) ** 2);
+    if (arena < (LANDMARK_RADIUS - 3) ** 2) return SEA.LAND;
+    const v = this.#oceanValue(x, y);
+    const q = this.q;
+    if (v >= q.ocean + 0.018) return SEA.LAND;
+    if (v >= q.ocean) return SEA.BEACH;
+    if (arena < LANDMARK_RADIUS * LANDMARK_RADIUS) return SEA.ISLE_BEACH; // an arena island's shore
+    const iv = fbm(this.seed ^ 0x151a, x / 42, y / 42);
+    if (iv > q.isle + 0.035) return SEA.ISLE;
+    if (iv > q.isle) return SEA.ISLE_BEACH;
+    // Deep water needs a real ship; the band along coasts, islands and
+    // island arenas stays shallow enough for a raft.
+    const nearShore = iv > q.isle - 0.07 || arena < (LANDMARK_RADIUS + 8) ** 2;
+    return v < q.deep && !nearShore ? SEA.DEEP : SEA.SHALLOW;
+  }
+
+  /** Continent noise: below q.ocean is sea. Land is guaranteed near camp. */
+  #oceanValue(x, y) {
+    const s = this.seed;
+    // The dry zone around camp has a ragged, noisy edge (never a circle).
+    const d = Math.sqrt(x * x + y * y) - valueNoise(s ^ 0x0cee, x / 90, y / 90) * 110;
+    const bias = Math.min(1, Math.max(0, (LAND_SAFE + LAND_FADE - d) / LAND_FADE)) * 0.5;
+    return fbm(s ^ 0x0cea, x / 380, y / 380) * 0.8 + fbm(s ^ 0x0ced, x / 1400, y / 1400) * 0.2
+      + (valueNoise(s ^ 0x0ceb, x / 15, y / 15) - 0.5) * 0.06 + bias;
+  }
+
+  /** A whole boss arena (and a margin) on the mainland? */
+  #dryArena(x, y) {
+    const q = this.q;
+    if (this.#oceanValue(x, y) < q.ocean + 0.03) return false;
+    for (const rr of [LANDMARK_RADIUS - 2, LANDMARK_RADIUS + 6]) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2;
+        if (this.#oceanValue(x + Math.cos(a) * rr, y + Math.sin(a) * rr) < q.ocean + 0.03) return false;
+      }
+    }
+    return true;
+  }
+
+  /** True for sea water (not lakes) on the tile containing (x, y). */
+  isSea(x, y) {
+    return this.seaAt(Math.floor(x) + 0.5, Math.floor(y) + 0.5) >= SEA.SHALLOW;
   }
 
   worldLevel(x, y) {
@@ -211,6 +304,19 @@ export class World {
         const d2 = x * x + y * y;
         if (d2 <= CAMP_RADIUS * CAMP_RADIUS) {
           ground[i] = T.CAMP;
+          continue;
+        }
+        // Tiles are classified at their centre (the same point every other check uses).
+        const sea = d2 < LAND_SAFE * LAND_SAFE ? SEA.LAND : this.seaAt(x + 0.5, y + 0.5);
+        if (sea >= SEA.SHALLOW) {
+          ground[i] = T.SAND;
+          block[i] = sea === SEA.DEEP ? T.DEEP : T.SEA;
+          continue;
+        }
+        if (sea === SEA.BEACH || sea === SEA.ISLE_BEACH) {
+          ground[i] = tileHash(s, x, y, 91) < 0.3 ? T.SAND2 : T.SAND;
+          // A few palms lean over island beaches.
+          if (sea === SEA.ISLE_BEACH && tileHash(s, x, y, 92) < 0.05 && !this.#nearLandmark(x, y, 6)) block[i] = T.PALM;
           continue;
         }
         // Market grounds: paved inside, cleared around the walls.
@@ -299,6 +405,67 @@ export class World {
       const p = this.#freeTileIn(chunk, 2);
       if (p) chunk.objects.push({ type: 'shrine', key: `s:${key}`, ...p });
     }
+    if (far) this.#placeCuriosities(chunk);
+  }
+
+  /** Small points of interest (see discoveries.js) and island content. */
+  #placeCuriosities(chunk) {
+    const { cx, cy } = chunk;
+    const roll = (salt) => hashInts(this.seed, cx, cy, salt) / 4294967296;
+    const put = (type, p, extra = {}) => p && chunk.objects.push({ type, key: `poi:${type}:${cx},${cy}`, ...p, ...extra });
+    const tileSea = (i) => this.seaAt(cx * CHUNK + (i % CHUNK) + 0.5, cy * CHUNK + ((i / CHUNK) | 0) + 0.5);
+    const where = (salt, pred) => this.#freeTileWhere(chunk, salt, pred);
+    const island = [[4, 4], [12, 4], [8, 8], [4, 12], [12, 12]].some(([lx, ly]) => this.seaAt(cx * CHUNK + lx, cy * CHUNK + ly) === SEA.ISLE);
+    if (island) {
+      // Island chests are richer.
+      for (const o of chunk.objects) if (o.type === 'chest') o.rich = true;
+      // Treasure first (its spot is fixed), so nothing else lands on it.
+      const t = this.treasureAt(cx, cy);
+      if (t) {
+        chunk.block[(t.ty - cy * CHUNK) * CHUNK + (t.tx - cx * CHUNK)] = 0;
+        chunk.objects.push(t);
+      }
+      if (roll(0x1d0) < 0.3) put('idol', where(0x1d1, (i) => tileSea(i) === SEA.ISLE));
+      if (roll(0x3ec) < 0.2) put('wreck', where(0x3ed, (i) => tileSea(i) === SEA.ISLE_BEACH));
+      return;
+    }
+    const beach = (i) => tileSea(i) === SEA.BEACH;
+    if (roll(0xb0e) < 0.06) put('bones', where(0xb0f, () => true));
+    if (roll(0x519) < 0.035) put('signpost', where(0x51a, () => true));
+    if (roll(0xc4a) < 0.03) put('camp', where(0xc4b, () => true));
+    const biome = this.biomeAt(cx * CHUNK + 8, cy * CHUNK + 8).id;
+    if (['forest', 'void', 'plains', 'snow'].includes(biome) && roll(0x3a5) < 0.04) put('mushrooms', where(0x3a6, () => true));
+    if (roll(0xb07) < 0.25) put('bottle', where(0xb08, beach));
+    if (roll(0x3e0) < 0.06) put('wreck', where(0x3e1, beach));
+  }
+
+  #freeTileWhere(chunk, salt, pred) {
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const h = hashInts(this.seed, chunk.cx, chunk.cy, salt, attempt);
+      const lx = 1 + (h % (CHUNK - 2));
+      const ly = 1 + ((h >>> 8) % (CHUNK - 2));
+      const i = ly * CHUNK + lx;
+      if (chunk.block[i] || !pred(i)) continue;
+      const x = chunk.cx * CHUNK + lx + 0.5;
+      const y = chunk.cy * CHUNK + ly + 0.5;
+      if (this.marketAt(x, y, 2) || this.#nearLandmark(x, y, LANDMARK_RADIUS)) continue;
+      if (chunk.objects.some((o) => Math.abs(o.x - x) < 2 && Math.abs(o.y - y) < 2)) continue;
+      return { x, y };
+    }
+    return null;
+  }
+
+  /**
+   * Buried treasure in chunk (cx, cy), or null. Analytic (no chunk needed),
+   * so a message in a bottle can point at one far away.
+   */
+  treasureAt(cx, cy) {
+    const h = hashInts(this.seed, cx, cy, 0x7e5);
+    if (h / 4294967296 >= 0.5) return null;
+    const tx = cx * CHUNK + 3 + ((h >>> 4) % 10);
+    const ty = cy * CHUNK + 3 + ((h >>> 12) % 10);
+    if (this.seaAt(tx + 0.5, ty + 0.5) !== SEA.ISLE) return null;
+    return { type: 'treasure', key: `poi:treasure:${cx},${cy}`, x: tx + 0.5, y: ty + 0.5, tx, ty };
   }
 
   getChunk(cx, cy) {
@@ -346,11 +513,15 @@ export class World {
 
   /**
    * Whether a tile blocks movement. Modes: 'player' (gates open for you),
-   * 'enemy' (every solid structure blocks) and 'fly' (flies over trees and
-   * rocks, but never over water, lava or walls).
+   * 'enemy' (every solid structure blocks), 'fly' (flies over trees and
+   * rocks, but never over water, lava or walls), and 'boat' / 'raft'
+   * (water only; rafts not on deep sea).
    */
   blockedFor(tx, ty, mode = 'player') {
     const b = this.blockAt(tx, ty);
+    // Boats float on water only; a raft stays out of the deep sea.
+    if (mode === 'boat') return !SAILABLE.has(b);
+    if (mode === 'raft') return !SAILABLE.has(b) || b === T.DEEP;
     if (b && (mode !== 'fly' || LIQUID.has(b))) return true;
     if (!this.structures.size) return false;
     const st = this.structures.get(tileKey(tx, ty));

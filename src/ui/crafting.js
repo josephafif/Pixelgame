@@ -11,6 +11,8 @@ import { craftingOptions, validateCraft, craftCost } from '../weapons/crafting.j
 import { buildingLevel } from '../game/base.js';
 import { pickaxeDefs, pickaxeBlockers } from '../game/gathering.js';
 import { pickaxeSprite } from '../render/structures.js';
+import { boatDefs, boatBlockers } from '../game/sailing.js';
+import { boatIcon } from '../render/boats.js';
 import { previewIcon } from './preview.js';
 
 // Last choice and tab, remembered for the next visit (per session).
@@ -201,6 +203,39 @@ export function open(game, app, arg = {}) {
     }
   }
 
+  function boats() {
+    const owned = save.tools?.boat ?? 0;
+    return [
+      h('h3.mh', 'Boats'),
+      h('p.small.muted', 'Boats carry you over lakes and the sea to islands. Walk up to the water and press Use to set sail; Use again next to land to go ashore.'),
+      h('div.tool-list', boatDefs(data).map((def) => {
+        const have = def.tier <= owned;
+        const blockers = have ? [] : boatBlockers(data, save, def);
+        const hard = blockers.filter((b) => !/^Needs \d+ more /.test(b));
+        const art = pixelCanvas(boatIcon(def.id, def.color));
+        art.style.height = '56px';
+        art.style.width = 'auto';
+        const traits = [`Speed ${def.speed}`, def.openSea ? 'Open sea' : 'Coast and lakes only'];
+        if (def.armor) traits.push(`Hull takes ${Math.round(def.armor * 100)}% of damage`);
+        return h('article.tool-card.framed', { class: have ? 'owned' : null },
+          h('div.tool-art.boat-art', art),
+          h('div.tool-info',
+            h('h3', def.name, have ? h('span.badge', def.tier === owned ? 'Yours' : 'Owned') : null),
+            h('p.small', def.desc),
+            h('p.small.muted', traits.join(' · ')),
+            have ? null : h('div.row',
+              costChips(def.cost, save.resources),
+              hard.length ? h('span.req', icon('lock', 16), ' ', hard[0]) : null,
+              h('button.btn-primary', {
+                disabled: blockers.length > 0,
+                onclick: () => {
+                  if (game.buildBoat(def.tier)) rerender();
+                },
+              }, icon('hammer', 20), 'Build'))));
+      })),
+    ];
+  }
+
   function tools() {
     const owned = save.tools?.pickaxe ?? 0;
     return h('div.tools',
@@ -227,7 +262,8 @@ export function open(game, app, arg = {}) {
                   if (game.forgePickaxe(def.tier)) rerender();
                 },
               }, icon('anvil', 20), 'Forge'))));
-      })));
+      })),
+      boats());
   }
 
   function tabs() {

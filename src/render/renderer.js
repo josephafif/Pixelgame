@@ -5,6 +5,7 @@
 
 import { createCanvas, ctx2d } from './canvas.js';
 import { renderChunk, TILE_PX } from './tiles-art.js';
+import { boatSprite } from './boats.js';
 import { CHUNK } from '../game/world.js';
 import { playerSprites, objectSprite, pickupSprite, tintedSprite } from './sprites.js';
 import { weaponSprite, weaponIcon } from './weapon-sprite.js';
@@ -298,6 +299,35 @@ export class Renderer {
           this.#circle(x, y, rr - 2, null, '#a8804a', 1 - a.t / a.dur);
           break;
         }
+        case 'orbit': {
+          const n = a.count ?? 3;
+          for (let k = 0; k < n; k++) {
+            const ang = a.t * 2.2 + (k / n) * TAU;
+            const bx = x + Math.cos(ang) * r;
+            const by = y + Math.sin(ang) * r;
+            this.#circle(bx, by, 4, '#161622', null, fade);
+            this.#circle(bx, by, 3, a.color, null, fade);
+            this.#circle(bx, by, 1.5, '#ffffff', null, fade);
+            this.#glow(bx, by, a.color, 10);
+          }
+          break;
+        }
+        case 'gravity': {
+          const grow = Math.min(1, a.t * 3);
+          this.#circle(x, y, r * 1.6 * grow, 'rgba(40,10,70,0.35)', null, fade);
+          this.#circle(x, y, 7, '#0a0412', a.color, fade);
+          v.strokeStyle = a.color;
+          v.globalAlpha = 0.8 * fade;
+          for (let k = 0; k < 3; k++) {
+            const rot = -a.t * 5 + k * 2.1;
+            v.beginPath();
+            v.arc(x, y, r * (0.4 + k * 0.35) * grow, rot, rot + 1.8);
+            v.stroke();
+          }
+          v.globalAlpha = 1;
+          this.#glow(x, y, a.color, r * 0.8);
+          break;
+        }
         case 'telegraph': {
           const k = a.t / a.dur;
           v.globalAlpha = 0.25 + 0.35 * k;
@@ -586,6 +616,16 @@ export class Renderer {
         if (!game.boss && Math.random() < 0.15) game.fx.emit(game.data.byId.elements.get(boss.element)?.particles ?? 'sparkle', o.x, o.y - 0.3, 1, 0.8, 0.6);
         break;
       }
+      case 'bones':
+      case 'signpost':
+      case 'mushrooms':
+      case 'camp':
+      case 'bottle':
+      case 'wreck':
+      case 'idol':
+      case 'treasure':
+        this.#drawCuriosity(game, o, x, y);
+        break;
       case 'building': {
         const level = buildingLevel(game.data, game.save, o.buildingId);
         const s = buildingSprite(o.buildingId, level);
@@ -596,6 +636,47 @@ export class Renderer {
         if (level > 0) this.#buildingAmbience(game, o, level, x, y);
         break;
       }
+      default:
+        break;
+    }
+  }
+
+  /** Small points of interest (discoveries.js); dimmed once used. */
+  #drawCuriosity(game, o, x, y) {
+    const v = this.v;
+    const found = game.save.world.found?.includes(o.key);
+    const t = game.time;
+    let kind = o.type;
+    let accent;
+    if (kind === 'camp') kind = found ? 'campOut' : 'campfire';
+    if (kind === 'treasure' && found) kind = 'hole';
+    if (kind === 'mushrooms') accent = found ? '#6a6a7a' : '#5affc8';
+    if (kind === 'idol') accent = found ? '#5d5a6e' : '#ffd24a';
+    if (found && (o.type === 'mushrooms' || o.type === 'bottle')) return; // eaten / taken
+    const s = objectSprite(kind, accent);
+    const w = s.width;
+    const h = s.height;
+    if (h > 6) this.#shadow(x, y + 2, Math.max(3, w >> 2));
+    if (found && o.type !== 'camp' && o.type !== 'treasure') v.globalAlpha = 0.6;
+    const bob = o.type === 'bottle' ? Math.round(Math.sin(t * 2 + o.x) * 1) : 0;
+    v.drawImage(s, x - (w >> 1), y + 3 - h + bob);
+    v.globalAlpha = 1;
+    if (found) return;
+    switch (o.type) {
+      case 'mushrooms':
+        this.#glow(x, y - 2, '#5affc8', 10 + Math.sin(t * 3 + o.x) * 2);
+        break;
+      case 'camp':
+        this.#glow(x, y - 4, '#ff9a3a', 10 + Math.sin(t * 9) * 1.5);
+        if (Math.random() < 0.08) game.fx.emit('ember', o.x, o.y - 0.3, 1, 0.2, 0.5);
+        break;
+      case 'idol':
+        this.#glow(x, y - 10, '#ffd24a', 8 + Math.sin(t * 2) * 2);
+        break;
+      case 'treasure':
+      case 'bottle':
+        if (Math.random() < 0.04) game.fx.emit('glint', o.x, o.y - 0.2, 1, 0.3, 0.4, ['#ffffff', '#ffe890']);
+        break;
       default:
         break;
     }
@@ -637,7 +718,9 @@ export class Renderer {
 
   #drawPickup(game, it, x, y) {
     const v = this.v;
-    const bob = Math.round(Math.sin(it.t * 4 + x) * 1.5);
+    // Phase from the world position: a screen-space phase jumps every time the
+    // camera scrolls, which made drops shake while you walked sideways.
+    const bob = Math.round(Math.sin(it.t * 4 + it.x * 1.7) * 1.5);
     if (it.kind === 'weapon') {
       this.#drawWeaponDrop(game, it, x, y, bob);
       return;
@@ -664,7 +747,7 @@ export class Renderer {
     const c = it.color;
     const t = game.time;
     const lift = Math.round((it.z ?? 0) * T);
-    const pulse = 0.5 + 0.5 * Math.sin(t * 3 + x);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 3 + it.x * 1.7);
     // Ground marker.
     if (r >= 1) {
       v.globalAlpha = 0.35 + 0.25 * pulse;
@@ -789,14 +872,24 @@ export class Renderer {
     let img = (right ? sprites.right : sprites.left)[isClone ? 0 : frame];
     if (!isClone && c.hurtFlash > 0) img = sprites.flash;
     const bob = c.moving ? (Math.floor(c.walkT) % 2) : 0;
-    this.#shadow(x + lx, y + 1 + ly, 5);
+    if (isClone || !game.sailing) this.#shadow(x + lx, y + 1 + ly, 5);
     const behind = pose && Math.sin(pose.angle) < -0.35;
     if (isClone) v.globalAlpha = 0.65;
     else if (c.invuln > 0 && Math.floor(game.time * 20) % 2) v.globalAlpha = 0.5;
     const hand = { x: x + lx + (right ? 1 : -1), y: y - 6 - bob + ly };
+    if (!isClone && game.sailing) {
+      this.#drawSailor(game, c, x, y, img, right, pose, anim);
+      v.globalAlpha = 1;
+      return;
+    }
     if (!isClone && (c.toolAnim || game.toolActive)) {
       v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
       this.#drawPickaxe(game, c, hand);
+      v.globalAlpha = 1;
+      return;
+    }
+    if (!isClone && game.handsEmpty) {
+      v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
       v.globalAlpha = 1;
       return;
     }
@@ -804,6 +897,33 @@ export class Renderer {
     v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
     if (!behind) this.#drawHeldWeapon(game, pose, hand, isClone);
     v.globalAlpha = 1;
+  }
+
+  /** You in your boat: mast and sails behind, hull in front of your legs. */
+  #drawSailor(game, c, x, y, img, right, pose) {
+    const v = this.v;
+    const boat = game.boat;
+    if (!boat) return;
+    const art = boatSprite(boat.id, boat.color);
+    const side = right ? art.right : art.left;
+    const rock = Math.round(Math.sin(game.time * 2.2) * 1);
+    const left = x - (art.w >> 1);
+    const deck = y - 2 + rock; // deck line (sailor stands on it)
+    // Ripples around the hull.
+    v.globalAlpha = 0.5;
+    v.fillStyle = '#e8f8ff';
+    const ripple = Math.floor(game.time * 3) % 3;
+    v.fillRect(left - 2 - ripple, deck + art.hullY + 5, 3, 1);
+    v.fillRect(left + art.w - 1 + ripple, deck + art.hullY + 5, 3, 1);
+    v.globalAlpha = 1;
+    v.drawImage(side.back, left, deck + art.hullY - art.backH + 2);
+    // The sailor from the waist up.
+    const hand = { x: x + (right ? 1 : -1), y: deck - 4 };
+    const behind = pose && Math.sin(pose.angle) < -0.35;
+    if (behind && !game.handsEmpty) this.#drawHeldWeapon(game, pose, hand, false);
+    v.drawImage(img, 0, 0, img.width, 9, x - 5, deck - 9, img.width, 9);
+    if (!behind && !game.handsEmpty && !game.toolActive) this.#drawHeldWeapon(game, pose, hand, false);
+    v.drawImage(side.hull, left, deck + art.hullY - 2);
   }
 
   /** Pickaxe swing: raised overhead, then down onto the target. */
@@ -841,17 +961,22 @@ export class Renderer {
     if (!isClone && w.attack.pattern === 'boomerang' && this.#boomerangInFlight(game)) return;
     const v = this.v;
     const spr = weaponSprite(w.dna);
-    const scale = 0.75;
+    // Bows are held across the aim (belly forward); everything else points along it.
+    const across = spr.hold === 'across';
+    const scale = across ? 0.62 : 0.75;
+    const turn = across ? Math.PI : Math.PI / 2;
+    // A bow is held out at arm's length so it never covers the archer.
+    const reach = pose.reach + (across ? 5 : 0);
     const at = (angle) => ({
-      x: hand.x + Math.cos(angle) * pose.reach,
-      y: hand.y + Math.sin(angle) * pose.reach + pose.lift,
+      x: hand.x + Math.cos(angle) * reach,
+      y: hand.y + Math.sin(angle) * reach + pose.lift,
     });
     const drawAt = (img, angle, alpha, ox = 0, oy = 0) => {
       const p = at(angle);
       v.save();
       v.globalAlpha *= alpha;
       v.translate(Math.round(p.x + ox), Math.round(p.y + oy));
-      v.rotate(angle + Math.PI / 2);
+      v.rotate(angle + turn);
       v.scale(scale, scale);
       v.drawImage(img, -spr.pivotX, -spr.pivotY);
       v.restore();
@@ -866,8 +991,18 @@ export class Renderer {
     }
     drawAt(spr.canvas, pose.angle, 1);
     const base = at(pose.angle);
-    const tipX = base.x + Math.cos(pose.angle) * (spr.pivotY - 4) * scale;
-    const tipY = base.y + Math.sin(pose.angle) * (spr.pivotY - 4) * scale;
+    if (across && !pose.flash) {
+      // A nocked arrow from the string to just past the grip.
+      const dx = Math.cos(pose.angle);
+      const dy = Math.sin(pose.angle);
+      v.fillStyle = '#d8c090';
+      for (let k = -3; k <= 3; k++) v.fillRect(Math.round(base.x + dx * k), Math.round(base.y + dy * k), 1, 1);
+      v.fillStyle = '#eef2f8';
+      v.fillRect(Math.round(base.x + dx * 4), Math.round(base.y + dy * 4), 1, 1);
+    }
+    const tipLen = spr.hold === 'across' ? 4 : spr.pivotY - 4;
+    const tipX = base.x + Math.cos(pose.angle) * tipLen * scale;
+    const tipY = base.y + Math.sin(pose.angle) * tipLen * scale;
     if (w.dna.visual.glow && w.dna.visual.palette.glow) {
       this.#glow((base.x + tipX) / 2, (base.y + tipY) / 2, w.dna.visual.palette.glow, pose.striking ? 16 : 11);
     }
@@ -888,7 +1023,7 @@ export class Renderer {
     const y = this.#sy(t.y) - Math.round(t.r * T * 0.9);
     const size = Math.round(t.r * T + 5 + Math.sin(game.time * 8) * 1.5);
     const arm = Math.max(3, Math.round(size / 3));
-    const color = t.boss ? '#ff5a3a' : '#ffd24a';
+    const color = t.boss || t.cloneOf ? '#ff5a3a' : '#ffd24a';
     for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
       const cx = x + sx * size;
       const cy = y + sy * size;
