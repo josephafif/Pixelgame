@@ -9,8 +9,8 @@ export const CHUNK = 16;
 const SAFE_RADIUS = 16;
 // The camp plaza (stone floor) and the open ground around it where the
 // base buildings stand.
-const CAMP_RADIUS = 6.5;
-const CAMP_CLEAR = 9;
+const CAMP_RADIUS = 8.5;
+const CAMP_CLEAR = 12;
 const LANDMARK_RADIUS = 22;
 // Lesser altars: one more boss to find in about half of the big world cells.
 // Every altar can be beaten once; after that you look for a new one.
@@ -88,9 +88,11 @@ export class World {
     this.data = data;
     this.seed = seed >>> 0;
     this.chunks = new Map();
-    // Player-built structures by tileKey (filled by the build system) and
-    // harvested blockers ("x,y" → [time, tileId]) from the save.
+    // Player-built structures by tileKey (filled by the build system):
+    // floors lie in their own layer, so walls and turrets can stand on them.
+    // Plus harvested blockers ("x,y" → [time, tileId]) from the save.
     this.structures = new Map();
+    this.floors = new Map();
     this.harvested = {};
     this.biomes = data.biomes;
     this.biomeById = data.byId.biomes;
@@ -365,6 +367,11 @@ export class World {
           ground[i] = T.CAMP;
           continue;
         }
+        // A dirt road leads south out of the camp's open side.
+        if (Math.abs(x) <= 1 && y > 0 && y < CAMP_CLEAR + 6) {
+          ground[i] = T.PATH;
+          continue;
+        }
         // Tiles are classified at their centre (the same point every other check uses).
         const sea = d2 < LAND_SAFE * LAND_SAFE ? SEA.LAND : this.seaAt(x + 0.5, y + 0.5);
         if (sea >= SEA.SHALLOW) {
@@ -435,7 +442,8 @@ export class World {
       const i = ly * CHUNK + lx;
       const x = chunk.cx * CHUNK + lx + 0.5;
       const y = chunk.cy * CHUNK + ly + 0.5;
-      // Nothing spawns inside a market's walls.
+      // Nothing spawns inside a market's walls or on the camp grounds.
+      if (x * x + y * y < CAMP_CLEAR * CAMP_CLEAR) continue;
       if (!chunk.block[i] && !this.marketAt(x, y, 2)) return { x, y };
     }
     return null;
@@ -571,6 +579,10 @@ export class World {
 
   structureAt(tx, ty) {
     return this.structures.size ? this.structures.get(tileKey(tx, ty)) ?? null : null;
+  }
+
+  floorAt(tx, ty) {
+    return this.floors.size ? this.floors.get(tileKey(tx, ty)) ?? null : null;
   }
 
   /**

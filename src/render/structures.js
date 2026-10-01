@@ -23,54 +23,74 @@ function rect(g, x, y, w, h, c) {
 }
 
 function woodWall(g, mask) {
+  // With a wall above, the logs run on up into it (no pointed tips); with
+  // one below, they run down into it (no base line). Vertical runs read as
+  // one continuous palisade.
+  const up = mask & UP;
+  const down = mask & DOWN;
+  const bottom = down ? 24 : 22;
   const logs = [[0, 5], [5, 6], [11, 5]];
   logs.forEach(([x, w], i) => {
-    const top = 3 + (i % 2);
-    rect(g, x, top + 2, w, 22 - top - 2, '#9a6a3c');
-    rect(g, x, top + 2, 1, 22 - top - 2, '#c8945a');
-    rect(g, x + w - 1, top + 2, 1, 22 - top - 2, '#6b4a2a');
-    // Pointed tip.
-    rect(g, x + 1, top + 1, w - 2, 1, '#9a6a3c');
-    rect(g, x + (w >> 1), top, 1, 1, '#c8945a');
+    const top = up ? -2 : 3 + (i % 2);
+    rect(g, x, top + 2, w, bottom - top - 2, '#9a6a3c');
+    rect(g, x, top + 2, 1, bottom - top - 2, '#c8945a');
+    rect(g, x + w - 1, top + 2, 1, bottom - top - 2, '#6b4a2a');
+    if (!up) {
+      // Pointed tip.
+      rect(g, x + 1, top + 1, w - 2, 1, '#9a6a3c');
+      rect(g, x + (w >> 1), top, 1, 1, '#c8945a');
+    }
     // Outline between logs.
-    if (i > 0 || !(mask & LEFT)) rect(g, x, top + 1, 1, 21 - top, O);
+    if (i > 0 || !(mask & LEFT)) rect(g, x, top + 1, 1, bottom - top - 1, O);
   });
-  if (!(mask & RIGHT)) rect(g, 15, 4, 1, 18, O);
-  // Rope bindings.
-  rect(g, 0, 9, 16, 2, '#4a3220');
-  rect(g, 0, 17, 16, 2, '#4a3220');
-  rect(g, 0, 9, 16, 1, '#6b4a2a');
-  rect(g, 0, 22, 16, 2, O);
-  // Tips outline.
-  g.fillStyle = O;
-  for (const [x, w] of logs) g.fillRect(x + (w >> 1), 2 + (x === 5 ? 1 : 0), 1, 1);
+  if (!(mask & RIGHT)) rect(g, 15, up ? 0 : 4, 1, bottom - (up ? 0 : 4), O);
+  // Rope bindings, every 8 px so they line up from tile to tile.
+  for (const y of up ? [1, 9, 17] : [9, 17]) {
+    rect(g, 0, y, 16, 2, '#4a3220');
+    rect(g, 0, y, 16, 1, '#6b4a2a');
+  }
+  if (!down) rect(g, 0, 22, 16, 2, O);
+  if (!up) {
+    // Tips outline.
+    g.fillStyle = O;
+    for (const [x, w] of logs) g.fillRect(x + (w >> 1), 2 + (x === 5 ? 1 : 0), 1, 1);
+  }
 }
 
 function stoneWall(g, mask) {
-  const top = mask & UP ? 6 : 6;
-  // Merlons.
-  for (const mx of [1, 10]) {
-    rect(g, mx, 2, 5, 5, '#a4a8b8');
-    rect(g, mx, 2, 5, 1, '#d0d4e0');
-    rect(g, mx - 1, 1, 7, 1, O);
-    rect(g, mx - 1, 1, 1, 6, O);
-    rect(g, mx + 5, 1, 1, 6, O);
+  const up = mask & UP;
+  const down = mask & DOWN;
+  const bottom = down ? 24 : 21;
+  const top = up ? 0 : 6;
+  if (!up) {
+    // Merlons and the walkway cap on top.
+    for (const mx of [1, 10]) {
+      rect(g, mx, 2, 5, 5, '#a4a8b8');
+      rect(g, mx, 2, 5, 1, '#d0d4e0');
+      rect(g, mx - 1, 1, 7, 1, O);
+      rect(g, mx - 1, 1, 1, 6, O);
+      rect(g, mx + 5, 1, 1, 6, O);
+    }
+    rect(g, 0, top, 16, 3, '#c0c4d0');
   }
-  rect(g, 0, top, 16, 3, '#c0c4d0');
-  rect(g, 0, top + 3, 16, 14, '#8d8a9e');
-  // Brick courses.
+  const body = up ? 0 : top + 3;
+  rect(g, 0, body, 16, bottom - body, '#8d8a9e');
+  // Brick courses on a fixed 4 px grid, so stacked walls line up.
   g.fillStyle = '#6e6b80';
-  for (let row = 0; row < 4; row++) {
-    const y = top + 3 + row * 4;
+  for (let y = 1; y < bottom; y += 4) {
+    if (y < body) continue;
     g.fillRect(0, y, 16, 1);
-    const off = row % 2 ? 4 : 0;
-    for (let x = off; x < 16; x += 8) g.fillRect(x, y, 1, 4);
+    const off = ((y - 1) / 4) % 2 ? 4 : 0;
+    for (let x = off; x < 16; x += 8) g.fillRect(x, y, 1, Math.min(4, bottom - y));
   }
-  rect(g, 0, 21, 16, 1, '#5d5a6e');
-  rect(g, 0, 22, 16, 2, O);
-  rect(g, 0, top - 1, 16, 1, O);
-  if (!(mask & LEFT)) rect(g, 0, top - 1, 1, 24 - top, O);
-  if (!(mask & RIGHT)) rect(g, 15, top - 1, 1, 24 - top, O);
+  if (!down) {
+    rect(g, 0, 21, 16, 1, '#5d5a6e');
+    rect(g, 0, 22, 16, 2, O);
+  }
+  if (!up) rect(g, 0, top - 1, 16, 1, O);
+  const side = up ? 0 : top - 1;
+  if (!(mask & LEFT)) rect(g, 0, side, 1, (down ? 24 : 22) - side, O);
+  if (!(mask & RIGHT)) rect(g, 15, side, 1, (down ? 24 : 22) - side, O);
 }
 
 function gate(g, mask, open) {

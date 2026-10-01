@@ -188,7 +188,8 @@ test('camp: buildings upgrade, the well pays out and the waystone recalls', asyn
   await page.keyboard.press('Escape');
   await page.click('.menu button:has-text("Recall to camp")');
   const pos = await game(page, () => ({ x: window.__pixelgame.game.player.x, y: window.__pixelgame.game.player.y }));
-  expect(Math.hypot(pos.x, pos.y)).toBeLessThan(8);
+  expect(await game(page, () => window.__pixelgame.game.atCamp())).toBe(true);
+  expect(Math.hypot(pos.x, pos.y)).toBeLessThan(10);
   expect(errors).toEqual([]);
 });
 
@@ -1001,5 +1002,51 @@ test('legendaries carry a signature power shown on the card and cast with Q', as
   await page.keyboard.press('Escape');
   await page.keyboard.press('KeyQ');
   await expect.poll(() => game(page, (id) => (window.__pixelgame.game.abilityReadyAt.get(id) ?? 0) > window.__pixelgame.game.time, info.id)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('camp: turrets stand on floors, and vertical walls join into one wall', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    Object.assign(g.save.resources, { wood: 500, stone: 500, scrap: 500, essence: 500 });
+    g.save.base.buildings.training = 1;
+    g.player.x = 3.5;
+    g.player.y = 9.5;
+    g.renderer.snapCamera();
+  });
+  await page.waitForTimeout(300);
+  await page.keyboard.press('KeyG');
+  await expect(page.locator('#build-bar')).toBeVisible();
+  const at = (tx, ty) => game(page, ([x, y]) => window.__pixelgame.game.renderer.worldToScreen(x + 0.5, y + 0.5), [tx, ty]);
+  const pick = (id) => game(page, (s) => window.__pixelgame.game.selectStructure(s), id);
+  // A stone floor, then a turret on it.
+  await pick('stone_floor');
+  const f = await at(2, 8);
+  await page.mouse.click(f.x, f.y);
+  await pick('arrow_turret');
+  await page.mouse.click(f.x, f.y);
+  const layers = await game(page, () => {
+    const w = window.__pixelgame.game.world;
+    return [w.floorAt(2, 8)?.id, w.structureAt(2, 8)?.id];
+  });
+  expect(layers).toEqual(['stone_floor', 'arrow_turret']);
+  // A wall drawn top to bottom is one continuous wall: no gaps, no tips in between.
+  const seams = await game(page, async () => {
+    const { structureSprite, UP, DOWN } = await import('/src/render/structures.js');
+    const opaqueRows = (c, rows) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      return rows.map((y) => [...Array(c.width).keys()].filter((x) => d[(y * c.width + x) * 4 + 3] > 0).length);
+    };
+    return {
+      woodMiddle: opaqueRows(structureSprite('wood_wall', UP | DOWN), [0, 23]),
+      woodAlone: opaqueRows(structureSprite('wood_wall', 0), [0, 23]),
+      stoneMiddle: opaqueRows(structureSprite('stone_wall', UP | DOWN), [0, 23]),
+    };
+  });
+  expect(seams.woodMiddle).toEqual([16, 16]);
+  expect(seams.stoneMiddle).toEqual([16, 16]);
+  expect(seams.woodAlone[0]).toBeLessThan(16);
   expect(errors).toEqual([]);
 });

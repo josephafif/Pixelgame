@@ -5,6 +5,7 @@
 //
 // Saved as plain { id, x, y, hp } objects in save.base.structures; the
 // runtime adds non-enumerable `def` and `rt` fields that never get saved.
+// Floors are a layer of their own: a wall, turret or torch can stand on one.
 
 import { tileKey, T } from './world.js';
 import { buildingLevel, buildingDef, canAfford, pay, shortfalls, COST_KEYS } from './base.js';
@@ -127,13 +128,28 @@ export class Construction {
   }
 
   load() {
-    const world = this.game.world;
+    const { world, data, save } = this.game;
     world.structures.clear();
+    world.floors.clear();
     const keep = [];
+    let moved = 0;
     for (const st of this.list) {
+      // The camp was laid out anew: anything standing where a building now
+      // stands is taken down and its full cost handed back.
+      const def = structureDef(data, st.id);
+      if (def && reservedTile(data, st.x, st.y)) {
+        for (const k of COST_KEYS) if (def.cost?.[k]) save.resources[k] = (save.resources[k] ?? 0) + def.cost[k];
+        moved++;
+        continue;
+      }
       if (this.#attach(st)) keep.push(st);
     }
-    this.game.save.base.structures = keep;
+    save.base.structures = keep;
+    if (moved) {
+      this.game.schedule(1.5, () => this.game.toast(
+        `Your camp was rearranged: ${moved} structure${moved > 1 ? 's' : ''} that stood in the way ${moved > 1 ? 'were' : 'was'} taken down, materials returned.`,
+      ));
+    }
   }
 
   #attach(st) {
@@ -143,12 +159,15 @@ export class Construction {
     hidden(st, 'rt', { cd: Math.random() * 0.5, aim: -Math.PI / 2, flash: 0, trig: -9, open: 0 });
     st.hp = Math.min(def.hp, st.hp ?? def.hp);
     if (st.hp < def.hp) this.damaged.add(st);
-    this.game.world.structures.set(tileKey(st.x, st.y), st);
+    const layer = def.kind === 'floor' ? this.game.world.floors : this.game.world.structures;
+    if (layer.has(tileKey(st.x, st.y))) return false; // two things on one spot: keep the first
+    layer.set(tileKey(st.x, st.y), st);
     return true;
   }
 
+  /** What stands on a tile: the structure on top, else its floor. */
   at(tx, ty) {
-    return this.game.world.structureAt(tx, ty);
+    return this.game.world.structureAt(tx, ty) ?? this.game.world.floorAt(tx, ty);
   }
 
   /** Why `def` can't go on tile (tx, ty), or null when it can. */
@@ -161,7 +180,8 @@ export class Construction {
     if (reservedTile(data, tx, ty)) return 'Too close to a camp building';
     const block = world.blockAt(tx, ty);
     if (block) return [T.WATER, T.LAVA, T.SEA, T.DEEP].includes(block) ? 'Can’t build on water' : 'Clear the tree or rock first (pickaxe)';
-    if (this.at(tx, ty)) return 'Something is already built here';
+    // Floors go under things; everything else stands on top (a floor is fine).
+    if (def.kind === 'floor' ? world.floorAt(tx, ty) : world.structureAt(tx, ty)) return 'Something is already built here';
     if (!def.walkable) {
       const inside = (x, y, r) => x + r > tx && x - r < tx + 1 && y + r > ty && y - r < ty + 1;
       if (inside(player.x, player.y, player.r)) return 'You are standing there';
@@ -205,7 +225,8 @@ export class Construction {
     const g = this.game;
     const i = this.list.indexOf(st);
     if (i >= 0) this.list.splice(i, 1);
-    g.world.structures.delete(tileKey(st.x, st.y));
+    const layer = st.def.kind === 'floor' ? g.world.floors : g.world.structures;
+    if (layer.get(tileKey(st.x, st.y)) === st) layer.delete(tileKey(st.x, st.y));
     this.damaged.delete(st);
     st.dead = true;
     g.fx.emit(st.def.kind === 'wall' && st.id.startsWith('stone') ? 'stone' : 'wood', st.x + 0.5, st.y + 0.5, 12, 0.8, 2.5);

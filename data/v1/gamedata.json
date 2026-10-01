@@ -997,7 +997,7 @@
         ]
       },
       {
-        "id": "forge", "name": "Forge", "x": -3.5, "y": -1.5, "bonusFrom": 2,
+        "id": "forge", "name": "Forge", "x": -4.5, "y": -2.5, "bonusFrom": 2,
         "desc": "Craft weapons and pickaxes. Upgrades make crafting cheaper, crafted weapons stronger and unlock better catalysts and tools.",
         "perLevel": { "craftDiscountPct": 5, "craftLevel": 1 },
         "levels": [
@@ -1009,7 +1009,7 @@
         ]
       },
       {
-        "id": "vault", "name": "Vault", "x": 4.5, "y": -1.5,
+        "id": "vault", "name": "Vault", "x": 5.5, "y": -2.5,
         "desc": "Your stash. Every upgrade adds storage slots and a bigger bag.",
         "perLevel": { "storage": 30, "bag": 4 },
         "levels": [
@@ -1021,7 +1021,7 @@
         ]
       },
       {
-        "id": "library", "name": "Library", "x": -3.5, "y": 3.5,
+        "id": "library", "name": "Library", "x": -5.5, "y": 2.5,
         "desc": "Study weapon components. Every upgrade makes research cheaper.",
         "perLevel": { "researchDiscountPct": 10 },
         "levels": [
@@ -1033,7 +1033,7 @@
         ]
       },
       {
-        "id": "training", "name": "Training Grounds", "x": 4.5, "y": 3.5,
+        "id": "training", "name": "Training Grounds", "x": 6.5, "y": 2.5,
         "desc": "Drill every day. Every upgrade adds Attack Power and Defense.",
         "perLevel": { "attackPower": 4, "defense": 2 },
         "levels": [
@@ -1045,7 +1045,7 @@
         ]
       },
       {
-        "id": "well", "name": "Essence Well", "x": 0.5, "y": -3.5,
+        "id": "well", "name": "Essence Well", "x": 0.5, "y": -4.5,
         "desc": "Draws essence from the ground, even while you are away. Come back and collect it.",
         "perLevel": { "essencePerHour": 15 },
         "levels": [
@@ -1057,7 +1057,7 @@
         ]
       },
       {
-        "id": "den", "name": "Pal Den", "x": -6.5, "y": 1.5,
+        "id": "den", "name": "Pal Den", "x": -3.5, "y": 6.5,
         "desc": "A cosy nest for pals. Hatch pal eggs here; every upgrade lets your pals grow two levels stronger.",
         "perLevel": { "palLevelCap": 2 },
         "levels": [
@@ -1069,7 +1069,7 @@
         ]
       },
       {
-        "id": "waystone", "name": "Waystone", "x": 0.5, "y": 4.5,
+        "id": "waystone", "name": "Waystone", "x": 4.5, "y": 6.5,
         "desc": "Level 1: recall to camp from anywhere. Level 2: step back through to where you left.",
         "perLevel": {},
         "levels": [

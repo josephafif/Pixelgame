@@ -303,6 +303,11 @@ legendariskt.
 | Spikfälla | Skadar fiender som går över den |
 | Fackla, banderoll, trägolv, stenväg | För att göra lägret till ditt |
 
+**Golv** ligger i ett eget lager: torn, murar, facklor och fällor kan stå på ett golv, och ett
+golv kan läggas under något som redan står. River du tar verktyget det översta först och golvet
+sedan. **Murar sitter ihop** åt alla håll: en mur som byggs lodrätt blir en sammanhängande mur
+utan spetsar och kanter mellan rutorna, både i trä och sten.
+
 Lägrets byggyta växer med varje Hearth-uppgradering. Fiender som blockeras av en vägg hugger på
 den, och turrets som skjuter drar till sig fiender. Skadade konstruktioner lagar sig själva när
 lägret är lugnt. Logik: `src/game/construction.js` och `src/game/gathering.js`; grafik:
@@ -373,7 +378,13 @@ testerna i `tests/unit/pals.test.js`.
 
 ## Läger (basen)
 
-Lägret mitt i världen byggs ut med scrap, essence, trä och sten. Gå fram till en byggnad och tryck
+Lägret ligger på en stor stenlagd plan mitt i världen. Härden står i mitten och de sju andra
+byggnaderna i en ring runt den: Essence Well i norr, Forge och Vault snett ovanför, Library och
+Training Grounds på sidorna, Pal Den och Waystone längst ned. Den södra sidan är öppen, och en
+väg leder ut ur lägret där. Mellan alla byggnader finns gångar. Om något du byggt stod där en
+byggnad nu står, tas det ned och du får tillbaka hela kostnaden.
+
+Lägret byggs ut med scrap, essence, trä och sten. Gå fram till en byggnad och tryck
 Use, eller öppna lägerpanelen (B / hus-knappen). Varje byggnad har nivåer med krav på spelarnivå
 (och ibland en besegrad boss), och all data ligger i `gamedata.json` → `base`.
 

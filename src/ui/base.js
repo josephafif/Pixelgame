@@ -48,7 +48,7 @@ export function open(game, app, { focus = null } = {}) {
         }, icon('essence', 20), n > 0 ? `Collect ${n}` : 'Filling…')];
       }
       case 'waystone': {
-        const far = Math.hypot(game.player.x, game.player.y) >= 8;
+        const far = !game.atCamp();
         const out = [];
         if (far) {
           const left = Math.ceil(game.recallReadyIn());

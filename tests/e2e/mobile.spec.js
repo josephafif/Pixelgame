@@ -117,34 +117,34 @@ test('build mode on a phone: tap a tile to pick it, tap again to build, drag for
   expect(bar.height).toBeLessThan(vh * 0.2);
   const at = (tx, ty) => game(page, ([x, y]) => window.__pixelgame.game.renderer.worldToScreen(x + 0.5, y + 0.5), [tx, ty]);
   const built = (tx, ty) => game(page, ([x, y]) => window.__pixelgame.game.world.structureAt(x, y)?.id ?? null, [tx, ty]);
-  // Tiles inside the camp's cleared ground (no trees in the way).
+  // Tiles on the open south side of the camp plaza (no trees, no buildings).
   // A tap on the left half (the joystick side) picks the tile instead of walking.
   const start = await game(page, () => ({ x: window.__pixelgame.game.player.x, y: window.__pixelgame.game.player.y }));
-  const t = await at(-3, 7);
+  const t = await at(-2, 4);
   await page.touchscreen.tap(t.x, t.y);
-  await expect.poll(() => game(page, () => window.__pixelgame.game.build.ghost)).toEqual({ tx: -3, ty: 7 });
-  expect(await built(-3, 7)).toBeNull();
+  await expect.poll(() => game(page, () => window.__pixelgame.game.build.ghost)).toEqual({ tx: -2, ty: 4 });
+  expect(await built(-2, 4)).toBeNull();
   // Tapping the picked tile builds there.
   await page.touchscreen.tap(t.x, t.y);
-  await expect.poll(() => built(-3, 7)).toBe('wood_wall');
+  await expect.poll(() => built(-2, 4)).toBe('wood_wall');
   // Pick the next tile and drag a line from it.
   const cdp = await context.newCDPSession(page);
-  const a = await at(-2, 7);
+  const a = await at(-1, 4);
   await page.touchscreen.tap(a.x, a.y);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x, y: a.y, id: 1 }] });
   for (let i = 1; i <= 8; i++) {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x + i * 8, y: a.y, id: 1 }] });
   }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await expect.poll(() => built(-2, 7)).toBe('wood_wall');
-  expect(await built(-1, 7)).toBe('wood_wall');
+  await expect.poll(() => built(-1, 4)).toBe('wood_wall');
+  expect(await built(0, 4)).toBe('wood_wall');
   const moved = await game(page, ({ x, y }) => Math.hypot(window.__pixelgame.game.player.x - x, window.__pixelgame.game.player.y - y), start);
   expect(moved).toBeLessThan(0.01);
   // The hammer builds on the picked tile too.
-  const b = await at(3, 8);
+  const b = await at(2, 8);
   await page.touchscreen.tap(b.x, b.y);
   await page.tap('#btn-attack');
-  await expect.poll(() => built(3, 8)).toBe('wood_wall');
+  await expect.poll(() => built(2, 8)).toBe('wood_wall');
   await page.tap('#build-bar .done');
   await expect(page.locator('#build-bar')).toBeHidden();
   expect(errors).toEqual([]);

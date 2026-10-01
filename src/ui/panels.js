@@ -114,7 +114,7 @@ export class Panels {
       : null;
     const waystone = buildingLevel(g.data, g.save, 'waystone');
     const recallLeft = Math.ceil(g.recallReadyIn());
-    const farFromCamp = Math.hypot(g.player.x, g.player.y) >= 8;
+    const farFromCamp = !g.atCamp();
     const recall = waystone >= 1 && farFromCamp
       ? item('portal', recallLeft > 0 ? `Recall to camp (${recallLeft}s)` : 'Recall to camp', () => {
         closeModal();

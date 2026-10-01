@@ -1465,6 +1465,11 @@ export class Game {
   }
 
   /** Waystone: teleport to camp (remembering where we were at level 2). */
+  /** Are you at your camp (on or right around the plaza)? */
+  atCamp() {
+    return Math.hypot(this.player.x - 0.5, this.player.y - 0.5) < 12;
+  }
+
   recall() {
     if (buildingLevel(this.data, this.save, 'waystone') < 1 || this.player.dead) return false;
     if (this.recallReadyIn() > 0) {
@@ -1472,7 +1477,7 @@ export class Game {
       return false;
     }
     const p = this.player;
-    if (Math.hypot(p.x, p.y) < 8) return false;
+    if (this.atCamp()) return false;
     if (buildingLevel(this.data, this.save, 'waystone') >= 2) this.save.base.recall = { x: p.x, y: p.y };
     this.#teleport(buildingDef(this.data, 'waystone').x, buildingDef(this.data, 'waystone').y + 1);
     this.recallReadyAt = this.time + this.data.base.recallCooldown;

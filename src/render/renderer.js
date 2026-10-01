@@ -479,8 +479,10 @@ export class Renderer {
 
   #drawFlatStructures(game, W, H) {
     const v = this.v;
-    for (const st of game.structuresForDraw()) {
-      if (!isFlat(st.id)) continue;
+    // Floors first, then traps on top of them.
+    const flat = game.structuresForDraw().filter((st) => isFlat(st.id));
+    flat.sort((a, b) => (a.def?.kind === 'floor' ? 0 : 1) - (b.def?.kind === 'floor' ? 0 : 1));
+    for (const st of flat) {
       const x = this.#sx(st.x);
       const y = this.#sy(st.y);
       if (x < -16 || y < -16 || x > W || y > H) continue;

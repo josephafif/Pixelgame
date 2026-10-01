@@ -25,6 +25,7 @@ function stubGame(save) {
     requestSave() {},
     damageEnemy() {},
     spawnProjectile() { return {}; },
+    schedule() {},
   };
   game.construction = new Construction(game);
   return game;
@@ -106,11 +107,69 @@ test('movement modes: gates let you through, flyers skip trees but never water',
   assert.equal(world.blockedFor(water.x, water.y, 'fly'), true, 'flyers avoid water');
   assert.equal(world.blockedFor(tree.x, tree.y, 'fly'), false, 'flyers pass over trees');
   assert.equal(world.blockedFor(tree.x, tree.y, 'enemy'), true);
-  assert.ok(game.construction.place('gate', 7, 0).ok);
-  assert.equal(world.blockedFor(7, 0, 'player'), false, 'you walk through your gate');
-  assert.equal(world.blockedFor(7, 0, 'enemy'), true, 'enemies do not');
-  assert.ok(game.construction.place('wood_floor', 7, 1).ok);
-  assert.equal(world.blockedFor(7, 1, 'enemy'), false, 'floors are walkable');
+  assert.ok(game.construction.place('gate', 3, 0).ok);
+  assert.equal(world.blockedFor(3, 0, 'player'), false, 'you walk through your gate');
+  assert.equal(world.blockedFor(3, 0, 'enemy'), true, 'enemies do not');
+  assert.ok(game.construction.place('wood_floor', 3, 1).ok);
+  assert.equal(world.blockedFor(3, 1, 'enemy'), false, 'floors are walkable');
+});
+
+test('floors lie under things: turrets, walls and torches can stand on them', () => {
+  const save = richSave();
+  save.base.buildings.training = 1;
+  const game = stubGame(save);
+  const c = game.construction;
+  const { world } = game;
+  assert.ok(c.place('stone_floor', 3, 1).ok);
+  assert.ok(c.place('arrow_turret', 3, 1).ok, 'a turret on a floor');
+  assert.equal(world.structureAt(3, 1).id, 'arrow_turret');
+  assert.equal(world.floorAt(3, 1).id, 'stone_floor');
+  assert.equal(world.blockedFor(3, 1, 'enemy'), true, 'the turret still blocks');
+  assert.match(c.place('wood_floor', 3, 1).reason, /already/, 'one floor per tile');
+  assert.match(c.place('torch', 3, 1).reason, /already/, 'one thing on top');
+  // A floor can also go under something already built.
+  assert.ok(c.place('wood_wall', 3, 2).ok);
+  assert.ok(c.place('wood_floor', 3, 2).ok);
+  // Taking down removes the top first, then the floor.
+  assert.equal(c.at(3, 1).id, 'arrow_turret');
+  c.remove(3, 1);
+  assert.equal(world.structureAt(3, 1), null);
+  assert.equal(c.at(3, 1).id, 'stone_floor');
+  c.remove(3, 1);
+  assert.equal(c.at(3, 1), null);
+  // Both layers come back after a reload.
+  const reloaded = stubGame(save);
+  assert.equal(reloaded.world.structureAt(3, 2).id, 'wood_wall');
+  assert.equal(reloaded.world.floorAt(3, 2).id, 'wood_floor');
+});
+
+test('the camp: every building stands on the plaza, with room to walk around each', () => {
+  const save = richSave();
+  const game = stubGame(save);
+  for (const b of data.base.buildings) {
+    // The sprite's footprint (two tiles wide) is on the paved plaza.
+    for (const dx of [-1, 0]) {
+      const g = game.world.getChunk(Math.floor((b.x + dx) / 16), Math.floor(b.y / 16));
+      const lx = ((Math.floor(b.x + dx) % 16) + 16) % 16;
+      const ly = ((Math.floor(b.y) % 16) + 16) % 16;
+      assert.equal(g.ground[ly * 16 + lx], T.CAMP, `${b.id} stands on the plaza`);
+    }
+    for (const o of data.base.buildings) {
+      if (o === b) continue;
+      const apart = Math.abs(Math.floor(o.x) - Math.floor(b.x)) >= 4 || Math.abs(Math.floor(o.y) - Math.floor(b.y)) >= 4;
+      assert.ok(apart, `${b.id} and ${o.id} leave a lane between them`);
+    }
+  }
+});
+
+test('structures in the way of a building are taken down and refunded on load', () => {
+  const save = richSave();
+  const den = data.base.buildings.find((b) => b.id === 'den');
+  save.base.structures.push({ id: 'wood_wall', x: Math.floor(den.x), y: Math.floor(den.y), hp: 120 });
+  const wood = save.resources.wood;
+  stubGame(save);
+  assert.equal(save.base.structures.length, 0);
+  assert.equal(save.resources.wood, wood + structureDef(data, 'wood_wall').cost.wood);
 });
 
 test('building: costs, camp area, obstacles, refunds and saving', () => {
@@ -119,10 +178,10 @@ test('building: costs, camp area, obstacles, refunds and saving', () => {
   const c = game.construction;
   const wall = structureDef(data, 'wood_wall');
   const wood = save.resources.wood;
-  assert.ok(c.place('wood_wall', 7, 0).ok);
+  assert.ok(c.place('wood_wall', 3, 0).ok);
   assert.equal(save.resources.wood, wood - wall.cost.wood);
-  assert.equal(game.world.structureAt(7, 0).id, 'wood_wall');
-  assert.match(c.place('wood_wall', 7, 0).reason, /already/);
+  assert.equal(game.world.structureAt(3, 0).id, 'wood_wall');
+  assert.match(c.place('wood_wall', 3, 0).reason, /already/);
   const far = Math.ceil(buildRadius(data, save)) + 3;
   game.player.x = far;
   game.player.y = 0.5;
@@ -132,24 +191,24 @@ test('building: costs, camp area, obstacles, refunds and saving', () => {
   assert.match(c.place('wood_wall', 0, 0).reason, /camp building/);
   assert.match(c.place('wood_wall', 0, 1).reason, /camp building|standing/);
   save.resources.wood = 0;
-  assert.match(c.place('wood_wall', 7, 2).reason, /wood/);
+  assert.match(c.place('wood_wall', 3, 2).reason, /wood/);
   save.resources.wood = 100;
   // Stone walls need a better Hearth.
-  assert.match(c.place('stone_wall', 7, 3).reason, /Hearth level 2/);
+  assert.match(c.place('stone_wall', 3, 3).reason, /Hearth level 2/);
   save.base.buildings.hearth = 2;
-  assert.ok(c.place('stone_wall', 7, 3).ok);
+  assert.ok(c.place('stone_wall', 3, 3).ok);
   // Removing refunds half.
   const before = save.resources.wood;
-  const refund = c.remove(7, 0);
+  const refund = c.remove(3, 0);
   assert.deepEqual(refund, refundFor(data, wall));
   assert.equal(save.resources.wood, before + refund.wood);
-  assert.equal(game.world.structureAt(7, 0), null);
+  assert.equal(game.world.structureAt(3, 0), null);
   // Only plain data is saved (no runtime fields).
   const saved = JSON.parse(JSON.stringify(save.base.structures));
   assert.deepEqual(Object.keys(saved[0]).sort(), ['hp', 'id', 'x', 'y']);
   // Reloading rebuilds the collision map.
   const reloaded = stubGame(save);
-  assert.equal(reloaded.world.structureAt(7, 3).id, 'stone_wall');
+  assert.equal(reloaded.world.structureAt(3, 3).id, 'stone_wall');
 });
 
 test('enemies can break structures; turrets hit harder as you grow', () => {
@@ -157,17 +216,17 @@ test('enemies can break structures; turrets hit harder as you grow', () => {
   save.base.buildings.training = 1;
   const game = stubGame(save);
   const c = game.construction;
-  assert.ok(c.place('wood_wall', 7, 0).ok);
-  const st = game.world.structureAt(7, 0);
+  assert.ok(c.place('wood_wall', 3, 0).ok);
+  const st = game.world.structureAt(3, 0);
   c.damage(st, st.def.hp + 1);
-  assert.equal(game.world.structureAt(7, 0), null);
+  assert.equal(game.world.structureAt(3, 0), null);
   assert.equal(save.base.structures.length, 0);
   const turret = structureDef(data, 'arrow_turret');
   const strong = c.turretDamage(turret);
   save.player.level = 1;
   save.base.buildings.training = 0;
   assert.ok(c.turretDamage(turret) < strong);
-  assert.ok(game.world.structures.get(tileKey(7, 0)) === undefined);
+  assert.ok(game.world.structures.get(tileKey(3, 0)) === undefined);
 });
 
 test('salvaging is a trickle: never more than a fraction of crafting costs', () => {
