@@ -590,7 +590,8 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 
 - Ingen backend ingår. Synk-klienten och protokollet finns, men en server och
   kontohantering behöver byggas separat. Multiplayer finns bara som en knapp i huvudmenyn än så
-  länge.
+  länge. Planen för multiplayer (nätkod, fuskskydd, klaner, PvP-regler och gratis hosting) finns i
+  [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md).
 - Du kan bara ha en pal med dig åt gången, och pals har inga egna förmågor utöver bett, zap och
   insamling. Fler sorter och specialförmågor vore ett naturligt nästa steg.
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
