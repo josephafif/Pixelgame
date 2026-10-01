@@ -289,6 +289,29 @@ export class Renderer {
           this.#glow(x, y, a.color, r);
           break;
         }
+        case 'field': {
+          // A swirling disc with spinning arcs (and a flower for Venom Bloom).
+          this.#circle(x, y, r, a.color, null, 0.16 * fade);
+          v.strokeStyle = a.color;
+          v.globalAlpha = 0.7 * fade;
+          for (let k = 0; k < 4; k++) {
+            v.beginPath();
+            const rot = a.t * (a.spin ?? 3) + k * (Math.PI / 2);
+            v.arc(x, y, r * (0.45 + 0.13 * k), rot, rot + 1.1);
+            v.stroke();
+          }
+          if (a.flower) {
+            const open = Math.min(1, a.t * 3);
+            for (let k = 0; k < 6; k++) {
+              const ang = (k / 6) * Math.PI * 2 + a.t * 0.4;
+              this.#circle(x + Math.cos(ang) * 7 * open, y + Math.sin(ang) * 7 * open - 4, 5 * open, '#ff7ad8', '#161622', fade);
+            }
+            this.#circle(x, y - 4, 5 * open, '#ffe45c', '#161622', fade);
+          }
+          v.globalAlpha = 1;
+          this.#glow(x, y, a.color, r * 0.8);
+          break;
+        }
         case 'cloud':
         case 'hazard':
           this.#circle(x, y, r, a.lava || a.element === 'fire' ? '#ff5a1a' : a.color, null, 0.28 * fade);
@@ -616,6 +639,15 @@ export class Renderer {
     v.globalAlpha = 1;
     v.strokeStyle = color;
     v.strokeRect(x + 0.5, y + 0.5, 15, 15);
+    if (game.input.mode === 'touch') {
+      // The picked tile breathes: tap it again (or the hammer) to build there.
+      const k = 1 + Math.round(1 + Math.sin(game.time * 6));
+      v.fillStyle = color;
+      for (const [cx, cy, dx, dy] of [[x - k, y - k, 1, 1], [x + 16 + k, y - k, -1, 1], [x - k, y + 16 + k, 1, -1], [x + 16 + k, y + 16 + k, -1, -1]]) {
+        v.fillRect(cx, cy, 5 * dx, dy);
+        v.fillRect(cx, cy, dx, 5 * dy);
+      }
+    }
   }
 
   #drawObject(game, o, x, y) {
@@ -642,10 +674,18 @@ export class Renderer {
       }
       case 'altar': {
         const boss = game.data.byId.bosses.get(o.bossId);
-        const defeated = game.save.bosses.defeated[o.bossId];
+        if (game.altarSpent(o)) {
+          // A spent altar: cold grey stone, no light.
+          v.globalAlpha = 0.75;
+          v.drawImage(objectSprite('altar', '#6a6a76'), x - 8, y - 6);
+          v.globalAlpha = 1;
+          break;
+        }
         const s = objectSprite('altar', boss.color);
+        // Great altars stand on a wider dais of light.
+        if (!o.lesser) this.#glow(x, y + 2, boss.color, 26 + Math.sin(game.time * 2) * 3);
         v.drawImage(s, x - 8, y - 6);
-        this.#glow(x, y - 2, boss.color, defeated ? 8 : 16 + Math.sin(game.time * 3) * 3);
+        this.#glow(x, y - 2, boss.color, 16 + Math.sin(game.time * 3) * 3);
         if (!game.boss && Math.random() < 0.15) game.fx.emit(game.data.byId.elements.get(boss.element)?.particles ?? 'sparkle', o.x, o.y - 0.3, 1, 0.8, 0.6);
         break;
       }
@@ -926,6 +966,17 @@ export class Renderer {
       return;
     }
     const t = game.time;
+    if (e.boss && e.submerged) {
+      // Under the ground: only a rumbling mound shows where it is.
+      const k = Math.sin(t * 20) > 0 ? 1 : 0;
+      this.#shadow(x, y + 1, 10);
+      v.fillStyle = '#161622';
+      v.fillRect(Math.round(x) - 8 + k, Math.round(y) - 3, 16, 4);
+      v.fillStyle = e.color;
+      v.fillRect(Math.round(x) - 7 + k, Math.round(y) - 2, 14, 2);
+      if (Math.random() < 0.4) game.fx.emit('dust', e.x, e.y, 1, 0.8, 1);
+      return;
+    }
     const set = e.sprites;
     const right = e.facing >= 0;
     const body = e.def?.body ?? 'walk';
@@ -1089,6 +1140,11 @@ export class Renderer {
     if (!isClone && c.hurtFlash > 0) img = sprites.flash;
     const bob = c.moving ? (Math.floor(c.walkT) % 2) : 0;
     if (isClone || !game.sailing) this.#shadow(x + lx, y + 1 + ly, 5);
+    // Ascension: a radiant aura while the power lasts.
+    if (!isClone && game.ascend && game.ascend.until > game.time) {
+      this.#glow(x, y - 6, game.ascend.color, 20 + Math.sin(game.time * 8) * 3);
+      if (Math.random() < 0.4) game.fx.emit('arcane', c.x, c.y - 0.3, 1, 0.5, 1.5);
+    }
     const behind = pose && Math.sin(pose.angle) < -0.35;
     if (isClone) v.globalAlpha = 0.65;
     else if (c.invuln > 0 && Math.floor(game.time * 20) % 2) v.globalAlpha = 0.5;

@@ -12,6 +12,11 @@ const SAFE_RADIUS = 16;
 const CAMP_RADIUS = 6.5;
 const CAMP_CLEAR = 9;
 const LANDMARK_RADIUS = 22;
+// Lesser altars: one more boss to find in about half of the big world cells.
+// Every altar can be beaten once; after that you look for a new one.
+export const ALTAR_CELL = 200;
+const ALTAR_CHANCE = 0.55;
+const ALTAR_CLEAR = 5;
 const MAX_CHUNKS = 160;
 // Markets: at most one per big cell of the world, and only in some cells.
 export const MARKET_CELL = 112;
@@ -29,15 +34,15 @@ const LAND_SAFE = 170;
 const LAND_FADE = 220;
 /** What a spot is, seen from the sea. */
 export const SEA = { LAND: 0, BEACH: 1, ISLE: 2, ISLE_BEACH: 3, SHALLOW: 4, DEEP: 5 };
-// Boss arenas at growing distances (the first is always reachable on foot).
-const BOSS_DISTANCES = [150, 290, 430, 570];
+// Great boss altars at growing distances (the first is always reachable on foot).
+const BOSS_DISTANCES = [150, 270, 390, 510, 630, 750, 870, 990];
 
 // Tile ids. Ground tiles are walkable; blockers sit on top of ground.
 export const T = {
   GRASS: 1, FLOWERS: 2, MOSS: 3, SAND: 4, SAND2: 5, SNOW: 6, ICE: 7, ASH: 8, BASALT: 9,
   ROCKGRASS: 10, VOIDSTONE: 11, VOIDMOSS: 12, CAMP: 13, PATH: 14,
   WATER: 20, LAVA: 21, TREE: 22, PINE: 23, ROCK: 24, CACTUS: 25, CRYSTAL: 26,
-  SEA: 27, DEEP: 28, PALM: 29,
+  SEA: 27, DEEP: 28, PALM: 29, OBSIDIAN: 30, ORE: 31, STARSTONE: 32,
 };
 
 const GROUND_BY_NAME = {
@@ -45,7 +50,10 @@ const GROUND_BY_NAME = {
   ice: T.ICE, ash: T.ASH, basalt: T.BASALT, rockgrass: T.ROCKGRASS, voidstone: T.VOIDSTONE,
   voidmoss: T.VOIDMOSS,
 };
-const BLOCKER_BY_NAME = { tree: T.TREE, pine: T.PINE, rock: T.ROCK, cactus: T.CACTUS, crystal: T.CRYSTAL, palm: T.PALM };
+const BLOCKER_BY_NAME = {
+  tree: T.TREE, pine: T.PINE, rock: T.ROCK, cactus: T.CACTUS, crystal: T.CRYSTAL, palm: T.PALM,
+  obsidian: T.OBSIDIAN, ore: T.ORE, starstone: T.STARSTONE,
+};
 /** Blocker tile id → name used by game data (gathering.harvest). */
 export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).map(([k, v]) => [v, k]));
 const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
@@ -100,21 +108,19 @@ export class World {
       deep: noiseThreshold(0.22),
       isle: noiseThreshold(0.92),
     };
-    // One boss arena per boss, spread around the compass and far apart: the
-    // first a good walk away, the last deep in the world (sometimes out at
-    // sea, where its arena becomes an island).
+    // One great altar per boss, spread around the compass and far apart:
+    // the first a good walk away, the rest deeper and deeper into the world.
+    // The island boss may end up out at sea (its arena becomes an island).
     const start = hashInts(this.seed, 71) % 8;
-    const last = data.bosses.length - 1;
     this.landmarks = data.bosses.map((boss, i) => {
       const jitter = ((hashInts(this.seed, 72, i) % 1000) / 1000 - 0.5) * 0.5;
       const angle0 = ((start + i * 2 + (i >= 2 ? 1 : 0)) % 8) * (Math.PI / 4) + jitter;
       const dist = BOSS_DISTANCES[i] ?? 150 + 140 * i;
-      // Every arena but the last stands on the mainland: nudge it around
-      // the circle (and a little in or out) until it is on dry ground. The
-      // last one may end up on an island.
+      // Arenas stand on the mainland: nudge each around the circle (and a
+      // little in or out) until it is on dry ground. Islanders may stay at sea.
       let angle = angle0;
       let r = dist;
-      if (i < last && !this.#dryArena(Math.cos(angle) * r, Math.sin(angle) * r)) {
+      if (boss.biome !== 'isles' && !this.#dryArena(Math.cos(angle) * r, Math.sin(angle) * r)) {
         search: for (const dd of [0, 30, -30, 60]) {
           for (let k = 1; k < 50; k++) {
             const a = angle0 + Math.ceil(k / 2) * 0.13 * (k % 2 ? 1 : -1);
@@ -131,6 +137,7 @@ export class World {
         x: Math.round(Math.cos(angle) * r) + 0.5, y: Math.round(Math.sin(angle) * r) + 0.5,
       };
     });
+    this.altarCache = new Map();
     // One market is guaranteed within reach, in a direction no boss uses.
     this.marketCache = new Map();
     const [fx, fy] = COMPASS[(start + 1) % 8];
@@ -175,6 +182,56 @@ export class World {
     }
     this.marketCache.set(key, m);
     return m;
+  }
+
+  // --- Lesser altars ------------------------------------------------------------------
+
+  /** The lesser altar in a world cell, or null (deterministic per seed). */
+  altarForCell(ax, ay) {
+    const key = `${ax},${ay}`;
+    if (this.altarCache.has(key)) return this.altarCache.get(key);
+    let altar = null;
+    const h = hashInts(this.seed, ax, ay, 0xa17a2);
+    if ((h % 1000) / 1000 < ALTAR_CHANCE) {
+      const x = ax * ALTAR_CELL + 30 + ((h >>> 10) % (ALTAR_CELL - 60)) + 0.5;
+      const y = ay * ALTAR_CELL + 30 + ((h >>> 20) % (ALTAR_CELL - 60)) + 0.5;
+      const far = x * x + y * y > 210 * 210;
+      const clear = far && !this.landmarks.some((lm) => (lm.x - x) ** 2 + (lm.y - y) ** 2 < 70 * 70);
+      // On dry ground (mainland or a big enough island), away from markets.
+      const dry = clear && [[0, 0], ...COMPASS].every(([dx, dy]) => this.seaAt(x + dx * 7, y + dy * 7) < SEA.SHALLOW);
+      if (dry && !this.marketAt(x, y, 14)) {
+        // The guardian belongs to the land around it.
+        const biome = this.biomeAt(Math.floor(x), Math.floor(y));
+        const local = this.data.bosses.filter((b) => b.biome === biome.id);
+        const list = local.length ? local : this.data.bosses;
+        altar = { key: `a:c${key}`, x, y, bossId: list[(h >>> 4) % list.length].id, lesser: true };
+      }
+    }
+    this.altarCache.set(key, altar);
+    return altar;
+  }
+
+  /** Lesser altars within `range` tiles of (x, y). */
+  altarsNear(x, y, range) {
+    const out = [];
+    for (let ay = Math.floor((y - range) / ALTAR_CELL); ay <= Math.floor((y + range) / ALTAR_CELL); ay++) {
+      for (let ax = Math.floor((x - range) / ALTAR_CELL); ax <= Math.floor((x + range) / ALTAR_CELL); ax++) {
+        const a = this.altarForCell(ax, ay);
+        if (a && (a.x - x) ** 2 + (a.y - y) ** 2 <= range * range) out.push(a);
+      }
+    }
+    return out;
+  }
+
+  /** The great altars, one per boss, as altar objects. */
+  greatAltars() {
+    return this.landmarks.map((lm) => ({ key: `a:${lm.bossId}`, x: lm.x, y: lm.y, bossId: lm.bossId, lesser: false }));
+  }
+
+  /** Every altar (great and lesser) within `range` tiles. */
+  allAltarsNear(x, y, range) {
+    const great = this.greatAltars().filter((a) => (a.x - x) ** 2 + (a.y - y) ** 2 <= range * range);
+    return [...great, ...this.altarsNear(x, y, range)];
   }
 
   /** Markets whose area comes within `range` tiles of (x, y). */
@@ -294,6 +351,8 @@ export class World {
     const biomeIdx = new Uint8Array(CHUNK * CHUNK);
     const s = this.seed;
     const markets = this.marketsNear(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, CHUNK + 6);
+    const altars = this.altarsNear(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, CHUNK + ALTAR_CLEAR + 2);
+    const nearAltar = (x, y) => altars.some((a) => (a.x - x) ** 2 + (a.y - y) ** 2 < ALTAR_CLEAR * ALTAR_CLEAR);
     for (let ly = 0; ly < CHUNK; ly++) {
       for (let lx = 0; lx < CHUNK; lx++) {
         const x = cx * CHUNK + lx;
@@ -329,7 +388,7 @@ export class World {
         const detail = fbm(s ^ 0x4444, x / 6, y / 6);
         ground[i] = GROUND_BY_NAME[detail > this.q.detail ? b.alt : b.ground] ?? T.GRASS;
         if (d2 < CAMP_CLEAR * CAMP_CLEAR) continue; // keep the camp surroundings open
-        if (this.#nearLandmark(x, y, 4)) continue; // keep arenas open
+        if (this.#nearLandmark(x, y, 4) || nearAltar(x + 0.5, y + 0.5)) continue; // keep arenas open
         const w = fbm(s ^ 0x5555, x / 9, y / 9);
         if (b.water && w < noiseThreshold(b.water)) {
           block[i] = T.WATER;
@@ -394,8 +453,11 @@ export class World {
     }
     for (const lm of this.landmarks) {
       if (Math.floor(lm.x / CHUNK) === cx && Math.floor(lm.y / CHUNK) === cy) {
-        chunk.objects.push({ type: 'altar', key: `a:${lm.bossId}`, x: lm.x, y: lm.y, bossId: lm.bossId });
+        chunk.objects.push({ type: 'altar', key: `a:${lm.bossId}`, x: lm.x, y: lm.y, bossId: lm.bossId, lesser: false });
       }
+    }
+    for (const a of this.altarsNear(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, CHUNK)) {
+      if (Math.floor(a.x / CHUNK) === cx && Math.floor(a.y / CHUNK) === cy) chunk.objects.push({ type: 'altar', ...a });
     }
     if (far && r < 0.3) {
       const p = this.#freeTileIn(chunk, 1);

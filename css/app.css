@@ -358,6 +358,40 @@ body[data-input="touch"] .build-bar { top: calc(158px + var(--safe-t)); bottom: 
 @media (max-height: 520px) {
   body[data-input="touch"] .build-bar { top: calc(8px + var(--safe-t)); left: auto; right: calc(8px + var(--safe-r)); transform: none; width: min(460px, 60vw); }
 }
+/* Touch: a slim strip of icons across the top, so the camp stays in view. */
+body[data-input="touch"] .build-bar.compact {
+  top: calc(52px + var(--safe-t)); bottom: auto; left: calc(6px + var(--safe-l)); right: calc(6px + var(--safe-r));
+  transform: none; width: auto; max-width: 640px; margin: 0 auto; padding: 3px 6px; gap: 3px;
+  border-width: 4px; border-image-width: 4px;
+}
+.build-bar.compact .bitem { width: 46px; height: 50px; padding: 1px; }
+.build-bar.compact .bitem .art { height: 44px; }
+.build-bar.compact .bitem .art canvas { width: 20px !important; height: 30px !important; }
+.build-bar.compact .bitem .art .lock { right: 0; bottom: 0; }
+.build-bar.compact .build-foot { gap: 6px; }
+.build-bar.compact .done { min-height: 34px; padding: 0 14px; font-size: 15px; }
+.build-sel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; }
+.build-sel .bcost { display: flex; gap: 3px; }
+.build-sel .cost { font-size: 12px; padding: 0 4px; border-width: 3px; border-image-width: 3px; }
+.build-sel .cost .icon { width: 12px; height: 12px; }
+.build-bar.compact .status { font-size: 12px; line-height: 1.2; color: var(--muted); }
+.build-bar.compact .status.bad { color: #ffb070; }
+/* While building on a phone the strip takes the top; menus are reached from it (Done). */
+body.building[data-input="touch"] .hud-right,
+body.building[data-input="touch"] .compass,
+body.building[data-input="touch"] .hud-pal,
+body.building[data-input="touch"] .hud-weapon { display: none; }
+body.building[data-input="touch"] .toasts { top: calc(176px + var(--safe-t)); }
+@media (max-height: 520px) {
+  body[data-input="touch"] .build-bar.compact {
+    top: calc(4px + var(--safe-t)); left: calc(210px + var(--safe-l)); right: calc(6px + var(--safe-r)); max-width: none;
+    flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 8px;
+  }
+  .build-bar.compact .build-list { flex: 1 1 0; min-width: 0; }
+  .build-bar.compact .build-foot { flex: none; max-width: 50%; }
+  .build-bar.compact .status { flex-basis: 100%; }
+  body.building[data-input="touch"] .toasts { top: auto; bottom: calc(8px + var(--safe-b)); flex-direction: column-reverse; }
+}
 
 /* Forge tools tab */
 .tool-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
@@ -443,6 +477,8 @@ body[data-input="keyboard"] .key-hints { display: block; }
   background: conic-gradient(rgba(8, 6, 14, 0.72) var(--cd), transparent 0), linear-gradient(#6b3fc6, #2e1a58);
 }
 .btn.ability.ready { background: linear-gradient(#b35cff, #4a2488); animation: ready-pulse 1.2s ease-in-out infinite; }
+.btn.ability.legendary.ready { background: linear-gradient(#ffe27a, #c8781a); box-shadow: 0 0 14px rgba(255, 210, 74, 0.7); }
+.ability-name.legendary-power { font-size: 20px; text-shadow: 0 0 8px currentColor; }
 @keyframes ready-pulse { 50% { filter: brightness(1.35); } }
 .btn .cd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; font-weight: 700; text-shadow: 0 2px 0 var(--ink); }
 .btn.ability:not(.ready) .glyph { opacity: 0.35; }
@@ -763,6 +799,22 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 }
 .tile.on { border-image-source: var(--frame-chip-on); color: var(--gold); }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips.ranked .chip { gap: 5px; }
+.chip.locked { opacity: 0.45; }
+.tierpips { display: inline-flex; gap: 2px; }
+.tierpips i { width: 4px; height: 8px; background: var(--sunken); box-shadow: 0 0 0 1px var(--ink); }
+.tierpips i.on { background: var(--gold); }
+.opt-cost { display: inline-flex; gap: 4px; font-size: 12px; color: var(--muted); }
+.opt-cost span { display: inline-flex; align-items: center; gap: 1px; }
+.chip.on .opt-cost { color: var(--text); }
+.explain { margin-top: 6px; padding: 6px 8px; font-size: 14px; line-height: 1.35; background: rgba(255, 255, 255, 0.04); box-shadow: inset 3px 0 0 var(--brass); }
+.explain .fx { color: var(--good); }
+.forge-guide { margin: 0 0 12px; font-size: 14px; color: var(--muted); }
+.tier .name { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.price-breakdown { font-size: 13px; }
+.price-breakdown summary { cursor: pointer; color: var(--muted); }
+.price-breakdown ul { list-style: none; margin: 4px 0; padding: 0; }
+.price-breakdown li { display: flex; justify-content: space-between; gap: 8px; }
 .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
 .tier {
   flex-direction: column; align-items: stretch; gap: 2px; min-height: 70px; text-align: left; padding: 4px 10px;

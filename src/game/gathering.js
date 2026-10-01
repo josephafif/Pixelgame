@@ -33,6 +33,8 @@ export function pickaxeBlockers(data, save, def) {
   const out = [];
   const forge = buildingLevel(data, save, 'forge');
   if (forge < def.requiresForge) out.push(forge ? `Needs Forge level ${def.requiresForge}` : 'Build a Forge first');
+  const bosses = Object.keys(save.bosses?.defeated ?? {}).length;
+  if (def.requiresBosses && bosses < def.requiresBosses) out.push(`Defeat ${def.requiresBosses} different bosses first`);
   out.push(...shortfalls(save.resources, def.cost));
   return out;
 }
@@ -87,14 +89,19 @@ export function findHarvestTarget(game) {
   return best;
 }
 
-function roll([lo, hi]) {
-  return lo + Math.floor(Math.random() * (hi - lo + 1));
-}
-
-/** Rolls the drops for a felled tile, e.g. { wood: 4 }. */
-export function rollDrops(info) {
+/**
+ * Rolls the drops for a felled tile, e.g. { wood: 4 }. Better pickaxes
+ * bring in more (`yieldMult`); some tiles have a small chance of a bonus
+ * (a Star Shard from starstone).
+ */
+export function rollDrops(info, yieldMult = 1, rng = Math.random) {
   const out = {};
-  for (const [kind, range] of Object.entries(info.drops ?? {})) out[kind] = roll(range);
+  for (const [kind, [lo, hi]] of Object.entries(info.drops ?? {})) {
+    out[kind] = Math.round((lo + Math.floor(rng() * (hi - lo + 1))) * yieldMult);
+  }
+  for (const [kind, chance] of Object.entries(info.bonus ?? {})) {
+    if (rng() < chance) out[kind] = (out[kind] ?? 0) + 1;
+  }
   return out;
 }
 

@@ -881,6 +881,273 @@ function bossPattern(game, b, pattern) {
       game.audio.play('whirl');
       return 3;
     }
+
+    // --- Bone King: the dead rise around you, fans of bone, delayed curses -------
+    case 'raise': {
+      const n = b.phase === 2 ? 4 : 3;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + Math.random();
+        const spot = game.world.findFreeSpot(p.x + Math.cos(a) * 3.2, p.y + Math.sin(a) * 3.2, 0.4, 'enemy', null);
+        if (!spot) continue;
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'circle', x: spot.x, y: spot.y, r: 0.6, dur: 0.9, color: '#e8e4d4',
+          onEnd: () => {
+            if (b.dead) return;
+            const m = spawnEnemy(game, 'skeleton', spot.x, spot.y, { level: b.level, element: 'physical' });
+            if (m) Object.assign(m, { summoned: true, alert: true, xp: Math.round(m.xp * 0.3) });
+            game.fx.emit('dust', spot.x, spot.y, 10, 0.5, 2);
+          },
+        });
+      }
+      return 2.6;
+    }
+    case 'bonefan': {
+      const volleys = b.phase === 2 ? 3 : 2;
+      for (let v = 0; v < volleys; v++) {
+        game.schedule(v * 0.5, () => {
+          if (b.dead) return;
+          const aim = Math.atan2(p.y - b.y, p.x - b.x) + (v % 2 ? 0.085 : 0);
+          for (let i = 0; i < 7; i++) {
+            enemyShoot(game, b, aim + (i - 3) * 0.17, { speed: 7.5, damage: dmg * 0.8, size: 2, sprite: 'bone' });
+          }
+        });
+      }
+      return volleys * 0.5 + 1.2;
+    }
+    case 'curse': {
+      const n = b.phase === 2 ? 5 : 3;
+      for (let i = 0; i < n; i++) {
+        game.schedule(i * 0.3, () => {
+          if (b.dead || p.dead) return;
+          const tx = p.x;
+          const ty = p.y;
+          game.spawnArea('telegraph', {
+            owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 1.5, dur: 1.1, color: '#d0263a',
+            onEnd: () => {
+              if (b.dead) return;
+              game.fx.add({ type: 'ring', x: tx, y: ty, r0: 0.3, r1: 1.6, color: '#d0263a', dur: 0.3, fill: true });
+              game.fx.emit('hit', tx, ty, 8, 0.6, 2);
+              if (dist2(tx, ty, p.x, p.y) <= (1.5 + p.r) ** 2) {
+                game.hurtPlayer(b.dmg * 1.1, { element: 'bleed', fromX: tx, fromY: ty });
+                game.applyPlayerStatus('bleed');
+              }
+            },
+          });
+        });
+      }
+      return n * 0.3 + 1.6;
+    }
+
+    // --- Thornmother: roots race towards you, spore clouds, she re-roots ---------
+    case 'roots': {
+      const lines = b.phase === 2 ? 5 : 3;
+      const aim = Math.atan2(p.y - b.y, p.x - b.x);
+      for (let k = 0; k < lines; k++) {
+        const a = aim + (k - (lines - 1) / 2) * 0.32;
+        for (let j = 0; j < 9; j++) {
+          const d = b.r + 0.6 + j * 1.2;
+          const tx = b.x + Math.cos(a) * d;
+          const ty = b.y + Math.sin(a) * d;
+          game.schedule(j * 0.11, () => {
+            if (b.dead) return;
+            game.spawnArea('telegraph', {
+              owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 0.7, dur: 0.55, color: '#6ac04a',
+              onEnd: () => {
+                game.fx.add({ type: 'spike', x: tx, y: ty, color: '#7a5232', dur: 0.4 });
+                game.fx.emit('leaf', tx, ty, 3, 0.4, 1.5);
+                if (dist2(tx, ty, p.x, p.y) <= (0.7 + p.r) ** 2) {
+                  game.hurtPlayer(b.dmg * 0.9, { element: 'poison', fromX: tx, fromY: ty });
+                  game.applyPlayerStatus('poison');
+                }
+              },
+            });
+          });
+        }
+      }
+      return 2.6;
+    }
+    case 'spores': {
+      const n = b.phase === 2 ? 6 : 4;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + Math.random() * 0.6;
+        const d = i === 0 ? 0 : 1.6 + Math.random() * 2.4;
+        const tx = p.x + Math.cos(a) * d;
+        const ty = p.y + Math.sin(a) * d;
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 1.3, dur: 0.8, color: '#9ae05a',
+          onEnd: () => {
+            if (b.dead) return;
+            game.spawnArea('hazard', { owner: 'enemy', x: tx, y: ty, r: 1.3, dur: 4.5, dps: b.dmg * 0.45, element: 'poison' });
+          },
+        });
+      }
+      return 2.4;
+    }
+    case 'reroot': {
+      // She sinks into the ground and bursts up somewhere else, roots first.
+      const a = Math.random() * Math.PI * 2;
+      const spot = game.world.findFreeSpot(p.x + Math.cos(a) * 6, p.y + Math.sin(a) * 6, b.r * 0.6, 'fly', { x: b.x, y: b.y });
+      game.fx.emit('leaf', b.x, b.y, 18, b.r * 1.5, 2);
+      b.submerged = true;
+      b.state = 'windup';
+      game.spawnArea('telegraph', {
+        owner: 'enemy', shape: 'circle', x: spot.x, y: spot.y, r: b.r + 0.6, dur: 1, color: '#6ac04a',
+        onEnd: () => {
+          if (b.dead) return;
+          b.x = spot.x;
+          b.y = spot.y;
+          b.submerged = false;
+          b.state = 'move';
+          game.shake = Math.max(game.shake, 0.3);
+          game.fx.emit('leaf', b.x, b.y, 20, b.r * 1.5, 3);
+          if (dist2(b.x, b.y, p.x, p.y) <= (b.r + 0.6 + p.r) ** 2) game.hurtPlayer(b.dmg * 1.3, { element: 'poison', fromX: b.x, fromY: b.y });
+        },
+      });
+      return 2.2;
+    }
+
+    // --- Sand Wyrm: dives under the sand, quakes, spits sand ---------------------
+    case 'burrow': {
+      b.submerged = true;
+      b.state = 'windup';
+      game.fx.emit('dust', b.x, b.y, 20, b.r * 1.5, 3);
+      game.audio.play('boom');
+      const erupt = (k) => {
+        if (b.dead) return;
+        const tx = p.x;
+        const ty = p.y;
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 2, dur: 1.05, color: '#d8a858',
+          onEnd: () => {
+            if (b.dead) return;
+            b.x = tx;
+            b.y = ty;
+            game.shake = Math.max(game.shake, 0.45);
+            game.fx.add({ type: 'ring', x: tx, y: ty, r0: 0.4, r1: 2.4, color: '#d8a858', dur: 0.35, fill: true });
+            game.fx.emit('dust', tx, ty, 26, 1.6, 4);
+            if (dist2(tx, ty, p.x, p.y) <= (2 + p.r) ** 2) game.hurtPlayer(b.dmg * 1.6, { element: 'earth', fromX: tx, fromY: ty });
+            // Debris flies out in a ring.
+            for (let i = 0; i < 10; i++) enemyShoot(game, b, (i / 10) * Math.PI * 2, { speed: 5, damage: dmg * 0.6, size: 2 });
+            if (b.phase === 2 && k === 0) {
+              game.schedule(0.6, () => erupt(1));
+            } else {
+              b.submerged = false;
+              b.state = 'move';
+            }
+          },
+        });
+      };
+      game.schedule(0.9, () => erupt(0));
+      return b.phase === 2 ? 4.4 : 3.2;
+    }
+    case 'quake': {
+      const waves = b.phase === 2 ? 4 : 3;
+      for (let w = 0; w < waves; w++) {
+        game.schedule(w * 0.7, () => {
+          if (b.dead) return;
+          const cx = b.x;
+          const cy = b.y;
+          game.shake = Math.max(game.shake, 0.2);
+          game.fx.add({ type: 'ring', x: cx, y: cy, r0: b.r, r1: 9, color: '#d8a858', dur: 1.1 });
+          game.audio.play('boom', { throttle: 200 });
+          // The ripple hits whatever it passes (once): step over the gap between rings.
+          let hit = false;
+          for (let k = 1; k <= 10; k++) {
+            game.schedule(k * 0.11, () => {
+              if (hit || b.dead || p.dead) return;
+              const rad = b.r + (9 - b.r) * (k / 10);
+              const d = Math.sqrt(dist2(cx, cy, p.x, p.y));
+              if (Math.abs(d - rad) < 0.55) {
+                hit = true;
+                game.hurtPlayer(b.dmg * 0.9, { element: 'earth', fromX: cx, fromY: cy });
+              }
+            });
+          }
+        });
+      }
+      return waves * 0.7 + 1.4;
+    }
+    case 'sandspit': {
+      const shots = b.phase === 2 ? 5 : 3;
+      for (let i = 0; i < shots; i++) {
+        game.schedule(i * 0.35, () => {
+          if (b.dead || p.dead) return;
+          const tx = p.x + p.vx * 0.5;
+          const ty = p.y + p.vy * 0.5;
+          game.spawnArea('telegraph', {
+            owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 1.4, dur: 0.9, color: '#e8c890',
+            onEnd: () => {
+              if (b.dead) return;
+              game.fx.emit('dust', tx, ty, 14, 1, 3);
+              if (dist2(tx, ty, p.x, p.y) <= (1.4 + p.r) ** 2) game.hurtPlayer(b.dmg, { element: 'earth', fromX: tx, fromY: ty });
+              game.spawnArea('hazard', { owner: 'enemy', x: tx, y: ty, r: 1.1, dur: 2.5, dps: b.dmg * 0.3, element: 'earth' });
+            },
+          });
+        });
+      }
+      return shots * 0.35 + 1.4;
+    }
+
+    // --- Tide Leviathan: walls of water, geysers, whirlpools ----------------------
+    case 'wave': {
+      const waves = b.phase === 2 ? 3 : 2;
+      for (let w = 0; w < waves; w++) {
+        game.schedule(w * 1.1, () => {
+          if (b.dead || p.dead) return;
+          // A wall of water rolls in from one side, with a gap to slip through.
+          const from = Math.random() * Math.PI * 2;
+          const dirX = -Math.cos(from);
+          const dirY = -Math.sin(from);
+          const ox = p.x + Math.cos(from) * 8;
+          const oy = p.y + Math.sin(from) * 8;
+          const gap = Math.floor(Math.random() * 9) - 4;
+          for (let k = -7; k <= 7; k++) {
+            if (Math.abs(k - gap) <= 1) continue;
+            game.spawnProjectile({
+              x: ox - dirY * k * 0.9, y: oy + dirX * k * 0.9, angle: Math.atan2(dirY, dirX), speed: 4.2, damage: dmg * 0.8,
+              range: 17, size: 3, sprite: 'orb', owner: 'enemy', element: 'ice', color: '#9ad8f4', status: 'chill', depth: 0,
+            });
+          }
+          game.fx.emit('splash', ox, oy, 12, 3, 2);
+        });
+      }
+      return waves * 1.1 + 2;
+    }
+    case 'geysers': {
+      const n = b.phase === 2 ? 7 : 5;
+      const cx = p.x;
+      const cy = p.y;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
+        const d = i === 0 ? 0 : 2.2;
+        const tx = cx + Math.cos(a) * d;
+        const ty = cy + Math.sin(a) * d;
+        game.schedule(i * 0.12, () => {
+          if (b.dead) return;
+          game.spawnArea('telegraph', {
+            owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 1, dur: 0.9, color: '#7ad8ff',
+            onEnd: () => {
+              if (b.dead) return;
+              game.fx.add({ type: 'pillar', x: tx, y: ty, r: 0.8, color: '#bfe8ff', dur: 0.4 });
+              game.fx.emit('splash', tx, ty, 14, 0.5, 4);
+              if (dist2(tx, ty, p.x, p.y) <= (1 + p.r) ** 2) {
+                game.hurtPlayer(b.dmg * 1.05, { element: 'ice', fromX: tx, fromY: ty });
+                game.applyPlayerStatus('chill');
+              }
+            },
+          });
+        });
+      }
+      return 2.6;
+    }
+    case 'whirlpool': {
+      game.spawnArea('gravity', {
+        owner: 'enemy', x: p.x + (Math.random() - 0.5) * 2, y: p.y + (Math.random() - 0.5) * 2, r: 3.2, dur: 3.4,
+        pull: b.phase === 2 ? 3 : 2.3, dps: b.dmg * 0.8, element: 'ice', color: '#3a9ad8', particles: 'splash',
+      });
+      game.audio.play('whirl');
+      return 3;
+    }
     default:
       return 1.5;
   }
@@ -936,7 +1203,7 @@ function updateBoss(game, b, dt) {
       game.applyPlayerStatus('chill');
     }
   }
-  if (!p.dead && d < b.r + p.r && (b.contactCd ?? 0) <= game.time) {
+  if (!p.dead && !b.submerged && d < b.r + p.r && (b.contactCd ?? 0) <= game.time) {
     b.contactCd = game.time + 0.8;
     game.hurtPlayer(b.dmg * (b.state === 'charge' ? 1.6 : 1), { element: b.element, fromX: b.x, fromY: b.y });
   }

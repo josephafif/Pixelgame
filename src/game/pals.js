@@ -35,8 +35,9 @@ export function palStats(data, speciesId, level) {
     speed: b.speed + per.speed * n,
     attackInterval: Math.max(0.45, b.attackInterval + per.attackInterval * n),
     gatherPower: Math.round((b.gatherPower + per.gatherPower * n) * (sp.gather ?? 1) * 100) / 100,
-    // Crystals need a strong pal (like they need a steel pickaxe).
-    gatherTier: level >= 5 ? 2 : 1,
+    // Harder stone needs a stronger pal (like it needs a better pickaxe):
+    // crystals from level 5, obsidian from 7, iron ore from 9.
+    gatherTier: level >= 9 ? 4 : level >= 7 ? 3 : level >= 5 ? 2 : 1,
     range: sp.attack === 'zap' ? sp.range ?? 4.5 : 0,
     element: sp.element ?? 'physical',
   };

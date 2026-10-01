@@ -80,7 +80,9 @@ export function open(game, app) {
           onclick: () => game.setPalMode(m),
         }, icon(m === 'fight' ? 'sword' : m === 'gather' ? 'pickaxe' : 'pal', 16), MODE_LABEL[m]))),
       h('p.small.muted', MODE_HELP[save.pals.mode] ?? ''),
-      stats.gatherTier < 2 && save.pals.mode === 'gather' ? h('p.small.muted', 'Crystals need a level 5 pal.') : null,
+      save.pals.mode === 'gather' && stats.gatherTier < 4
+        ? h('p.small.muted', ['Crystals need a level 5 pal', 'obsidian level 7', 'iron ore level 9'].slice(stats.gatherTier - 1).join(', ') + '.')
+        : null,
       hard.length ? h('div.req', icon('lock', 16), ' ', hard.join(' · ')) : null,
       h('div.row',
         maxed ? h('span.badge', 'Max level') : costChips(upgradeCost(data, pal.level), save.resources),

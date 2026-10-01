@@ -59,9 +59,14 @@ export class Input {
     // UI commands (open inventory, menu, ...) are dispatched immediately so
     // they also work while the game is paused behind a panel.
     this.onUiCommand = null;
-    // Build mode claims clicks/taps on the world: { active(), down, move, up }.
+    // Build mode claims clicks/taps on the world:
+    // { active(), down, move, up, tap, aim, onGhost }.
     this.worldHandler = null;
     this.buildTouchId = null;
+    // A touch in build mode waits to see whether it is a tap (pick / build a
+    // tile), a drag from the picked tile (a line), or a drag elsewhere
+    // (walk on the joystick side, aim on the other).
+    this.buildTouch = null;
     this.#bind();
   }
 
@@ -189,28 +194,61 @@ export class Input {
     e.preventDefault();
     this.#setMode('touch');
     this.surface.setPointerCapture?.(e.pointerId);
-    if (this.joy.id === null && this.#isJoystickSide(e.clientX)) {
-      const fixed = this.settings().joystickMode === 'fixed';
-      const r = this.joystickRadius;
-      const ox = fixed ? (this.settings().leftHanded ? innerWidth - r * 1.6 : r * 1.6) : e.clientX;
-      const oy = fixed ? innerHeight - r * 1.6 : e.clientY;
-      this.joy = { id: e.pointerId, ox, oy, x: 0, y: 0 };
-      this.#updateJoystick(e.clientX, e.clientY);
-      this.joyEl.classList.add('active');
-    } else if (world && this.buildTouchId === null) {
+    if (world && this.buildTouchId === null) {
       this.buildTouchId = e.pointerId;
-      world.down(e.clientX, e.clientY, 0);
+      this.buildTouch = {
+        x: e.clientX, y: e.clientY, mode: null,
+        joySide: this.joy.id === null && this.#isJoystickSide(e.clientX),
+        onGhost: world.onGhost?.(e.clientX, e.clientY) ?? false,
+      };
+    } else if (this.joy.id === null && this.#isJoystickSide(e.clientX)) {
+      this.#startJoystick(e.pointerId, e.clientX, e.clientY);
     } else if (this.attackTouchId === null) {
       this.attackTouchId = e.pointerId;
       this.touchAttack = true;
     }
   }
 
+  #startJoystick(id, cx, cy, from = { x: cx, y: cy }) {
+    const fixed = this.settings().joystickMode === 'fixed';
+    const r = this.joystickRadius;
+    const ox = fixed ? (this.settings().leftHanded ? innerWidth - r * 1.6 : r * 1.6) : from.x;
+    const oy = fixed ? innerHeight - r * 1.6 : from.y;
+    this.joy = { id, ox, oy, x: 0, y: 0 };
+    this.#updateJoystick(cx, cy);
+    this.joyEl.classList.add('active');
+  }
+
   #pointerMove(e) {
-    if (e.pointerId === this.joy.id) this.#updateJoystick(e.clientX, e.clientY);
-    else if (e.pointerType === 'mouse' || e.pointerId === this.buildTouchId) {
-      if (this.worldHandler?.active()) this.worldHandler.move(e.clientX, e.clientY, e.buttons);
+    if (e.pointerId === this.joy.id) {
+      this.#updateJoystick(e.clientX, e.clientY);
+      return;
     }
+    const world = this.worldHandler?.active() ? this.worldHandler : null;
+    if (e.pointerType === 'mouse') {
+      world?.move(e.clientX, e.clientY, e.buttons);
+      return;
+    }
+    const bt = this.buildTouch;
+    if (e.pointerId !== this.buildTouchId || !bt || !world) return;
+    if (!bt.mode) {
+      if (Math.hypot(e.clientX - bt.x, e.clientY - bt.y) < 10) return;
+      if (bt.onGhost) {
+        // Drawing a line from the picked tile.
+        bt.mode = 'paint';
+        world.down(bt.x, bt.y, 0);
+      } else if (bt.joySide) {
+        // Walking: this touch becomes the joystick.
+        this.buildTouchId = null;
+        this.buildTouch = null;
+        this.#startJoystick(e.pointerId, e.clientX, e.clientY, bt);
+        return;
+      } else {
+        bt.mode = 'aim';
+      }
+    }
+    if (bt.mode === 'paint') world.move(e.clientX, e.clientY, 1);
+    else world.aim?.(e.clientX, e.clientY);
   }
 
   #pointerUp(e) {
@@ -220,7 +258,11 @@ export class Input {
       return;
     }
     if (e.pointerId === this.buildTouchId) {
+      const bt = this.buildTouch;
       this.buildTouchId = null;
+      this.buildTouch = null;
+      const world = this.worldHandler?.active() ? this.worldHandler : null;
+      if (world && bt && !bt.mode && e.type === 'pointerup') world.tap?.(bt.x, bt.y);
       this.worldHandler?.up();
       return;
     }
@@ -287,6 +329,7 @@ export class Input {
     this.joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
     this.attackTouchId = null;
     this.buildTouchId = null;
+    this.buildTouch = null;
     this.joyEl?.classList.remove('active');
   }
 

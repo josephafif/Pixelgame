@@ -1,11 +1,16 @@
 // Build bar: shown while build mode is on. Pick a structure (or the
-// remove tool), then click/tap the ground in your camp. Drag to build a
-// line of walls. Keyboard: 1–9 pick, X remove, Space builds in front of
-// you, Esc/G leaves build mode.
+// remove tool), then click the ground in your camp; drag to build a line
+// of walls. Keyboard: 1–9 pick, X remove, Space builds in front of you,
+// Esc/G leaves build mode.
+//
+// On touch screens the bar is a slim strip of icons along the top (the
+// picked structure's name and cost underneath), so the camp stays in view:
+// tap a tile to pick it, tap it again (or the hammer button) to build, and
+// drag from the picked tile to draw a line.
 
 import { $, h, clear, pixelCanvas } from './dom.js';
 import { icon, costChips } from './icons.js';
-import { structureDefs } from '../game/construction.js';
+import { structureDefs, structureDef } from '../game/construction.js';
 import { structureIcon } from '../render/structures.js';
 import { canAfford } from '../game/base.js';
 
@@ -50,6 +55,7 @@ export class BuildBar {
       return h('button.bitem', {
         class: [on ? 'on' : null, lock ? 'locked' : null].filter(Boolean).join(' ') || null,
         'aria-pressed': String(on),
+        'aria-label': def.name,
         'data-id': def.id,
         title: lock ? `${def.name} — ${lock}` : `${def.name}: ${def.desc}`,
         onclick: (e) => {
@@ -59,31 +65,41 @@ export class BuildBar {
         },
       },
       h('span.art', art, lock ? h('span.lock', icon('lock', 16)) : null),
-      h('span.name', def.name),
-      h('span.bcost', costChips(def.cost, g.save.resources)),
+      touch ? null : h('span.name', def.name),
+      touch ? null : h('span.bcost', costChips(def.cost, g.save.resources)),
       touch ? null : h('span.num', String(i + 1)));
     });
     const removing = g.build.tool === 'remove';
+    const done = h('button.btn-primary.done', {
+      onclick: (e) => {
+        e.currentTarget.blur();
+        g.toggleBuildMode(false);
+      },
+    }, 'Done');
+    const sel = structureDef(g.data, g.build.selected);
+    el.classList.toggle('compact', touch);
     clear(el).append(
       h('div.build-list', { role: 'toolbar', 'aria-label': 'Structures' },
         items,
         h('button.bitem.remove', {
           class: removing ? 'on' : null,
           'aria-pressed': String(removing),
+          'aria-label': 'Remove',
           title: 'Take structures down (you get half the materials back)',
           onclick: (e) => {
             e.currentTarget.blur();
             g.selectStructure('remove');
           },
-        }, h('span.art', icon('remove', 32)), h('span.name', 'Remove'), touch ? null : h('span.num', 'X'))),
-      h('div.build-foot',
-        h('span.status'),
-        h('button.btn-primary.done', {
-          onclick: (e) => {
-            e.currentTarget.blur();
-            g.toggleBuildMode(false);
-          },
-        }, 'Done')));
+        }, h('span.art', icon('remove', touch ? 24 : 32)), touch ? null : h('span.name', 'Remove'), touch ? null : h('span.num', 'X'))),
+      touch
+        ? h('div.build-foot',
+          h('div.build-sel',
+            removing || !sel
+              ? [icon('remove', 16), h('b', 'Remove'), h('span.small.muted', 'half the materials back')]
+              : [h('b', sel.name), h('span.bcost', costChips(sel.cost, g.save.resources))]),
+          done)
+        : h('div.build-foot', h('span.status'), done));
+    if (touch) el.append(h('div.status'));
     this.refresh();
   }
 
@@ -95,10 +111,14 @@ export class BuildBar {
     if (status) {
       const touch = g.input.mode === 'touch';
       const hint = g.build.tool === 'remove'
-        ? (touch ? 'Tap a structure to take it down.' : 'Click a structure to take it down.')
-        : touch ? 'Tap the ground to build · drag for a line.' : 'Click to build · drag for a line · right-click removes · Space builds ahead.';
+        ? (touch ? 'Tap a structure, then tap it again (or the hammer) to take it down.' : 'Click a structure to take it down.')
+        : touch ? 'Tap a tile, then tap it again (or the hammer) to build · drag from it for a line.' : 'Click to build · drag for a line · right-click removes · Space builds ahead.';
       status.textContent = g.build.reason && g.build.ghost ? g.build.reason : hint;
       status.classList.toggle('bad', Boolean(g.build.reason));
+    }
+    const sel = structureDef(g.data, g.build.selected);
+    for (const chip of this.el.querySelectorAll('.build-sel .cost')) {
+      chip.classList.toggle('short', (g.save.resources[chip.dataset.kind] ?? 0) < (sel?.cost[chip.dataset.kind] ?? 0));
     }
     for (const btn of this.el.querySelectorAll('.bitem[data-id]')) {
       const def = structureDefs(g.data).find((d) => d.id === btn.dataset.id);

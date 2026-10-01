@@ -6,6 +6,7 @@ import { statRows, abilityRows, rarityInfo, summaryLine, dpsEstimate, elementNam
 import { formatSeed } from '../core/rng.js';
 import { weaponValue } from '../game/economy.js';
 import { icon } from './icons.js';
+import { effectiveAbility } from '../weapons/legendary.js';
 
 export function weaponIconEl(dna, size = 48) {
   const el = pixelCanvas(weaponIcon(dna, 32), size);
@@ -46,7 +47,7 @@ export function weaponCard(data, dna, { compareTo = null, compact = false } = {}
   const mods = dna.modifiers.map((m) => h('li', { class: `mod mod-${m.category}` }, m.label));
   if (dna.drawback) mods.push(h('li.mod.mod-drawback', `${dna.drawback.name}: ${dna.drawback.label}`));
   const effects = dna.effects.map((e) => h('li.effect', h('b', e.name), ' — ', e.desc));
-  const ab = dna.ability;
+  const ab = effectiveAbility(data, dna);
 
   return h(`article.weapon-card.r-${dna.rarity}`, { style: { '--rarity': rarity.color } },
     h('div.card-head',
@@ -64,8 +65,8 @@ export function weaponCard(data, dna, { compareTo = null, compact = false } = {}
     statTable,
     mods.length ? section('Modifiers', h('ul.mods', mods)) : null,
     effects.length ? section('Special Effects', h('ul.effects', effects)) : null,
-    ab ? section('Ability',
-      h('div.ability-name', ab.name),
+    ab ? section(ab.legendary ? 'Legendary Power' : 'Ability',
+      h('div.ability-name', { class: ab.legendary ? 'legendary-power' : null, style: ab.legendary ? { color: ab.color } : null }, ab.name),
       h('p.ability-desc', ab.desc, ab.twistDesc ? ` ${ab.twistDesc}` : '', ab.infuse ? ` Infused with ${elementName(data, ab.infuse)}.` : ''),
       h('dl.stats.small', abilityRows(ab).map(([k, v]) => [h('dt', k), h('dd', v)]))) : null,
     compact ? null : h('div.dna-row',

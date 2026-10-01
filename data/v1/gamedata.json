@@ -61,57 +61,57 @@
   ],
   "elements": [
     {
-      "id": "physical", "name": "Physical", "weight": 30, "status": null,
+      "id": "physical", "name": "Physical", "desc": "No element: steady damage that nothing resists.", "weight": 30, "status": null,
       "palette": null, "glow": null, "particles": null, "edge": null, "opposes": [],
       "abilityPrefix": "", "soundPitch": 1.0
     },
     {
-      "id": "fire", "name": "Fire", "weight": 10, "status": "burn",
+      "id": "fire", "name": "Fire", "desc": "Sets enemies on fire: extra damage over 3 seconds. Strong against ice.", "weight": 10, "status": "burn",
       "palette": ["#ffe08a", "#ff7b25", "#b8231a"], "glow": "#ff8a2a", "particles": "ember",
       "edge": null, "opposes": ["ice"], "abilityPrefix": "Inferno", "soundPitch": 0.9
     },
     {
-      "id": "ice", "name": "Ice", "weight": 10, "status": "chill",
+      "id": "ice", "name": "Ice", "desc": "Chills and slows enemies; chill them enough and they freeze solid. Strong against fire.", "weight": 10, "status": "chill",
       "palette": ["#f4fcff", "#8fd6ff", "#3a78cf"], "glow": "#a9e6ff", "particles": "frost",
       "edge": "crystal", "opposes": ["fire"], "abilityPrefix": "Frost", "soundPitch": 1.25
     },
     {
-      "id": "lightning", "name": "Lightning", "weight": 9, "status": "shock",
+      "id": "lightning", "name": "Lightning", "desc": "Shocks enemies so they take 20% more damage from everything.", "weight": 9, "status": "shock",
       "palette": ["#fffcd6", "#ffe45c", "#b98f10"], "glow": "#fff27a", "particles": "spark",
       "edge": "jagged", "opposes": [], "abilityPrefix": "Storm", "soundPitch": 1.4
     },
     {
-      "id": "poison", "name": "Poison", "weight": 8, "status": "poison",
+      "id": "poison", "name": "Poison", "desc": "Poison stacks up to 5 times and eats away at tough enemies.", "weight": 8, "status": "poison",
       "palette": ["#e0ffae", "#79d23c", "#2d7228"], "glow": "#9dff5c", "particles": "toxic",
       "edge": null, "opposes": [], "abilityPrefix": "Venom", "soundPitch": 0.8
     },
     {
-      "id": "bleed", "name": "Bleed", "weight": 8, "status": "bleed",
+      "id": "bleed", "name": "Bleed", "desc": "Bleeding stacks up to 3 times: big damage over time.", "weight": 8, "status": "bleed",
       "palette": ["#ffb0b0", "#d0263a", "#651021"], "glow": "#ff3450", "particles": "blood",
       "edge": "serrated", "opposes": [], "abilityPrefix": "Blood", "soundPitch": 0.95
     },
     {
-      "id": "void", "name": "Void", "weight": 6, "status": "rift",
+      "id": "void", "name": "Void", "desc": "Tears rifts: damage over time and a slow. Strong against holy.", "weight": 6, "status": "rift",
       "palette": ["#cdb2ff", "#6b3fc6", "#1f0e3a"], "glow": "#9a5cff", "particles": "void",
       "edge": "jagged", "opposes": ["holy"], "abilityPrefix": "Void", "soundPitch": 0.7, "distortion": true
     },
     {
-      "id": "earth", "name": "Earth", "weight": 7, "status": "stagger",
+      "id": "earth", "name": "Earth", "desc": "Staggers enemies for a moment (a short stun).", "weight": 7, "status": "stagger",
       "palette": ["#ead3a6", "#a8804a", "#553b20"], "glow": "#d9a45c", "particles": "dust",
       "edge": null, "opposes": [], "abilityPrefix": "Stone", "soundPitch": 0.75
     },
     {
-      "id": "wind", "name": "Wind", "weight": 7, "status": "gust",
+      "id": "wind", "name": "Wind", "desc": "Knocks enemies back, keeping them away from you.", "weight": 7, "status": "gust",
       "palette": ["#effff9", "#9de8c8", "#3a9481"], "glow": "#bfffe6", "particles": "leaf",
       "edge": null, "opposes": [], "abilityPrefix": "Gale", "soundPitch": 1.2
     },
     {
-      "id": "holy", "name": "Holy", "weight": 5, "status": "smite",
+      "id": "holy", "name": "Holy", "desc": "Smites for 25% bonus damage. Strong against void.", "weight": 5, "status": "smite",
       "palette": ["#fffef4", "#ffe9a3", "#cf9f30"], "glow": "#fff3b0", "particles": "holy",
       "edge": null, "opposes": ["void"], "abilityPrefix": "Radiant", "soundPitch": 1.3
     },
     {
-      "id": "arcane", "name": "Arcane", "weight": 5, "status": "mark",
+      "id": "arcane", "name": "Arcane", "desc": "Marks enemies: your next hit on a marked enemy is a sure critical.", "weight": 5, "status": "mark",
       "palette": ["#ffd8fc", "#e05ce0", "#721d82"], "glow": "#ff8cf5", "particles": "arcane",
       "edge": null, "opposes": [], "abilityPrefix": "Arcane", "soundPitch": 1.1
     }
@@ -131,67 +131,67 @@
   },
   "materials": [
     {
-      "id": "iron", "name": "Iron", "kinds": ["metal"], "weight": 14,
+      "id": "iron", "name": "Iron", "tier": 1, "desc": "Plain and reliable.", "kinds": ["metal"], "weight": 14,
       "palette": ["#eef1f5", "#a4abb6", "#565e6a"], "handle": ["#9a6a3d", "#5b3a21"],
       "stats": { "damage": 1.0, "attackSpeed": 1.0, "range": 1.0, "crit": 0 }, "tags": []
     },
     {
-      "id": "steel", "name": "Steel", "kinds": ["metal"], "weight": 10,
+      "id": "steel", "name": "Steel", "tier": 2, "desc": "Harder than iron: more damage.", "kinds": ["metal"], "weight": 10,
       "palette": ["#ffffff", "#c3cad6", "#687383"], "handle": ["#3c3f58", "#23243a"],
       "stats": { "damage": 1.06, "attackSpeed": 1.0, "range": 1.0, "crit": 1 }, "tags": ["damage"]
     },
     {
-      "id": "bronze", "name": "Bronze", "kinds": ["metal"], "weight": 9,
+      "id": "bronze", "name": "Bronze", "tier": 1, "desc": "Light: a little faster, a little weaker.", "kinds": ["metal"], "weight": 9,
       "palette": ["#ffe0a8", "#cf8f45", "#74461d"], "handle": ["#6b3f28", "#40241a"],
       "stats": { "damage": 0.97, "attackSpeed": 1.04, "range": 1.0, "crit": 0 }, "tags": ["speed"]
     },
     {
-      "id": "bone", "name": "Bone", "kinds": ["metal", "wood"], "weight": 7,
+      "id": "bone", "name": "Bone", "tier": 2, "desc": "Light and sharp, with a taste for blood.", "kinds": ["metal", "wood"], "weight": 7,
       "palette": ["#fbf6e4", "#d8cfae", "#8a7f5e"], "handle": ["#7d5a45", "#4a3326"],
       "stats": { "damage": 0.95, "attackSpeed": 1.06, "range": 1.0, "crit": 3 }, "tags": ["crit", "bleed"]
     },
     {
-      "id": "oak", "name": "Oak", "kinds": ["wood"], "weight": 12,
+      "id": "oak", "name": "Oak", "tier": 1, "desc": "Plain and reliable.", "kinds": ["wood"], "weight": 12,
       "palette": ["#e2b47a", "#a8743e", "#5f3d1c"], "handle": ["#5f3d1c", "#3a2410"],
       "stats": { "damage": 1.0, "attackSpeed": 1.0, "range": 1.0, "crit": 0 }, "tags": []
     },
     {
-      "id": "yew", "name": "Yew", "kinds": ["wood"], "weight": 9,
+      "id": "yew", "name": "Yew", "tier": 2, "desc": "Springy wood: a bit better at everything, with longer reach.", "kinds": ["wood"], "weight": 9,
       "palette": ["#f0c9a0", "#b8683c", "#6a2f1a"], "handle": ["#4a2a18", "#2c170c"],
       "stats": { "damage": 1.03, "attackSpeed": 1.03, "range": 1.05, "crit": 1 }, "tags": ["range"]
     },
     {
-      "id": "obsidian", "name": "Obsidian", "kinds": ["metal", "crystal"], "weight": 6,
+      "id": "obsidian", "name": "Obsidian", "tier": 3, "desc": "Heavy volcanic glass: hits hard but swings slower.", "kinds": ["metal", "crystal"], "weight": 6,
       "palette": ["#8f86a8", "#3d3550", "#15111e"], "handle": ["#5a2d2d", "#2e1414"],
       "stats": { "damage": 1.1, "attackSpeed": 0.95, "range": 1.0, "crit": 2 }, "tags": ["fire", "damage"]
     },
     {
-      "id": "crystal", "name": "Crystal", "kinds": ["crystal", "metal"], "weight": 6,
+      "id": "crystal", "name": "Crystal", "tier": 3, "desc": "Quick and keen, humming with frost and magic.", "kinds": ["crystal", "metal"], "weight": 6,
       "palette": ["#f2ffff", "#9fe7f2", "#3f8fb0"], "handle": ["#b0b8d8", "#6a7098"],
       "stats": { "damage": 1.02, "attackSpeed": 1.05, "range": 1.02, "crit": 2 }, "tags": ["ice", "arcane"]
     },
     {
-      "id": "mythril", "name": "Mythril", "kinds": ["metal", "crystal"], "weight": 5,
+      "id": "mythril", "name": "Mythril", "tier": 4, "desc": "Light and strong: more damage and more speed.", "kinds": ["metal", "crystal"], "weight": 5,
       "palette": ["#f4fbff", "#9fc7e8", "#4c6f9a"], "handle": ["#e8e8f0", "#9a9ab0"],
       "stats": { "damage": 1.08, "attackSpeed": 1.08, "range": 1.0, "crit": 2 }, "tags": ["speed", "holy"]
     },
     {
-      "id": "dragonscale", "name": "Dragonscale", "kinds": ["metal", "wood"], "weight": 4,
+      "id": "dragonscale", "name": "Dragonscale", "tier": 5, "desc": "Big damage and big crits, warm to the touch.", "kinds": ["metal", "wood"], "weight": 4,
       "palette": ["#ffc38a", "#c2452d", "#5a1a16"], "handle": ["#3a2a1a", "#1e150c"],
       "stats": { "damage": 1.12, "attackSpeed": 1.0, "range": 1.0, "crit": 3 }, "tags": ["fire", "crit"]
     },
     {
-      "id": "fang", "name": "Monster Fang", "kinds": ["metal", "wood"], "weight": 5,
+      "id": "fang", "name": "Monster Fang", "tier": 3, "desc": "Wicked edges that find weak spots.", "kinds": ["metal", "wood"], "weight": 5,
       "palette": ["#fff7e0", "#e3cf9a", "#8c6f3a"], "handle": ["#4d2e2e", "#2a1616"],
       "stats": { "damage": 1.0, "attackSpeed": 1.04, "range": 1.0, "crit": 5 }, "tags": ["bleed", "crit"]
     },
     {
-      "id": "ancient", "name": "Ancient", "kinds": ["metal"], "weight": 4,
+      "id": "ancient", "name": "Ancient", "tier": 5, "desc": "The heaviest hitter: long reach, slow swings.", "kinds": ["metal"], "weight": 4,
       "palette": ["#e6f0d8", "#8fa37a", "#3d4a33"], "handle": ["#6a5a2a", "#3a3016"],
       "stats": { "damage": 1.15, "attackSpeed": 0.93, "range": 1.05, "crit": 1 }, "tags": ["damage", "holy"]
     },
     {
-      "id": "shadowsteel", "name": "Shadowsteel", "kinds": ["metal", "crystal"], "weight": 4,
+      "id": "shadowsteel", "name": "Shadowsteel", "tier": 4, "desc": "Forged in the dark: damage, speed and crits.", "kinds": ["metal", "crystal"], "weight": 4,
       "palette": ["#b8a8d8", "#4e3f78", "#140f24"], "handle": ["#2a2a3a", "#101018"],
       "stats": { "damage": 1.07, "attackSpeed": 1.06, "range": 1.0, "crit": 3 }, "tags": ["void", "crit"]
     }
@@ -388,41 +388,41 @@
     }
   ],
   "modifiers": [
-    { "id": "dmg", "name": "+Damage", "category": "offensive", "kind": "stat", "stat": "damagePct", "range": [8, 40], "step": 1, "cost": { "base": 0, "per": 0.6 }, "weight": 12, "tags": ["damage"], "label": "+{v}% Damage" },
-    { "id": "aspd", "name": "+Attack Speed", "category": "offensive", "kind": "stat", "stat": "attackSpeedPct", "range": [6, 30], "step": 1, "cost": { "base": 0, "per": 0.5 }, "weight": 12, "tags": ["speed"], "label": "+{v}% Attack Speed" },
-    { "id": "critc", "name": "+Critical Chance", "category": "offensive", "kind": "stat", "stat": "critChance", "range": [3, 15], "step": 1, "cost": { "base": 0, "per": 1.1 }, "weight": 10, "tags": ["crit"], "label": "+{v}% Critical Chance" },
-    { "id": "critd", "name": "+Critical Damage", "category": "offensive", "kind": "stat", "stat": "critDamage", "range": [15, 80], "step": 5, "cost": { "base": 0, "per": 0.2 }, "weight": 10, "tags": ["crit"], "label": "+{v}% Critical Damage" },
-    { "id": "pspeed", "name": "+Projectile Speed", "category": "offensive", "kind": "stat", "stat": "projectileSpeedPct", "range": [10, 50], "step": 5, "cost": { "base": 0, "per": 0.12 }, "weight": 6, "tags": ["projectile", "speed"], "requires": ["projectile"], "label": "+{v}% Projectile Speed" },
-    { "id": "range", "name": "+Range", "category": "offensive", "kind": "stat", "stat": "rangePct", "range": [8, 35], "step": 1, "cost": { "base": 0, "per": 0.3 }, "weight": 8, "tags": ["range"], "label": "+{v}% Range" },
-    { "id": "multishot", "name": "+Projectiles", "category": "offensive", "kind": "stat", "stat": "projectiles", "range": [1, 2], "step": 1, "cost": { "base": 1, "per": 9 }, "weight": 6, "tags": ["projectile", "multi"], "requires": ["projectile"], "minRarity": "uncommon", "perf": 2, "label": "+{v} Projectiles" },
-    { "id": "swift", "name": "Swiftness", "category": "offensive", "kind": "stat", "playerStat": "moveSpeedPct", "range": [4, 12], "step": 1, "cost": { "base": 0, "per": 0.8 }, "weight": 5, "tags": ["speed", "mobility"], "label": "+{v}% Movement Speed" },
-    { "id": "guard", "name": "Guard", "category": "offensive", "kind": "stat", "playerStat": "defense", "range": [3, 12], "step": 1, "cost": { "base": 0, "per": 0.8 }, "weight": 5, "tags": ["defense"], "label": "+{v} Defense" },
-    { "id": "fortune", "name": "Fortune", "category": "offensive", "kind": "stat", "playerStat": "luck", "range": [2, 8], "step": 1, "cost": { "base": 0, "per": 1 }, "weight": 4, "tags": ["luck"], "label": "+{v} Luck" },
+    { "id": "dmg", "name": "+Damage", "category": "offensive", "runeTier": 2, "kind": "stat", "stat": "damagePct", "range": [8, 40], "step": 1, "cost": { "base": 0, "per": 0.6 }, "weight": 12, "tags": ["damage"], "label": "+{v}% Damage" },
+    { "id": "aspd", "name": "+Attack Speed", "category": "offensive", "runeTier": 2, "kind": "stat", "stat": "attackSpeedPct", "range": [6, 30], "step": 1, "cost": { "base": 0, "per": 0.5 }, "weight": 12, "tags": ["speed"], "label": "+{v}% Attack Speed" },
+    { "id": "critc", "name": "+Critical Chance", "category": "offensive", "runeTier": 2, "kind": "stat", "stat": "critChance", "range": [3, 15], "step": 1, "cost": { "base": 0, "per": 1.1 }, "weight": 10, "tags": ["crit"], "label": "+{v}% Critical Chance" },
+    { "id": "critd", "name": "+Critical Damage", "category": "offensive", "runeTier": 2, "kind": "stat", "stat": "critDamage", "range": [15, 80], "step": 5, "cost": { "base": 0, "per": 0.2 }, "weight": 10, "tags": ["crit"], "label": "+{v}% Critical Damage" },
+    { "id": "pspeed", "name": "+Projectile Speed", "category": "offensive", "runeTier": 1, "kind": "stat", "stat": "projectileSpeedPct", "range": [10, 50], "step": 5, "cost": { "base": 0, "per": 0.12 }, "weight": 6, "tags": ["projectile", "speed"], "requires": ["projectile"], "label": "+{v}% Projectile Speed" },
+    { "id": "range", "name": "+Range", "category": "offensive", "runeTier": 1, "kind": "stat", "stat": "rangePct", "range": [8, 35], "step": 1, "cost": { "base": 0, "per": 0.3 }, "weight": 8, "tags": ["range"], "label": "+{v}% Range" },
+    { "id": "multishot", "name": "+Projectiles", "category": "offensive", "runeTier": 4, "kind": "stat", "stat": "projectiles", "range": [1, 2], "step": 1, "cost": { "base": 1, "per": 9 }, "weight": 6, "tags": ["projectile", "multi"], "requires": ["projectile"], "minRarity": "uncommon", "perf": 2, "label": "+{v} Projectiles" },
+    { "id": "swift", "name": "Swiftness", "category": "offensive", "runeTier": 1, "kind": "stat", "playerStat": "moveSpeedPct", "range": [4, 12], "step": 1, "cost": { "base": 0, "per": 0.8 }, "weight": 5, "tags": ["speed", "mobility"], "label": "+{v}% Movement Speed" },
+    { "id": "guard", "name": "Guard", "category": "offensive", "runeTier": 1, "kind": "stat", "playerStat": "defense", "range": [3, 12], "step": 1, "cost": { "base": 0, "per": 0.8 }, "weight": 5, "tags": ["defense"], "label": "+{v} Defense" },
+    { "id": "fortune", "name": "Fortune", "category": "offensive", "runeTier": 1, "kind": "stat", "playerStat": "luck", "range": [2, 8], "step": 1, "cost": { "base": 0, "per": 1 }, "weight": 4, "tags": ["luck"], "label": "+{v} Luck" },
 
-    { "id": "e_fire", "name": "Fire", "category": "elemental", "kind": "element", "element": "fire", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["fire", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "fire", "pct": "$v" }], "label": "+{v}% damage as Fire" },
-    { "id": "e_ice", "name": "Ice", "category": "elemental", "kind": "element", "element": "ice", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["ice", "elemental", "slow"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "ice", "pct": "$v" }], "label": "+{v}% damage as Ice" },
-    { "id": "e_lightning", "name": "Lightning", "category": "elemental", "kind": "element", "element": "lightning", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["lightning", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "lightning", "pct": "$v" }], "label": "+{v}% damage as Lightning" },
-    { "id": "e_poison", "name": "Poison", "category": "elemental", "kind": "element", "element": "poison", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 6, "tags": ["poison", "elemental", "dot"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "poison", "pct": "$v" }], "label": "+{v}% damage as Poison" },
-    { "id": "e_bleed", "name": "Bleed", "category": "elemental", "kind": "element", "element": "bleed", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 6, "tags": ["bleed", "elemental", "dot"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "bleed", "pct": "$v" }], "label": "+{v}% damage as Bleed" },
-    { "id": "e_void", "name": "Void", "category": "elemental", "kind": "element", "element": "void", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 5, "tags": ["void", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "void", "pct": "$v" }], "label": "+{v}% damage as Void" },
-    { "id": "e_earth", "name": "Earth", "category": "elemental", "kind": "element", "element": "earth", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 5, "tags": ["earth", "elemental", "control"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "earth", "pct": "$v" }], "label": "+{v}% damage as Earth" },
-    { "id": "e_wind", "name": "Wind", "category": "elemental", "kind": "element", "element": "wind", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 5, "tags": ["wind", "elemental", "knockback"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "wind", "pct": "$v" }], "label": "+{v}% damage as Wind" },
-    { "id": "e_holy", "name": "Holy", "category": "elemental", "kind": "element", "element": "holy", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 4, "tags": ["holy", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "holy", "pct": "$v" }], "label": "+{v}% damage as Holy" },
-    { "id": "e_arcane", "name": "Arcane", "category": "elemental", "kind": "element", "element": "arcane", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 4, "tags": ["arcane", "elemental", "crit"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "arcane", "pct": "$v" }], "label": "+{v}% damage as Arcane" },
+    { "id": "e_fire", "name": "Fire", "category": "elemental", "runeTier": 3, "kind": "element", "element": "fire", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["fire", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "fire", "pct": "$v" }], "label": "+{v}% damage as Fire" },
+    { "id": "e_ice", "name": "Ice", "category": "elemental", "runeTier": 3, "kind": "element", "element": "ice", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["ice", "elemental", "slow"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "ice", "pct": "$v" }], "label": "+{v}% damage as Ice" },
+    { "id": "e_lightning", "name": "Lightning", "category": "elemental", "runeTier": 3, "kind": "element", "element": "lightning", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 7, "tags": ["lightning", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "lightning", "pct": "$v" }], "label": "+{v}% damage as Lightning" },
+    { "id": "e_poison", "name": "Poison", "category": "elemental", "runeTier": 3, "kind": "element", "element": "poison", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 6, "tags": ["poison", "elemental", "dot"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "poison", "pct": "$v" }], "label": "+{v}% damage as Poison" },
+    { "id": "e_bleed", "name": "Bleed", "category": "elemental", "runeTier": 3, "kind": "element", "element": "bleed", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 6, "tags": ["bleed", "elemental", "dot"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "bleed", "pct": "$v" }], "label": "+{v}% damage as Bleed" },
+    { "id": "e_void", "name": "Void", "category": "elemental", "runeTier": 3, "kind": "element", "element": "void", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 5, "tags": ["void", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "void", "pct": "$v" }], "label": "+{v}% damage as Void" },
+    { "id": "e_earth", "name": "Earth", "category": "elemental", "runeTier": 3, "kind": "element", "element": "earth", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 5, "tags": ["earth", "elemental", "control"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "earth", "pct": "$v" }], "label": "+{v}% damage as Earth" },
+    { "id": "e_wind", "name": "Wind", "category": "elemental", "runeTier": 3, "kind": "element", "element": "wind", "range": [15, 50], "step": 5, "cost": { "base": 4, "per": 0.2 }, "weight": 5, "tags": ["wind", "elemental", "knockback"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "wind", "pct": "$v" }], "label": "+{v}% damage as Wind" },
+    { "id": "e_holy", "name": "Holy", "category": "elemental", "runeTier": 3, "kind": "element", "element": "holy", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 4, "tags": ["holy", "elemental"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "holy", "pct": "$v" }], "label": "+{v}% damage as Holy" },
+    { "id": "e_arcane", "name": "Arcane", "category": "elemental", "runeTier": 3, "kind": "element", "element": "arcane", "range": [15, 50], "step": 5, "cost": { "base": 5, "per": 0.2 }, "weight": 4, "tags": ["arcane", "elemental", "crit"], "hooks": [{ "on": "hit", "do": "elementDamage", "element": "arcane", "pct": "$v" }], "label": "+{v}% damage as Arcane" },
 
-    { "id": "lifesteal", "name": "Lifesteal", "category": "special", "kind": "behavior", "range": [2, 8], "step": 1, "cost": { "base": 1, "per": 2 }, "weight": 8, "tags": ["lifesteal", "vampire", "sustain"], "hooks": [{ "on": "hit", "do": "heal", "pct": "$v" }], "label": "{v}% of damage restores Health" },
-    { "id": "chain", "name": "Chain Attack", "category": "special", "kind": "behavior", "range": [2, 4], "step": 1, "cost": { "base": 2, "per": 6 }, "weight": 7, "tags": ["chain", "lightning", "aoe"], "perf": 2, "vfx": 1, "hooks": [{ "on": "hit", "do": "chain", "chance": 30, "targets": "$v", "dmg": 45, "radius": 3.5 }], "label": "30% chance to chain to {v} enemies" },
-    { "id": "explosion", "name": "Explosion", "category": "special", "kind": "behavior", "range": [15, 40], "step": 5, "cost": { "base": 6, "per": 0.3 }, "weight": 7, "tags": ["explosion", "aoe", "fire"], "perf": 2, "vfx": 1, "hooks": [{ "on": "hit", "do": "explode", "chance": "$v", "radius": 1.4, "dmg": 50 }], "label": "{v}% chance to explode on hit" },
-    { "id": "pierce", "name": "Piercing", "category": "special", "kind": "behavior", "stat": "pierce", "range": [1, 3], "step": 1, "cost": { "base": 1, "per": 5 }, "weight": 7, "tags": ["pierce", "projectile"], "requires": ["projectile"], "excludesTags": ["returning"], "label": "Projectiles pierce {v} enemies" },
-    { "id": "homing", "name": "Homing", "category": "special", "kind": "behavior", "stat": "homing", "range": [1, 1], "step": 1, "cost": { "base": 12, "per": 0 }, "weight": 6, "tags": ["homing", "projectile"], "requires": ["projectile"], "excludesTags": ["returning", "homing"], "perf": 1, "label": "Projectiles seek enemies" },
-    { "id": "knockback", "name": "Knockback", "category": "special", "kind": "behavior", "stat": "knockback", "range": [1, 3], "step": 1, "cost": { "base": 0, "per": 3 }, "weight": 6, "tags": ["knockback", "control"], "excludesTags": ["pull"], "label": "Knockback +{v}" },
-    { "id": "split", "name": "Split Projectile", "category": "special", "kind": "behavior", "stat": "split", "range": [2, 4], "step": 1, "cost": { "base": 2, "per": 5 }, "weight": 5, "tags": ["split", "projectile", "multi"], "requires": ["projectile"], "excludesTags": ["returning"], "perf": 2, "vfx": 1, "label": "Projectiles split into {v} on hit" },
-    { "id": "burning", "name": "Burning", "category": "special", "kind": "behavior", "range": [15, 45], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 6, "tags": ["burn", "fire", "dot"], "excludes": ["freezing"], "statusElement": "fire", "hooks": [{ "on": "hit", "do": "status", "status": "burn", "chance": "$v" }], "label": "{v}% chance to Burn" },
-    { "id": "freezing", "name": "Freezing", "category": "special", "kind": "behavior", "range": [10, 35], "step": 5, "cost": { "base": 1, "per": 0.4 }, "weight": 6, "tags": ["freeze", "ice", "control"], "excludes": ["burning"], "statusElement": "ice", "hooks": [{ "on": "hit", "do": "status", "status": "freeze", "chance": "$v" }], "label": "{v}% chance to Freeze" },
-    { "id": "shock", "name": "Shock", "category": "special", "kind": "behavior", "range": [15, 45], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 6, "tags": ["shock", "lightning"], "statusElement": "lightning", "hooks": [{ "on": "hit", "do": "status", "status": "shock", "chance": "$v" }], "label": "{v}% chance to Shock" },
-    { "id": "execute", "name": "Execute", "category": "special", "kind": "behavior", "range": [5, 12], "step": 1, "cost": { "base": 4, "per": 2 }, "weight": 4, "tags": ["execute", "damage"], "minRarity": "epic", "hooks": [{ "on": "hit", "do": "execute", "threshold": "$v" }], "label": "Executes enemies below {v}% Health" },
-    { "id": "feast", "name": "Vampiric Kills", "category": "special", "kind": "behavior", "range": [3, 8], "step": 1, "cost": { "base": 0, "per": 1.5 }, "weight": 5, "tags": ["lifesteal", "vampire", "sustain"], "hooks": [{ "on": "kill", "do": "heal", "flat": "$v" }], "label": "Kills restore {v} Health" },
-    { "id": "momentum", "name": "Momentum", "category": "special", "kind": "behavior", "range": [10, 30], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 5, "tags": ["speed", "damage", "mobility"], "hooks": [{ "on": "attack", "do": "sprintBonus", "pct": "$v" }], "label": "+{v}% damage while sprinting" }
+    { "id": "lifesteal", "name": "Lifesteal", "category": "special", "runeTier": 3, "kind": "behavior", "range": [2, 8], "step": 1, "cost": { "base": 1, "per": 2 }, "weight": 8, "tags": ["lifesteal", "vampire", "sustain"], "hooks": [{ "on": "hit", "do": "heal", "pct": "$v" }], "label": "{v}% of damage restores Health" },
+    { "id": "chain", "name": "Chain Attack", "category": "special", "runeTier": 5, "kind": "behavior", "range": [2, 4], "step": 1, "cost": { "base": 2, "per": 6 }, "weight": 7, "tags": ["chain", "lightning", "aoe"], "perf": 2, "vfx": 1, "hooks": [{ "on": "hit", "do": "chain", "chance": 30, "targets": "$v", "dmg": 45, "radius": 3.5 }], "label": "30% chance to chain to {v} enemies" },
+    { "id": "explosion", "name": "Explosion", "category": "special", "runeTier": 4, "kind": "behavior", "range": [15, 40], "step": 5, "cost": { "base": 6, "per": 0.3 }, "weight": 7, "tags": ["explosion", "aoe", "fire"], "perf": 2, "vfx": 1, "hooks": [{ "on": "hit", "do": "explode", "chance": "$v", "radius": 1.4, "dmg": 50 }], "label": "{v}% chance to explode on hit" },
+    { "id": "pierce", "name": "Piercing", "category": "special", "runeTier": 4, "kind": "behavior", "stat": "pierce", "range": [1, 3], "step": 1, "cost": { "base": 1, "per": 5 }, "weight": 7, "tags": ["pierce", "projectile"], "requires": ["projectile"], "excludesTags": ["returning"], "label": "Projectiles pierce {v} enemies" },
+    { "id": "homing", "name": "Homing", "category": "special", "runeTier": 4, "kind": "behavior", "stat": "homing", "range": [1, 1], "step": 1, "cost": { "base": 12, "per": 0 }, "weight": 6, "tags": ["homing", "projectile"], "requires": ["projectile"], "excludesTags": ["returning", "homing"], "perf": 1, "label": "Projectiles seek enemies" },
+    { "id": "knockback", "name": "Knockback", "category": "special", "runeTier": 1, "kind": "behavior", "stat": "knockback", "range": [1, 3], "step": 1, "cost": { "base": 0, "per": 3 }, "weight": 6, "tags": ["knockback", "control"], "excludesTags": ["pull"], "label": "Knockback +{v}" },
+    { "id": "split", "name": "Split Projectile", "category": "special", "runeTier": 4, "kind": "behavior", "stat": "split", "range": [2, 4], "step": 1, "cost": { "base": 2, "per": 5 }, "weight": 5, "tags": ["split", "projectile", "multi"], "requires": ["projectile"], "excludesTags": ["returning"], "perf": 2, "vfx": 1, "label": "Projectiles split into {v} on hit" },
+    { "id": "burning", "name": "Burning", "category": "special", "runeTier": 3, "kind": "behavior", "range": [15, 45], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 6, "tags": ["burn", "fire", "dot"], "excludes": ["freezing"], "statusElement": "fire", "hooks": [{ "on": "hit", "do": "status", "status": "burn", "chance": "$v" }], "label": "{v}% chance to Burn" },
+    { "id": "freezing", "name": "Freezing", "category": "special", "runeTier": 3, "kind": "behavior", "range": [10, 35], "step": 5, "cost": { "base": 1, "per": 0.4 }, "weight": 6, "tags": ["freeze", "ice", "control"], "excludes": ["burning"], "statusElement": "ice", "hooks": [{ "on": "hit", "do": "status", "status": "freeze", "chance": "$v" }], "label": "{v}% chance to Freeze" },
+    { "id": "shock", "name": "Shock", "category": "special", "runeTier": 3, "kind": "behavior", "range": [15, 45], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 6, "tags": ["shock", "lightning"], "statusElement": "lightning", "hooks": [{ "on": "hit", "do": "status", "status": "shock", "chance": "$v" }], "label": "{v}% chance to Shock" },
+    { "id": "execute", "name": "Execute", "category": "special", "runeTier": 5, "kind": "behavior", "range": [5, 12], "step": 1, "cost": { "base": 4, "per": 2 }, "weight": 4, "tags": ["execute", "damage"], "minRarity": "epic", "hooks": [{ "on": "hit", "do": "execute", "threshold": "$v" }], "label": "Executes enemies below {v}% Health" },
+    { "id": "feast", "name": "Vampiric Kills", "category": "special", "runeTier": 2, "kind": "behavior", "range": [3, 8], "step": 1, "cost": { "base": 0, "per": 1.5 }, "weight": 5, "tags": ["lifesteal", "vampire", "sustain"], "hooks": [{ "on": "kill", "do": "heal", "flat": "$v" }], "label": "Kills restore {v} Health" },
+    { "id": "momentum", "name": "Momentum", "category": "special", "runeTier": 1, "kind": "behavior", "range": [10, 30], "step": 5, "cost": { "base": 1, "per": 0.3 }, "weight": 5, "tags": ["speed", "damage", "mobility"], "hooks": [{ "on": "attack", "do": "sprintBonus", "pct": "$v" }], "label": "+{v}% damage while sprinting" }
   ],
   "drawbacks": [
     { "id": "fragile", "name": "Fragile", "playerStat": "defensePct", "range": [-40, -20], "step": 5, "refund": 10, "tags": ["glass"], "label": "{v}% Defense" },
@@ -493,6 +493,16 @@
     { "id": "frost_nova", "name": "Glacial Nova", "desc": "Freezes every enemy nearby.", "do": "frostnova", "cost": [18, 26], "cooldown": [9, 13], "damage": [80, 130], "radius": [3.5, 4.5], "duration": [1.6, 2.6], "words": ["Winter", "Glacier", "Rime"], "sound": "zap", "weight": 9 },
     { "id": "blade_ring", "affinity": "physical", "name": "Blade Ring", "desc": "Summons blades that orbit you.", "do": "bladering", "cost": [18, 26], "cooldown": [14, 20], "damage": [40, 70], "radius": [1.8, 2.4], "duration": [5, 8], "count": [3, 5], "words": ["Halo", "Ring", "Crown"], "sound": "whirl", "weight": 9 },
     { "id": "time_warp", "affinity": "arcane", "name": "Time Warp", "desc": "Slows enemies in a large area.", "do": "timewarp", "cost": [18, 26], "cooldown": [16, 22], "damage": [0, 0], "radius": [4.5, 6], "duration": [3, 5], "slow": [50, 70], "words": ["Chrono", "Hour", "Stasis"], "sound": "hum", "weight": 7 }
+  ],
+  "legendaryAbilities": [
+    { "id": "starfall", "name": "Starfall", "affinity": ["holy", "arcane"], "do": "starfall", "desc": "Stars rain down on the enemies around you and burst in blinding light.", "damage": [110, 160], "radius": [6.5, 8], "count": [9, 13], "duration": [1.6, 1.6], "cooldown": [13, 17], "color": "#fff3b0" },
+    { "id": "dragon_breath", "name": "Dragon's Breath", "affinity": ["fire"], "do": "breath", "desc": "Breathe a roaring cone of dragonfire that follows your aim and leaves the ground burning.", "damage": [40, 60], "radius": [5, 6.5], "duration": [1.5, 1.9], "cooldown": [12, 16], "color": "#ff8a2a" },
+    { "id": "absolute_zero", "name": "Absolute Zero", "affinity": ["ice", "wind"], "do": "zero", "desc": "A blizzard whirls around you, slowing everything in it, then freezes it solid and shatters it.", "damage": [240, 340], "radius": [5, 6.5], "duration": [2.2, 2.2], "cooldown": [15, 19], "color": "#bfeaff" },
+    { "id": "wrath_of_storms", "name": "Wrath of Storms", "affinity": ["lightning", "wind"], "do": "wrath", "desc": "Three waves of lightning leap from enemy to enemy, shocking all they touch.", "damage": [80, 120], "radius": [9, 11], "count": [8, 12], "cooldown": [12, 16], "color": "#fff27a" },
+    { "id": "event_horizon", "name": "Event Horizon", "affinity": ["void"], "do": "horizon", "desc": "Open a singularity that drags enemies in, then collapses in a devastating blast.", "damage": [320, 460], "radius": [4.5, 5.5], "duration": [2.4, 2.4], "cooldown": [17, 22], "color": "#9a5cff" },
+    { "id": "thousand_blades", "name": "Thousand Blades", "affinity": ["physical", "bleed"], "do": "blades", "desc": "Conjure a halo of spectral blades that hunt enemies down one after another.", "damage": [70, 105], "radius": [9, 11], "count": [12, 18], "cooldown": [11, 15], "color": "#e8f4ff" },
+    { "id": "venom_bloom", "name": "Venom Bloom", "affinity": ["poison", "earth"], "do": "bloom", "desc": "A giant flower bursts from the ground and pulses waves of venom for several seconds.", "damage": [70, 100], "radius": [4.5, 5.5], "count": [6, 8], "duration": [5, 6], "cooldown": [15, 19], "color": "#9ae05a" },
+    { "id": "ascension", "name": "Ascension", "affinity": ["arcane", "holy", "earth", "bleed"], "do": "ascend", "desc": "Rise as an avatar of power: much stronger and faster, and every strike sends out a shockwave.", "damage": [50, 70], "radius": [2, 2.6], "duration": [6, 8], "cooldown": [24, 30], "color": "#ff8cf5" }
   ],
   "abilityTwists": [
     { "id": "twin", "name": "Twin", "desc": "Casts twice.", "cost": 10, "weight": 10, "exclude": ["phoenix", "clone", "time_warp"] },
@@ -923,16 +933,16 @@
     ]
   },
   "components": [
-    { "id": "fire_core", "name": "Fire Core", "type": "core", "rarity": "uncommon", "element": "fire", "research": 25, "desc": "Lets the forge craft Fire weapons.", "unlocks": {} },
-    { "id": "ice_core", "name": "Ice Core", "type": "core", "rarity": "uncommon", "element": "ice", "research": 25, "desc": "Lets the forge craft Ice weapons.", "unlocks": {} },
-    { "id": "lightning_core", "name": "Lightning Core", "type": "core", "rarity": "uncommon", "element": "lightning", "research": 25, "desc": "Lets the forge craft Lightning weapons.", "unlocks": {} },
-    { "id": "poison_core", "name": "Poison Core", "type": "core", "rarity": "uncommon", "element": "poison", "research": 25, "desc": "Lets the forge craft Poison weapons.", "unlocks": {} },
-    { "id": "blood_core", "name": "Blood Core", "type": "core", "rarity": "rare", "element": "bleed", "research": 35, "desc": "Lets the forge craft Bleed weapons.", "unlocks": {} },
-    { "id": "earth_core", "name": "Earth Core", "type": "core", "rarity": "uncommon", "element": "earth", "research": 25, "desc": "Lets the forge craft Earth weapons.", "unlocks": {} },
-    { "id": "wind_core", "name": "Wind Core", "type": "core", "rarity": "uncommon", "element": "wind", "research": 25, "desc": "Lets the forge craft Wind weapons.", "unlocks": {} },
-    { "id": "holy_core", "name": "Holy Core", "type": "core", "rarity": "rare", "element": "holy", "research": 40, "desc": "Lets the forge craft Holy weapons.", "unlocks": {} },
-    { "id": "void_core", "name": "Void Core", "type": "core", "rarity": "rare", "element": "void", "research": 45, "desc": "Void weapons, Void Edge, Phase Strike and the Soul Lantern.", "unlocks": { "effects": ["void_edge", "phase_strike"], "archetypes": ["lantern"] } },
-    { "id": "arcane_core", "name": "Arcane Core", "type": "core", "rarity": "rare", "element": "arcane", "research": 45, "desc": "Arcane weapons, Phantom Blades and the Clone ability.", "unlocks": { "effects": ["phantom_blades"], "abilities": ["clone"] } },
+    { "id": "fire_core", "name": "Fire Core", "type": "core", "tier": 1, "rarity": "uncommon", "element": "fire", "research": 25, "desc": "Lets the forge craft Fire weapons.", "unlocks": {} },
+    { "id": "ice_core", "name": "Ice Core", "type": "core", "tier": 1, "rarity": "uncommon", "element": "ice", "research": 25, "desc": "Lets the forge craft Ice weapons.", "unlocks": {} },
+    { "id": "lightning_core", "name": "Lightning Core", "type": "core", "tier": 1, "rarity": "uncommon", "element": "lightning", "research": 25, "desc": "Lets the forge craft Lightning weapons.", "unlocks": {} },
+    { "id": "poison_core", "name": "Poison Core", "type": "core", "tier": 1, "rarity": "uncommon", "element": "poison", "research": 25, "desc": "Lets the forge craft Poison weapons.", "unlocks": {} },
+    { "id": "blood_core", "name": "Blood Core", "type": "core", "tier": 2, "rarity": "rare", "element": "bleed", "research": 35, "desc": "Lets the forge craft Bleed weapons.", "unlocks": {} },
+    { "id": "earth_core", "name": "Earth Core", "type": "core", "tier": 1, "rarity": "uncommon", "element": "earth", "research": 25, "desc": "Lets the forge craft Earth weapons.", "unlocks": {} },
+    { "id": "wind_core", "name": "Wind Core", "type": "core", "tier": 1, "rarity": "uncommon", "element": "wind", "research": 25, "desc": "Lets the forge craft Wind weapons.", "unlocks": {} },
+    { "id": "holy_core", "name": "Holy Core", "type": "core", "tier": 2, "rarity": "rare", "element": "holy", "research": 40, "desc": "Lets the forge craft Holy weapons.", "unlocks": {} },
+    { "id": "void_core", "name": "Void Core", "type": "core", "tier": 3, "rarity": "rare", "element": "void", "research": 45, "desc": "Void weapons, Void Edge, Phase Strike and the Soul Lantern.", "unlocks": { "effects": ["void_edge", "phase_strike"], "archetypes": ["lantern"] } },
+    { "id": "arcane_core", "name": "Arcane Core", "type": "core", "tier": 3, "rarity": "rare", "element": "arcane", "research": 45, "desc": "Arcane weapons, Phantom Blades and the Clone ability.", "unlocks": { "effects": ["phantom_blades"], "abilities": ["clone"] } },
     { "id": "monster_fang", "name": "Monster Fang", "type": "material", "rarity": "uncommon", "material": "fang", "research": 30, "desc": "A serrated material. Also teaches the Whip.", "unlocks": { "materials": ["fang"], "archetypes": ["whip"] } },
     { "id": "dragon_scale", "name": "Dragon Scale", "type": "material", "rarity": "epic", "material": "dragonscale", "research": 70, "desc": "Dragonscale material and Critical Detonation.", "unlocks": { "materials": ["dragonscale"], "effects": ["crit_detonation"] } },
     { "id": "crystal_heart", "name": "Crystal Heart", "type": "material", "rarity": "rare", "material": "crystal", "research": 45, "desc": "Crystal material and the Magic Orb.", "unlocks": { "materials": ["crystal"], "archetypes": ["orb"] } },
@@ -946,10 +956,14 @@
     { "id": "bp_cannon", "name": "Blueprint: Cannon", "type": "blueprint", "rarity": "rare", "research": 40, "desc": "Teaches the Cannon.", "unlocks": { "archetypes": ["cannon"] } },
     { "id": "bp_chakram", "name": "Blueprint: Chakram", "type": "blueprint", "rarity": "uncommon", "research": 30, "desc": "Teaches the Chakram.", "unlocks": { "archetypes": ["chakram"] } },
     { "id": "bp_warfan", "name": "Blueprint: Warfan", "type": "blueprint", "rarity": "rare", "research": 35, "desc": "Teaches the exotic Warfan.", "unlocks": { "archetypes": ["warfan"] } },
-    { "id": "inferno_core", "name": "Inferno Core", "type": "core", "rarity": "legendary", "element": "fire", "boss": "inferno_titan", "research": 0, "rarityBonus": 1, "desc": "Boss core. Lava Burst, the Phoenix ability and fierce fire weapons.", "craftTags": ["fire", "burn", "explosion"], "unlocks": { "effects": ["lava_burst"], "abilities": ["phoenix"] } },
-    { "id": "glacial_heart", "name": "Glacial Heart", "type": "core", "rarity": "legendary", "element": "ice", "boss": "frost_warden", "research": 0, "rarityBonus": 1, "desc": "Boss core. Permafrost and unbreakable ice weapons.", "craftTags": ["ice", "freeze", "control"], "unlocks": { "effects": ["permafrost"] } },
-    { "id": "storm_heart", "name": "Storm Heart", "type": "core", "rarity": "legendary", "element": "lightning", "boss": "storm_colossus", "research": 0, "rarityBonus": 1, "desc": "Boss core. Tempest and roaring storm weapons.", "craftTags": ["lightning", "chain", "shock"], "unlocks": { "effects": ["tempest"] } },
-    { "id": "abyssal_crown", "name": "Abyssal Crown", "type": "core", "rarity": "legendary", "element": "void", "boss": "void_herald", "research": 0, "rarityBonus": 1, "desc": "Boss core. Singularity and the Black Hole ability.", "craftTags": ["void", "pull", "portal"], "unlocks": { "effects": ["singularity"], "abilities": ["black_hole"] } }
+    { "id": "inferno_core", "name": "Inferno Core", "type": "core", "tier": 4, "rarity": "legendary", "element": "fire", "boss": "inferno_titan", "research": 0, "rarityBonus": 1, "desc": "Boss core. Lava Burst, the Phoenix ability and fierce fire weapons.", "craftTags": ["fire", "burn", "explosion"], "unlocks": { "effects": ["lava_burst"], "abilities": ["phoenix"] } },
+    { "id": "glacial_heart", "name": "Glacial Heart", "type": "core", "tier": 4, "rarity": "legendary", "element": "ice", "boss": "frost_warden", "research": 0, "rarityBonus": 1, "desc": "Boss core. Permafrost and unbreakable ice weapons.", "craftTags": ["ice", "freeze", "control"], "unlocks": { "effects": ["permafrost"] } },
+    { "id": "storm_heart", "name": "Storm Heart", "type": "core", "tier": 4, "rarity": "legendary", "element": "lightning", "boss": "storm_colossus", "research": 0, "rarityBonus": 1, "desc": "Boss core. Tempest and roaring storm weapons.", "craftTags": ["lightning", "chain", "shock"], "unlocks": { "effects": ["tempest"] } },
+    { "id": "abyssal_crown", "name": "Abyssal Crown", "type": "core", "tier": 4, "rarity": "legendary", "element": "void", "boss": "void_herald", "research": 0, "rarityBonus": 1, "desc": "Boss core. Singularity and the Black Hole ability.", "craftTags": ["void", "pull", "portal"], "unlocks": { "effects": ["singularity"], "abilities": ["black_hole"] } },
+    { "id": "bone_crown", "name": "Bone Crown", "type": "core", "tier": 4, "rarity": "legendary", "element": "bleed", "boss": "bone_king", "research": 0, "rarityBonus": 1, "desc": "Boss core. Savage bleeding weapons fit for a king of the dead.", "craftTags": ["bleed", "lifesteal", "execute"], "unlocks": {} },
+    { "id": "heartwood", "name": "Heartwood", "type": "core", "tier": 4, "rarity": "legendary", "element": "poison", "boss": "thornmother", "research": 0, "rarityBonus": 1, "desc": "Boss core. Weapons that drip with the forest's venom.", "craftTags": ["poison", "dot", "aoe"], "unlocks": {} },
+    { "id": "wyrm_fang", "name": "Wyrm Fang", "type": "core", "tier": 4, "rarity": "legendary", "element": "earth", "boss": "sand_wyrm", "research": 0, "rarityBonus": 1, "desc": "Boss core. Heavy, staggering earth weapons.", "craftTags": ["earth", "control", "knockback"], "unlocks": {} },
+    { "id": "tide_pearl", "name": "Tide Pearl", "type": "core", "tier": 4, "rarity": "legendary", "element": "ice", "boss": "tide_leviathan", "research": 0, "rarityBonus": 1, "desc": "Boss core. Cold, crashing weapons of the deep sea.", "craftTags": ["ice", "freeze", "chain"], "unlocks": {} }
   ],
   "catalysts": [
     { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
@@ -957,7 +971,13 @@
     { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 600, "scrap": 300, "requiresForge": 4 },
     { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 2500, "scrap": 1200, "shards": 3, "requiresForge": 5, "requiresBoss": true }
   ],
-  "crafting": { "scrapCost": 40, "essenceCost": 30, "runeCost": 40, "abilityCost": 150, "levelScalePct": 6 },
+  "crafting": {
+    "scrapCost": 40, "essenceCost": 30, "abilityCost": 150, "levelScalePct": 6,
+    "tierNames": ["Basic", "Good", "Fine", "Superb", "Masterwork"],
+    "materialCost": [{}, { "scrap": 10, "essence": 10 }, { "scrap": 30, "essence": 25 }, { "scrap": 70, "essence": 60 }, { "scrap": 140, "essence": 120 }],
+    "coreCost": [{ "essence": 20 }, { "essence": 45, "scrap": 10 }, { "essence": 70, "scrap": 25 }, { "essence": 150, "scrap": 60 }],
+    "runeCost": [{ "essence": 25 }, { "essence": 40 }, { "essence": 60, "scrap": 10 }, { "essence": 90, "scrap": 25 }, { "essence": 140, "scrap": 50 }]
+  },
   "base": {
     "baseBag": 24,
     "baseStorage": 120,
@@ -1062,8 +1082,10 @@
   "gathering": {
     "pickaxes": [
       { "tier": 1, "name": "Iron Pickaxe", "power": 1, "requiresForge": 1, "cost": { "scrap": 20, "essence": 10 }, "color": "#a4abb6", "desc": "Chops trees and breaks rocks." },
-      { "tier": 2, "name": "Steel Pickaxe", "power": 1.7, "requiresForge": 2, "cost": { "scrap": 90, "essence": 60, "wood": 25, "stone": 30 }, "color": "#eef1f5", "desc": "Faster, and can mine crystals." },
-      { "tier": 3, "name": "Mythril Pickaxe", "power": 2.6, "requiresForge": 4, "cost": { "scrap": 300, "essence": 250, "wood": 60, "stone": 120 }, "color": "#7ae0ff", "desc": "Cuts through anything in a few swings." }
+      { "tier": 2, "name": "Steel Pickaxe", "power": 1.7, "requiresForge": 2, "cost": { "scrap": 90, "essence": 60, "wood": 25, "stone": 30 }, "color": "#eef1f5", "desc": "Faster, and mines the purple crystals of the Voidreach." },
+      { "tier": 3, "name": "Mythril Pickaxe", "power": 2.6, "requiresForge": 3, "cost": { "scrap": 220, "essence": 180, "wood": 50, "stone": 90 }, "color": "#7ae0ff", "desc": "Breaks obsidian in the Ashlands (stone and essence)." },
+      { "tier": 4, "name": "Adamant Pickaxe", "power": 3.8, "yield": 1.25, "swing": 0.32, "requiresForge": 4, "cost": { "scrap": 420, "essence": 380, "wood": 90, "stone": 180 }, "color": "#5ad6a0", "desc": "Mines iron ore veins for scrap, and brings in 25% more of everything." },
+      { "tier": 5, "name": "Starforged Pickaxe", "power": 5.5, "yield": 1.5, "swing": 0.27, "requiresForge": 5, "requiresBosses": 2, "cost": { "scrap": 800, "essence": 800, "wood": 160, "stone": 320 }, "color": "#ffd24a", "desc": "Cracks starstone in the Voidreach (essence, sometimes a Star Shard). 50% more of everything, and the fastest swing." }
     ],
     "harvest": {
       "tree": { "name": "Tree", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 15, "chips": "#8a5a33" },
@@ -1071,7 +1093,10 @@
       "cactus": { "name": "Cactus", "verb": "Cut", "hp": 3, "tier": 1, "drops": { "wood": [1, 3] }, "regrowMinutes": 10, "chips": "#5fb050" },
       "rock": { "name": "Rock", "verb": "Mine", "hp": 7, "tier": 1, "drops": { "stone": [3, 5] }, "regrowMinutes": 30, "chips": "#8d8a9e" },
       "palm": { "name": "Palm", "verb": "Chop", "hp": 4, "tier": 1, "drops": { "wood": [2, 4] }, "regrowMinutes": 15, "chips": "#9a6a3a" },
-      "crystal": { "name": "Crystal", "verb": "Mine", "hp": 10, "tier": 2, "drops": { "stone": [2, 3], "essence": [2, 4] }, "regrowMinutes": 45, "chips": "#cdb2ff" }
+      "crystal": { "name": "Crystal", "verb": "Mine", "hp": 10, "tier": 2, "drops": { "stone": [2, 3], "essence": [2, 4] }, "regrowMinutes": 45, "chips": "#cdb2ff" },
+      "obsidian": { "name": "Obsidian", "verb": "Mine", "hp": 14, "tier": 3, "drops": { "stone": [4, 6], "essence": [3, 5] }, "regrowMinutes": 45, "chips": "#4a3a66" },
+      "ore": { "name": "Iron Ore", "verb": "Mine", "hp": 18, "tier": 4, "drops": { "scrap": [6, 10], "stone": [2, 4] }, "regrowMinutes": 60, "chips": "#c87a3a" },
+      "starstone": { "name": "Starstone", "verb": "Mine", "hp": 24, "tier": 5, "drops": { "essence": [8, 14] }, "bonus": { "shards": 0.1 }, "regrowMinutes": 90, "chips": "#ffd24a" }
     }
   },
   "building": {
@@ -1119,11 +1144,11 @@
   "biomes": [
     { "id": "plains", "name": "Green Plains", "ground": "grass", "alt": "flowers", "blockers": { "tree": 0.05, "rock": 0.02 }, "water": 0.1, "enemies": ["slime", "boar", "bat", "skeleton", "brute"], "elements": ["physical", "earth", "wind"], "components": ["earth_core", "wind_core", "bp_crossbow", "bp_chakram"] },
     { "id": "forest", "name": "Deepwood", "ground": "moss", "alt": "grass", "blockers": { "tree": 0.22, "rock": 0.02 }, "water": 0.12, "enemies": ["slime", "spider", "wisp", "bat"], "elements": ["poison", "earth", "physical"], "components": ["poison_core", "monster_fang", "earth_core", "bp_warfan"] },
-    { "id": "desert", "name": "Sunscar Desert", "ground": "sand", "alt": "sand2", "blockers": { "cactus": 0.04, "rock": 0.04 }, "water": 0.02, "enemies": ["scorpion", "mummy", "skeleton", "bat"], "elements": ["fire", "earth", "physical"], "components": ["fire_core", "bp_gun", "bp_cannon", "ancient_blade"] },
-    { "id": "snow", "name": "Frostvale", "ground": "snow", "alt": "ice", "blockers": { "pine": 0.08, "rock": 0.03 }, "water": 0.06, "enemies": ["wolf", "yeti", "wisp"], "elements": ["ice", "physical", "wind"], "components": ["ice_core", "crystal_heart", "mythril_ore"], "boss": "frost_warden" },
-    { "id": "volcanic", "name": "Ashlands", "ground": "ash", "alt": "basalt", "blockers": { "rock": 0.07 }, "water": 0.0, "lava": 0.06, "enemies": ["slime", "imp", "brute"], "elements": ["fire", "earth"], "components": ["fire_core", "obsidian_shard", "dragon_scale"], "boss": "inferno_titan" },
-    { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02 }, "water": 0.04, "enemies": ["harpy", "golem", "bat", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
-    { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06 }, "water": 0.0, "enemies": ["eye", "shade", "wisp", "bat"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" },
+    { "id": "desert", "name": "Sunscar Desert", "ground": "sand", "alt": "sand2", "blockers": { "cactus": 0.04, "rock": 0.04, "ore": 0.005 }, "water": 0.02, "enemies": ["scorpion", "mummy", "skeleton", "bat"], "elements": ["fire", "earth", "physical"], "components": ["fire_core", "bp_gun", "bp_cannon", "ancient_blade"] },
+    { "id": "snow", "name": "Frostvale", "ground": "snow", "alt": "ice", "blockers": { "pine": 0.08, "rock": 0.03, "ore": 0.004 }, "water": 0.06, "enemies": ["wolf", "yeti", "wisp"], "elements": ["ice", "physical", "wind"], "components": ["ice_core", "crystal_heart", "mythril_ore"], "boss": "frost_warden" },
+    { "id": "volcanic", "name": "Ashlands", "ground": "ash", "alt": "basalt", "blockers": { "rock": 0.07, "obsidian": 0.025 }, "water": 0.0, "lava": 0.06, "enemies": ["slime", "imp", "brute"], "elements": ["fire", "earth"], "components": ["fire_core", "obsidian_shard", "dragon_scale"], "boss": "inferno_titan" },
+    { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02, "ore": 0.012 }, "water": 0.04, "enemies": ["harpy", "golem", "bat", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
+    { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06, "starstone": 0.006 }, "water": 0.0, "enemies": ["eye", "shade", "wisp", "bat"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" },
     { "id": "isles", "name": "Sunken Isles", "ground": "grass", "alt": "flowers", "blockers": { "palm": 0.08, "rock": 0.02 }, "water": 0.0, "enemies": ["crab", "slime", "bat"], "elements": ["wind", "holy", "physical"], "components": ["wind_core", "holy_core", "bp_chakram"] }
   ],
   "enemies": [
@@ -1151,6 +1176,10 @@
     { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["meteors", "charge", "slam", "ring", "meteors", "summon"], "trail": "fire", "tip": "Meteors fall where you stand, and its charge leaves the ground burning.", "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "rare", "theme": "fire" } },
     { "id": "frost_warden", "name": "Frost Warden", "biome": "snow", "element": "ice", "hp": 1700, "damage": 20, "speed": 1.2, "size": 2.1, "xp": 420, "patterns": ["breath", "spikes", "icering", "summon", "breath", "spikes"], "aura": "chill", "tip": "Its frost breath sweeps a cone, ice spikes run out in lines, and a ring of ice closes in: find the gap.", "color": "#8fd6ff", "drop": { "component": "glacial_heart", "minRarity": "rare", "theme": "freeze" } },
     { "id": "storm_colossus", "name": "Storm Colossus", "biome": "highlands", "element": "lightning", "hp": 1800, "damage": 24, "speed": 1.6, "size": 2.3, "xp": 460, "patterns": ["strikes", "dash", "orbs", "chain", "strikes"], "trail": "lightning", "tip": "Lightning strikes where you are: keep moving. Static orbs circle it.", "color": "#ffe45c", "drop": { "component": "storm_heart", "minRarity": "rare", "theme": "storm" } },
-    { "id": "void_herald", "name": "Void Herald", "biome": "void", "element": "void", "hp": 2000, "damage": 26, "speed": 1.5, "size": 2.0, "xp": 520, "patterns": ["clones", "gravity", "spiral", "blink", "gravity"], "tip": "It hides among mirror images and opens singularities that drag you in.", "color": "#9a5cff", "drop": { "component": "abyssal_crown", "minRarity": "rare", "theme": "void" } }
+    { "id": "void_herald", "name": "Void Herald", "biome": "void", "element": "void", "hp": 2000, "damage": 26, "speed": 1.5, "size": 2.0, "xp": 520, "patterns": ["clones", "gravity", "spiral", "blink", "gravity"], "tip": "It hides among mirror images and opens singularities that drag you in.", "color": "#9a5cff", "drop": { "component": "abyssal_crown", "minRarity": "rare", "theme": "void" } },
+    { "id": "bone_king", "name": "Bone King", "biome": "plains", "element": "bleed", "hp": 1500, "damage": 20, "speed": 1.3, "size": 2.0, "xp": 400, "patterns": ["raise", "bonefan", "curse", "blink", "bonefan", "curse"], "tip": "It raises the dead around you and hurls fans of bone. Its curses burst a moment after they mark the ground.", "color": "#a83248", "drop": { "component": "bone_crown", "minRarity": "rare", "theme": "bleeder" } },
+    { "id": "thornmother", "name": "Thornmother", "biome": "forest", "element": "poison", "hp": 1650, "damage": 21, "speed": 0.7, "size": 2.1, "xp": 420, "patterns": ["roots", "spores", "summon", "roots", "reroot", "spores"], "tip": "Roots burst from the ground towards you and spore clouds poison the air. She burrows away and roots again elsewhere.", "color": "#6ac04a", "drop": { "component": "heartwood", "minRarity": "rare", "theme": "plague" } },
+    { "id": "sand_wyrm", "name": "Sand Wyrm", "biome": "desert", "element": "earth", "hp": 1800, "damage": 24, "speed": 1.5, "size": 2.2, "xp": 460, "patterns": ["burrow", "quake", "sandspit", "charge", "burrow", "quake"], "tip": "It dives under the sand and bursts up beneath you: run from the rumbling circle. Quakes ripple outward in rings.", "color": "#d8a858", "drop": { "component": "wyrm_fang", "minRarity": "rare", "theme": "earthshaker" } },
+    { "id": "tide_leviathan", "name": "Tide Leviathan", "biome": "isles", "element": "ice", "hp": 1900, "damage": 24, "speed": 1.2, "size": 2.3, "xp": 480, "patterns": ["wave", "geysers", "whirlpool", "summon", "wave", "geysers"], "tip": "Walls of water sweep across the island: find the gap. Geysers burst under your feet and whirlpools drag you in.", "color": "#2f8fc4", "drop": { "component": "tide_pearl", "minRarity": "rare", "theme": "freeze" } }
   ]
 }

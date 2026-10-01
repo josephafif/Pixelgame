@@ -28,7 +28,7 @@ export function computePlayerStats(data, save, dna, buffs = []) {
   return {
     maxHp: Math.round((p.health + p.perLevel.health * L) * (1 + camp.maxHpPct / 100)) + (save.player.bonusHp ?? 0),
     moveSpeed: p.moveSpeed * (1 + ((bonus.moveSpeedPct ?? 0) + buffTotal('moveSpeedPct')) / 100),
-    attackPower: Math.round(p.attackPower + p.perLevel.attackPower * L + camp.attackPower),
+    attackPower: Math.round(p.attackPower + p.perLevel.attackPower * L + camp.attackPower + buffTotal('attackPower')),
     defense: Math.max(0, Math.round((p.defense + p.perLevel.defense * L + camp.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0) / 100))),
     critChance: Math.min(90, p.critChance + (dna?.stats.critChance ?? 0)),
     critDamage: Math.max(p.critDamage, dna?.stats.critDamage ?? 0),

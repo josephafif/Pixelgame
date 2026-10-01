@@ -74,6 +74,7 @@ export class Hud {
       this.el.attack.setAttribute('aria-label', active ? 'Place' : 'Attack');
       this.el.buildBtn?.classList.toggle('on', active);
       this.el.hotbar?.toggleAttribute('hidden', active);
+      document.body.classList.toggle('building', active);
     });
     this.setWeapon(game.weapon?.dna ?? null);
   }
@@ -124,8 +125,10 @@ export class Hud {
       h(`div.slot.framed.r-${dna.rarity}`, { style: { '--rarity': color } }, weaponIconEl(dna, 32)),
       h('span.name', { style: { color } }, dna.name.text));
     el.title = `${dna.name.text} — ${dna.identity}`;
-    this.el.ability.toggleAttribute('hidden', !dna.ability);
-    if (dna.ability) this.el.ability.setAttribute('aria-label', `Ability: ${dna.ability.name}`);
+    const ab = g.weapon?.ability ?? dna.ability;
+    this.el.ability.toggleAttribute('hidden', !ab);
+    this.el.ability.classList.toggle('legendary', Boolean(ab?.legendary));
+    if (ab) this.el.ability.setAttribute('aria-label', `Ability: ${ab.name}`);
   }
 
   /** The three loadout slots: main weapon, secondary weapon, pickaxe. */
@@ -258,10 +261,12 @@ export class Hud {
     const t = h(`div.toast.toast-${kind}`, { role: 'status' }, text, h('span.count'));
     t.dataset.text = text;
     box.append(t);
-    // Too many: plain notices give way before important ones (finds, bosses, loot).
+    // Too many: older plain notices give way before important ones (finds,
+    // bosses, loot). The newest notice always shows: it answers what you just did.
     while (box.children.length > (compact ? 2 : 4)) {
-      const plain = [...box.children].find((c) => c.classList.contains('toast-info') || c.classList.contains('toast-warn'));
-      (plain ?? box.firstChild).remove();
+      const older = [...box.children].filter((c) => c !== t);
+      const plain = older.find((c) => c.classList.contains('toast-info') || c.classList.contains('toast-warn'));
+      (plain ?? older[0]).remove();
     }
     this.#expire(t, life);
   }

@@ -101,9 +101,9 @@ export function interactPoi(game, o) {
     }
     case 'signpost': {
       const targets = [];
-      for (const lm of game.world.landmarks) {
-        if (game.save.bosses.defeated[lm.bossId]) continue;
-        targets.push({ x: lm.x, y: lm.y, name: game.data.byId.bosses.get(lm.bossId)?.name ?? 'A boss' });
+      for (const a of game.world.allAltarsNear(o.x, o.y, 900)) {
+        if (game.altarSpent(a)) continue;
+        targets.push({ x: a.x, y: a.y, name: `The altar of the ${game.data.byId.bosses.get(a.bossId)?.name ?? 'boss'}` });
       }
       for (const m of game.world.marketsNear(o.x, o.y, 500)) targets.push({ x: m.x, y: m.y, name: m.name });
       targets.sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y));

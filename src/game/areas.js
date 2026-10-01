@@ -155,7 +155,35 @@ export function updateAreas(game, dt) {
           }
           if (tick && d2 <= 1.1 * 1.1) game.hurtPlayer(a.dps * TICK, { element: a.element });
         }
-        if (Math.random() < 0.6) game.fx.emit('void', a.x, a.y, 1, a.r * 1.4, 0.5);
+        if (Math.random() < 0.6) game.fx.emit(a.particles ?? 'void', a.x, a.y, 1, a.r * 1.4, 0.5);
+        break;
+      }
+      case 'field': {
+        // A lingering legendary power: Absolute Zero's blizzard, Venom Bloom.
+        if (a.follow) {
+          a.x = player.x;
+          a.y = player.y;
+        }
+        if (a.slow) {
+          for (const e of game.enemies) {
+            if (!e.dead && dist2(a.x, a.y, e.x, e.y) <= a.r * a.r) {
+              e.warpUntil = game.time + 0.2;
+              e.warpSlow = a.slow;
+            }
+          }
+        }
+        if (a.pulse) {
+          a.pulseT = (a.pulseT ?? 0) - dt;
+          if (a.pulseT <= 0) {
+            a.pulseT = a.pulse;
+            a.onPulse?.(a);
+          }
+        }
+        if (Math.random() < 0.8) game.fx.emit(a.particles ?? 'sparkle', a.x, a.y, 1, a.r, 1.2);
+        if (a.t >= a.dur && !a.ended) {
+          a.ended = true;
+          a.onEnd?.(a);
+        }
         break;
       }
       case 'hazard':

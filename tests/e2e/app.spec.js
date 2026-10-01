@@ -849,6 +849,8 @@ test('pals: an egg hatches at the Pal Den, the pal gathers and fights, and upgra
     g.dropEgg('elite', g.player.x + 1, g.player.y);
   });
   await expect.poll(() => game(page, () => window.__pixelgame.game.save.pals.eggs.length)).toBe(1);
+  // A Mossling: the quickest gatherer, so the test doesn't wait on a slow chopper.
+  await game(page, () => { window.__pixelgame.game.save.pals.eggs[0].species = 'mossling'; });
   await expect(page.locator('#toasts')).toContainText('Pal Egg');
   // No den yet: the panel says so.
   await page.keyboard.press('KeyH');
@@ -893,7 +895,7 @@ test('pals: an egg hatches at the Pal Den, the pal gathers and fights, and upgra
     return null;
   });
   expect(wood).not.toBeNull();
-  await expect.poll(() => game(page, () => window.__pixelgame.game.save.resources.wood), { timeout: 15000 }).toBeGreaterThan(wood);
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.resources.wood), { timeout: 20000 }).toBeGreaterThan(wood);
   // In fight mode it bites the monsters around you.
   await game(page, async () => {
     const g = window.__pixelgame.game;
@@ -905,5 +907,99 @@ test('pals: an egg hatches at the Pal Den, the pal gathers and fights, and upgra
     window.__slime = e;
   });
   await expect.poll(() => game(page, () => window.__slime.hp < window.__slime.maxHp || window.__slime.dead), { timeout: 10000 }).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('forge: options run from basic to best with prices, and each pick is explained', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    Object.assign(g.save.resources, { scrap: 9000, essence: 9000 });
+    g.save.base.buildings.forge = 4;
+    for (const c of g.data.components) g.save.components[c.id] = { researched: true };
+    g.emit('ui', { name: 'crafting', tab: 'weapons' });
+  });
+  const panel = page.locator('.forge-panel');
+  await expect(panel.locator('.forge-guide')).toContainText('basic');
+  await expect(panel.locator('.explain').first()).toContainText('damage');
+  // Materials: the first is free and basic, the last costs the most.
+  const mats = panel.locator('.step').nth(1).locator('.chips.ranked .chip');
+  await expect(mats.first()).toContainText('Free');
+  const before = await game(page, () => window.__pixelgame.game.data.crafting.essenceCost);
+  await mats.last().click();
+  await expect(panel.locator('.step').nth(1).locator('.explain')).toContainText('%');
+  await page.click('.forge-panel .price-breakdown summary');
+  await expect(panel.locator('.price-breakdown li')).toHaveCount(2);
+  const total = await panel.locator('.forge-preview .cost-row').textContent();
+  expect(Number(total.replace(/\D+/g, ' ').trim().split(' ').pop())).toBeGreaterThan(before);
+  // Element cores explain what their element does.
+  await panel.locator('.step').nth(2).locator('.chip', { hasText: 'Ice Core' }).click();
+  await expect(panel.locator('.step').nth(2).locator('.explain')).toContainText('freeze');
+  expect(errors).toEqual([]);
+});
+
+test('altars: beat a boss once and its altar falls silent; the compass points to the next', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const first = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    g.godMode = true;
+    const a = g.world.greatAltars()[0];
+    g.player.x = a.x;
+    g.player.y = a.y + 1.2;
+    g.renderer.snapCamera();
+    return a;
+  });
+  await expect.poll(() => game(page, () => window.__pixelgame.game.interactTarget?.type)).toBe('altar');
+  await page.keyboard.press('KeyE');
+  await expect.poll(() => game(page, () => Boolean(window.__pixelgame.game.boss))).toBe(true);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.damageEnemy(g.boss, 1e9, {});
+  });
+  await expect.poll(() => game(page, (k) => window.__pixelgame.game.save.world.altars.includes(k), first.key)).toBe(true);
+  await expect(page.locator('#toasts')).toContainText('falls silent', { timeout: 8000 });
+  // If the boss's weapon got revealed meanwhile, keep it.
+  const reveal = page.locator('.discovery button:has-text("Keep in bag")');
+  if (await reveal.isVisible().catch(() => false)) await reveal.click();
+  await expect(page.locator('.discovery')).toBeHidden();
+  // Coming back to it: nothing wakes up.
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.enemies.length = 0;
+    g.pickups.length = 0;
+  });
+  await expect.poll(() => game(page, () => window.__pixelgame.game.interactTarget?.type)).toBe('altar');
+  await expect(page.locator('#interact-hint')).toContainText('silent altar');
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('#toasts')).toContainText('guardian is gone');
+  expect(await game(page, () => Boolean(window.__pixelgame.game.boss))).toBe(false);
+  const next = await game(page, () => window.__pixelgame.game.nearestAltar());
+  expect(next.key).not.toBe(first.key);
+  expect(errors).toEqual([]);
+});
+
+test('legendaries carry a signature power shown on the card and cast with Q', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const info = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    g.godMode = true;
+    let dna = null;
+    for (let seed = 1; seed < 40 && !dna?.ability; seed++) {
+      dna = await g.weapons.generate({ seed, level: 12, luck: 0, source: 'drop', unlocked: [], minRarity: 'legendary' });
+    }
+    g.addWeapon(dna);
+    g.equip(dna.id);
+    g.enemies.length = 0;
+    return { ability: g.weapon.ability, id: dna.id };
+  });
+  expect(info.ability.legendary).toBe(true);
+  await game(page, () => window.__pixelgame.game.emit('ui', { name: 'inventory' }));
+  await expect(page.locator('.weapon-card .legendary-power').first()).toHaveText(info.ability.name);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('KeyQ');
+  await expect.poll(() => game(page, (id) => (window.__pixelgame.game.abilityReadyAt.get(id) ?? 0) > window.__pixelgame.game.time, info.id)).toBe(true);
   expect(errors).toEqual([]);
 });

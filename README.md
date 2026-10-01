@@ -39,7 +39,7 @@ npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline 
 | Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
 | Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
 | Pals | I menyn, eller tryck på pal-chippen under hälsan | H | – |
-| Byggläge (i lägret) | Hammarknappen | G (1–9 väljer, X river, Esc klar) | – |
+| Byggläge (i lägret) | Hammarknappen; tryck på en ruta för att välja den, tryck igen (eller på hammaren) för att bygga, dra från den valda rutan för en mur | G (1–9 väljer, X river, Esc klar) | – |
 | Hugga / bryta | Byt till hackan (3), sedan svärdknappen nära träd/sten | 3, sedan Space / E (håll inne) | A |
 | Handla på en marknad | Handknappen nära en handlare | E | A |
 
@@ -75,6 +75,8 @@ Progressionen är medvetet långsammare än i första versionen:
 - **Skrotning** ger lite: från 2 scrap för ett vanligt vapen till 24 scrap och 12 essence för ett
   legendariskt.
 - **Crafting** kostar mer och blir dyrare med din nivå (+6 % per nivå); Forge-nivåer ger rabatt.
+  Priset byggs upp av dina val: bättre material, element-kärnor och runor kostar mer (se Forge
+  nedan).
 - **Catalysts:** Azure kräver Forge 2 och Violet (garanterat episkt, 600 essence och 300 scrap)
   Forge 4. Golden (legendariskt) kräver Forge 5,
   en besegrad boss, 2 500 essence, 1 200 scrap och **3 Star Shards**, så det tar lång tid.
@@ -112,6 +114,28 @@ mycket.
 - Varje vapen har ett **värde i guld** som visas på vapenkortet. Ett legendariskt är värt
   tusentals guld (över 20 gånger mer än ett episkt), och upptäcktsrutan visar det direkt.
 - Att smida ett legendariskt kräver Golden Catalyst (se ovan).
+
+### Legendariska krafter
+
+Varje legendariskt vapen med en ability får en **legendarisk kraft** i stället för en vanlig
+ability. Kraften väljs efter vapnets element och seed (samma vapen får alltid samma kraft), och
+den blir starkare och laddar om snabbare ju bättre vapnet rullade sin ability. Kraften ligger som
+ett lager ovanpå vapnets DNA, så legendariska vapen du redan har får den också.
+
+| Kraft | Element | Gör |
+| --- | --- | --- |
+| Starfall | Holy, Arcane | Stjärnor regnar ned över fienderna runt dig och exploderar i ljus |
+| Dragon's Breath | Fire | En kon av drakeld som följer ditt sikte och lämnar marken brinnande |
+| Absolute Zero | Ice, Wind | En snöstorm runt dig saktar ned allt, fryser det sedan och krossar det |
+| Wrath of Storms | Lightning, Wind | Tre vågor av blixtar som hoppar från fiende till fiende |
+| Event Horizon | Void | En singularitet drar in fiender och kollapsar i en enorm explosion |
+| Thousand Blades | Physical, Bleed | En gloria av spöklika svärd som jagar fiender ett efter ett |
+| Venom Bloom | Poison, Earth | En jätteblomma växer upp och pulserar giftvågor i flera sekunder |
+| Ascension | Arcane, Holy, Earth, Bleed | Du blir en avatar: mycket starkare och snabbare, och varje slag skickar ut en chockvåg |
+
+När en legendarisk kraft används blinkar skärmen i kraftens färg och namnet syns ovanför dig.
+Vapenkortet visar den under *Legendary Power*. Logik: `src/weapons/legendary.js` och
+`src/game/abilities.js`; data: `gamedata.json` → `legendaryAbilities`.
 
 ## Loadout: tre platser
 
@@ -219,32 +243,57 @@ hoppar ute på havet.
 
 ## Bossar
 
-Bossarnas arenor ligger nu **långt ifrån varandra**: den första cirka 150 rutor från lägret och
-de följande ungefär 290, 430 och 570 rutor bort, åt olika håll. De tre första står alltid på
-fastlandet; den sista kan hamna på en ö, så då behöver du en båt. Alla bossar har egen grafik
-och egna attacker, och när du väcker en får du ett tips om hur den slåss.
+Det finns **åtta bossar**, en för varje biom, och varje altare kan bara besegras **en gång**.
+När bossen är död tystnar altaret, och för att slåss igen måste du hitta ett nytt altare.
 
-| Boss | Signatur |
-| --- | --- |
-| Inferno Titan | Meteorer faller där du står, och laddningen lämnar brinnande mark efter sig |
-| Frost Warden | Riddare i isrustning: frostandedräkt i en kon, isspikar i linjer, en isring som sluter sig (hitta luckan) och en kylande aura |
-| Storm Colossus | Svävande stengolem: blixtnedslag där du står, snabba blixtrusningar, statiska klot som cirklar runt den och en solfjäder av blixtar |
-| Void Herald | Gömmer sig bland spegelbilder (auto-aim avslöjar inte vilken som är äkta) och öppnar singulariteter som drar in dig |
+- **Stora altare:** varje boss har ett stort altare. De ligger långt ifrån varandra, från cirka
+  150 rutor från lägret och sedan ungefär var 120:e ruta längre ut, åt olika håll. De står på
+  fastlandet, utom Tide Leviathans som kan hamna på en ö. De syns (bleka) på kartan från början.
+- **Mindre altare:** utspridda över hela världen, i ungefär hälften av alla stora rutor
+  (200×200), aldrig närmare lägret än 200 rutor. Bossen hör till landet runt altaret (en Sand Wyrm
+  i öknen, en Thornmother i skogen, och så vidare). De syns på kartan när du har utforskat dem.
+- Kompassen och vägskyltarna pekar mot närmaste altare som fortfarande har en boss. Ju längre ut
+  ett altare ligger, desto starkare är bossen.
+- Alla bossar har egen grafik och egna attacker, och när du väcker en får du ett tips om hur den
+  slåss.
 
+| Boss | Biom | Signatur |
+| --- | --- | --- |
+| Inferno Titan | Ashlands | Meteorer faller där du står, och laddningen lämnar brinnande mark efter sig |
+| Frost Warden | Frostvale | Riddare i isrustning: frostandedräkt i en kon, isspikar i linjer, en isring som sluter sig (hitta luckan) och en kylande aura |
+| Storm Colossus | Stormpeaks | Svävande stengolem: blixtnedslag där du står, snabba blixtrusningar, statiska klot som cirklar runt den och en solfjäder av blixtar |
+| Void Herald | Voidreach | Gömmer sig bland spegelbilder (auto-aim avslöjar inte vilken som är äkta) och öppnar singulariteter som drar in dig |
+| **Bone King** | Green Plains | Väcker skelett ur marken runt dig, kastar solfjädrar av ben och lägger förbannelser som brister en stund senare (blödning) |
+| **Thornmother** | Deepwood | Rötter skjuter upp mot dig i linjer, giftmoln fyller luften, och hon gräver ned sig och slår rot på ett nytt ställe |
+| **Sand Wyrm** | Sunscar Desert | Dyker ned i sanden och bryter upp under dig (spring från den mullrande cirkeln), skalv som rullar ut i ringar, sandspott |
+| **Tide Leviathan** | Sunken Isles | Vattenväggar sveper över ön (hitta luckan), gejsrar under fötterna och virvlar som drar in dig |
+
+De nya bossarna har egna boss-kärnor till Forge (Bone Crown, Heartwood, Wyrm Fang, Tide Pearl).
 Bossar släpper alltid ett vapen, minst sällsynt (rare), med 30 % chans till episkt och 3 % till
 legendariskt.
 
 ## Samla och bygga
 
-1. Bygg en **Forge** i lägret och smid en **hacka** (Forge → Tools). Det finns tre nivåer; högre
-   nivå hugger snabbare och kan bryta kristaller.
+1. Bygg en **Forge** i lägret och smid en **hacka** (Forge → Tools). Det finns fem nivåer. Varje
+   ny hacka hugger snabbare och kan bryta något nytt:
+
+   | Hacka | Kräver | Bryter också | Extra |
+   | --- | --- | --- | --- |
+   | Iron | Forge 1 | Träd, sten, kaktus, palmer | – |
+   | Steel | Forge 2 | Lila kristaller (Voidreach) | – |
+   | Mythril | Forge 3 | **Obsidian** (Ashlands): sten och essence | – |
+   | Adamant | Forge 4 | **Järnmalm** (Stormpeaks, öknen, Frostvale): scrap | +25 % material |
+   | Starforged | Forge 5 + två olika bossar | **Stjärnsten** (Voidreach): mycket essence, ibland en Star Shard | +50 % material, snabbast sving |
 2. Byt till hackan (plats 3), gå fram till ett träd eller en sten och tryck på attack eller Use
    (håll inne för att fortsätta). Träd ger
    **trä** och stenar ger **sten**. Utanför lägret växer de tillbaka efter en stund; inne i lägret
    förblir marken röjd så att du kan bygga där.
 3. Tryck **G** (eller hammarknappen) i lägret för **byggläget**. Välj något i listan och klicka
-   eller tryck på marken. Dra för att bygga en hel rad. Högerklick eller X-verktyget river och ger
-   tillbaka halva kostnaden.
+   på marken. Dra för att bygga en hel rad. Högerklick eller X-verktyget river och ger tillbaka
+   halva kostnaden.
+   **På telefon** är byggpanelen en smal remsa med ikoner högst upp, så lägret syns. Tryck på en
+   ruta för att välja den (den pulserar), tryck igen eller på hammarknappen för att bygga, och dra
+   från den valda rutan för att bygga en mur. Dra någon annanstans på vänster sida för att gå.
 
 | Konstruktion | Gör |
 | --- | --- |
@@ -313,8 +362,8 @@ I pal-panelen (H) väljer du vad den gör: *Fight*, *Gather* eller *Follow*. En 
 sig bara om något kommer för nära.
 
 Pals uppgraderas med essence, scrap, trä och sten (dyrare för varje nivå) upp till nivå 10.
-Varje nivå ger mer hälsa, skada, insamlingskraft och fart, och från nivå 5 kan de bryta
-kristaller. Pal Den bestämmer taket: varje Den-nivå låter pals växa två nivåer till. Blir din
+Varje nivå ger mer hälsa, skada, insamlingskraft och fart. De kan bryta kristaller från nivå 5,
+obsidian från nivå 7 och järnmalm från nivå 9. Pal Den bestämmer taket: varje Den-nivå låter pals växa två nivåer till. Blir din
 pal nedslagen tar den en tupplur i 30 sekunder och kommer sedan tillbaka. På havet åker den med i
 båten.
 
@@ -352,9 +401,18 @@ panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src
   vapnet du håller i, och snabbskrotning som aldrig rör favoriter eller det utrustade vapnet.
   Tangentbord: piltangenter väljer, Enter utrustar, T flyttar mellan väska och förråd, F favorit,
   X skrotar, Q/E byter flik.
-- **Forge:** fyra steg (typ, material, element, kvalitet) med klickbara rutor i stället för
-  rullgardiner, tillval i en egen sektion och en live-förhandsvisning av vapnet på städet. På
-  mobil ligger kostnad och Forge-knapp fast längst ned.
+- **Forge:** fyra steg (typ, material, element-kärna, catalyst) med klickbara rutor, tillval
+  (runa och ability) i en egen sektion och en live-förhandsvisning av vapnet på städet. På mobil
+  ligger kostnad och Forge-knapp fast längst ned.
+  - Varje rad går **från enkelt till bäst** (vänster till höger), med nivåstreck och priset för
+    valet. Ju bättre val, desto dyrare: material i fem nivåer (från Iron, Oak och Bronze till
+    Ancient och Dragonscale), element-kärnor i fyra (vanliga element, Blood/Holy, Void/Arcane,
+    boss-kärnor) och runor i fem (små bonusar upp till Chain och Execute).
+  - Under varje steg förklarar en ruta vad valet gör: vapentypens attackstil och grundvärden,
+    materialets bonusar i procent, vad elementet gör med fiender, vad catalysten ger för rarity,
+    och runans exakta bonus. Material som inte är framforskade och runor som inte passar vapnet
+    visas nedtonade med en förklaring.
+  - *Price breakdown* visar var priset kommer ifrån.
 - **Helskärm på mobil:** appen installeras med `display: fullscreen`, så systemfälten inte
   ramar in spelet. Canvasen täcker hela skärmen (även bakom notch och rundade hörn, med safe
   areas för gränssnittet). I webbläsaren på en telefon går spelet in i helskärm när du trycker

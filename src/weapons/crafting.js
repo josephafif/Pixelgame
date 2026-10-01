@@ -50,22 +50,85 @@ export function craftingOptions(data, save) {
   };
 }
 
+/** Tier (1 = basic … 5 = masterwork) of a material, element core or rune. */
+export function optionTier(kind, item) {
+  if (!item) return 0;
+  return (kind === 'rune' ? item.runeTier : item.tier) ?? 1;
+}
+
+/** What picking this material / core / rune adds to the price. */
+export function optionCost(data, kind, item) {
+  if (!item) return {};
+  const table = { material: data.crafting.materialCost, core: data.crafting.coreCost, rune: data.crafting.runeCost }[kind];
+  return table?.[optionTier(kind, item) - 1] ?? {};
+}
+
+/** Options sorted from basic to best (then cheapest first, then by name). */
+export function byTier(kind, list) {
+  return [...list].sort((a, b) => optionTier(kind, a) - optionTier(kind, b) || a.name.localeCompare(b.name));
+}
+
 /**
- * Cost of a craft. With a `save`, the price grows with the player's level
- * (income grows too) and the Forge's level discounts it.
+ * Cost of a craft: a base price, plus the catalyst, plus every better
+ * material, element core and rune you pick. With a `save`, the price grows
+ * with the player's level (income grows too) and the Forge's level
+ * discounts it.
  */
 export function craftCost(data, choice, save = null) {
   const catalyst = data.byId.catalysts.get(choice.catalyst ?? 'none');
   const cfg = data.crafting;
   const scale = save ? 1 + ((cfg.levelScalePct ?? 0) / 100) * (save.player.level - 1) : 1;
   const keep = (1 - (save ? baseBonuses(data, save).craftDiscountPct : 0) / 100) * scale;
+  const extras = [
+    optionCost(data, 'material', data.byId.materials.get(choice.material)),
+    optionCost(data, 'core', choice.core ? data.byId.components.get(choice.core) : null),
+    optionCost(data, 'rune', choice.rune ? data.byId.modifiers.get(choice.rune) : null),
+  ];
+  const extra = (k) => extras.reduce((sum, c) => sum + (c[k] ?? 0), 0);
   return {
-    scrap: Math.ceil((cfg.scrapCost + (catalyst?.scrap ?? 0)) * keep),
-    essence: Math.ceil((cfg.essenceCost + (catalyst?.essence ?? 0) + (choice.rune ? cfg.runeCost : 0)
+    scrap: Math.ceil((cfg.scrapCost + (catalyst?.scrap ?? 0) + extra('scrap')) * keep),
+    essence: Math.ceil((cfg.essenceCost + (catalyst?.essence ?? 0) + extra('essence')
       + (choice.ability ? cfg.abilityCost : 0)) * keep),
     // Star Shards (Golden Catalyst) are never discounted.
     shards: catalyst?.shards ?? 0,
   };
+}
+
+/** A material's effect in words, e.g. "+6% damage · +1% crit chance". */
+export function materialEffects(m) {
+  const pct = (x) => Math.round((x - 1) * 100);
+  const out = [];
+  const st = m.stats ?? {};
+  const add = (v, label) => {
+    if (v) out.push(`${v > 0 ? '+' : '−'}${Math.abs(v)}% ${label}`);
+  };
+  add(pct(st.damage ?? 1), 'damage');
+  add(pct(st.attackSpeed ?? 1), 'attack speed');
+  add(pct(st.range ?? 1), 'reach');
+  add(st.crit ?? 0, 'crit chance');
+  return out.length ? out.join(' · ') : 'No bonuses';
+}
+
+/** A weapon type in words: how it attacks and its base numbers. */
+export function archetypeSummary(a) {
+  const b = a.base;
+  const style = {
+    melee: 'Melee', ranged: 'Ranged', special: 'Special',
+  }[a.class] ?? a.class;
+  const span = ([lo, hi], d = 0) => `${lo.toFixed(d)}–${hi.toFixed(d)}`;
+  return `${style} · ${span(b.damage)} damage · ${span(b.attackSpeed, 1)} attacks/s · reach ${span(b.range, 1)}`;
+}
+
+/** Why a rune can't go on the weapon being forged (null = it can). */
+export function runeProblem(data, choice, rune) {
+  const archetype = data.byId.archetypes.get(choice.archetype);
+  const catalyst = data.byId.catalysts.get(choice.catalyst ?? 'none');
+  if (!archetype || !catalyst || !rune) return null;
+  const core = choice.core ? data.byId.components.get(choice.core) : null;
+  const state = createRuleState(data, {
+    archetype, rarity: data.byId.rarities.get(catalyst.maxRarity), element: core?.element ?? 'physical',
+  });
+  return incompatibility(rune, state, 'modifier');
 }
 
 /** Returns a list of reasons the choice can't be crafted (empty = ok). */

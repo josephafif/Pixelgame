@@ -13,6 +13,7 @@ const COLORS = {
   [T.VOIDSTONE]: '#2e2440', [T.VOIDMOSS]: '#3a2a52', [T.CAMP]: '#8a7f70', [T.PATH]: '#b89a6a',
   [T.WATER]: '#3f7fd0', [T.LAVA]: '#ff6a2a', [T.TREE]: '#2f6e2c', [T.PINE]: '#2a5a3a', [T.ROCK]: '#8d8a9e',
   [T.CACTUS]: '#5f9a40', [T.CRYSTAL]: '#9a5cff', [T.SEA]: '#2f8fc4', [T.DEEP]: '#1d4e8c', [T.PALM]: '#3f9a44',
+  [T.OBSIDIAN]: '#3a2a52', [T.ORE]: '#9a7a5a', [T.STARSTONE]: '#ffd24a',
 };
 
 // Chunk images (1 px per tile), kept for the session.
@@ -82,10 +83,16 @@ export function open(game) {
 
   const markers = () => {
     const out = [{ kind: 'camp', x: 0.5, y: 0.5, label: 'Camp' }];
-    for (const lm of world.landmarks) {
-      const boss = data.byId.bosses.get(lm.bossId);
-      const known = game.explored.has(`${Math.floor(lm.x / CHUNK)},${Math.floor(lm.y / CHUNK)}`);
-      out.push({ kind: 'boss', x: lm.x, y: lm.y, color: boss.color, done: Boolean(save.bosses.defeated[lm.bossId]), faded: !known, label: boss.name });
+    // Great altars are always on the map (faded until found); lesser ones once explored.
+    for (const a of world.greatAltars()) {
+      const boss = data.byId.bosses.get(a.bossId);
+      const known = game.explored.has(`${Math.floor(a.x / CHUNK)},${Math.floor(a.y / CHUNK)}`);
+      out.push({ kind: 'boss', x: a.x, y: a.y, color: boss.color, done: game.altarSpent(a), faded: !known, label: `${boss.name} (great altar)` });
+    }
+    for (const a of world.altarsNear(p.x, p.y, 1600)) {
+      if (!game.explored.has(`${Math.floor(a.x / CHUNK)},${Math.floor(a.y / CHUNK)}`)) continue;
+      const boss = data.byId.bosses.get(a.bossId);
+      out.push({ kind: 'boss', x: a.x, y: a.y, color: boss.color, done: game.altarSpent(a), small: true, label: `${boss.name} (altar)` });
     }
     for (const [id, st] of Object.entries(save.markets)) {
       if (!st.seen && !st.visited) continue;
@@ -195,7 +202,7 @@ export function open(game) {
         case 'boss':
           g.fillStyle = mk.done ? '#6a6a7a' : mk.color;
           g.beginPath();
-          g.arc(x, y, r + 1, 0, Math.PI * 2);
+          g.arc(x, y, mk.small ? r - 1 : r + 1, 0, Math.PI * 2);
           g.fill();
           g.stroke();
           g.fillStyle = '#f3ecdc';

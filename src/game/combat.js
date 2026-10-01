@@ -4,6 +4,7 @@
 // play differently (Flame Arc throws fire, Thunder Strike chains lightning,
 // Blood Feast heals, Void Edge opens portals...).
 
+import { effectiveAbility } from '../weapons/legendary.js';
 import { angleDiff, angleTo, dist2, normalize, segmentDist2 } from '../core/math.js';
 import { applyStatus, statusForElement, isChilled } from './status.js';
 import { spawnProjectile } from './projectiles.js';
@@ -17,7 +18,7 @@ const DEG = Math.PI / 180;
 // chain reactions bounded and cheap.
 const PROC_SAFE = new Set(['heal', 'status']);
 
-export function compileWeapon(dna) {
+export function compileWeapon(dna, data = null) {
   const hooks = { attack: [], hit: [], crit: [], kill: [], nth: [] };
   let bounces = 0;
   const sources = [...dna.modifiers, ...dna.effects, ...(dna.drawback ? [dna.drawback] : [])];
@@ -39,6 +40,8 @@ export function compileWeapon(dna) {
     bounces,
     trail: dna.visual.trail,
     particles: dna.visual.particles,
+    // What its ability button casts (a legendary's signature power).
+    ability: data ? effectiveAbility(data, dna) : dna.ability,
   };
 }
 
@@ -362,6 +365,8 @@ export function tryAttack(game, angle) {
     if (game.target && !game.target.dead) a = Math.atan2(game.target.y - p.y, game.target.x - p.x);
     anim.angle = a;
     executePattern(game, { x: p.x, y: p.y, angle: a, damage, dir });
+    // Ascension: every strike also sends out a shockwave.
+    if (game.ascend && game.ascend.until > game.time) game.ascend.strike(a);
     for (const h of w.hooks.attack) runAttackHook(game, h, a, damage);
     for (const h of w.hooks.nth) if (count % h.n === 0) runAttackHook(game, h, a, damage);
     game.audio.weapon(w.dna.sound);

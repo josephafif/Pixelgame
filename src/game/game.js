@@ -323,6 +323,7 @@ export class Game {
     if (id === 'burn') s.burn = { until: this.time + 2, dps: 2 + this.save.player.level * 0.6 };
     if (id === 'poison') s.poison = { until: this.time + 3, dps: 1.5 + this.save.player.level * 0.4 };
     if (id === 'chill') s.chill = { until: this.time + 1.5 };
+    if (id === 'bleed') s.bleed = { until: this.time + 3, dps: 2 + this.save.player.level * 0.5 };
   }
 
   recomputeStats() {
@@ -391,7 +392,7 @@ export class Game {
     if (inv.secondary && !inv.bag.some((w) => w.id === inv.secondary)) inv.secondary = null;
     const slot = inv.activeSlot === 'secondary' && inv.secondary ? 'secondary' : 'main';
     const dna = this.#slotDna(slot) ?? this.#slotDna(slot === 'main' ? 'secondary' : 'main');
-    this.weapon = dna ? compileWeapon(dna) : null;
+    this.weapon = dna ? compileWeapon(dna, this.data) : null;
     this.recomputeStats();
   }
 
@@ -464,7 +465,7 @@ export class Game {
     const inv = this.save.inventory;
     if (inv.activeSlot !== 'tool') {
       const dna = this.#slotDna(inv.activeSlot) ?? this.#slotDna('main');
-      if (dna && dna.id !== this.weapon?.dna.id) this.weapon = compileWeapon(dna);
+      if (dna && dna.id !== this.weapon?.dna.id) this.weapon = compileWeapon(dna, this.data);
       if (!dna) this.weapon = null;
     }
     const p = this.player;
@@ -781,6 +782,11 @@ export class Game {
     if (e.boss) {
       const id = e.bossDef.id;
       this.save.bosses.defeated[id] = (this.save.bosses.defeated[id] ?? 0) + 1;
+      // Each altar can be beaten once: the next fight is at another altar.
+      if (e.altarKey && !this.save.world.altars.includes(e.altarKey)) {
+        this.save.world.altars.push(e.altarKey);
+        this.schedule(2.5, () => this.toast('The altar falls silent. Seek out another altar to face a boss again.', 'boss'));
+      }
       this.boss = null;
       this.shake = 0.6;
       this.emit('boss', { active: false, victory: true, name: e.bossDef.name });
@@ -1063,7 +1069,7 @@ export class Game {
       }
       case 'chest': return 'Open chest';
       case 'shrine': return 'Pray at shrine';
-      case 'altar': return `Summon ${this.data.byId.bosses.get(o.bossId)?.name ?? 'boss'}`;
+      case 'altar': return this.altarSpent(o) ? 'A silent altar' : `Summon ${this.data.byId.bosses.get(o.bossId)?.name ?? 'boss'}`;
       case 'building': {
         const def = buildingDef(this.data, o.buildingId);
         const level = buildingLevel(this.data, this.save, o.buildingId);
@@ -1124,7 +1130,7 @@ export class Game {
     const angle = Math.atan2(o.y - p.y, o.x - p.x);
     p.facing = angle;
     p.toolAnim = { t: 0, dur: 0.32, angle };
-    p.toolCd = 0.36;
+    p.toolCd = tool.swing ?? 0.36;
     this.schedule(0.13, () => {
       const key = `${o.tx},${o.ty}`;
       if (!this.world.blockAt(o.tx, o.ty)) return;
@@ -1145,11 +1151,12 @@ export class Game {
   fellBlock(o, { direct = false } = {}) {
     this.world.removeBlock(o.tx, o.ty);
     this.harvestDamage.delete(`${o.tx},${o.ty}`);
-    const drops = rollDrops(o.info);
-    const color = { wood: '#b07a48', stone: '#b8bcc8', essence: '#7ae0ff' };
+    const drops = rollDrops(o.info, direct ? 1 : currentPickaxe(this.data, this.save)?.yield ?? 1);
+    const color = { wood: '#b07a48', stone: '#b8bcc8', essence: '#7ae0ff', scrap: '#c8ccd8', shards: '#ffd24a' };
     for (const [kind, n] of Object.entries(drops)) {
+      if (!n) continue;
       if (direct) this.save.resources[kind] = (this.save.resources[kind] ?? 0) + n;
-      else for (let i = 0; i < n; i++) addPickup(this, kind, o.x, o.y, { value: 1, color: color[kind] ?? '#ffffff' });
+      else for (let i = 0; i < n; i++) addPickup(this, kind === 'shards' ? 'shard' : kind, o.x, o.y, { value: 1, color: color[kind] ?? '#ffffff' });
     }
     const label = Object.entries(drops).map(([k, n]) => `+${n} ${k}`).join(' ');
     this.fx.text(o.x, o.y - 1, label.toUpperCase(), '#ffe890', 1.2);
@@ -1283,6 +1290,7 @@ export class Game {
       }
       b.active = true;
       b.tool = 'place';
+      b.hover = null;
       if (!structureDef(this.data, b.selected)) b.selected = structureDefs(this.data)[0]?.id;
       this.interactTarget = null;
       this.emit('interact', { label: null });
@@ -1362,6 +1370,31 @@ export class Game {
       up: () => {
         b.painting = false;
       },
+      // Touch: a tap picks a tile; tapping the picked (highlighted) tile
+      // builds there. Dragging from it draws a line; dragging elsewhere aims.
+      tap: (cx, cy) => {
+        const { tx, ty } = this.#tileAt(cx, cy);
+        const g = b.ghost;
+        if (g && g.tx === tx && g.ty === ty) {
+          const problem = this.buildAt(tx, ty);
+          if (problem) {
+            this.toast(problem, 'warn');
+            this.audio.play('hurt', { throttle: 200 });
+          }
+        }
+        b.hover = { tx, ty };
+        b.hoverAt = this.time;
+        this.#updateBuildGhost();
+      },
+      aim: (cx, cy) => {
+        const { tx, ty } = this.#tileAt(cx, cy);
+        b.hover = { tx, ty };
+        b.hoverAt = this.time;
+      },
+      onGhost: (cx, cy) => {
+        const { tx, ty } = this.#tileAt(cx, cy);
+        return Boolean(b.ghost && b.ghost.tx === tx && b.ghost.ty === ty);
+      },
     };
   }
 
@@ -1374,7 +1407,8 @@ export class Game {
       return;
     }
     let tile;
-    if (b.hover && this.time - b.hoverAt < 4) tile = b.hover;
+    // A picked tile stays picked on touch screens; a mouse hover fades after a while.
+    if (b.hover && (this.input.mode === 'touch' || this.time - b.hoverAt < 4)) tile = b.hover;
     else tile = { tx: Math.floor(p.x + Math.cos(p.facing) * 1.1), ty: Math.floor(p.y + Math.sin(p.facing) * 1.1) };
     b.ghost = tile;
     if (b.tool === 'remove') {
@@ -1520,8 +1554,13 @@ export class Game {
         this.toast('Shrine blessing: +1 Luck, fully healed. Respawn point set.', 'component');
         break;
       case 'altar': {
+        if (this.altarSpent(o)) {
+          this.toast('This altar is silent: its guardian is gone. Find another altar to face a boss again.', 'warn');
+          return true;
+        }
         const def = this.data.byId.bosses.get(o.bossId);
         this.boss = spawnBoss(this, o.bossId, o.x, o.y - 3.5);
+        this.boss.altarKey = o.key;
         this.shake = 0.6;
         this.audio.play('boss');
         this.emit('boss', { active: true, name: def.name });
@@ -1625,6 +1664,7 @@ export class Game {
     let dot = 0;
     if (st.burn?.until > this.time) dot += st.burn.dps;
     if (st.poison?.until > this.time) dot += st.poison.dps;
+    if (st.bleed?.until > this.time) dot += st.bleed.dps;
     if (dot && !this.godMode) {
       p.dotAcc = (p.dotAcc ?? 0) + dot * dt;
       if (p.dotAcc >= 1) {
@@ -1796,7 +1836,7 @@ export class Game {
       building: this.build.active,
       nearCamp: Math.hypot(this.player.x - 0.5, this.player.y - 0.5) <= this.buildRadius() + 6,
       ability: abilityProgress(this),
-      abilityName: this.weapon?.dna.ability?.name ?? null,
+      abilityName: this.weapon?.ability?.name ?? null,
       sprinting: this.player.sprinting,
       boss: this.boss ? { name: this.boss.bossDef.name, hp: this.boss.hp, maxHp: this.boss.maxHp, phase: this.boss.phase } : null,
       dead: this.player.dead,
@@ -1825,21 +1865,43 @@ export class Game {
     return this.data.base.buildings.some((b) => upgradeBlockers(this.data, this.save, b.id).length === 0);
   }
 
-  #compass() {
+  /** Has this altar's boss already been beaten? */
+  altarSpent(o) {
+    return this.save.world.altars.includes(o.key);
+  }
+
+  /** The nearest altar that still has a boss: great altars, or a lesser one nearby. */
+  nearestAltar(range = 700) {
     const p = this.player;
+    // The search moves in steps, so it doesn't run every frame.
+    const cx = Math.round(p.x / 40);
+    const cy = Math.round(p.y / 40);
+    const stamp = `${cx},${cy},${this.save.world.altars.length}`;
+    if (this.altarStamp !== stamp) {
+      this.altarStamp = stamp;
+      // Every great altar (however far) plus the lesser ones around you.
+      const all = new Map(this.world.greatAltars().map((a) => [a.key, a]));
+      for (const a of this.world.altarsNear(p.x, p.y, range)) all.set(a.key, a);
+      this.altarList = [...all.values()].filter((a) => !this.altarSpent(a));
+    }
     let best = null;
     let bestD = Infinity;
-    for (const lm of this.world.landmarks) {
-      if (this.save.bosses.defeated[lm.bossId]) continue;
-      const d = dist2(p.x, p.y, lm.x, lm.y);
+    for (const a of this.altarList) {
+      const d = dist2(p.x, p.y, a.x, a.y);
       if (d < bestD) {
         bestD = d;
-        best = lm;
+        best = a;
       }
     }
+    return best ? { ...best, dist: Math.sqrt(bestD) } : null;
+  }
+
+  #compass() {
+    const p = this.player;
+    const best = this.nearestAltar();
     if (!best) return null;
     const boss = this.data.byId.bosses.get(best.bossId);
-    return { angle: angleTo(p.x, p.y, best.x, best.y), dist: Math.sqrt(bestD), name: boss.name, color: boss.color };
+    return { angle: angleTo(p.x, p.y, best.x, best.y), dist: best.dist, name: boss.name, color: boss.color };
   }
 
   // --- Persistence ------------------------------------------------------------------

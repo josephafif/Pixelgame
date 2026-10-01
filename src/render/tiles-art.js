@@ -226,6 +226,50 @@ function drawBlocker(ctx, id, rng) {
       }
       break;
     }
+    case T.OBSIDIAN: {
+      // A glassy black boulder with violet facets and a glowing seam.
+      circle(ctx, 8, 9, 6, '#161622');
+      circle(ctx, 8, 9, 5, '#2a2238');
+      ctx.fillStyle = '#4a3a66';
+      ctx.fillRect(4, 6, 3, 3);
+      ctx.fillRect(9, 9, 3, 2);
+      ctx.fillStyle = '#9a7aff';
+      ctx.fillRect(5, 6, 1, 1);
+      ctx.fillRect(10, 9, 1, 1);
+      ctx.fillStyle = '#ff6a2a';
+      ctx.fillRect(7, 11, 3, 1);
+      ctx.fillRect(9, 12, 1, 1);
+      break;
+    }
+    case T.ORE: {
+      // A grey rock shot through with rusty iron and bright specks.
+      circle(ctx, 8, 9, 6, '#161622');
+      circle(ctx, 8, 9, 5, '#6a6a76');
+      circle(ctx, 7, 8, 4, '#7d7a86');
+      ctx.fillStyle = '#c87a3a';
+      for (const [x, y] of [[5, 7], [9, 6], [10, 10], [6, 11], [8, 9]]) ctx.fillRect(x, y, 2, 1);
+      ctx.fillStyle = '#e8e4d4';
+      for (const [x, y] of [[6, 8], [10, 7], [8, 11]]) ctx.fillRect(x, y, 1, 1);
+      break;
+    }
+    case T.STARSTONE: {
+      // A golden crystal cluster that glitters.
+      const shards = [[6, 2, 4, 13], [10, 6, 3, 9], [3, 8, 3, 7]];
+      for (const [x, y, w, h] of shards) {
+        ctx.fillStyle = '#161622';
+        ctx.fillRect(x - 1, y - 1, w + 2, h + 1);
+        ctx.fillStyle = '#c8961a';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#ffd24a';
+        ctx.fillRect(x, y, 1, h);
+        ctx.fillStyle = '#fff4b0';
+        ctx.fillRect(x + 1, y, 1, 1);
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(8, 5, 1, 1);
+      ctx.fillRect(11, 9, 1, 1);
+      break;
+    }
     default:
       break;
   }

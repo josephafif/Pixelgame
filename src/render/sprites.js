@@ -176,6 +176,90 @@ const MAPS = {
     '...ohhhho.ohhhho..',
     '...oooooo.oooooo..',
   ],
+  // Sand Wyrm: a segmented worm rearing out of a sand mound.
+  wyrm: [
+    '......oooooo......',
+    '....oorrrrrroo....',
+    '...orrrrrrrrrro...',
+    '..orreerrrreerro..',
+    '..orrrrrrrrrrrro..',
+    '.otorrrrrrrrrroto.',
+    'ottoorRtRRtRroott.',
+    '.oo.orrrrrrrro.oo.',
+    '....ohhhhhhhho....',
+    '....orrrrrrrro....',
+    '.....ohhhhhho.....',
+    '.....orrrrrro.....',
+    '....ohhhhhhhho....',
+    '....orrrrrrrro....',
+    '..oossssssssssoo..',
+    '.osssSssssssSsssso',
+    'osssssssSsssssssso',
+    'oooooooooooooooooo',
+  ],
+  // Thornmother: a bark-skinned tree hag crowned with flowers.
+  thorn: [
+    '...o.oo....oo.o...',
+    '..oyoyyo..oyyoyo..',
+    '...oyyo....oyyo...',
+    '....oo.oooo.oo....',
+    '.t...ohhhhhho...t.',
+    '.ot.ohheehheho.to.',
+    '..ohhhhhhhhhhhho..',
+    '.ohho.ohhhho.ohho.',
+    'ohho.ohrrrrho.ohho',
+    'oho..orrggrro..oho',
+    '.o...orrggrro...o.',
+    '.....orrrrrro.....',
+    '....ohrrrrrrho....',
+    '...ohhRrrrrRhho...',
+    '..ohho.oooo.ohho..',
+    '.ohho........ohho.',
+    'oho............oho',
+    'oo..............oo',
+  ],
+  // Bone King: a crowned skeleton in a blood-red robe.
+  lich: [
+    '....o.o.oo.o.o....',
+    '....ogogggggogo...',
+    '....oggggggggo....',
+    '....ohhhhhhhho....',
+    '...ohhoohhoohho...',
+    '...ohoeeohoeeoho..',
+    '...ohhhhoohhhhho..',
+    '....ohtttttttho...',
+    '..oooohhhhhhoooo..',
+    '.ohhhorrrrrrohhho.',
+    'ohhhorrrhhrrrohhho',
+    'oho.orrrhhrrro.oho',
+    'oho.orRrrrrRro.oho',
+    '.o..orrrrrrrro..o.',
+    '....orRrrrrRro....',
+    '...orrrrrrrrrro...',
+    '..orrRrrrrrrRrro..',
+    '..oRRoRRRRRRoRRo..',
+    '..ooo.oooooo.ooo..',
+  ],
+  // Tide Leviathan: a finned sea beast rising from the waves.
+  leviathan: [
+    '...o..........o...',
+    '..ogo........ogo..',
+    '..oggo.oooo.oggo..',
+    '...oggorrrrroggo..',
+    '....orrrrrrrrro...',
+    '...orreerrreerro..',
+    '...orrrrrrrrrrro..',
+    '..otrrrrrrrrrrtro.',
+    '..ottohhhhhhottoo.',
+    '...oohhhhhhhhoo...',
+    '....orrrrrrrro....',
+    '...ohhhhhhhhhho...',
+    '..orrrrrrrrrrrro..',
+    '.owwwrrrrrrrrwwwo.',
+    'owWWWwwrrrrwwWWWwo',
+    'oWWWWWWwwwwWWWWWWo',
+    'oooooooooooooooooo',
+  ],
   // Storm Colossus: a floating stone golem with a lightning core.
   colossus: [
     '......oooooo......',
@@ -472,6 +556,10 @@ const BOSS_SHAPES = {
   storm_colossus: 'colossus',
   frost_warden: 'warden',
   void_herald: 'specter',
+  bone_king: 'lich',
+  thornmother: 'thorn',
+  sand_wyrm: 'wyrm',
+  tide_leviathan: 'leviathan',
 };
 
 export function bossSprites(bossId, color) {
@@ -484,6 +572,10 @@ export function bossSprites(bossId, color) {
     // Ice-silver armour for the Warden, weathered stone for the Colossus.
     if (shape === 'warden') Object.assign(pal, { h: '#e8f4ff', H: '#6a8aa8', r: '#9fd8f4', R: '#5a8ab0', e: '#7affff', g: '#ffffff' });
     if (shape === 'colossus') Object.assign(pal, { h: '#9a9aa8', H: '#5d5d6e', r: color, g: '#fffbd0', e: '#ffe45c' });
+    if (shape === 'wyrm') Object.assign(pal, { h: shadeHex(color, 0.3), e: '#ff5030', s: '#e8c890', S: '#b8905a' });
+    if (shape === 'thorn') Object.assign(pal, { h: '#7a5232', H: '#4a3018', e: '#ffe45c', y: '#ff7ad8', g: '#c8f59a', t: '#e8e0c8' });
+    if (shape === 'lich') Object.assign(pal, { h: '#e8e4d4', H: '#a8a090', e: '#ff4040', g: '#ffd24a', t: '#161622' });
+    if (shape === 'leviathan') Object.assign(pal, { h: '#bfe8ff', g: '#7ad8ff', e: '#ffe45c', w: '#e8f8ff', W: '#3a78c8' });
     const base = spriteFromMap(MAPS[shape], pal);
     const right = scaled(base, 2);
     return { right, left: flipped(right), flash: silhouette(right) };

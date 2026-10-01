@@ -47,7 +47,8 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     components: {},
     bosses: { defeated: {} },
     // explored: chunk keys "cx,cy" you have seen (for the map); pins: your map markers.
-    world: { chests: [], shrines: [], harvested: {}, explored: [], pins: [], found: [] },
+    // altars: altars whose boss you have beaten (each altar can be beaten once).
+    world: { chests: [], shrines: [], harvested: {}, explored: [], pins: [], found: [], altars: [] },
     // Per-market state: { visited, hostileUntil, stockPeriod, bought: [] }.
     markets: {},
     abilityState: { cooldowns: {} },
@@ -102,6 +103,8 @@ export function fillDefaults(save) {
   out.base.buildings = { ...(save.base?.buildings ?? {}) };
   out.base.structures = Array.isArray(save.base?.structures) ? save.base.structures.map((st) => ({ ...st })) : [];
   out.world.harvested = { ...(save.world?.harvested ?? {}) };
+  // Older saves: a boss you beat was beaten at its great altar.
+  if (!Array.isArray(save.world?.altars)) out.world.altars = Object.keys(save.bosses?.defeated ?? {}).map((id) => `a:${id}`);
   out.pals.eggs = Array.isArray(save.pals?.eggs) ? save.pals.eggs.map((e) => ({ ...e })) : [];
   out.pals.owned = Array.isArray(save.pals?.owned) ? save.pals.owned.map((pal) => ({ ...pal })) : [];
   return out;
