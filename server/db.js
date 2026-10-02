@@ -112,6 +112,8 @@ const SCHEMA = [
      detail TEXT
    );
    CREATE INDEX ledger_account ON ledger(account_id, at);`,
+  // v2: log in with your name and a password (guest servers, `npm run share`).
+  'ALTER TABLE accounts ADD COLUMN pass_hash TEXT;',
 ];
 
 const json = (s, fallback) => {
@@ -215,9 +217,14 @@ export class Db {
     return this.get('SELECT * FROM accounts WHERE name = ? COLLATE NOCASE', name) ?? null;
   }
 
-  createAccount({ id, name, email }) {
-    this.run('INSERT INTO accounts (id, name, email, created_at, last_seen) VALUES (?, ?, ?, ?, ?)', id, name, email ?? null, Date.now(), Date.now());
+  createAccount({ id, name, email, passHash = null }) {
+    this.run('INSERT INTO accounts (id, name, email, created_at, last_seen, pass_hash) VALUES (?, ?, ?, ?, ?, ?)',
+      id, name, email ?? null, Date.now(), Date.now(), passHash);
     return this.account(id);
+  }
+
+  setPassword(id, passHash) {
+    this.run('UPDATE accounts SET pass_hash = ? WHERE id = ?', passHash, id);
   }
 
   touchAccount(id, email) {

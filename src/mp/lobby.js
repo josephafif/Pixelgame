@@ -7,7 +7,8 @@ import { h, clear, $ } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { openModal, closeModal, replaceModalBody } from '../ui/modal.js';
 import { PROTOCOL_VERSION } from '../net/protocol.js';
-import { MpAuth, serverList, addServer, removeServer, infoUrl, sameOriginServer } from './auth.js';
+import { MpAuth, serverList, addServer, removeServer, infoUrl, sameOriginServer, loginWithPassword } from './auth.js';
+import { passwordProblem } from '../net/rules.js';
 
 const JOIN_KEY = 'pg-mp-join';
 // Keep ?debug=1 across the reloads (network overlay, test hooks).
@@ -41,7 +42,7 @@ async function probe(server) {
 export function openLobby(app, { message = null } = {}) {
   const auth = makeAuth();
   const local = sameOriginServer();
-  const state = { servers: [], infos: new Map(), sent: null, error: message, busy: false };
+  const state = { servers: [], infos: new Map(), sent: null, error: message, busy: false, login: null };
 
   const refreshServers = async () => {
     const list = serverList(mpConfig());
@@ -69,11 +70,8 @@ export function openLobby(app, { message = null } = {}) {
   };
 
   function accountSection() {
-    if (!auth.configured) {
-      return h('section.mp-account',
-        h('h3', 'Konto'),
-        h('p.small.muted', 'Inloggning med konto är inte inställd för den här versionen av spelet. Du kan spela som gäst på servrar som tillåter det.'));
-    }
+    // No e-mail/Google/Discord login set up: guests (with name + password) only.
+    if (!auth.configured) return null;
     const email = auth.email;
     if (email || auth.session) {
       return h('section.mp-account',
@@ -150,8 +148,58 @@ export function openLobby(app, { message = null } = {}) {
           title: loggedIn ? null : 'Logga in först',
           onclick: () => join(s, 'account'),
         }, icon('players', 20), loggedIn ? 'Spela' : 'Logga in för att spela') : null,
-        ready && info.guests ? h(`button${info.supabase ? '' : '.btn-primary'}`, { onclick: () => join(s, 'guest') }, 'Spela som gäst') : null,
-        s.custom ? h('button.btn-danger', { onclick: () => { removeServer(s.url); refreshServers(); } }, 'Ta bort') : null));
+        ready && info.guests ? h(`button${info.supabase ? '' : '.btn-primary'}`, { onclick: () => join(s, 'guest') },
+          auth.guestToken(s.url) ? 'Fortsätt som gäst' : 'Spela som gäst') : null,
+        ready && info.logins ? h('button', {
+          'aria-expanded': String(state.login?.url === s.url),
+          onclick: () => {
+            state.login = state.login?.url === s.url ? null : { url: s.url, name: '', password: '', error: null };
+            rerender();
+            document.querySelector('.mp-login input')?.focus();
+          },
+        }, 'Logga in med namn') : null,
+        s.custom ? h('button.btn-danger', { onclick: () => { removeServer(s.url); refreshServers(); } }, 'Ta bort') : null),
+      ready && info.logins && state.login?.url === s.url ? loginForm(s) : null);
+  }
+
+  /** Name + password: your character from another link or device. */
+  function loginForm(s) {
+    const form = state.login;
+    const name = h('input', { type: 'text', maxlength: 16, autocomplete: 'username', value: form.name, oninput: (e) => { form.name = e.target.value; } });
+    const password = h('input', { type: 'password', maxlength: 64, autocomplete: 'current-password', value: form.password, oninput: (e) => { form.password = e.target.value; } });
+    const submit = async () => {
+      if (state.busy) return;
+      if (form.name.trim().length < 3 || passwordProblem(form.password)) {
+        form.error = 'Skriv ditt namn och ditt lösenord';
+        rerender();
+        return;
+      }
+      state.busy = true;
+      try {
+        const res = await loginWithPassword(s.url, form.name.trim(), form.password);
+        auth.setGuestToken(s.url, res.token);
+        join(s, 'guest');
+        return;
+      } catch (err) {
+        form.error = err.message;
+        form.password = '';
+      } finally {
+        state.busy = false;
+      }
+      rerender();
+    };
+    for (const input of [name, password]) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submit();
+      });
+    }
+    return h('div.mp-login',
+      h('p.small.muted', 'Har du spelat här förut, från en annan länk eller enhet? Logga in med namnet och lösenordet du valde.'),
+      form.error ? h('p.warn', form.error) : null,
+      h('div.mp-login-fields',
+        h('label.field', h('span', 'Namn'), name),
+        h('label.field', h('span', 'Lösenord'), password),
+        h('button.btn-primary', { disabled: state.busy, onclick: submit }, 'Logga in')));
   }
 
   function addSection() {
@@ -213,20 +261,42 @@ export function handleAuthRedirect(app) {
   setTimeout(() => openLobby(app, { message }), 400);
 }
 
-function namePrompt(msg, send) {
-  const input = h('input', { type: 'text', maxlength: 16, value: msg.suggestion ?? '', autocomplete: 'nickname', autofocus: true });
-  const submit = () => send(input.value.trim());
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') submit();
-  });
+/**
+ * A new character's name. Guests also pick a password: guest identities
+ * live in the browser, per address, so the password is how you get your
+ * character back on a new link or another device.
+ */
+function namePrompt(msg, send, { guest = false, last = {} } = {}) {
+  const input = h('input', { type: 'text', maxlength: 16, value: last.name ?? msg.suggestion ?? '', autocomplete: 'username', autofocus: true });
+  const password = guest ? h('input', { type: 'password', maxlength: 64, autocomplete: 'new-password', value: last.password ?? '' }) : null;
+  const error = h('p.warn', { hidden: !msg.error }, msg.error ?? '');
+  const submit = () => {
+    const name = input.value.trim();
+    const pw = password?.value ?? '';
+    const problem = password ? passwordProblem(pw) : null;
+    if (problem) {
+      error.textContent = problem;
+      error.hidden = false;
+      password.focus();
+      return;
+    }
+    send(name, pw || undefined);
+  };
+  for (const el of [input, password]) {
+    el?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submit();
+    });
+  }
   openModal({
     title: 'Välj ditt namn',
     locked: true,
     className: 'tutorial-panel',
     body: h('div.mp-name',
       h('p', 'Så här ser andra spelare dig. Du kan inte byta senare.'),
-      msg.error ? h('p.warn', msg.error) : null,
+      error,
       h('label.field', h('span', 'Namn (3–16 tecken)'), input),
+      password ? h('label.field', h('span', 'Lösenord (minst 4 tecken)'), password) : null,
+      password ? h('p.small.muted', 'Med namnet och lösenordet kommer du tillbaka till din karaktär från en ny länk eller en annan enhet.') : null,
       h('button.btn-primary', { onclick: submit }, 'Börja spela')),
   });
 }
@@ -284,13 +354,16 @@ export async function startMultiplayer(app) {
     if (reason === 'update' || /uppdaterats/.test(reason)) failModal('Ny version', 'Spelet har uppdaterats. Ladda om sidan för att fortsätta.');
     else failModal('Frånkopplad', reason);
   });
+  const last = {};
   try {
     await game.connect(join.server, token, {
       onGuestToken: (t) => auth.setGuestToken(join.server.url, t),
-      onNeedName: (msg, send) => namePrompt(msg, (name) => {
+      onNeedName: (msg, send) => namePrompt(msg, (name, password) => {
+        last.name = name;
+        last.password = password;
         connectingModal(join.server.name);
-        send(name);
-      }),
+        send(name, password);
+      }, { guest: join.mode === 'guest', last }),
     });
   } catch (err) {
     failModal('Kunde inte ansluta', err.message);

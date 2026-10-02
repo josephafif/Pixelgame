@@ -105,6 +105,7 @@ export class MpPanels {
       case 'clan': return this.#clan();
       case 'players': return this.#players();
       case 'town': return this.#town();
+      case 'password': return this.#password();
       case 'crafting':
         if (!this.game.nearForge()) {
           this.game.toast('Smedjan finns i Fristaden: gå dit för att smida.', 'warn');
@@ -144,12 +145,39 @@ export class MpPanels {
         item('book', 'Regler', go('town'))),
       h('div.menu-grid',
         item('gear', 'Inställningar', go('settings')),
+        g.account?.guest ? item('lock', g.account.password ? 'Byt lösenord' : 'Välj lösenord', go('password')) : null,
         item('portal', 'Lämna servern', () => {
           g.disconnect();
           location.href = location.pathname;
         })),
       h('p.menu-foot', `${g.server?.name ?? ''} · ${g.myName ?? ''} · ${Math.round(g.conn?.rtt ?? 0)} ms`));
     openModal({ title: 'Meny', body, className: 'menu-panel', onClose: () => { this.open = null; } });
+  }
+
+  // --- Password (guests) -----------------------------------------------------------------
+
+  #password() {
+    const g = this.game;
+    const input = h('input', { type: 'password', maxlength: 64, autocomplete: 'new-password' });
+    const save = async () => {
+      const res = await g.setPassword(input.value);
+      if (!res.ok) return;
+      closeModal();
+      g.toast('Lösenordet är sparat. Logga in med ditt namn och lösenordet nästa gång.', 'component');
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') save();
+    });
+    const body = h('div.mp-name',
+      h('p', g.account?.password
+        ? 'Byt lösenordet du loggar in med.'
+        : 'Du spelar som gäst. Välj ett lösenord, så kan du logga in med ditt namn från en ny länk eller en annan enhet.'),
+      h('p.small.muted', `Ditt namn: ${g.myName ?? ''}`),
+      h('label.field', h('span', 'Nytt lösenord (minst 4 tecken)'), input),
+      h('button.btn-primary', { onclick: save }, 'Spara'));
+    openModal({ title: 'Lösenord', icon: 'lock', body, className: 'tutorial-panel', onClose: () => { this.open = null; } });
+    input.focus();
   }
 
   // --- Clan ------------------------------------------------------------------------------

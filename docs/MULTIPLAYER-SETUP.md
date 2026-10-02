@@ -1,21 +1,105 @@
 # Så sätter du upp multiplayer
 
-Den här guiden tar dig från noll till en server som du och dina vänner kan
-spela på, utan månadskostnad. Den tar ungefär en timme första gången.
+Det finns två sätt, och båda är gratis:
 
-Det här behöver du:
+| | **A. Från din dator** | **B. En server som alltid är på** |
+|---|---|---|
+| Kommando | `npm run share` | Docker på en server i molnet |
+| Tid första gången | 5 minuter | ungefär en timme |
+| Konton som behövs | inga | Oracle Cloud (betalkort för verifiering, inget dras) och valfritt Supabase |
+| Länk till spelet | ny varje gång du startar | fast adress |
+| När ni kan spela | när din dator är på och kör `npm run share` | alltid |
+| Inloggning | namn och lösenord | namn och lösenord, eller e-post, Google och Discord via Supabase |
+
+Börja med A. Byt till B när ni vill kunna spela utan att din dator är på. Allt följer med när
+ni byter: karaktärer, lösenord, klaner och baser (se *Flytta till en server* nedan).
+
+---
+
+## A. Spela från din dator (`npm run share`)
+
+Spelet och servern körs på din dator. En gratis Cloudflare-tunnel ger datorn en
+`https://`-adress som dina vänner kan öppna. Du behöver inget konto, inget betalkort och inga
+inställningar i routern.
+
+### Första gången
+
+1. Installera **Node.js 22 eller nyare** från <https://nodejs.org> (välj LTS).
+2. Hämta spelet: `git clone https://github.com/josephafif/pixelgame.git`, eller **Code →
+   Download ZIP** på GitHub och packa upp.
+3. Öppna en terminal i mappen (på Windows: högerklicka i mappen → *Öppna i terminal*) och kör:
+   ```bash
+   npm install
+   npm run share
+   ```
+   Första gången hämtas Cloudflares tunnelprogram (`cloudflared`, cirka 40 MB) till
+   `server-data/bin/`. Har du redan `cloudflared` installerat används det.
+4. Efter några sekunder visas en ruta:
+   ```
+   Skicka till dina vänner:   https://några-slumpade-ord.trycloudflare.com
+   Spela själv (admin):       http://localhost:8787
+   ```
+
+### Spela
+
+- **Dina vänner** öppnar länken, trycker på **Multiplayer** och sedan **Spela som gäst**, och
+  väljer ett namn och ett lösenord.
+- **Du** öppnar <http://localhost:8787> på samma dator. Där är du admin: skriv `/help` i
+  chatten (öppnas med T) för att se kommandona, till exempel `/kick`, `/ban` och `/announce`.
+- **Stäng av** med Ctrl+C. Servern sparar allt först.
+
+### Nästa gång
+
+Kör `npm run share` igen. Länken blir en ny, så skicka den igen. Vännerna trycker på
+**Multiplayer → Logga in med namn** och skriver namnet och lösenordet de valde. Då får de
+tillbaka sin karaktär. Det fungerar också från en annan dator eller mobil. En gäst som spelar
+utan lösenord kan välja ett i spelets meny.
+
+### Bra att veta
+
+- **Datorn måste vara på** och vaken medan ni spelar. Stäng av viloläget under tiden.
+- **Internet:** varje spelare använder cirka 10 kB/s (80 kbit/s) av din uppladdning. Första
+  gången någon öppnar länken hämtas spelet, cirka 1,2 MB, från din dator. 20 spelare klarar de
+  flesta bredband.
+- **Tunneln** är Cloudflares gratistjänst för tester (*Quick Tunnels*). Den har ingen
+  drifttidsgaranti och tar högst 200 samtidiga anslutningar. Det räcker gott för en
+  kompisserver. Går tunneln ner startar skriptet en ny, med en ny länk.
+- **Säkerhet:** servern lyssnar bara på din egen dator, och tunneln är enda vägen in. Inga
+  portar öppnas i routern, och din IP-adress syns inte för spelarna. Lösenorden sparas som
+  saltade scrypt-hashar. Efter några felaktiga försök pausas inloggningen för det namnet en
+  stund.
+- **Sparat:** allt ligger i `server-data/pixelgame.db`. Varje dygn sparas en kopia i
+  `server-data/backups/`.
+- **Inställningar:** `npm run share -- --name "Vår server"` byter serverns namn och
+  `npm run share -- --port 8788` byter port. `npm run share -- --no-tunnel` startar utan
+  tunnel, bara för din egen dator.
+- **Uppdatera spelet:** stäng servern, kör `git pull` (eller ladda ner en ny ZIP och kopiera
+  med dig mappen `server-data`) och starta igen.
+
+### Flytta till en server som alltid är på
+
+Följ del B och kopiera sedan `server-data/pixelgame.db` från din dator till
+`~/Pixelgame/server-data/` på servern innan du startar den. Alla karaktärer, lösenord, klaner och
+baser följer med. Sätt `ALLOW_GUESTS=1` i `server/.env` så att namn och lösenord fungerar även
+där.
+
+---
+
+## B. En server som alltid är på
+
+Den här delen tar dig från noll till en server som du och dina vänner kan spela på dygnet
+runt, utan månadskostnad.
 
 | Del | Tjänst | Kostnad |
 |---|---|---|
 | Spelservern, som också levererar själva spelet | Oracle Cloud Always Free (en ARM-server i Stockholm) | 0 kr |
 | En adress med HTTPS | DuckDNS och Caddy, eller en egen domän via Cloudflare | 0 kr, eller cirka 100 kr/år med egen domän |
-| Inloggning med e-post, Google och Discord | Supabase (gratisnivån) | 0 kr |
+| Inloggning med e-post, Google och Discord (valfritt) | Supabase (gratisnivån) | 0 kr |
 
-Du kan prova allt på din egen dator först, se steg 0.
+Vill du klara dig utan Supabase: hoppa över steg 1 och sätt `ALLOW_GUESTS=1` i
+`server/.env`. Då loggar alla in med namn och lösenord, som i del A.
 
----
-
-## Steg 0: prova lokalt (5 minuter)
+### Steg 0: prova lokalt (5 minuter)
 
 ```bash
 npm install
@@ -40,7 +124,7 @@ node scripts/loadtest.mjs --bots 50 --seconds 30  # lasttest
 
 ---
 
-## Steg 1: Supabase (inloggningen)
+### Steg 1: Supabase (inloggningen, valfritt)
 
 1. Skapa ett konto på <https://supabase.com> och skapa ett nytt projekt (**New
    project**). Välj den region som ligger närmast, helst i Norden eller annars
@@ -75,7 +159,7 @@ då hämtar servern dem själv.
 
 ---
 
-## Steg 2: Oracle Cloud (servern)
+### Steg 2: Oracle Cloud (servern)
 
 1. Skapa ett konto på <https://www.oracle.com/cloud/free/>. Du behöver ett
    betalkort för verifiering, men inget dras.
@@ -97,7 +181,7 @@ då hämtar servern dem själv.
 
 ---
 
-## Steg 3: installera spelet på servern
+### Steg 3: installera spelet på servern
 
 Kör följande på servern:
 
@@ -124,7 +208,10 @@ ADMINS=din@epost.se
 ALLOW_GUESTS=0
 ```
 
-### Alternativ A, 0 kr: DuckDNS och Caddy
+Utan Supabase: lämna de två `SUPABASE`-raderna tomma, sätt `ALLOW_GUESTS=1` och skriv ditt
+spelarnamn i `ADMINS`. Skapa din karaktär först, så att ingen annan hinner ta namnet.
+
+#### Alternativ 1, 0 kr: DuckDNS och Caddy
 
 1. Logga in på <https://www.duckdns.org>, skapa ett namn (till exempel
    `pixelgame`) och skriv in serverns IP-adress.
@@ -147,7 +234,7 @@ ALLOW_GUESTS=0
    Caddy hämtar ett HTTPS-certifikat själv. Efter någon minut ska
    <https://pixelgame.duckdns.org/health> svara `{"ok":true,...}`.
 
-### Alternativ B, egen domän: Cloudflare Tunnel
+#### Alternativ 2, egen domän: Cloudflare Tunnel
 
 Det här ger skydd mot överbelastningsattacker, döljer serverns IP-adress och
 kräver inga öppna portar. Du behöver en domän som ligger hos Cloudflare.
@@ -165,7 +252,7 @@ kräver inga öppna portar. Du behöver en domän som ligger hos Cloudflare.
 
 ---
 
-## Steg 4: fyll i inställningarna i spelet
+### Steg 4: fyll i inställningarna i spelet
 
 Servern levererar spelet själv, så alla spelar på samma adress:
 <https://pixelgame.duckdns.org>. Spelet behöver bara känna till Supabase.
@@ -183,7 +270,7 @@ Servern levererar spelet själv, så alla spelar på samma adress:
    cd ~/Pixelgame && git pull && docker compose --profile caddy up -d --build
    ```
 
-### Valfritt: spelet på Cloudflare Pages
+#### Valfritt: spelet på Cloudflare Pages
 
 Om du vill att spelet laddas från Cloudflares CDN i stället:
 
@@ -197,7 +284,7 @@ Om du vill att spelet laddas från Cloudflares CDN i stället:
 
 ---
 
-## Steg 5: spela
+### Steg 5: spela
 
 1. Öppna spelet, tryck på **Multiplayer**, logga in och tryck på **Spela**.
 2. Välj ditt namn. Det går inte att byta senare.
@@ -217,18 +304,37 @@ Om du vill att spelet laddas från Cloudflares CDN i stället:
 | Backup | Servern sparar en kopia av databasen varje natt i `server-data/backups` och behåller 14 dagar. För att kopiera dem till en annan plats: installera rclone, kör `rclone config` och skapa till exempel en R2-, Google Drive- eller Oracle-remote som heter `backup`. Lägg sedan in `deploy/backup-offsite.sh` i crontab |
 | Återställa | Stoppa servern och kopiera en backup till `server-data/pixelgame.db` |
 | Övervakning | Lägg in `https://din-adress/health` hos <https://uptimerobot.com> (gratis). Då får du ett mejl om servern går ner |
-| Admin i spelet | Skriv i chatten (T): `/kick namn`, `/ban namn timmar orsak`, `/unban namn`, `/tp x y`, `/give scrap 100`, `/announce text`, `/save` |
+| Admin i spelet | Skriv i chatten (T): `/kick namn`, `/ban namn timmar orsak`, `/unban namn`, `/tp x y`, `/give scrap 100`, `/announce text`, `/save`, `/password namn nyttlösenord` (när någon glömt sitt lösenord) |
 | Raidvarningar till Discord | Sätt `DISCORD_WEBHOOK_URL` i `server/.env` |
 | Utan Docker | `deploy/pixelgame.service` är en systemd-tjänst. Den behöver Node 22 och `npm ci --omit=dev` |
 
 ## Felsökning
+
+### `npm run share`
+
+- **"Servern behöver Node.js 22 eller nyare":** installera den senaste LTS-versionen från
+  <https://nodejs.org> och öppna en ny terminal.
+- **"Port 8787 används redan":** servern körs redan i ett annat fönster. Stäng det, eller kör
+  `npm run share -- --port 8788`.
+- **"Tunneln startade inte":** kontrollera internetanslutningen. Vissa skol- och
+  jobbnätverk stoppar port 7844, som tunneln använder. Prova ett annat nät, till exempel
+  mobilen som surfzon.
+- **"Kunde inte hämta cloudflared":** installera det själv (Windows:
+  `winget install --id Cloudflare.cloudflared`, macOS: `brew install cloudflared`) och kör
+  `npm run share` igen.
+- **Länken visar ett Cloudflare-fel (530 eller 1033):** tunneln har stängts. Titta i
+  terminalen: skriptet startar en ny och skriver ut den nya länken.
+- **En vän har glömt sitt lösenord:** öppna <http://localhost:8787> och skriv
+  `/password Namn nyttlösenord` i chatten.
+
+### Server och inloggning
 
 - **"Inloggningen misslyckades: Wrong issuer":** `SUPABASE_URL` i
   `server/.env` stämmer inte med projektets adress. Den ska inte sluta med `/`.
 - **Inloggningen fastnar efter Google eller Discord:** adressen
   `.../?mp=auth` saknas under Redirect URLs i Supabase.
 - **"Servern svarar inte" i lobbyn:** kontrollera `/health`, öppna portar (alternativ
-  A) och att `ALLOWED_ORIGINS` innehåller sidans adress exakt, med `https://`.
+  1) och att `ALLOWED_ORIGINS` innehåller sidans adress exakt, med `https://`.
 - **Oracle har stängt servern:** starta den igen i konsolen och uppgradera till
   Pay As You Go (se steg 2).
 - **Supabase-projektet är pausat:** återställ det i Supabases konsol. Servern

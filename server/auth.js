@@ -9,8 +9,11 @@
 //
 // Guests: for local testing (and friends trying it out) the server can hand
 // out its own signed guest tokens. Off by default when Supabase is set up.
+// A guest can give their character a password; then they can log in again
+// with name + password from any address or device (the browser forgets the
+// guest token when the address changes, as it does with `npm run share`).
 
-import { createHmac, createPublicKey, timingSafeEqual, verify as cryptoVerify, randomBytes } from 'node:crypto';
+import { createHmac, createPublicKey, timingSafeEqual, verify as cryptoVerify, randomBytes, scrypt } from 'node:crypto';
 
 const b64url = (buf) => Buffer.from(buf).toString('base64url');
 const fromB64url = (s) => Buffer.from(s, 'base64url');
@@ -109,8 +112,15 @@ export class Auth {
 
   /** A new guest identity (kept by the browser, so a guest keeps their character). */
   issueGuest() {
+    return this.guestTokenFor(`guest:${randomBytes(12).toString('hex')}`);
+  }
+
+  /** A guest token for an existing guest account (after logging in with a password). */
+  guestTokenFor(accountId) {
     if (!this.allowGuests) throw new AuthError('Guests are not allowed on this server');
-    const payload = { sub: randomBytes(12).toString('hex'), iat: Math.floor(Date.now() / 1000) };
+    const sub = /^guest:([0-9a-f]{24})$/.exec(accountId)?.[1];
+    if (!sub) throw new AuthError('Not a guest account');
+    const payload = { sub, iat: Math.floor(Date.now() / 1000) };
     const body = b64url(JSON.stringify(payload));
     const sig = createHmac('sha256', this.guestSecret).update(body).digest('base64url');
     return `guest.${body}.${sig}`;
@@ -131,5 +141,82 @@ export class Auth {
     }
     if (typeof payload.sub !== 'string' || !/^[0-9a-f]{24}$/.test(payload.sub)) throw new AuthError('Bad guest token');
     return { id: `guest:${payload.sub}`, email: null, name: null, guest: true };
+  }
+}
+
+// --- Passwords -------------------------------------------------------------------------
+
+const SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
+function scryptAsync(password, salt, len, opts) {
+  return new Promise((resolve, reject) => scrypt(password, salt, len, opts, (err, key) => (err ? reject(err) : resolve(key))));
+}
+
+/** Checked against when the name has no password, so a miss takes as long as a hit. */
+export const DUMMY_HASH = `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${'A'.repeat(22)}$${'A'.repeat(43)}`;
+
+/** Slow, salted hash (scrypt, off the main thread so the game keeps ticking). */
+export async function hashPassword(password) {
+  const salt = randomBytes(16);
+  const key = await scryptAsync(String(password).normalize('NFKC'), salt, 32, SCRYPT);
+  return `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${b64url(salt)}$${b64url(key)}`;
+}
+
+export async function checkPassword(password, stored) {
+  const parts = String(stored ?? '').split('$');
+  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
+  const [N, r, p] = parts.slice(1, 4).map(Number);
+  const want = fromB64url(parts[5]);
+  const key = await scryptAsync(String(password).normalize('NFKC'), fromB64url(parts[4]), want.length, { N, r, p, maxmem: SCRYPT.maxmem });
+  return key.length === want.length && timingSafeEqual(key, want);
+}
+
+/**
+ * Slows down password guessing: a few wrong tries from one address (or on
+ * one name) and logins from there pause for a while. Also caps how many
+ * slow hashes run at once.
+ */
+export class LoginGuard {
+  constructor({ maxFails = 6, windowMs = 15 * 60 * 1000, maxBusy = 4 } = {}) {
+    this.maxFails = maxFails;
+    this.windowMs = windowMs;
+    this.maxBusy = maxBusy;
+    this.busy = 0;
+    this.fails = new Map();
+  }
+
+  #entry(key, now) {
+    const e = this.fails.get(key);
+    if (!e || now - e.first > this.windowMs) return null;
+    return e;
+  }
+
+  /** Null when a try is allowed, else a reason to give the player. */
+  check(ip, name, now = Date.now()) {
+    for (const key of [`ip:${ip}`, `name:${String(name).toLowerCase()}`]) {
+      const e = this.#entry(key, now);
+      if (e && e.count >= this.maxFails) {
+        const minutes = Math.max(1, Math.ceil((e.first + this.windowMs - now) / 60000));
+        return `För många felaktiga försök. Vänta ${minutes} min och försök igen.`;
+      }
+    }
+    if (this.busy >= this.maxBusy) return 'Servern är upptagen, försök igen om en stund.';
+    return null;
+  }
+
+  fail(ip, name, now = Date.now()) {
+    if (this.fails.size > 5000) {
+      for (const [k, e] of this.fails) if (now - e.first > this.windowMs) this.fails.delete(k);
+    }
+    for (const key of [`ip:${ip}`, `name:${String(name).toLowerCase()}`]) {
+      const e = this.#entry(key, now) ?? { first: now, count: 0 };
+      e.count++;
+      this.fails.set(key, e);
+    }
+  }
+
+  succeed(ip, name) {
+    this.fails.delete(`ip:${ip}`);
+    this.fails.delete(`name:${String(name).toLowerCase()}`);
   }
 }

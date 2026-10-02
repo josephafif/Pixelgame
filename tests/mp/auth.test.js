@@ -66,3 +66,64 @@ test('Supabase ES256 tokens are checked against the published keys (JWKS)', asyn
   await assert.rejects(auth.verify(make(payload, stranger)), /signature/);
   await assert.rejects(auth.verify(make(payload, privateKey, 'unknown')));
 });
+
+test('passwords: salted scrypt hashes, checked in constant time', async () => {
+  const { hashPassword, checkPassword, DUMMY_HASH } = await import('../../server/auth.js');
+  const a = await hashPassword('hemligt');
+  const b = await hashPassword('hemligt');
+  assert.notEqual(a, b, 'a new salt every time');
+  assert.equal(await checkPassword('hemligt', a), true);
+  assert.equal(await checkPassword('Hemligt', a), false);
+  assert.equal(await checkPassword('hemligt', null), false);
+  assert.equal(await checkPassword('hemligt', 'garbage'), false);
+  assert.equal(await checkPassword('', DUMMY_HASH), false);
+});
+
+test('login guard: wrong passwords from one address or on one name pause logins', async () => {
+  const { LoginGuard } = await import('../../server/auth.js');
+  const g = new LoginGuard({ maxFails: 3, windowMs: 60000 });
+  const t0 = 1_000_000;
+  for (let i = 0; i < 3; i++) {
+    assert.equal(g.check('1.1.1.1', 'Anna', t0), null);
+    g.fail('1.1.1.1', 'Anna', t0);
+  }
+  assert.match(g.check('1.1.1.1', 'Bertil', t0), /Vänta 1 min/);
+  assert.match(g.check('2.2.2.2', 'anna', t0), /För många/, 'the name is paused for everyone');
+  assert.equal(g.check('2.2.2.2', 'Bertil', t0), null);
+  assert.equal(g.check('1.1.1.1', 'Anna', t0 + 61000), null, 'the pause ends');
+  g.busy = 4;
+  assert.match(g.check('3.3.3.3', 'Cilla', t0), /upptagen/);
+});
+
+test('guest tokens for an existing guest account', async () => {
+  const auth = new Auth({ allowGuests: true, guestSecret: 'x'.repeat(32) });
+  const id = 'guest:0123456789abcdef01234567';
+  assert.equal((await auth.verify(auth.guestTokenFor(id))).id, id);
+  assert.throws(() => auth.guestTokenFor('sb:user-1'), /Not a guest/);
+  assert.throws(() => new Auth({ allowGuests: false }).guestTokenFor(id), /not allowed/);
+});
+
+test('local requests: only the server computer itself, never through a tunnel', async () => {
+  const { isLocalRequest } = await import('../../server/net.js');
+  const req = (addr, headers) => ({ socket: { remoteAddress: addr }, headers });
+  assert.equal(isLocalRequest(req('127.0.0.1', { host: 'localhost:8787' })), true);
+  assert.equal(isLocalRequest(req('::1', { host: '[::1]:8787' })), true);
+  assert.equal(isLocalRequest(req('::ffff:127.0.0.1', { host: '127.0.0.1:8787' })), true);
+  assert.equal(isLocalRequest(req('192.168.1.5', { host: 'localhost:8787' })), false);
+  assert.equal(isLocalRequest(req('127.0.0.1', { host: 'brave-otter.trycloudflare.com' })), false);
+  assert.equal(isLocalRequest(req('127.0.0.1', { host: 'localhost:8787', 'cf-ray': '8a1b' })), false);
+  assert.equal(isLocalRequest(req('127.0.0.1', { host: 'localhost:8787', 'cf-connecting-ip': '1.2.3.4' })), false);
+  assert.equal(isLocalRequest(req('127.0.0.1', { host: 'localhost:8787', 'x-forwarded-for': '1.2.3.4' })), false);
+});
+
+test('npm run share: the right cloudflared for each computer, and the link in its log', async () => {
+  const { cloudflaredAsset, tunnelUrl } = await import('../../scripts/share.mjs');
+  assert.equal(cloudflaredAsset('win32', 'x64').file, 'cloudflared-windows-amd64.exe');
+  assert.equal(cloudflaredAsset('win32', 'arm64').file, 'cloudflared-windows-amd64.exe');
+  assert.equal(cloudflaredAsset('darwin', 'arm64').file, 'cloudflared-darwin-arm64.tgz');
+  assert.equal(cloudflaredAsset('darwin', 'x64').tgz, true);
+  assert.equal(cloudflaredAsset('linux', 'arm64').file, 'cloudflared-linux-arm64');
+  assert.equal(cloudflaredAsset('freebsd', 'x64'), null);
+  assert.equal(tunnelUrl('2026-10-02T12:00:00Z INF |  https://brave-otter-quiet-river.trycloudflare.com      |'), 'https://brave-otter-quiet-river.trycloudflare.com');
+  assert.equal(tunnelUrl('ERR failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel": EOF'), null);
+});

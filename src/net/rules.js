@@ -153,6 +153,13 @@ export function playerNameProblem(name) {
   return null;
 }
 
+/** Password for logging in with your name (guest servers). */
+export function passwordProblem(pw) {
+  if (typeof pw !== 'string' || pw.length < 4) return 'Lösenordet ska vara minst 4 tecken';
+  if (pw.length > 64) return 'Lösenordet får vara högst 64 tecken';
+  return null;
+}
+
 export function clanNameProblem(name) {
   if (typeof name !== 'string' || name.length < 3 || name.length > 20) return 'Klannamnet ska vara 3–20 tecken';
   if (!/^[\p{L}\p{N}][\p{L}\p{N} '_-]*[\p{L}\p{N}]$/u.test(name) || /\s{2,}/.test(name)) return 'Bara bokstäver, siffror och mellanslag';

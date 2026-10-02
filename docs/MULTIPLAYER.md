@@ -16,12 +16,19 @@ de här besluten:
 Planens faser 0–6 är byggda. Så sätter du upp en egen server:
 [MULTIPLAYER-SETUP.md](MULTIPLAYER-SETUP.md).
 
+Det enklaste sättet att komma igång kräver inget konto och kostar ingenting: `npm run share`.
+Det kör servern på din egen dator och ger den en tillfällig `https://`-adress via en
+Cloudflare Quick Tunnel. Spelarna väljer namn och lösenord. Adressen byts vid varje start,
+och med namn och lösenord får man tillbaka sin karaktär på den nya adressen. Den som spelar på
+`localhost` är admin. Supabase och en egen server (Oracle) behövs först när servern ska vara på
+dygnet runt.
+
 | Del | Var i koden |
 |---|---|
 | Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
 | Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `net.js`, `auth.js`, `db.js`) |
 | Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
-| Drift | `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
+| Drift | `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
 
 ### Uppmätt

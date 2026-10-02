@@ -19,6 +19,7 @@ npm test             # enhetstester (node:test, inga beroenden)
 npm run build        # uppdaterar precache-manifest.js efter ändringar i appfiler
 npm run check        # verifierar att precache-manifestet är aktuellt + enhetstester
 npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline, uppdatering, multiplayer
+npm run share        # spela multiplayer med vänner från din dator: ger en gratis länk att skicka (se nedan)
 npm run mp           # multiplayer lokalt: spelserver + spelet på http://localhost:8787 (gäster, admin för alla)
 npm run test:mp      # multiplayer-tester: protokoll, regler, inloggning, databas, botar mot en riktig server
 npm run server       # spelservern i produktion (inställningar i server/.env, se docs/MULTIPLAYER-SETUP.md)
@@ -327,7 +328,15 @@ driver världen sakta förbi.
 
 **Multiplayer** i huvudmenyn öppnar lobbyn. Där loggar du in (e-post, Google eller Discord via
 Supabase) eller spelar som gäst på servrar som tillåter det, och väljer server. Du får en egen
-multiplayer-karaktär som sparas på servern. Din singleplayer-värld påverkas inte.
+multiplayer-karaktär som sparas på servern. Din singleplayer-värld påverkas inte. En gäst väljer
+ett lösenord tillsammans med sitt namn. Med namn och lösenord loggar man in igen från en ny
+länk eller en annan enhet.
+
+**Snabbast, gratis och utan konto:** kör `npm run share` på din dator. Det startar spelservern
+(som också levererar spelet) och en Cloudflare-tunnel, och skriver ut en
+`https://…trycloudflare.com`-länk som du skickar till dina vänner. Du spelar själv på
+`http://localhost:8787` och är admin där. Datorn måste vara på medan ni spelar, och länken byts
+varje gång du startar. Allt sparas i `server-data/pixelgame.db`.
 
 - **Servern bestämmer allt** (30 tick per sekund). Klienten skickar bara vad du vill göra:
   riktning, attack och använd. Fart, kollisioner, träffar, skada och loot räknas ut på
@@ -352,9 +361,9 @@ multiplayer-karaktär som sparas på servern. Din singleplayer-värld påverkas 
 - **Chatt:** T eller pratbubblan, och `/c` för klanchatt. Med `?debug=1` visas ett
   nätverksöverlägg med ping, interpolering och rättningar.
 
-Planen och vad som är byggt finns i [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md). Så sätter du upp
-en egen server gratis (Oracle Cloud, DuckDNS eller Cloudflare, Supabase) står i
-[docs/MULTIPLAYER-SETUP.md](docs/MULTIPLAYER-SETUP.md).
+Planen och vad som är byggt finns i [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md). Hur du delar
+spelet från din dator, eller sätter upp en server som alltid är på (Oracle Cloud, DuckDNS eller
+Cloudflare, Supabase), står i [docs/MULTIPLAYER-SETUP.md](docs/MULTIPLAYER-SETUP.md).
 
 ## Fiender
 
@@ -616,9 +625,11 @@ src/
   mp/                         multiplayer-klienten: lobby, inloggning, MpGame (förutsägelse och
                               interpolering), paneler, chatt
 server/                       spelservern (Node): simulering, strid, monster, loot, baser, klaner,
-                              ögonblicksbilder, inloggning (Supabase JWT, gäster), SQLite, Dockerfile
+                              ögonblicksbilder, inloggning (Supabase JWT, gäster med lösenord),
+                              SQLite, Dockerfile
 deploy/                       Caddy, systemd, backup-skript
-scripts/                      dev-server, precache-byggare, ikongenerator, lasttest
+scripts/                      dev-server, precache-byggare, ikongenerator, lasttest,
+                              share.mjs (server + Cloudflare-tunnel i ett kommando)
 tests/unit/, tests/e2e/, tests/mp/
 ```
 

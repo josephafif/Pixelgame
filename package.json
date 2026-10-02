@@ -14,6 +14,7 @@
     "dist": "node scripts/build-precache.mjs && node scripts/build-dist.mjs",
     "server": "node --disable-warning=ExperimentalWarning server/index.js",
     "mp": "node --disable-warning=ExperimentalWarning server/index.js --dev",
+    "share": "node scripts/share.mjs",
     "test:mp": "node --disable-warning=ExperimentalWarning --test \"tests/mp/*.test.js\""
   },
   "engines": {

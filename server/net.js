@@ -3,8 +3,8 @@
 
 import { PROTOCOL_VERSION, decodeInput, MSG } from '../src/net/protocol.js';
 import { TICK_RATE } from '../src/net/movement.js';
-import { playerNameProblem, describeRaidWindow } from '../src/net/rules.js';
-import { AuthError } from './auth.js';
+import { playerNameProblem, passwordProblem, describeRaidWindow } from '../src/net/rules.js';
+import { AuthError, hashPassword } from './auth.js';
 import * as players from './players.js';
 import * as commands from './commands.js';
 import * as clans from './clans.js';
@@ -75,6 +75,25 @@ export class Connection {
   }
 }
 
+/** The player's real address (behind Cloudflare Tunnel or Caddy it is in a header). */
+export function clientIp(req, config) {
+  const forwarded = config.trustProxy ? (req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) : '';
+  return forwarded || req.socket.remoteAddress || '?';
+}
+
+/**
+ * Someone at the server's own computer (http://localhost), not through a
+ * tunnel or proxy: they always add headers a visitor can't remove (cf-ray,
+ * x-forwarded-for) and never send a localhost Host.
+ */
+export function isLocalRequest(req) {
+  const addr = req.socket.remoteAddress ?? '';
+  if (!/^(127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/.test(addr)) return false;
+  const hd = req.headers;
+  if (hd['cf-ray'] || hd['cf-connecting-ip'] || hd['x-forwarded-for'] || hd['x-real-ip'] || hd.forwarded) return false;
+  return /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(String(hd.host ?? ''));
+}
+
 export function serverInfo(gs, auth, config) {
   let online = 0;
   for (const p of gs.players.values()) if (p.conn) online++;
@@ -84,6 +103,8 @@ export function serverInfo(gs, auth, config) {
     players: online,
     maxPlayers: config.maxPlayers,
     guests: auth.allowGuests,
+    // Guests can log in again with name + password (POST /login).
+    logins: auth.allowGuests,
     supabase: auth.supabaseEnabled,
     rules: {
       safeRadius: gs.rules.safeRadius,
@@ -102,12 +123,11 @@ export function serverInfo(gs, auth, config) {
  * then, for a brand-new account, { t: 'create', name }.
  */
 export function handleConnection(gs, auth, config, ws, req, perIp) {
-  // Behind Cloudflare Tunnel or Caddy the real address is in a header.
-  const forwarded = config.trustProxy ? (req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) : '';
-  const ip = forwarded || req.socket.remoteAddress || '?';
+  const ip = clientIp(req, config);
   const count = (perIp.get(ip) ?? 0) + 1;
   perIp.set(ip, count);
   const conn = new Connection(ws, ip);
+  conn.local = isLocalRequest(req);
   const release = () => {
     const n = (perIp.get(ip) ?? 1) - 1;
     if (n <= 0) perIp.delete(ip);
@@ -148,6 +168,7 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
       x: p.x,
       y: p.y,
       time: Date.now(),
+      account: { guest: identity.guest, password: Boolean(account.pass_hash) },
       spentAltars: [...gs.marks.values()].filter((m) => m.kind === 'altar').map((m) => m.key),
     });
     conn.sendJson(players.inventoryPayload(gs, p));
@@ -196,15 +217,23 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
     return undefined;
   };
 
-  const onCreate = (msg) => {
+  const onCreate = async (msg) => {
     if (msg.t !== 'create') return conn.kick('Välj ett namn först');
     const name = String(msg.name ?? '').trim();
     const problem = playerNameProblem(name);
     if (problem) return conn.sendJson({ t: 'need-name', error: problem });
     if (gs.db.accountByName(name)) return conn.sendJson({ t: 'need-name', error: 'Namnet är upptaget' });
+    // Guests may pick a password, to log in again from another address or device.
+    let passHash = null;
+    if (identity.guest && msg.password) {
+      const pwProblem = passwordProblem(msg.password);
+      if (pwProblem) return conn.sendJson({ t: 'need-name', error: pwProblem });
+      passHash = await hashPassword(msg.password);
+      if (conn.closed) return undefined;
+    }
     let account;
     try {
-      account = gs.db.createAccount({ id: identity.id, name, email: identity.email });
+      account = gs.db.createAccount({ id: identity.id, name, email: identity.email, passHash });
     } catch {
       return conn.sendJson({ t: 'need-name', error: 'Namnet är upptaget' });
     }
@@ -228,15 +257,19 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
       if (!conn.text.take()) return conn.strike(gs, 'rate limit');
       const msg = JSON.parse(data.toString('utf8'));
       if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return conn.strike(gs, 'bad message');
-      if (stage === 'auth') {
+      if (stage === 'auth' || stage === 'create') {
         if (busy) return undefined;
         busy = true;
-        await onAuth(msg);
-        busy = false;
+        try {
+          await (stage === 'auth' ? onAuth(msg) : onCreate(msg));
+        } finally {
+          busy = false;
+        }
         return undefined;
       }
-      if (stage === 'create') return onCreate(msg);
-      const problem = commands.handle(gs, conn.player, msg);
+      let problem = commands.handle(gs, conn.player, msg);
+      if (problem instanceof Promise) problem = await problem;
+      if (conn.closed) return undefined;
       if (msg.rid !== undefined) conn.sendJson({ t: 'res', rid: msg.rid, ok: !problem, error: problem ?? undefined });
       else if (problem) conn.sendJson({ t: 'toast', text: problem, kind: 'warn' });
     } catch (err) {

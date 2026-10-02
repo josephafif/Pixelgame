@@ -4,7 +4,8 @@
 // localStorage and refreshed before they expire.
 //
 // Servers that allow guests hand out their own guest token; it is kept per
-// server so a guest keeps their character.
+// server so a guest keeps their character. A guest with a password can get
+// their token back from any address or device (POST /login).
 
 const SESSION_KEY = 'pg-mp-session';
 const GUEST_PREFIX = 'pg-mp-guest:';
@@ -180,13 +181,31 @@ export function removeServer(url) {
   write('pg-mp-servers', (read('pg-mp-servers') ?? []).filter((s) => s.url !== url));
 }
 
-/** http(s) URL of a server's info endpoint from its WebSocket URL. */
-export function infoUrl(wsUrl) {
+/** http(s) URL of a server endpoint (`info`, `login`) from its WebSocket URL. */
+export function infoUrl(wsUrl, endpoint = 'info') {
   const u = new URL(wsUrl);
   u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:';
-  u.pathname = `${u.pathname.replace(/\/ws\/?$/, '').replace(/\/$/, '')}/info`;
+  u.pathname = `${u.pathname.replace(/\/ws\/?$/, '').replace(/\/$/, '')}/${endpoint}`;
   u.search = '';
   return u.toString();
+}
+
+/** Name + password → this server's guest token for that character. */
+export async function loginWithPassword(serverUrl, name, password) {
+  let res;
+  try {
+    res = await fetch(infoUrl(serverUrl, 'login'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, password }),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error('Servern svarar inte');
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.token) throw new Error(body.error ?? `Fel ${res.status}`);
+  return body;
 }
 
 /** This page's own server (when the game is served by the game server, e.g. `npm run mp`). */

@@ -5,7 +5,8 @@
 import { validateCraft, craftCost, buildCraftRequest } from '../src/weapons/crafting.js';
 import { forgePickaxe } from '../src/game/gathering.js';
 import { mpVirtualSave, mpInventorySizes, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
-import { inSafeZone, describeRaidWindow } from '../src/net/rules.js';
+import { inSafeZone, describeRaidWindow, passwordProblem } from '../src/net/rules.js';
+import { hashPassword } from './auth.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
@@ -37,7 +38,21 @@ function findItem(p, id) {
   return st ? { dna: st, place: 'storage' } : null;
 }
 
-/** Handles one request. Returns null (ok) or a problem text. */
+/** A guest's password, so they can log in with their name from anywhere. */
+async function setPassword(gs, p, password) {
+  if (!p.accountId.startsWith('guest:')) return 'Ditt konto loggar in via e-post, Google eller Discord';
+  const problem = passwordProblem(password);
+  if (problem) return problem;
+  const now = Date.now();
+  if (now - (p.passwordAt ?? 0) < 3000) return 'Vänta lite innan du försöker igen';
+  p.passwordAt = now;
+  const hash = await hashPassword(password);
+  gs.db.setPassword(p.accountId, hash);
+  gs.log.info(`[account] ${p.name} set a password`);
+  return null;
+}
+
+/** Handles one request. Returns null (ok) or a problem text (or a promise of one). */
 export function handle(gs, p, msg) {
   switch (msg.t) {
     case 'ping':
@@ -103,6 +118,8 @@ export function handle(gs, p, msg) {
       return null;
     case 'clan':
       return clans.handle(gs, p, msg);
+    case 'password':
+      return setPassword(gs, p, msg.password);
     case 'who':
       gs.send(p, { t: 'who', list: whoList(gs) });
       return null;
@@ -236,7 +253,7 @@ function chat(gs, p, msg) {
         return null;
       case 'help':
       case 'hjälp':
-        gs.send(p, { t: 'sys', text: 'Kommandon: /c text (klanchatt), /who (vilka är online), /raid (raidregler)' + (p.isAdmin ? ' · Admin: /kick, /ban, /unban, /tp, /give, /announce, /save' : '') });
+        gs.send(p, { t: 'sys', text: 'Kommandon: /c text (klanchatt), /who (vilka är online), /raid (raidregler)' + (p.isAdmin ? ' · Admin: /kick, /ban, /unban, /tp, /give, /announce, /save, /password namn nyttlösenord' : '') });
         return null;
       case 'raid': {
         const st = p.clanId ? gs.raidState(p.clanId) : null;
@@ -315,6 +332,21 @@ function admin(gs, p, cmd, args) {
       gs.saveAll();
       gs.send(p, { t: 'sys', text: 'Sparat.' });
       return null;
+    case 'password': {
+      // Someone forgot their password: /password name newpassword
+      const pw = args.at(-1) ?? '';
+      const acc = args.length >= 2 ? gs.db.accountByName(args.slice(0, -1).join(' ')) : null;
+      if (!acc) return 'Använd: /password namn nyttlösenord';
+      if (!acc.id.startsWith('guest:')) return 'Den spelaren loggar in med e-post, Google eller Discord';
+      const problem = passwordProblem(pw);
+      if (problem) return problem;
+      return hashPassword(pw).then((hash) => {
+        gs.db.setPassword(acc.id, hash);
+        gs.log.warn(`[admin] ${p.name} set a new password for ${acc.name}`);
+        gs.send(p, { t: 'sys', text: `${acc.name} har fått ett nytt lösenord.` });
+        return null;
+      });
+    }
     default:
       return 'Okänt kommando';
   }

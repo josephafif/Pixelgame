@@ -302,7 +302,7 @@ export class MpGame {
         this.connected = false;
         this.emit('disconnect', info);
       },
-      onNeedName: (msg) => onNeedName?.(msg, (name) => this.conn.sendJson({ t: 'create', name })),
+      onNeedName: (msg) => onNeedName?.(msg, (name, password) => this.conn.sendJson({ t: 'create', name, password })),
     });
     const welcome = await this.conn.connect(token);
     this.#onWelcome(welcome);
@@ -317,6 +317,7 @@ export class MpGame {
     this.connected = true;
     this.myId = w.id;
     this.myName = w.name;
+    this.account = w.account ?? { guest: false, password: false };
     this.rules = w.rules;
     this.serverInfo = w.server;
     this.worldSeed = w.seed;
@@ -1803,6 +1804,13 @@ export class MpGame {
 
   request(msg) {
     return this.#ask(msg);
+  }
+
+  /** Guests: a password to log in with your name from another link or device. */
+  async setPassword(password) {
+    const res = await this.#ask({ t: 'password', password });
+    if (res.ok) this.account.password = true;
+    return res;
   }
 
   // --- Map ---------------------------------------------------------------------------------------------------

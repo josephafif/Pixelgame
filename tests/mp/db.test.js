@@ -39,3 +39,30 @@ test('characters, clans and structures persist', () => {
   assert.equal(db.loadStructures().find((s) => s.sid === sid).clanId, null);
   db.close();
 });
+
+test('a database from before passwords is upgraded in place', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { DatabaseSync } = await import('node:sqlite');
+  const dir = mkdtempSync(join(tmpdir(), 'pg-db-'));
+  const file = join(dir, 'old.db');
+  try {
+    // Make it look like the first version: no password column.
+    let db = new Db(file);
+    db.createAccount({ id: 'guest:0123456789abcdef01234567', name: 'Gamla' });
+    db.close();
+    const raw = new DatabaseSync(file);
+    raw.exec('ALTER TABLE accounts DROP COLUMN pass_hash; PRAGMA user_version = 1;');
+    raw.close();
+    db = new Db(file);
+    const acc = db.accountByName('gamla');
+    assert.equal(acc.name, 'Gamla', 'old accounts are kept');
+    assert.equal(acc.pass_hash, null);
+    db.setPassword(acc.id, 'scrypt$1$1$1$x$y');
+    assert.equal(db.account(acc.id).pass_hash, 'scrypt$1$1$1$x$y');
+    db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

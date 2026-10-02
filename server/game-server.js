@@ -184,7 +184,13 @@ export class GameServer {
     }
     p.conn = conn;
     p.name = account.name;
-    p.isAdmin = Boolean(this.config.devAdmins) || this.config.admins.includes(account.id) || Boolean(account.email && this.config.admins.includes(account.email));
+    const admins = this.config.admins.map((a) => a.toLowerCase());
+    p.isAdmin = Boolean(this.config.devAdmins) || admins.includes(account.id.toLowerCase())
+      || Boolean(account.email && admins.includes(account.email.toLowerCase()))
+      // A player name works too (names can't contain @ or :, so never clash with the above).
+      || admins.includes(String(account.name ?? '').toLowerCase())
+      // `npm run share`: whoever plays at the server's own computer runs it.
+      || Boolean(this.config.localAdmin && conn?.local);
     p.lastQueued = 0;
     p.lastSeq = 0;
     p.credits = 4;

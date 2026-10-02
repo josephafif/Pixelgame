@@ -18,7 +18,7 @@ test.afterAll(async () => {
   await srv?.stop();
 });
 
-async function join(browser, name) {
+async function join(browser, name, password = 'hemligt') {
   const ctx = await browser.newContext({ serviceWorkers: 'block' });
   const page = await ctx.newPage();
   const errors = trackErrors(page);
@@ -27,8 +27,9 @@ async function join(browser, name) {
   const server = page.locator('.mp-server');
   await expect(server).toContainText('Pixelgame-servern');
   await server.locator('button', { hasText: 'Spela som gäst' }).click();
-  await expect(page.locator('.mp-name input')).toBeVisible();
-  await page.fill('.mp-name input', name);
+  await expect(page.locator('.mp-name input[type="text"]')).toBeVisible();
+  await page.fill('.mp-name input[type="text"]', name);
+  await page.fill('.mp-name input[type="password"]', password);
   await page.locator('.mp-name button').click();
   await page.waitForFunction(() => window.__pixelgame?.game?.connected);
   await expect(page.locator('#hud')).toBeVisible();
@@ -93,4 +94,38 @@ test('the inventory and forge open in multiplayer, and nobody can build in town'
   await expect(a.page.locator('.forge-panel')).toBeVisible();
   expect(a.errors).toEqual([]);
   await a.ctx.close();
+});
+
+test('on a new link or device: log in with name and password and get your character back', async ({ browser }) => {
+  const a = await join(browser, 'Doris', 'ostkaka');
+  const level = await a.page.evaluate(() => window.__pixelgame.game.me?.level);
+  await a.ctx.close();
+  // A fresh browser knows nothing about Doris (as after a new share link).
+  const ctx = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await ctx.newPage();
+  const errors = trackErrors(page);
+  await page.goto(`${base}/?debug=1`);
+  // Served by the game server: Multiplayer is the main button.
+  await expect(page.locator('#title-multiplayer')).toHaveClass(/btn-primary/);
+  await page.click('#title-multiplayer');
+  const server = page.locator('.mp-server');
+  await server.locator('button', { hasText: 'Logga in med namn' }).click();
+  await page.fill('.mp-login input[type="text"]', 'doris');
+  await page.fill('.mp-login input[type="password"]', 'felord');
+  await page.locator('.mp-login button').click();
+  await expect(page.locator('.mp-login .warn')).toContainText('Fel namn eller lösenord');
+  await page.fill('.mp-login input[type="password"]', 'ostkaka');
+  await page.locator('.mp-login button').click();
+  await page.waitForFunction(() => window.__pixelgame?.game?.connected);
+  expect(await page.evaluate(() => window.__pixelgame.game.myName)).toBe('Doris');
+  expect(await page.evaluate(() => window.__pixelgame.game.me?.level)).toBe(level);
+  // The menu lets a guest change the password.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.menu-panel button', { hasText: 'Byt lösenord' })).toBeVisible();
+  await page.locator('.menu-panel button', { hasText: 'Byt lösenord' }).click();
+  await page.fill('.mp-name input[type="password"]', 'nyttlosen');
+  await page.locator('.mp-name button').click();
+  await expect(page.locator('.toast').last()).toContainText('Lösenordet är sparat');
+  expect(errors.filter((e) => !/401/.test(e))).toEqual([]);
+  await ctx.close();
 });

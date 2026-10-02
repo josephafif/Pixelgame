@@ -196,6 +196,17 @@ class App {
     $('#title-settings')?.addEventListener('click', () => import('./ui/settings.js').then((m) => m.open(this.game, this)));
     $('#title-howto')?.addEventListener('click', () => this.#howToPlay());
     $('#title-multiplayer')?.addEventListener('click', () => this.#multiplayer());
+    // Served by a game server (a friend's `npm run share` link): multiplayer first.
+    if (document.querySelector('meta[name="pixelgame-server"]')) {
+      const mp = $('#title-multiplayer');
+      const play = $('#title-play');
+      if (mp && play) {
+        play.classList.remove('btn-primary', 'big');
+        play.removeAttribute('autofocus');
+        mp.classList.add('btn-primary', 'big');
+        play.before(mp);
+      }
+    }
     const line = $('#title-save');
     if (line && !this.isNewGame) {
       const pl = this.save.player;

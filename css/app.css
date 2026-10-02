@@ -139,7 +139,7 @@ kbd {
   font-family: var(--font); font-size: 12px; color: var(--muted);
   padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--sunken);
 }
-select, input[type="text"] {
+select, input[type="text"], input[type="password"], input[type="email"], input[type="url"], input[type="number"] {
   min-height: 44px; padding: 4px 10px; width: 100%;
   border: 6px solid transparent; border-image: var(--frame-slot) 3 fill / 6px / 0 stretch; background: none; color: var(--text);
 }
@@ -1122,6 +1122,10 @@ body.mp .key-hints { display: none !important; }
 .mp-server { padding: 8px 10px; border: 5px solid transparent; border-image: var(--frame-slot) 3 fill / 5px / 0 stretch; display: flex; flex-direction: column; gap: 6px; }
 .mp-server-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .mp-server-head .muted { overflow-wrap: anywhere; }
+.mp-login { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.mp-login p { margin: 0; }
+.mp-login-fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.mp-login-fields .field { flex: 1; min-width: 140px; }
 .mp-rules ul { margin: 0; padding-left: 1.2em; }
 .mp-clan { display: flex; flex-direction: column; gap: 12px; }
 .mp-clan section { display: flex; flex-direction: column; gap: 6px; }

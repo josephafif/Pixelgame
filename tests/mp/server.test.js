@@ -433,3 +433,85 @@ test('forge and gathering: craft in town, forge a pickaxe, chop a tree', async (
     await t.close();
   }
 });
+
+test('name + password: a guest gets their character back on a new link or device', async () => {
+  const t = await testServer();
+  const { Bot } = await import('./bot.js');
+  const base = t.url.replace(/^ws/, 'http').replace(/\/ws$/, '');
+  const login = (body) => fetch(`${base}/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, ...(await r.json()) }));
+  try {
+    // Too short a password: asked again.
+    const short = new Bot(t.url, { name: 'Dora', password: 'abc' });
+    short.connect().catch(() => {});
+    const again = await short.waitFor((m) => m.t === 'need-name' && m.error);
+    assert.match(again.error, /minst 4/);
+    short.close();
+    const a = await t.bot('Dora', { password: 'hemligt' });
+    assert.deepEqual(a.welcome.account, { guest: true, password: true });
+    const item = a.json.find((m) => m.t === 'inv').bag[0].id;
+    a.close();
+    await sleep(100);
+    // A new browser (no guest token): log in with name + password.
+    assert.equal((await login({ name: 'dora', password: 'fel' })).status, 401);
+    assert.equal((await login({ name: 'Ingen', password: 'hemligt' })).status, 401);
+    const ok = await login({ name: 'dora', password: 'hemligt' });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.name, 'Dora');
+    const back = await t.bot(null, { token: ok.token });
+    assert.equal(back.welcome.name, 'Dora');
+    assert.equal(back.welcome.id, t.player(back).id);
+    assert.equal(back.json.find((m) => m.t === 'inv').bag[0].id, item, 'same character, same sword');
+    // A guest without a password can set one in the game.
+    const b = await t.bot('Erik');
+    assert.equal(b.welcome.account.password, false);
+    assert.equal((await b.request({ t: 'password', password: 'x' })).ok, false);
+    assert.equal((await b.request({ t: 'password', password: 'svärdfisk' })).ok, true);
+    assert.equal((await login({ name: 'Erik', password: 'svärdfisk' })).status, 200);
+    // Guessing: a few wrong tries and that name pauses.
+    for (let i = 0; i < 6; i++) await login({ name: 'Erik', password: `fel${i}` });
+    const paused = await login({ name: 'Erik', password: 'svärdfisk' });
+    assert.equal(paused.status, 429);
+    assert.match(paused.error, /För många/);
+  } finally {
+    await t.close();
+  }
+});
+
+test('share mode: whoever plays at the server computer is admin, visitors through the tunnel are not', async () => {
+  const t = await testServer({ localAdmin: true, trustProxy: true });
+  try {
+    const port = t.srv.port;
+    const host = await t.bot('Värden', { headers: { host: `localhost:${port}` } });
+    assert.equal(t.player(host).isAdmin, true);
+    const visitor = await t.bot('Gästen', { headers: { host: 'brave-otter-quiet-river.trycloudflare.com', 'cf-ray': '8a1b2c', 'cf-connecting-ip': '203.0.113.7' } });
+    assert.equal(t.player(visitor).isAdmin, false);
+    assert.equal(t.player(visitor).conn.ip, '203.0.113.7', 'the real address, for the per-address limits');
+    const before = t.player(visitor).ch.resources.scrap ?? 0;
+    const res = await visitor.request({ t: 'chat', text: '/give scrap 500' });
+    assert.equal(res.ok, false);
+    assert.match(res.error, /Okänt kommando/);
+    assert.equal(t.player(visitor).ch.resources.scrap ?? 0, before);
+    assert.equal((await host.request({ t: 'chat', text: '/give scrap 500' })).ok, true);
+    // A friend forgot their password: the host sets a new one.
+    assert.equal((await host.request({ t: 'chat', text: '/password Gästen ny' })).ok, false, 'too short');
+    assert.equal((await host.request({ t: 'chat', text: '/password Gästen nyttlösen' })).ok, true);
+    const base = t.url.replace(/^ws/, 'http').replace(/\/ws$/, '');
+    const res2 = await fetch(`${base}/login`, { method: 'POST', body: JSON.stringify({ name: 'gästen', password: 'nyttlösen' }) });
+    assert.equal(res2.status, 200);
+  } finally {
+    await t.close();
+  }
+});
+
+test('admins can be listed by player name', async () => {
+  const t = await testServer({ admins: ['Chefen'] });
+  try {
+    const boss = await t.bot('chefen');
+    const other = await t.bot('Annan');
+    assert.equal(t.player(boss).isAdmin, true);
+    assert.equal(t.player(other).isAdmin, false);
+  } finally {
+    await t.close();
+  }
+});
