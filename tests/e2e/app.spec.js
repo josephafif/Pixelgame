@@ -777,16 +777,17 @@ test('settings: the view size changes how much of the world you see', async ({ p
   expect(close).toBeLessThan(normal);
 });
 
-test('main menu: settings and how to play before you start; multiplayer is announced, not playable yet', async ({ page }) => {
+test('main menu: settings and how to play before you start; multiplayer opens its lobby', async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto('/?debug=1');
   await expect(page.locator('#title')).toBeVisible();
   for (const id of ['#title-play', '#title-multiplayer', '#title-settings', '#title-howto']) await expect(page.locator(id)).toBeVisible();
   await page.click('#title-multiplayer');
   const modal = page.locator('.modal, [role="dialog"]').last();
-  await expect(modal).toContainText('Multiplayer is in development');
+  await expect(modal).toContainText('Servrar');
+  await expect(modal).toContainText('Fristaden');
   await page.keyboard.press('Escape');
-  await expect(page.locator('text=Multiplayer is in development')).toBeHidden();
+  await expect(page.locator('.mp-lobby')).toBeHidden();
   await page.click('#title-settings');
   await expect(page.locator('.settings')).toBeVisible();
   await page.keyboard.press('Escape');

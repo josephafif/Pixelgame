@@ -84,9 +84,26 @@ export function noiseThreshold(fraction) {
 const COMPASS = [[1, 0], [0.7, 0.7], [0, 1], [-0.7, 0.7], [-1, 0], [-0.7, -0.7], [0, -1], [0.7, -0.7]];
 
 export class World {
-  constructor(data, seed) {
+  /**
+   * @param {object} data game data
+   * @param {number} seed terrain seed
+   * @param {object} [opts] multiplayer options:
+   *   secretSeed — places chests, shrines, curiosities and treasure (the
+   *     server keeps it to itself, so nobody can map the loot offline);
+   *   hideObjects — leave those objects out (clients get them from the server);
+   *   maxChunks — how many chunks stay cached.
+   */
+  constructor(data, seed, opts = {}) {
     this.data = data;
     this.seed = seed >>> 0;
+    this.objSeed = (opts.secretSeed ?? seed) >>> 0;
+    this.hideObjects = Boolean(opts.hideObjects);
+    // In multiplayer nothing hidden may change the terrain (clients must
+    // predict collisions without knowing the secret seed).
+    this.sharedTerrain = opts.secretSeed !== undefined || this.hideObjects;
+    this.maxChunks = opts.maxChunks ?? MAX_CHUNKS;
+    // Multiplayer: which gates let the moving player through (null = all).
+    this.gateFilter = null;
     this.chunks = new Map();
     // Player-built structures by tileKey (filled by the build system):
     // floors lie in their own layer, so walls and turrets can stand on them.
@@ -436,7 +453,7 @@ export class World {
 
   #freeTileIn(chunk, salt) {
     for (let attempt = 0; attempt < 12; attempt++) {
-      const h = hashInts(this.seed, chunk.cx, chunk.cy, salt, attempt);
+      const h = hashInts(this.objSeed, chunk.cx, chunk.cy, salt, attempt);
       const lx = 1 + (h % (CHUNK - 2));
       const ly = 1 + ((h >>> 8) % (CHUNK - 2));
       const i = ly * CHUNK + lx;
@@ -452,8 +469,8 @@ export class World {
   #placeObjects(chunk) {
     const { cx, cy } = chunk;
     const key = `${cx},${cy}`;
-    const r = hashInts(this.seed, cx, cy, 0xb0b) / 4294967296;
-    const far = cx * cx + cy * cy > 1;
+    const r = hashInts(this.objSeed, cx, cy, 0xb0b) / 4294967296;
+    const far = cx * cx + cy * cy > 1 && !this.hideObjects;
     for (const b of this.data.base?.buildings ?? []) {
       if (Math.floor(b.x / CHUNK) === cx && Math.floor(b.y / CHUNK) === cy) {
         chunk.objects.push({ type: 'building', key: `b:${b.id}`, buildingId: b.id, x: b.x, y: b.y });
@@ -481,7 +498,7 @@ export class World {
   /** Small points of interest (see discoveries.js) and island content. */
   #placeCuriosities(chunk) {
     const { cx, cy } = chunk;
-    const roll = (salt) => hashInts(this.seed, cx, cy, salt) / 4294967296;
+    const roll = (salt) => hashInts(this.objSeed, cx, cy, salt) / 4294967296;
     const put = (type, p, extra = {}) => p && chunk.objects.push({ type, key: `poi:${type}:${cx},${cy}`, ...p, ...extra });
     const tileSea = (i) => this.seaAt(cx * CHUNK + (i % CHUNK) + 0.5, cy * CHUNK + ((i / CHUNK) | 0) + 0.5);
     const where = (salt, pred) => this.#freeTileWhere(chunk, salt, pred);
@@ -491,8 +508,12 @@ export class World {
       for (const o of chunk.objects) if (o.type === 'chest') o.rich = true;
       // Treasure first (its spot is fixed), so nothing else lands on it.
       const t = this.treasureAt(cx, cy);
-      if (t) {
-        chunk.block[(t.ty - cy * CHUNK) * CHUNK + (t.tx - cx * CHUNK)] = 0;
+      const ti = t ? (t.ty - cy * CHUNK) * CHUNK + (t.tx - cx * CHUNK) : -1;
+      if (t && this.sharedTerrain) {
+        // Multiplayer: buried only where the ground is already open.
+        if (!chunk.block[ti]) chunk.objects.push(t);
+      } else if (t) {
+        chunk.block[ti] = 0;
         chunk.objects.push(t);
       }
       if (roll(0x1d0) < 0.3) put('idol', where(0x1d1, (i) => tileSea(i) === SEA.ISLE));
@@ -511,7 +532,7 @@ export class World {
 
   #freeTileWhere(chunk, salt, pred) {
     for (let attempt = 0; attempt < 16; attempt++) {
-      const h = hashInts(this.seed, chunk.cx, chunk.cy, salt, attempt);
+      const h = hashInts(this.objSeed, chunk.cx, chunk.cy, salt, attempt);
       const lx = 1 + (h % (CHUNK - 2));
       const ly = 1 + ((h >>> 8) % (CHUNK - 2));
       const i = ly * CHUNK + lx;
@@ -530,7 +551,7 @@ export class World {
    * so a message in a bottle can point at one far away.
    */
   treasureAt(cx, cy) {
-    const h = hashInts(this.seed, cx, cy, 0x7e5);
+    const h = hashInts(this.objSeed, cx, cy, 0x7e5);
     if (h / 4294967296 >= 0.5) return null;
     const tx = cx * CHUNK + 3 + ((h >>> 4) % 10);
     const ty = cy * CHUNK + 3 + ((h >>> 12) % 10);
@@ -552,9 +573,9 @@ export class World {
   /** Drops chunks that haven't been touched recently. */
   prune(frame) {
     this.frame = frame;
-    if (this.chunks.size <= MAX_CHUNKS) return;
+    if (this.chunks.size <= this.maxChunks) return;
     const sorted = [...this.chunks.entries()].sort((a, b) => a[1].lastUsed - b[1].lastUsed);
-    for (let i = 0; i < sorted.length - MAX_CHUNKS; i++) this.chunks.delete(sorted[i][0]);
+    for (let i = 0; i < sorted.length - this.maxChunks; i++) this.chunks.delete(sorted[i][0]);
   }
 
   tile(tx, ty) {
@@ -605,7 +626,11 @@ export class World {
     if (!this.structures.size) return false;
     const st = this.structures.get(tileKey(tx, ty));
     if (!st || st.def.walkable) return false;
-    return !((mode === 'player' || mode === 'pal') && st.def.kind === 'gate');
+    if (st.def.kind === 'gate' && (mode === 'player' || mode === 'pal')) {
+      // Multiplayer: a clan's gates open only for its own members.
+      return this.gateFilter ? !this.gateFilter(st) : false;
+    }
+    return true;
   }
 
   /** True if a circle of radius r at (x, y) overlaps nothing that blocks `mode`. */

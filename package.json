@@ -2,7 +2,7 @@
   "name": "pixelgame",
   "version": "0.1.0",
   "private": true,
-  "description": "Pixelgame: Infinite Arsenal \u2014 an installable, offline-capable pixel action RPG with procedurally generated weapons (Weapon DNA).",
+  "description": "Pixelgame: Infinite Arsenal — an installable, offline-capable pixel action RPG with procedurally generated weapons (Weapon DNA).",
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
@@ -11,12 +11,18 @@
     "test": "node --test \"tests/unit/*.test.js\"",
     "test:e2e": "playwright test",
     "check": "node scripts/build-precache.mjs --check && node --test \"tests/unit/*.test.js\"",
-    "dist": "node scripts/build-precache.mjs && node scripts/build-dist.mjs"
+    "dist": "node scripts/build-precache.mjs && node scripts/build-dist.mjs",
+    "server": "node --disable-warning=ExperimentalWarning server/index.js",
+    "mp": "node --disable-warning=ExperimentalWarning server/index.js --dev",
+    "test:mp": "node --disable-warning=ExperimentalWarning --test \"tests/mp/*.test.js\""
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
   }
 }

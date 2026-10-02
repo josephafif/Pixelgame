@@ -24,6 +24,9 @@ import { registerServiceWorker, serviceWorkerSupported } from './pwa/register.js
 import { canInstall, promptInstall, isStandalone, iosInstallHint, onInstallAvailabilityChange } from './pwa/install.js';
 import { detectSupport } from './pwa/support.js';
 
+// ?mp=play starts the multiplayer game; ?mp=auth is the way back from a login.
+const MP_MODE = new URLSearchParams(location.search).get('mp');
+
 const splashText = $('#splash-text');
 const splashBar = $('#splash-bar');
 function progress(text, frac) {
@@ -137,13 +140,27 @@ class App {
         this.syncStatus = status;
       },
     });
-    this.game = new Game({
-      data, save, saveManager: this.saveManager, weapons: this.weapons, renderer: this.renderer,
-      input: this.input, audio: this.audio, sync: this.sync,
-    });
+    this.mpMode = MP_MODE === 'play';
+    if (this.mpMode) {
+      const { MpGame } = await import('./mp/mp-game.js');
+      this.game = new MpGame({
+        data, save, saveManager: this.saveManager, weapons: this.weapons, renderer: this.renderer,
+        input: this.input, audio: this.audio,
+      });
+    } else {
+      this.game = new Game({
+        data, save, saveManager: this.saveManager, weapons: this.weapons, renderer: this.renderer,
+        input: this.input, audio: this.audio, sync: this.sync,
+      });
+    }
     initModals(this.game);
     this.hud = new Hud(this.game);
-    this.panels = new Panels(this.game, this);
+    if (this.mpMode) {
+      const { MpPanels } = await import('./mp/panels.js');
+      this.panels = new MpPanels(this.game, this);
+    } else {
+      this.panels = new Panels(this.game, this);
+    }
     this.game.on('discovery', (d) => showDiscovery(this.game, d));
     this.#applyInputMode(this.input.mode);
     this.applySettings();
@@ -159,6 +176,15 @@ class App {
   #showTitle() {
     $('#splash').classList.add('done');
     setTimeout(() => $('#splash')?.remove(), 600);
+    if (this.mpMode) {
+      // Straight into the multiplayer world.
+      this.enterFullscreen();
+      this.audio.unlock();
+      trapBackNavigation({ playing: () => this.started, back: () => this.#onBack() });
+      import('./mp/lobby.js').then((m) => m.startMultiplayer(this)).then(() => this.panels.prefetch());
+      return;
+    }
+    if (MP_MODE === 'auth') import('./mp/lobby.js').then((m) => m.handleAuthRedirect(this));
     const title = $('#title');
     setTimeout(() => title.removeAttribute('hidden'), 350);
     $('#title-play').textContent = this.isNewGame ? 'New adventure' : 'Continue';
@@ -244,6 +270,7 @@ class App {
     if (isModalOpen()) {
       if (this.panels.open === 'menu') {
         this.game.saveNow();
+        if (this.mpMode) this.game.disconnect();
         return 'leave';
       }
       if (!isModalLocked()) closeModal();
@@ -285,12 +312,9 @@ class App {
   }
 
   #multiplayer() {
-    const body = h('div.tutorial',
-      h('p', h('b', 'Multiplayer is in development.')),
-      h('p', 'Soon you will be able to explore the world with friends, trade weapons and take on bosses together.'),
-      h('p.muted', 'Until then the adventure is single-player, and it works fully offline.'),
-      h('button.btn-primary', { autofocus: true, onclick: () => closeModal() }, 'OK'));
-    openModal({ title: 'Multiplayer', icon: 'players', body, className: 'tutorial-panel' });
+    import('./mp/lobby.js')
+      .then((m) => m.openLobby(this))
+      .catch((err) => this.game.toast(`Multiplayer kunde inte laddas: ${err.message}`, 'warn'));
   }
 
   #tutorial() {

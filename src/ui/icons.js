@@ -283,6 +283,36 @@ const ICONS = {
     ],
     pal: { o: O, b: '#3f6fd8', r: '#c8364a', f: '#f0c8a0' },
   },
+  // A speech bubble (multiplayer chat).
+  chat: {
+    map: [
+      '.oooooooooo.',
+      'owwwwwwwwwwo',
+      'owwkwwkwwkwo',
+      'owwwwwwwwwwo',
+      'owwwwwwwwwwo',
+      '.oooowwooooo',
+      '....owo.....',
+      '....oo......',
+    ],
+    pal: { o: O, w: '#f3ecdc', k: '#3a3a4a' },
+  },
+  // A clan banner on a pole.
+  flag: {
+    map: [
+      'oo..........',
+      'oooooooooo..',
+      'oorrrrrrrro.',
+      'oorryyrrro..',
+      'oorrrrrrrro.',
+      'oooooooooo..',
+      'oo..........',
+      'oo..........',
+      'oo..........',
+      'oo..........',
+    ],
+    pal: { o: O, r: '#c8364a', y: '#ffd24a' },
+  },
   // A small round creature with big eyes (pals).
   pal: {
     map: [

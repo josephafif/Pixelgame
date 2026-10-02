@@ -370,7 +370,7 @@ export function open(game, app, arg = {}) {
                 },
               }, icon('anvil', 20), 'Forge'))));
       })),
-      boats());
+      game.mp ? null : boats());
   }
 
   function tabs() {
@@ -406,5 +406,9 @@ export function open(game, app, arg = {}) {
       forgeBar(errors, cost)));
   }
 
-  openModal({ title: 'Forge', icon: 'anvil', body: build(), className: 'wide forge-panel' });
+  // A new pickaxe (or, in multiplayer, the server's answer) refreshes the panel.
+  const off = game.on('tools', () => {
+    if (!busy) rerender();
+  });
+  openModal({ title: 'Forge', icon: 'anvil', body: build(), className: 'wide forge-panel', onDispose: off });
 }

@@ -11,8 +11,39 @@ de här besluten:
 | Progression | En separat MP-karaktär som bara finns på servern. Singleplayer-sparfilen rörs aldrig |
 | Skala och inloggning | Vänner och mindre grupper, cirka 50 samtidigt per server. Konto med e-post, Google eller Discord |
 
-Det här är en plan och inget av det är byggt än. I spelet visar knappen
-Multiplayer fortfarande "in development".
+## Status: byggt
+
+Planens faser 0–6 är byggda. Så sätter du upp en egen server:
+[MULTIPLAYER-SETUP.md](MULTIPLAYER-SETUP.md).
+
+| Del | Var i koden |
+|---|---|
+| Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
+| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `net.js`, `auth.js`, `db.js`) |
+| Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
+| Drift | `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
+| Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
+
+### Uppmätt
+
+- **50 botar** som springer och slåss i vildmarken: servern lägger i snitt
+  cirka 7 ms per tick (budgeten är 33 ms) och skickar cirka 10 kB/s per spelare.
+  Det som är långt bort uppdateras 10 gånger per sekund i stället för 30.
+- **Förutsägelse:** i webbläsartesterna blev det inga stora rättningar av den
+  egna rörelsen. Små rättningar förekommer bara vid knuffar från träffar.
+- **Fusk:** 300 inputs som skickas på en gång ger ingen extra fart, servern
+  kickar den som skickar skräppaket, och spelare utanför synhåll skickas aldrig.
+
+### Inte med i multiplayer än
+
+Följande finns i singleplayer men inte i multiplayer än:
+- vapenförmågor och legendariska krafter;
+- pals;
+- båtar, havsdjur och marknader;
+- forskning (smedjan har samma val för alla);
+- WebTransport (allt går via WebSocket).
+
+Bossarnas attackmönster är förenklade jämfört med singleplayer.
 
 ---
 

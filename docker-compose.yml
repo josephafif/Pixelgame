@@ -1,0 +1,58 @@
+# Pixelgame multiplayer on one machine (e.g. an Oracle Cloud Always Free VM).
+#
+#   cp server/.env.example server/.env    # then fill it in
+#   docker compose --profile caddy up -d --build     # free: DuckDNS name + HTTPS by Caddy
+#   docker compose --profile tunnel up -d --build    # or: your own domain via Cloudflare Tunnel
+#
+# See docs/MULTIPLAYER-SETUP.md for the whole walk-through (in Swedish).
+
+services:
+  game:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    env_file: server/.env
+    environment:
+      SERVE_STATIC: "1"
+      TRUST_PROXY: "1"
+      DB_PATH: /app/server-data/pixelgame.db
+      BACKUP_DIR: /app/server-data/backups
+    volumes:
+      - ./server-data:/app/server-data
+    # Only reachable from this machine: Caddy or the tunnel in front of it.
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  # Option A (0 kr): HTTPS with a free DuckDNS name. Caddy fetches the
+  # certificate itself. Needs ports 80 and 443 open on the VM.
+  caddy:
+    profiles: ["caddy"]
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [game]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}   # set DOMAIN in .env next to this file, e.g. pixelgame.duckdns.org
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  # Option B (needs a domain on Cloudflare): no open ports, DDoS protection,
+  # the server's address stays hidden. Point the tunnel's public hostname at
+  # http://game:8787 in the Cloudflare dashboard.
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on: [game]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}   # set TUNNEL_TOKEN in .env next to this file
+
+volumes:
+  caddy-data:
+  caddy-config:

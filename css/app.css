@@ -1076,3 +1076,70 @@ body:not([data-input="keyboard"]) .keys { display: none; }
   .odds-table .short { display: inline; }
   .odds-table tr.forge-row th .short::before { content: "Forge "; color: var(--muted); }
 }
+
+/* ---------- Multiplayer ---------- */
+
+.mp-zone {
+  position: absolute; top: calc(8px + var(--safe-t)); left: 50%; transform: translateX(-50%);
+  font-size: 13px; padding: 0 10px; white-space: nowrap; pointer-events: none;
+  border: 5px solid transparent; border-image: var(--frame-chip) 3 fill / 5px / 0 stretch;
+  text-shadow: 0 1px 0 var(--ink);
+}
+.mp-zone[data-kind="safe"] { color: var(--brass-light); }
+.mp-zone[data-kind="own"] { color: var(--good); }
+.mp-zone[data-kind="wild"], .mp-zone[data-kind="foreign"] { color: #ffb0a0; }
+.net.slow { color: #ffb070; }
+.mp-chat-log {
+  position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(38% + var(--safe-b)); width: min(46vw, 360px);
+  display: flex; flex-direction: column; gap: 2px; pointer-events: none; font-size: 13px; line-height: 1.25;
+}
+.mp-chat-log .line { background: rgba(14, 12, 24, 0.6); padding: 1px 6px; text-shadow: 0 1px 0 var(--ink); transition: opacity 1s; overflow-wrap: anywhere; }
+.mp-chat-log .line.old { opacity: 0; }
+.mp-chat-log .line.clan b { color: var(--good); }
+.mp-chat-log .line.sys { color: var(--brass-light); }
+.mp-chat-log .line b { color: var(--essence); font-weight: 500; }
+.mp-chat-btn {
+  position: absolute; left: calc(10px + var(--safe-l)); top: calc(150px + var(--safe-t));
+  min-width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center;
+}
+.mp-chat-bar {
+  position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(10px + var(--safe-b));
+  width: min(96vw, 620px); display: flex; gap: 6px; align-items: center; padding: 6px;
+  border: 6px solid transparent; border-image: var(--frame-panel) 3 fill / 6px / 0 stretch;
+}
+.mp-chat-bar input { flex: 1; min-width: 0; }
+.mp-chat-ch { min-width: 4.5em; }
+.mp-debug {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(4px + var(--safe-b));
+  font-size: 11px; color: var(--muted); background: rgba(14, 12, 24, 0.7); padding: 1px 6px; pointer-events: none; white-space: nowrap;
+}
+body.mp .key-hints { display: none !important; }
+.mp-lobby { display: flex; flex-direction: column; gap: 14px; }
+.mp-lobby section { display: flex; flex-direction: column; gap: 8px; }
+.mp-lobby h3 { margin: 0; }
+.mp-oauth, .mp-email, .mp-code { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.mp-email .field, .mp-code .field { flex: 1; min-width: 180px; }
+.mp-server { padding: 8px 10px; border: 5px solid transparent; border-image: var(--frame-slot) 3 fill / 5px / 0 stretch; display: flex; flex-direction: column; gap: 6px; }
+.mp-server-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.mp-server-head .muted { overflow-wrap: anywhere; }
+.mp-rules ul { margin: 0; padding-left: 1.2em; }
+.mp-clan { display: flex; flex-direction: column; gap: 12px; }
+.mp-clan section { display: flex; flex-direction: column; gap: 6px; }
+.mp-clan h3 { margin: 0; }
+.mp-clan-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.mp-vault { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.mp-vault .field { flex-direction: column; align-items: flex-start; }
+.mp-members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.mp-members li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mp-members .dot { width: 8px; height: 8px; background: #4a4266; display: inline-block; }
+.mp-members .dot.on { background: var(--good); }
+.mp-member-actions { display: inline-flex; gap: 4px; }
+button.small { min-height: 30px; padding: 0 8px; font-size: 13px; }
+.mp-players ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.mp-name, .mp-fail, .mp-connecting { display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 640px), (max-height: 520px) {
+  .mp-zone { font-size: 11px; top: calc(4px + var(--safe-t)); border-width: 4px; border-image-width: 4px; }
+  .mp-chat-log { font-size: 11px; width: 60vw; bottom: calc(42% + var(--safe-b)); }
+  .mp-chat-btn { top: calc(78px + var(--safe-t)); left: calc(6px + var(--safe-l)); }
+  .mp-debug { font-size: 9px; white-space: normal; width: 96vw; text-align: center; }
+}

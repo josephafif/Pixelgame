@@ -18,7 +18,10 @@ npm start            # utvecklingsserver på http://localhost:5173
 npm test             # enhetstester (node:test, inga beroenden)
 npm run build        # uppdaterar precache-manifest.js efter ändringar i appfiler
 npm run check        # verifierar att precache-manifestet är aktuellt + enhetstester
-npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline och uppdatering
+npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline, uppdatering, multiplayer
+npm run mp           # multiplayer lokalt: spelserver + spelet på http://localhost:8787 (gäster, admin för alla)
+npm run test:mp      # multiplayer-tester: protokoll, regler, inloggning, databas, botar mot en riktig server
+npm run server       # spelservern i produktion (inställningar i server/.env, se docs/MULTIPLAYER-SETUP.md)
 ```
 
 `?debug=1` exponerar `window.__pixelgame` för felsökning och e2e-tester.
@@ -317,8 +320,41 @@ lägret är lugnt. Logik: `src/game/construction.js` och `src/game/gathering.js`
 
 Innan du kommer in i världen visas en huvudmeny: **Play** (med en rad om din sparfil: nivå,
 antal vapen och speltid), **New world**, **Settings** (samma inställningar som i spelet),
-**How to play** och **Multiplayer**. Multiplayer är inte byggt än; knappen visar bara ett
-meddelande om att det är under utveckling. Bakom menyn driver världen sakta förbi.
+**How to play** och **Multiplayer** (lobbyn: logga in och välj server, se nedan). Bakom menyn
+driver världen sakta förbi.
+
+## Multiplayer
+
+**Multiplayer** i huvudmenyn öppnar lobbyn. Där loggar du in (e-post, Google eller Discord via
+Supabase) eller spelar som gäst på servrar som tillåter det, och väljer server. Du får en egen
+multiplayer-karaktär som sparas på servern. Din singleplayer-värld påverkas inte.
+
+- **Servern bestämmer allt** (30 tick per sekund). Klienten skickar bara vad du vill göra:
+  riktning, attack och använd. Fart, kollisioner, träffar, skada och loot räknas ut på
+  servern. Vapen slumpas med oförutsägbara seeds och skrivs till databasen i en transaktion
+  innan någon får veta något, så de kan inte dupliceras.
+- **Inget lagg:** din egen gubbe förutsägs med exakt samma rörelsekod som servern kör, och
+  rättas mjukt om servern säger något annat. Andra spelare och monster ritas cirka 100 ms bakåt
+  i tiden och interpoleras mellan ögonblicksbilder. Träffar räknas mot det du såg
+  (lagkompensation, högst 200 ms).
+- **Fristaden** i mitten är säker: smedjan (vapen och hackor), förrådet och härden.
+  **Vildmarken** är PvP. Nya spelare är skyddade i två timmar eller tills de besegrat en boss.
+- **Klaner:** grunda en klan och bjud in vänner (B), res ett **klanbanér** i vildmarken. Marken
+  runt banéret blir er, och där bygger ni murar, grindar, torn och fällor tillsammans.
+  Klanvalvet vid banéret delas.
+- **Raider:** en bas kan bara skadas när någon i klanen är online, 15 minuter efter att den
+  sista loggat ut, eller under serverns raidfönster (lördag 18–21 som standard). Hälften av
+  valvet kan aldrig tas.
+- **Död i vildmarken:** hälften av det du bär hamnar i en säck. Loggar du ut där ligger din
+  kropp kvar en halv minut.
+- **Bossar:** altaret förbrukas för hela servern. Alla som gjort minst 10 % av skadan får
+  egen loot.
+- **Chatt:** T eller pratbubblan, och `/c` för klanchatt. Med `?debug=1` visas ett
+  nätverksöverlägg med ping, interpolering och rättningar.
+
+Planen och vad som är byggt finns i [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md). Så sätter du upp
+en egen server gratis (Oracle Cloud, DuckDNS eller Cloudflare, Supabase) står i
+[docs/MULTIPLAYER-SETUP.md](docs/MULTIPLAYER-SETUP.md).
 
 ## Fiender
 
@@ -575,8 +611,15 @@ src/
   render/                     renderer, pixelsprites, animerade monster och pals (creatures.js),
                               tiles, vapensprites, byggnader, konstruktioner, båtar, animationer
   input/, audio/, storage/, pwa/, ui/
-scripts/                      dev-server, precache-byggare, ikongenerator
-tests/unit/, tests/e2e/
+  net/                        multiplayer, delat av klient och server: binärt protokoll, rörelse,
+                              regler (zoner, PvP, raider, klaner), byggregler
+  mp/                         multiplayer-klienten: lobby, inloggning, MpGame (förutsägelse och
+                              interpolering), paneler, chatt
+server/                       spelservern (Node): simulering, strid, monster, loot, baser, klaner,
+                              ögonblicksbilder, inloggning (Supabase JWT, gäster), SQLite, Dockerfile
+deploy/                       Caddy, systemd, backup-skript
+scripts/                      dev-server, precache-byggare, ikongenerator, lasttest
+tests/unit/, tests/e2e/, tests/mp/
 ```
 
 ## Driftsättning
@@ -588,10 +631,8 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 
 ## Kända begränsningar och nästa steg
 
-- Ingen backend ingår. Synk-klienten och protokollet finns, men en server och
-  kontohantering behöver byggas separat. Multiplayer finns bara som en knapp i huvudmenyn än så
-  länge. Planen för multiplayer (nätkod, fuskskydd, klaner, PvP-regler och gratis hosting) finns i
-  [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md).
+- Multiplayer har ännu inte vapenförmågor, pals, båtar och marknader. Bossarna har enklare
+  attackmönster än i singleplayer. Se [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md).
 - Du kan bara ha en pal med dig åt gången, och pals har inga egna förmågor utöver bett, zap och
   insamling. Fler sorter och specialförmågor vore ett naturligt nästa steg.
 - Ljud och grafik genereras procedurellt (ingen musik ännu).

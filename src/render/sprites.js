@@ -479,6 +479,19 @@ const MAPS = {
     'okkkkko',
     '.ooooo.',
   ],
+  // A dropped sack (multiplayer death bag).
+  bag: [
+    '...ooo...',
+    '..oGwGo..',
+    '...ogo...',
+    '..oGGGo..',
+    '.oGwGGGo.',
+    'oGGGGGGGo',
+    'oGGGGGGgo',
+    'oGGGGGggo',
+    '.oggggggo',
+    '..ooooooo',
+  ],
   egg: [
     '..ooo..',
     '.owwwo.',

@@ -22,7 +22,8 @@ if (committed !== manifest.source) {
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist);
-const files = ['sw.js', 'precache-manifest.js', 'fonts/OFL.txt', ...manifest.shell, ...manifest.data];
+// _headers: cache rules for Cloudflare Pages (Netlify uses netlify.toml).
+const files = ['sw.js', 'precache-manifest.js', 'fonts/OFL.txt', '_headers', ...manifest.shell, ...manifest.data];
 for (const file of files) {
   const from = join(root, file);
   if (!existsSync(from)) throw new Error(`Missing file: ${file}`);

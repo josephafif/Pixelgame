@@ -12,10 +12,23 @@ export const CONFIG = {
   updateCheckIntervalMs: 30 * 60 * 1000,
   // Autosave cadence while playing (also saves on pause/hide/update).
   autosaveIntervalMs: 15 * 1000,
+  // Multiplayer (see docs/MULTIPLAYER-SETUP.md). Servers are WebSocket URLs
+  // ending in /ws; players can also add servers themselves in the lobby.
+  // Supabase: Project Settings → API → Project URL and the anon/publishable
+  // key (both are public by design; the server checks every login itself).
+  mp: {
+    servers: [
+      // { name: 'Vår server', url: 'wss://spel.example.se/ws' },
+    ],
+    supabaseUrl: '',
+    supabaseAnonKey: '',
+  },
 };
 
 // Deployments can override config without rebuilding by defining
 // window.PIXELGAME_CONFIG before src/main.js loads.
 if (typeof globalThis !== 'undefined' && globalThis.PIXELGAME_CONFIG) {
-  Object.assign(CONFIG, globalThis.PIXELGAME_CONFIG);
+  const { mp, ...rest } = globalThis.PIXELGAME_CONFIG;
+  Object.assign(CONFIG, rest);
+  if (mp) Object.assign(CONFIG.mp, mp);
 }

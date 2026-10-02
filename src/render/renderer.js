@@ -189,6 +189,7 @@ export class Renderer {
 
     this.#drawWorld(game, cx, cy, W, H);
     this.#drawFlatStructures(game, W, H);
+    if (game.zoneRings) this.#drawZoneRings(game);
     this.#drawHarvestTarget(game);
     this.#drawAreas(game);
     this.#drawEntities(game);
@@ -215,6 +216,27 @@ export class Renderer {
 
   #sx(x) {
     return Math.round(x * T - this.cx);
+  }
+
+  /** Multiplayer: dashed borders of the safe town and clan claims nearby. */
+  #drawZoneRings(game) {
+    const v = this.v;
+    const p = game.player;
+    v.save();
+    v.setLineDash([4, 4]);
+    v.lineDashOffset = -Math.floor(game.time * 6);
+    v.lineWidth = 1;
+    for (const ring of game.zoneRings) {
+      const d = Math.hypot(p.x - ring.x, p.y - ring.y);
+      if (Math.abs(d - ring.r) > 30) continue;
+      v.globalAlpha = ring.alpha ?? 0.55;
+      v.strokeStyle = ring.color;
+      v.beginPath();
+      v.arc(this.#sx(ring.x), this.#sy(ring.y), ring.r * T, 0, TAU);
+      v.stroke();
+    }
+    v.restore();
+    v.globalAlpha = 1;
   }
 
   #sy(y) {
@@ -429,6 +451,7 @@ export class Renderer {
     for (const e of game.enemies) if (!e.dead) list.push({ y: e.y, kind: 'enemy', o: e });
     for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
     if (game.pal && !game.pal.hidden) list.push({ y: game.pal.y, kind: 'pal', o: game.pal });
+    for (const o of game.others ?? []) if (!o.dead) list.push({ y: o.y, kind: 'remote', o });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
     list.sort((a, b) => a.y - b.y);
     const W = this.view.width;
@@ -446,6 +469,7 @@ export class Renderer {
         case 'ally': this.#drawCharacter(game, d.o, x, y, true); break;
         case 'pal': this.#drawPal(game, d.o, x, y); break;
         case 'player': this.#drawCharacter(game, p, x, y, false); break;
+        case 'remote': this.#drawRemote(game, d.o, x, y); break;
         default: break;
       }
     }
@@ -588,7 +612,9 @@ export class Renderer {
     const v = this.v;
     const b = game.build;
     const radius = game.buildRadius();
-    const inside = (tx, ty) => Math.hypot(tx, ty) <= radius;
+    // Single player: the camp around the Hearth; multiplayer: your clan's claim.
+    const c = game.buildCenter ?? { x: 0, y: 0 };
+    const inside = (tx, ty) => radius > 0 && Math.hypot(tx - c.x, ty - c.y) <= radius;
     const tx0 = Math.floor(this.cx / T) - 1;
     const ty0 = Math.floor(this.cy / T) - 1;
     const tx1 = tx0 + Math.ceil(W / T) + 2;
@@ -1117,10 +1143,29 @@ export class Renderer {
     }
   }
 
+  /** Another player (multiplayer): their character, name, clan tag and health. */
+  #drawRemote(game, c, x, y) {
+    const v = this.v;
+    if (c.asleep) v.globalAlpha = 0.55;
+    this.#drawCharacter(game, c, x, y, false);
+    v.globalAlpha = 1;
+    const label = c.tag ? `[${c.tag}] ${c.name}` : c.name;
+    drawPixelText(v, label.toUpperCase(), x, y - 27, c.nameColor ?? '#e8e8f0');
+    if (c.hp < c.maxHp) this.#healthBar(x, y - 18, 14, Math.max(0, c.hp) / c.maxHp, c.friendly ? '#6cd66c' : '#ff6a5a');
+    if (c.asleep) {
+      v.fillStyle = '#e8f0ff';
+      const k = (game.time * 0.8) % 1;
+      v.globalAlpha = 1 - k;
+      v.fillRect(Math.round(x + 4 + k * 4), Math.round(y - 16 - k * 6), 3, 1);
+      v.globalAlpha = 1;
+    }
+  }
+
   #drawCharacter(game, c, x, y, isClone) {
     const v = this.v;
-    const sprites = playerSprites(isClone ? '#9a5cff' : '#3f6fd8');
-    const w = game.weapon;
+    const remote = Boolean(c.remote);
+    const sprites = playerSprites(isClone ? '#9a5cff' : remote ? c.cloak ?? '#c8364a' : '#3f6fd8');
+    const w = remote ? c.weapon : game.weapon;
     const anim = isClone
       ? (game.time - (c.attackT ?? -1) < 0.22 ? { t: game.time - c.attackT, dur: 0.22, angle: c.facing, dir: 1 } : null)
       : c.attackAnim;
@@ -1141,35 +1186,39 @@ export class Renderer {
     let img = (right ? sprites.right : sprites.left)[isClone ? 0 : frame];
     if (!isClone && c.hurtFlash > 0) img = sprites.flash;
     const bob = c.moving ? (Math.floor(c.walkT) % 2) : 0;
-    if (isClone || !game.sailing) this.#shadow(x + lx, y + 1 + ly, 5);
+    const sailing = !remote && game.sailing;
+    const toolActive = remote ? c.slot === 'tool' : game.toolActive;
+    const handsEmpty = remote ? c.slot === 'none' : game.handsEmpty;
+    if (isClone || !sailing) this.#shadow(x + lx, y + 1 + ly, 5);
     // Ascension: a radiant aura while the power lasts.
     if (!isClone && game.ascend && game.ascend.until > game.time) {
       this.#glow(x, y - 6, game.ascend.color, 20 + Math.sin(game.time * 8) * 3);
       if (Math.random() < 0.4) game.fx.emit('arcane', c.x, c.y - 0.3, 1, 0.5, 1.5);
     }
     const behind = pose && Math.sin(pose.angle) < -0.35;
+    const baseAlpha = v.globalAlpha;
     if (isClone) v.globalAlpha = 0.65;
-    else if (c.invuln > 0 && Math.floor(game.time * 20) % 2) v.globalAlpha = 0.5;
+    else if (c.invuln > 0 && Math.floor(game.time * 20) % 2) v.globalAlpha = 0.5 * baseAlpha;
     const hand = { x: x + lx + (right ? 1 : -1), y: y - 6 - bob + ly };
-    if (!isClone && game.sailing) {
+    if (!isClone && sailing) {
       this.#drawSailor(game, c, x, y, img, right, pose, anim);
       v.globalAlpha = 1;
       return;
     }
-    if (!isClone && (c.toolAnim || game.toolActive)) {
+    if (!isClone && (c.toolAnim || toolActive)) {
       v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
-      this.#drawPickaxe(game, c, hand);
+      this.#drawPickaxe(game, c, hand, remote ? c.pickaxeDef : null);
       v.globalAlpha = 1;
       return;
     }
-    if (!isClone && game.handsEmpty) {
+    if (!isClone && handsEmpty) {
       v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
       v.globalAlpha = 1;
       return;
     }
-    if (behind) this.#drawHeldWeapon(game, pose, hand, isClone);
+    if (behind) this.#drawHeldWeapon(game, pose, hand, isClone, w, remote);
     v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
-    if (!behind) this.#drawHeldWeapon(game, pose, hand, isClone);
+    if (!behind) this.#drawHeldWeapon(game, pose, hand, isClone, w, remote);
     v.globalAlpha = 1;
   }
 
@@ -1201,8 +1250,8 @@ export class Renderer {
   }
 
   /** Pickaxe swing: raised overhead, then down onto the target. */
-  #drawPickaxe(game, c, hand) {
-    const tool = currentPickaxe(game.data, game.save);
+  #drawPickaxe(game, c, hand, def = null) {
+    const tool = def ?? currentPickaxe(game.data, game.save);
     if (!tool) return;
     const a = c.toolAnim;
     const facing = a ? a.angle : c.facing;
@@ -1229,10 +1278,10 @@ export class Renderer {
     return game.projectiles.some((p) => p.kind === 'boomerang' && p.owner === 'player' && p.depth === 0);
   }
 
-  #drawHeldWeapon(game, pose, hand, isClone) {
-    const w = game.weapon;
+  #drawHeldWeapon(game, pose, hand, isClone, weapon = game.weapon, remote = false) {
+    const w = weapon;
     if (!w || !pose) return;
-    if (!isClone && w.attack.pattern === 'boomerang' && this.#boomerangInFlight(game)) return;
+    if (!isClone && !remote && w.attack.pattern === 'boomerang' && this.#boomerangInFlight(game)) return;
     const v = this.v;
     const spr = weaponSprite(w.dna);
     // Bows are held across the aim (belly forward); everything else points along it.

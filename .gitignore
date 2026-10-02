@@ -4,3 +4,5 @@ playwright-report/
 .DS_Store
 *.log
 dist/
+server-data/
+.env

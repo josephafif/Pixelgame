@@ -1,0 +1,14 @@
+# Cloudflare Pages headers: the Service Worker and its file list must be
+# re-checked on every visit so updates arrive quickly.
+/sw.js
+  Cache-Control: no-cache
+/precache-manifest.js
+  Cache-Control: no-cache
+/data/*
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
