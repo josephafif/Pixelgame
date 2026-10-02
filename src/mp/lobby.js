@@ -79,7 +79,7 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
     state.open = registry.filter((x) => !x.official && !official.some((o) => o.url === x.url));
     state.custom = [...configuredServers(config).filter((s) => !s.official), ...customServers()];
     rerender();
-    await probeAll([...state.official, ...state.open, ...state.custom]);
+    await probeAll([...(state.local ? [] : state.official), ...state.open, ...state.custom]);
   };
 
   const join = (server, mode) => {

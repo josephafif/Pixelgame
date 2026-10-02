@@ -152,8 +152,9 @@ test('on the game\'s website: the official server, a friend\'s server by its cod
     await expect(found).toContainText('Annas server');
     await expect(found).toContainText('K7QX2M');
     await expect(found).toContainText('0/50 spelare');
-    // The official server is listed too.
-    await expect(page.locator('.mp-official .mp-server')).toContainText('Pixelgame');
+    // The official servers are listed too (the configured one and the list's).
+    await expect(page.locator('.mp-official .mp-server')).toHaveCount(2);
+    await expect(page.locator('.mp-official .mp-server').first()).toContainText('Pixelgame');
     // A code that isn't running, and one that doesn't exist.
     await page.fill('.mp-join input', 'zzzzzz');
     await page.locator('.mp-join button').click();

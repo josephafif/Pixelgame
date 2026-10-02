@@ -20,7 +20,8 @@ export const CONFIG = {
   // also keeps the list of servers players host, with their join codes.
   mp: {
     servers: [
-      // { name: 'Pixelgame', url: 'wss://pixelgame.<ditt-konto>.workers.dev/ws', official: true },
+      // The official server: Cloudflare Workers (cloud/worker.js, wrangler.jsonc).
+      { name: 'Pixelgame', url: 'wss://pixelgame.legolas04.workers.dev/ws', official: true },
     ],
     supabaseUrl: 'https://tqctqccltthwlhfdwkre.supabase.co',
     supabaseAnonKey: 'sb_publishable_vBLboWv3jCsSBPV8jg6ePA_TvCrsQn1',

@@ -198,8 +198,13 @@ export default {
 
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/') {
+      return new Response('Pixelgame: den officiella servern är igång.\nSpela på https://pixelgame-infinite-arsenal.netlify.app (Multiplayer).\nStatus: /health\n', {
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      });
+    }
     if (!['/ws', '/info', '/health', '/login'].includes(url.pathname)) {
-      return new Response('Pixelgame server. Play at https://pixelgame-infinite-arsenal.netlify.app', { status: 404 });
+      return new Response('Not found', { status: 404 });
     }
     // One world, placed in western Europe (closest to the players).
     const world = env.WORLD.get(env.WORLD.idFromName('main'), { locationHint: 'weur' });

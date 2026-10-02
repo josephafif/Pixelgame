@@ -53,5 +53,19 @@ export async function stubSupabase(page, { servers = [], codes = {}, providers =
     if (url.pathname === '/auth/v1/settings') return json({ external: providers });
     return route.fulfill({ status: 404, headers: cors, body: '{}' });
   });
+  // The official server (on Cloudflare) answers like a live one.
+  await page.route('**/*.workers.dev/**', (route) => {
+    calls.push(route.request().url());
+    return route.fulfill({
+      status: 200,
+      headers: { ...cors, 'content-type': 'application/json' },
+      body: JSON.stringify(official),
+    });
+  });
   return calls;
 }
+
+const official = {
+  name: 'Pixelgame', protocol: 1, players: 3, maxPlayers: 40, guests: true, logins: true, supabase: true,
+  rules: { safeRadius: 24, claimRadius: 16, raidWindow: 'lördag 18:00–21:00', raidGraceMinutes: 15, clanMax: 8, hardcore: false },
+};

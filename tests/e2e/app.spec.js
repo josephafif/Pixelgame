@@ -786,8 +786,9 @@ test('main menu: settings and how to play before you start; multiplayer opens it
   await page.click('#title-multiplayer');
   const modal = page.locator('.modal, [role="dialog"]').last();
   await expect(modal).toContainText('Spela på en väns server');
-  // No official server yet: its place says so (and Google login shows once it's switched on).
-  await expect(modal.locator('.mp-official')).toContainText('inte igång än');
+  // The official server is listed (with its players) at the top.
+  await expect(modal.locator('.mp-official')).toContainText('Pixelgame');
+  await expect(modal.locator('.mp-official')).toContainText('3/40 spelare');
   await expect(modal).toContainText('Fristaden');
   await page.keyboard.press('Escape');
   await expect(page.locator('.mp-lobby')).toBeHidden();

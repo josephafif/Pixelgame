@@ -370,7 +370,7 @@ Om du vill att spelet laddas från Cloudflares CDN i stället:
 | Vad | Hur |
 |---|---|
 | Se loggen | **Workers & Pages → pixelgame → Logs**, eller `npx wrangler tail` |
-| Hälsa och dagens kvot | `https://pixelgame.ditt-namn.workers.dev/health` |
+| Hälsa och dagens kvot | <https://pixelgame.legolas04.workers.dev/health> |
 | Uppdatera | Pusha till GitHub (med Git-kopplingen), eller `npm run cloud:deploy`. Spelarna kopplas ifrån en kort stund och kommer tillbaka på samma ställe |
 | Ändra inställningar | **Settings → Variables and Secrets**, till exempel `ADMINS`, `MAX_PLAYERS` och `RULE_RAID_WINDOW` (samma namn som i `server/.env.example`) |
 | Prova lokalt | `npm run cloud:dev`, sedan `node scripts/loadtest.mjs --bots 5 --url ws://localhost:8787/ws` |
