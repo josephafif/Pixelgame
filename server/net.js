@@ -162,6 +162,7 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
       name: p.name,
       tick: gs.tick,
       tickRate: TICK_RATE,
+      inputEvery: config.inputEvery ?? 1,
       seed: gs.worldSeed,
       rules: gs.rules,
       server: serverInfo(gs, auth, config),

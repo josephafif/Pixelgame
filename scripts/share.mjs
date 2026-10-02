@@ -3,11 +3,11 @@
 //
 // Starts the game server (it also serves the game itself) and a Cloudflare
 // quick tunnel, which gives this computer a public https:// address. It needs
-// no account, no card and no router settings. Send the address to your
-// friends: they open it and press Multiplayer.
+// no account, no card and no router settings.
 //
-//  - The address changes every time you start. Players choose a password
-//    with their name, and log in with it on the new address.
+//  - The tunnel's address changes every time you start; the join code below
+//    doesn't. Players choose a password with their name, so they can also
+//    log in from another device.
 //  - You play at http://localhost:8787 and are admin there (/help in the chat).
 //  - Everything is saved in server-data/pixelgame.db. Ctrl+C saves and stops.
 //
@@ -15,10 +15,16 @@
 // Otherwise it is downloaded once, from Cloudflare's releases on GitHub,
 // into server-data/bin/.
 //
-// Options: --port 8787   --name "Our server"   --no-tunnel (only this computer)
+// The server gets a join code from the game's server list (Supabase), the
+// same code every time: friends write it under Multiplayer on the game's
+// website, or open the invitation link. --public also shows the server in
+// the list for everyone.
+//
+// Options: --port 8787   --name "Our server"   --public   --no-tunnel (only this computer)
 
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, chmodSync, renameSync, rmSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { createWriteStream, existsSync, mkdirSync, chmodSync, renameSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
@@ -166,6 +172,41 @@ function runTunnel(bin, port, { onUrl, onDown }) {
   };
 }
 
+// --- The server list ---------------------------------------------------------------------
+
+const HOST_FILE = join(root, 'server-data', 'host.json');
+const HEARTBEAT_MS = 2 * 60 * 1000;
+
+/** This computer's server identity: its join code and the secret that proves it owns it. */
+function loadHost() {
+  let host = {};
+  try {
+    host = JSON.parse(readFileSync(HOST_FILE, 'utf8'));
+  } catch {
+    // first time
+  }
+  if (typeof host.secret !== 'string' || host.secret.length < 32) host.secret = randomBytes(32).toString('base64url');
+  return host;
+}
+
+function saveHost(host) {
+  mkdirSync(dirname(HOST_FILE), { recursive: true });
+  writeFileSync(HOST_FILE, `${JSON.stringify(host, null, 2)}\n`);
+}
+
+/** Registers (or refreshes) the server in the list; returns its code. */
+export async function registerServer({ supabaseUrl, key, url, host, listed, action = 'register', fetchFn = fetch }) {
+  const res = await fetchFn(`${supabaseUrl.replace(/\/+$/, '')}/functions/v1/game-servers`, {
+    method: 'POST',
+    headers: { apikey: key, 'content-type': 'application/json' },
+    body: JSON.stringify({ action, url, secret: host.secret, code: host.code ?? undefined, listed: Boolean(listed) }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.ok) throw new Error(body.error ?? `serverlistan svarade ${res.status}`);
+  return body.code ?? host.code;
+}
+
 // --- Main -------------------------------------------------------------------------------
 
 async function main() {
@@ -212,8 +253,10 @@ async function main() {
   const local = `http://localhost:${server.port}`;
 
   let tun = null;
+  const stopHooks = [];
   const stop = async (sig) => {
     say('', `  Stänger (${sig}): sparar alla spelare…`);
+    await Promise.all(stopHooks.map((fn) => fn()));
     tun?.stop();
     await server.stop();
     say('  Klart. Välkommen tillbaka!');
@@ -243,9 +286,61 @@ async function main() {
       '', `  Servern körs ändå, på den här datorn: ${local}`, '');
     return;
   }
+  // The game's server list, if this copy of the game has one.
+  const { CONFIG } = await import('../src/config.js');
+  const mp = CONFIG.mp ?? {};
+  const registry = mp.supabaseUrl && mp.supabaseAnonKey ? { supabaseUrl: mp.supabaseUrl, key: mp.supabaseAnonKey } : null;
+  const site = (mp.siteUrl ?? '').replace(/\/+$/, '');
+  const listed = process.argv.includes('--public');
+  const host = loadHost();
+  let current = null;
+  let warned = false;
+  const publish = async (url) => {
+    if (!registry) return null;
+    try {
+      const code = await registerServer({ ...registry, url, host, listed });
+      if (code !== host.code) {
+        host.code = code;
+        saveHost(host);
+      }
+      warned = false;
+      return code;
+    } catch (err) {
+      if (!warned) say('', `  Serverlistan svarade inte (${err.message}). Vännerna kan använda länken direkt.`);
+      warned = true;
+      return null;
+    }
+  };
+  const heartbeat = setInterval(() => current && publish(current), HEARTBEAT_MS);
+  heartbeat.unref();
+  const goOffline = async () => {
+    clearInterval(heartbeat);
+    if (!registry || !host.code) return;
+    await registerServer({ ...registry, url: current, host, listed, action: 'offline' }).catch(() => {});
+  };
+  stopHooks.push(goOffline);
+
   say('  Startar tunneln till Cloudflare…');
   tun = runTunnel(bin, server.port, {
-    onUrl(url) {
+    async onUrl(url) {
+      current = url;
+      const code = await publish(url);
+      if (code) {
+        box([
+          'Pixelgame är igång!',
+          '',
+          `Serverns kod:           ${code}`,
+          `Skicka länken:          ${site}/?join=${code}`,
+          `Spela själv (admin):    ${local}`,
+          '',
+          'Vännerna öppnar länken, eller skriver koden under Multiplayer',
+          `på ${site.replace(/^https?:\/\//, '')}. Koden är densamma nästa gång.`,
+          listed ? 'Servern syns också i listan för alla.' : 'Bara den som har koden hittar servern (--public visar den för alla).',
+          '',
+          'Stäng av: Ctrl+C (allt sparas). Datorn måste vara på medan ni spelar.',
+        ]);
+        return;
+      }
       box([
         'Pixelgame är igång!',
         '',

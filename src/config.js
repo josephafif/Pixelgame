@@ -13,15 +13,22 @@ export const CONFIG = {
   // Autosave cadence while playing (also saves on pause/hide/update).
   autosaveIntervalMs: 15 * 1000,
   // Multiplayer (see docs/MULTIPLAYER-SETUP.md). Servers are WebSocket URLs
-  // ending in /ws; players can also add servers themselves in the lobby.
-  // Supabase: Project Settings → API → Project URL and the anon/publishable
-  // key (both are public by design; the server checks every login itself).
+  // ending in /ws; the official one is marked official (only it gets your
+  // account's login). Players can also add servers themselves in the lobby.
+  // Supabase: Project Settings → API → Project URL and the publishable key
+  // (both are public by design; servers check every login themselves). It
+  // also keeps the list of servers players host, with their join codes.
   mp: {
     servers: [
-      // { name: 'Vår server', url: 'wss://spel.example.se/ws' },
+      // { name: 'Pixelgame', url: 'wss://pixelgame.<ditt-konto>.workers.dev/ws', official: true },
     ],
-    supabaseUrl: '',
-    supabaseAnonKey: '',
+    supabaseUrl: 'https://tqctqccltthwlhfdwkre.supabase.co',
+    supabaseAnonKey: 'sb_publishable_vBLboWv3jCsSBPV8jg6ePA_TvCrsQn1',
+    // Log in by e-mail only works once Supabase has its own e-mail sender (SMTP).
+    emailLogin: false,
+    // The game's address (invitation links) and where to download it.
+    siteUrl: 'https://pixelgame-infinite-arsenal.netlify.app',
+    repoUrl: 'https://github.com/josephafif/Pixelgame',
   },
 };
 

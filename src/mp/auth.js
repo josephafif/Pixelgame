@@ -79,6 +79,19 @@ export class MpAuth {
     return json;
   }
 
+  /** The ways of logging in the project has switched on ({ google, discord, email, … }). */
+  async providers() {
+    if (!this.configured) return {};
+    try {
+      const res = await fetch(`${this.url}/auth/v1/settings`, { headers: { apikey: this.key }, cache: 'no-store', signal: AbortSignal.timeout?.(6000) });
+      if (!res.ok) return {};
+      const body = await res.json();
+      return body?.external ?? {};
+    } catch {
+      return {};
+    }
+  }
+
   /** Sends the login e-mail (a link and, if the template has it, a code). */
   async sendEmail(email, redirectTo) {
     if (!this.configured) throw new Error('Inloggning med e-post är inte inställd');
@@ -164,11 +177,14 @@ export class MpAuth {
   }
 }
 
-/** The servers to show: configured ones, ones the player added, and this site's own. */
-export function serverList(config) {
-  const out = [...(config.servers ?? [])];
-  for (const s of read('pg-mp-servers') ?? []) if (!out.some((o) => o.url === s.url)) out.push({ ...s, custom: true });
-  return out;
+/** Servers from the game's configuration (the official one is marked official). */
+export function configuredServers(config) {
+  return (config.servers ?? []).filter((s) => s?.url).map((s) => ({ ...s }));
+}
+
+/** Servers the player added by address. */
+export function customServers() {
+  return (read('pg-mp-servers') ?? []).map((s) => ({ ...s, custom: true }));
 }
 
 export function addServer(name, url) {

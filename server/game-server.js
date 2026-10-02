@@ -100,14 +100,27 @@ export class GameServer {
     };
     loop();
     this.saveTimer = setInterval(() => this.saveAll(), this.config.saveIntervalMs);
-    this.hourly = setInterval(() => building.upkeep(this), 60 * 60 * 1000);
+    this.#upkeep(Date.now());
   }
 
   stop() {
     this.running = false;
     clearTimeout(this.timer);
     clearInterval(this.saveTimer);
-    clearInterval(this.hourly);
+  }
+
+  /** Base upkeep, once an hour (and, with upkeepCatchUp, for the hours the world slept). */
+  #upkeep(now) {
+    const HOUR = 60 * 60 * 1000;
+    if (!this.upkeepAt) this.upkeepAt = (this.config.upkeepCatchUp && Number(this.db.meta('upkeepAt'))) || now;
+    let n = 0;
+    while (now - this.upkeepAt >= HOUR && n < 24 * 7) {
+      building.upkeep(this);
+      this.upkeepAt += HOUR;
+      n++;
+    }
+    if (now - this.upkeepAt >= HOUR) this.upkeepAt = now; // more than a week: the rest is forgiven
+    if (this.config.upkeepCatchUp && (n || !this.db.meta('upkeepAt'))) this.db.setMeta('upkeepAt', this.upkeepAt);
   }
 
   schedule(delay, fn) {
@@ -412,6 +425,7 @@ export class GameServer {
   }
 
   #worldChores(now) {
+    this.#upkeep(now);
     // Trees and rocks grow back (but never under a structure or a player).
     for (const [key, [at, id]] of Object.entries(this.world.harvested)) {
       const info = loot.harvestInfoFor(this, id);

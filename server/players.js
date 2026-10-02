@@ -83,6 +83,7 @@ export function createPlayer(gs, account, ch, items) {
     clanId: gs.memberOf.get(account.id) ?? null,
     queue: [],
     credits: MAX_CREDITS,
+    idleTicks: 0,
     lastSeq: 0,
     lastQueued: 0,
     lastView: 0,
@@ -271,15 +272,20 @@ export function update(gs, p, now) {
     if (now >= p.asleepUntil) gs.removePlayer?.(p);
   } else {
     p.credits = Math.min(MAX_CREDITS, p.credits + 1);
+    // One frame per tick keeps movement smooth even when a client sends its
+    // frames in pairs; only a real backlog (a hiccup in the network) is
+    // caught up faster. Never more frames than ticks: no speed hacks.
+    const backlog = (gs.config.inputEvery ?? 1) + 1;
     let n = 0;
-    while (p.credits >= 1 && p.queue.length && n < MAX_CREDITS) {
+    while (p.credits >= 1 && p.queue.length && n < MAX_CREDITS && (n === 0 || p.queue.length > backlog)) {
       const f = p.queue.shift();
       p.credits -= 1;
       n++;
       applyFrame(gs, p, f, now);
       if (p.dead) break;
     }
-    if (!n) p.moving = false;
+    if (n) p.idleTicks = 0;
+    else if (++p.idleTicks > backlog) p.moving = false;
     p.ch.playSeconds += dt;
   }
   tickStatuses(gs, p, dt, now);

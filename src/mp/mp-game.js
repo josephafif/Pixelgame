@@ -318,6 +318,9 @@ export class MpGame {
     this.myId = w.id;
     this.myName = w.name;
     this.account = w.account ?? { guest: false, password: false };
+    this.inputEvery = Math.min(4, Math.max(1, w.inputEvery ?? 1));
+    this.outbox = [];
+    this.lastButtons = 0;
     this.rules = w.rules;
     this.serverInfo = w.server;
     this.worldSeed = w.seed;
@@ -768,7 +771,15 @@ export class MpGame {
     const frame = {
       seq: ++this.seq, mx, my, buttons, cmd, aim: angleToByte(aim), target: this.target?.id ?? 0, view: Math.max(0, Math.floor(this.renderTick)),
     };
-    this.conn.sendBinary(encodeInput([frame]));
+    // Frames go out in small batches when the server asks for it (each
+    // message costs on Cloudflare); a press or release goes out at once.
+    this.outbox.push(frame);
+    const edge = frame.buttons !== this.lastButtons || frame.cmd !== 0;
+    this.lastButtons = frame.buttons;
+    if (edge || this.outbox.length >= this.inputEvery) {
+      this.conn.sendBinary(encodeInput(this.outbox));
+      this.outbox = [];
+    }
     if (p.dead) return;
     this.pending.push(frame);
     if (this.pending.length > 120) this.pending.shift();

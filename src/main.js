@@ -185,6 +185,17 @@ class App {
       return;
     }
     if (MP_MODE === 'auth') import('./mp/lobby.js').then((m) => m.handleAuthRedirect(this));
+    // A friend's invitation: ?join=K7QX2M (a server's code) or ?server=host opens the lobby on it.
+    const invite = new URLSearchParams(location.search);
+    if (!MP_MODE && (invite.get('join') || invite.get('server'))) {
+      const joinCode = invite.get('join');
+      const server = invite.get('server');
+      history.replaceState(null, '', location.pathname + (invite.has('debug') ? '?debug=1' : ''));
+      import('./mp/lobby.js').then(async (m) => {
+        const { serverUrlFrom } = await import('./mp/registry.js');
+        setTimeout(() => m.openLobby(this, { joinCode, serverUrl: server ? serverUrlFrom(server) : null }), 400);
+      });
+    }
     const title = $('#title');
     setTimeout(() => title.removeAttribute('hidden'), 350);
     $('#title-play').textContent = this.isNewGame ? 'New adventure' : 'Continue';
@@ -196,8 +207,9 @@ class App {
     $('#title-settings')?.addEventListener('click', () => import('./ui/settings.js').then((m) => m.open(this.game, this)));
     $('#title-howto')?.addEventListener('click', () => this.#howToPlay());
     $('#title-multiplayer')?.addEventListener('click', () => this.#multiplayer());
-    // Served by a game server (a friend's `npm run share` link): multiplayer first.
-    if (document.querySelector('meta[name="pixelgame-server"]')) {
+    // Served by a game server (a friend's `npm run share` link) or opened from
+    // an invitation: multiplayer first.
+    if (document.querySelector('meta[name="pixelgame-server"]') || invite.get('join') || invite.get('server')) {
       const mp = $('#title-multiplayer');
       const play = $('#title-play');
       if (mp && play) {

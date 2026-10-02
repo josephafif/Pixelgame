@@ -1127,6 +1127,17 @@ body.mp .key-hints { display: none !important; }
 .mp-login-fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .mp-login-fields .field { flex: 1; min-width: 140px; }
 .mp-rules ul { margin: 0; padding-left: 1.2em; }
+.mp-account { display: flex; flex-direction: column; gap: 6px; }
+.mp-account p { margin: 0; }
+.mp-code-tag { font-family: var(--font); letter-spacing: 0.12em; padding: 0 6px; border: 1px solid var(--line); border-radius: 3px; background: var(--sunken); }
+.mp-join { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.mp-join .field { flex: 0 1 220px; }
+.mp-join input { text-transform: uppercase; letter-spacing: 0.15em; }
+.mp-recent { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mp-host p, .mp-host ol { margin: 6px 0; }
+.mp-host ol { padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
+.mp-host code, .mp-lobby code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.95em; padding: 0 4px; border-radius: 3px; background: var(--sunken); overflow-wrap: anywhere; }
+.mp-name .warn.small { margin: 0; }
 .mp-clan { display: flex; flex-direction: column; gap: 12px; }
 .mp-clan section { display: flex; flex-direction: column; gap: 6px; }
 .mp-clan h3 { margin: 0; }

@@ -3,7 +3,7 @@
 
 import { test, expect } from '@playwright/test';
 import { startServer } from '../../server/index.js';
-import { trackErrors } from './helpers.js';
+import { trackErrors, stubSupabase } from './helpers.js';
 
 let srv;
 let base;
@@ -22,6 +22,7 @@ async function join(browser, name, password = 'hemligt') {
   const ctx = await browser.newContext({ serviceWorkers: 'block' });
   const page = await ctx.newPage();
   const errors = trackErrors(page);
+  await stubSupabase(page);
   await page.goto(`${base}/?debug=1`);
   await page.click('#title-multiplayer');
   const server = page.locator('.mp-server');
@@ -104,6 +105,7 @@ test('on a new link or device: log in with name and password and get your charac
   const ctx = await browser.newContext({ serviceWorkers: 'block' });
   const page = await ctx.newPage();
   const errors = trackErrors(page);
+  await stubSupabase(page);
   await page.goto(`${base}/?debug=1`);
   // Served by the game server: Multiplayer is the main button.
   await expect(page.locator('#title-multiplayer')).toHaveClass(/btn-primary/);
@@ -128,4 +130,59 @@ test('on a new link or device: log in with name and password and get your charac
   await expect(page.locator('.toast').last()).toContainText('Lösenordet är sparat');
   expect(errors.filter((e) => !/401/.test(e))).toEqual([]);
   await ctx.close();
+});
+
+test('on the game\'s website: the official server, a friend\'s server by its code, and an invitation link', async ({ browser, baseURL }) => {
+  // The page comes from the static site (like Netlify); the servers are elsewhere.
+  const official = await startServer({ port: 0, host: '127.0.0.1', dbPath: ':memory:', allowGuests: true, serverName: 'Pixelgame', log: { info() {}, debug() {}, warn() {}, error: console.error } });
+  const friend = await startServer({ port: 0, host: '127.0.0.1', dbPath: ':memory:', allowGuests: true, serverName: 'Annas server', log: { info() {}, debug() {}, warn() {}, error: console.error } });
+  const row = (srv, code, extra) => ({ code, name: srv.config.serverName, url: `http://127.0.0.1:${srv.port}`, official: false, players: 0, max_players: 50, protocol: 1, online: true, ...extra });
+  const stub = {
+    servers: [row(official, 'PIXEL1', { official: true })],
+    codes: { K7QX2M: row(friend, 'K7QX2M'), ZZZZZZ: row(friend, 'ZZZZZZ', { online: false }) },
+  };
+  try {
+    const ctx = await browser.newContext({ serviceWorkers: 'block' });
+    const page = await ctx.newPage();
+    const errors = trackErrors(page);
+    await stubSupabase(page, stub);
+    // An invitation link opens the lobby on the friend's server.
+    await page.goto(`${baseURL}/?join=k7qx2m&debug=1`);
+    const found = page.locator('.mp-friends .mp-server');
+    await expect(found).toContainText('Annas server');
+    await expect(found).toContainText('K7QX2M');
+    await expect(found).toContainText('0/50 spelare');
+    // The official server is listed too.
+    await expect(page.locator('.mp-official .mp-server')).toContainText('Pixelgame');
+    // A code that isn't running, and one that doesn't exist.
+    await page.fill('.mp-join input', 'zzzzzz');
+    await page.locator('.mp-join button').click();
+    await expect(page.locator('.mp-friends .mp-server')).toContainText('Inte igång just nu');
+    await page.fill('.mp-join input', 'AAAAAA');
+    await page.locator('.mp-join button').click();
+    await expect(page.locator('.mp-friends .warn')).toContainText('Ingen server har koden AAAAAA');
+    // Join the friend's server by its code, as a guest with a password.
+    await page.fill('.mp-join input', 'K7QX2M');
+    await page.locator('.mp-join button').click();
+    await page.locator('.mp-friends .mp-server button', { hasText: 'Spela som gäst' }).click();
+    await expect(page.locator('.mp-name input[type="text"]')).toBeVisible();
+    await expect(page.locator('.mp-name')).toContainText('Använd inte ett lösenord');
+    await page.fill('.mp-name input[type="text"]', 'Vännen');
+    await page.fill('.mp-name input[type="password"]', 'hemligt');
+    await page.locator('.mp-name button').click();
+    await page.waitForFunction(() => window.__pixelgame?.game?.connected);
+    expect(await page.evaluate(() => window.__pixelgame.game.serverInfo.name)).toBe('Annas server');
+    // The login is kept by the code (the friend's address changes every time they start).
+    expect(await page.evaluate(() => Boolean(localStorage.getItem('pg-mp-guest:code:K7QX2M')))).toBe(true);
+    // Back in the lobby: the code is remembered, and you continue as yourself.
+    await page.goto(`${baseURL}/?debug=1`);
+    await page.click('#title-multiplayer');
+    await page.locator('.mp-recent button', { hasText: 'K7QX2M' }).click();
+    await expect(page.locator('.mp-friends .mp-server button', { hasText: 'Fortsätt som gäst' })).toBeVisible();
+    expect(errors).toEqual([]);
+    await ctx.close();
+  } finally {
+    await official.stop();
+    await friend.stop();
+  }
 });

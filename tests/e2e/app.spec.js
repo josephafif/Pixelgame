@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { trackErrors, startGame, game } from './helpers.js';
+import { trackErrors, startGame, game, stubSupabase } from './helpers.js';
 
 test('boots, discovers the starter weapon and plays with keyboard + mouse', async ({ page }) => {
   const errors = trackErrors(page);
@@ -779,12 +779,13 @@ test('settings: the view size changes how much of the world you see', async ({ p
 
 test('main menu: settings and how to play before you start; multiplayer opens its lobby', async ({ page }) => {
   const errors = trackErrors(page);
+  await stubSupabase(page);
   await page.goto('/?debug=1');
   await expect(page.locator('#title')).toBeVisible();
   for (const id of ['#title-play', '#title-multiplayer', '#title-settings', '#title-howto']) await expect(page.locator(id)).toBeVisible();
   await page.click('#title-multiplayer');
   const modal = page.locator('.modal, [role="dialog"]').last();
-  await expect(modal).toContainText('Servrar');
+  await expect(modal).toContainText('Spela på en väns server');
   await expect(modal).toContainText('Fristaden');
   await page.keyboard.press('Escape');
   await expect(page.locator('.mp-lobby')).toBeHidden();

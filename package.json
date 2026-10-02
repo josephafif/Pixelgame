@@ -15,7 +15,9 @@
     "server": "node --disable-warning=ExperimentalWarning server/index.js",
     "mp": "node --disable-warning=ExperimentalWarning server/index.js --dev",
     "share": "node scripts/share.mjs",
-    "test:mp": "node --disable-warning=ExperimentalWarning --test \"tests/mp/*.test.js\""
+    "test:mp": "node --disable-warning=ExperimentalWarning --test \"tests/mp/*.test.js\"",
+    "cloud:dev": "npx --yes wrangler@4 dev --var ALLOWED_ORIGINS:",
+    "cloud:deploy": "npx --yes wrangler@4 deploy"
   },
   "engines": {
     "node": ">=20"

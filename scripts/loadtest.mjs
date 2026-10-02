@@ -11,6 +11,8 @@ const arg = (name, fallback) => {
   return i > -1 ? process.argv[i + 1] : fallback;
 };
 const N = Number(arg('bots', 50));
+// Fresh names every run (a server keeps the characters of earlier runs).
+const RUN = Math.floor(Math.random() * 1e4);
 const SECONDS = Number(arg('seconds', 30));
 let url = arg('url', null);
 let srv = null;
@@ -22,7 +24,7 @@ if (!url) {
 console.log(`${N} bots for ${SECONDS}s against ${url}`);
 const bots = [];
 for (let i = 0; i < N; i++) {
-  bots.push(await new Bot(url, { name: `Last${i}` }).connect());
+  bots.push(await new Bot(url, { name: `L${RUN}_${i}` }).connect());
 }
 // Spread them over a few groups out in the wild (where the monsters are).
 for (const [i, b] of bots.entries()) {

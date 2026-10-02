@@ -28,3 +28,30 @@ export async function startGame(page, { tap = false } = {}) {
 export function game(page, fn, arg) {
   return page.evaluate(fn, arg);
 }
+
+/**
+ * Stands in for the Supabase project (server list, join codes, login
+ * settings), so lobby tests never need the internet.
+ *   servers: rows list_game_servers returns
+ *   codes:   { CODE: row } for find_game_server
+ *   providers: { google, discord, email } switched on in Supabase Auth
+ */
+export async function stubSupabase(page, { servers = [], codes = {}, providers = {} } = {}) {
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
+  const calls = [];
+  await page.route('**/*.supabase.co/**', async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    calls.push(url.pathname);
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const json = (body) => route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (url.pathname === '/rest/v1/rpc/list_game_servers') return json(servers);
+    if (url.pathname === '/rest/v1/rpc/find_game_server') {
+      const code = String(JSON.parse(req.postData() ?? '{}').p_code ?? '').toUpperCase();
+      return json(codes[code] ? [codes[code]] : []);
+    }
+    if (url.pathname === '/auth/v1/settings') return json({ external: providers });
+    return route.fulfill({ status: 404, headers: cors, body: '{}' });
+  });
+  return calls;
+}

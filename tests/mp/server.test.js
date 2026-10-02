@@ -515,3 +515,72 @@ test('admins can be listed by player name', async () => {
     await t.close();
   }
 });
+
+test('inputs sent in pairs (Cloudflare) still move you smoothly, one step every tick', async () => {
+  const t = await testServer({ inputEvery: 2 });
+  try {
+    const a = await t.bot('Paret');
+    assert.equal(a.welcome.inputEvery, 2);
+    const p = t.player(a);
+    const xs = [];
+    const step = t.gs.step.bind(t.gs);
+    t.gs.step = () => {
+      step();
+      xs.push(p.x);
+    };
+    // Two frames per message, a message every other tick (with real timer jitter).
+    for (let i = 0; i < 15; i++) {
+      a.input({ mx: 127, my: 0 });
+      a.input({ mx: 127, my: 0 });
+      await sleep(66);
+    }
+    await sleep(200);
+    t.gs.step = step;
+    const moves = xs.slice(5, -8).map((x, i, arr) => (i ? x - arr[i - 1] : 0)).slice(1);
+    const still = moves.filter((d) => d < 1e-6).length;
+    assert.ok(moves.length > 20, `ticks ${moves.length}`);
+    assert.ok(still <= Math.ceil(moves.length * 0.15), `stood still on ${still} of ${moves.length} ticks`);
+    assert.ok(Math.max(...moves) < p.speed * 1.6 / 30 + 1e-6, 'never more than a step (plus a little catch-up) per tick');
+  } finally {
+    await t.close();
+  }
+});
+
+test('Cloudflare: base upkeep is charged for the hours the world slept', async () => {
+  const t = await testServer({ upkeepCatchUp: true });
+  try {
+    const gs = t.gs;
+    const a = await t.bot('Valvet');
+    const p = t.player(a);
+    p.ch.resources.wood = 200;
+    p.ch.resources.scrap = 50;
+    assert.equal((await a.request({ t: 'clan', op: 'create', name: 'Sovarna', tag: 'SOV' })).ok, true);
+    t.place(a, 100.5, 0.5);
+    let built = false;
+    for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1], [2, 0], [0, 2]]) {
+      const res = await a.request({ t: 'build', id: 'banner', x: Math.floor(p.x) + dx, y: Math.floor(p.y) + dy });
+      if (res.ok) {
+        built = true;
+        break;
+      }
+    }
+    assert.ok(built, 'a banner in the wild');
+    const clan = gs.clans.get(p.clanId);
+    clan.vault = {};
+    clan.upkeep = {};
+    // The world slept for five and a half hours: five hours of upkeep are due.
+    gs.upkeepAt = Date.now() - 5.5 * 60 * 60 * 1000;
+    gs.stop();
+    gs.start();
+    const per = gs.rules.upkeepPerStructure;
+    const n = [...gs.structures.values()].filter((st) => st.clanId === clan.id).length;
+    for (const [k, v] of Object.entries(per)) {
+      const owed = (clan.upkeep[k] ?? 0);
+      assert.ok(Math.abs(owed - (5 * n * v) / 168) < 1e-9, `${k}: owes ${owed}`);
+    }
+    assert.ok(Date.now() - gs.upkeepAt < 60 * 60 * 1000, 'caught up to the last whole hour');
+    assert.ok(Number(gs.db.meta('upkeepAt')) > 0, 'remembered across restarts');
+  } finally {
+    await t.close();
+  }
+});

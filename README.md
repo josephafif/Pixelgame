@@ -19,7 +19,9 @@ npm test             # enhetstester (node:test, inga beroenden)
 npm run build        # uppdaterar precache-manifest.js efter ändringar i appfiler
 npm run check        # verifierar att precache-manifestet är aktuellt + enhetstester
 npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline, uppdatering, multiplayer
-npm run share        # spela multiplayer med vänner från din dator: ger en gratis länk att skicka (se nedan)
+npm run share        # kör en egen multiplayer-server på din dator: ger en kod och en länk att skicka (se nedan)
+npm run cloud:deploy # lägger upp den officiella servern på Cloudflare (gratisplanen)
+npm run cloud:dev    # kör Cloudflare-servern lokalt (workerd), för att prova
 npm run mp           # multiplayer lokalt: spelserver + spelet på http://localhost:8787 (gäster, admin för alla)
 npm run test:mp      # multiplayer-tester: protokoll, regler, inloggning, databas, botar mot en riktig server
 npm run server       # spelservern i produktion (inställningar i server/.env, se docs/MULTIPLAYER-SETUP.md)
@@ -332,11 +334,22 @@ multiplayer-karaktär som sparas på servern. Din singleplayer-värld påverkas 
 ett lösenord tillsammans med sitt namn. Med namn och lösenord loggar man in igen från en ny
 länk eller en annan enhet.
 
-**Snabbast, gratis och utan konto:** kör `npm run share` på din dator. Det startar spelservern
-(som också levererar spelet) och en Cloudflare-tunnel, och skriver ut en
-`https://…trycloudflare.com`-länk som du skickar till dina vänner. Du spelar själv på
-`http://localhost:8787` och är admin där. Datorn måste vara på medan ni spelar, och länken byts
-varje gång du startar. Allt sparas i `server-data/pixelgame.db`.
+Lobbyn på webbsidan har tre delar:
+
+- **Den officiella servern**, som alltid är öppen. Den körs på Cloudflare Workers gratisplan
+  som en Durable Object (`cloud/worker.js`): samma serverkod, med databasen i Cloudflare.
+  Världen sover när ingen spelar och vaknar när någon ansluter.
+- **Spela på en väns server**: skriv serverns kod, till exempel `K7QX2M`, eller öppna en
+  inbjudningslänk (`?join=K7QX2M`).
+- **Öppna servrar**: servrar som spelare har valt att visa för alla.
+
+**Kör en egen server** på din dator, gratis och utan konto: `npm run share`. Det startar
+spelservern och en Cloudflare-tunnel och registrerar servern i serverlistan (Supabase). Där får
+den en kod som är densamma varje gång. Med `--public` visas den för alla. Du spelar själv på
+`http://localhost:8787` och är admin där. Allt sparas i `server-data/pixelgame.db`.
+
+Inloggningstoken från Discord eller Google skickas bara till den officiella servern. På andra
+servrar loggar man in med namn och lösenord.
 
 - **Servern bestämmer allt** (30 tick per sekund). Klienten skickar bara vad du vill göra:
   riktning, attack och använd. Fart, kollisioner, träffar, skada och loot räknas ut på
@@ -361,9 +374,9 @@ varje gång du startar. Allt sparas i `server-data/pixelgame.db`.
 - **Chatt:** T eller pratbubblan, och `/c` för klanchatt. Med `?debug=1` visas ett
   nätverksöverlägg med ping, interpolering och rättningar.
 
-Planen och vad som är byggt finns i [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md). Hur du delar
-spelet från din dator, eller sätter upp en server som alltid är på (Oracle Cloud, DuckDNS eller
-Cloudflare, Supabase), står i [docs/MULTIPLAYER-SETUP.md](docs/MULTIPLAYER-SETUP.md).
+Planen och vad som är byggt finns i [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md). Hur du lägger
+upp den officiella servern (Cloudflare), serverlistan (Supabase), kör en egen server eller
+använder en egen Linux-server står i [docs/MULTIPLAYER-SETUP.md](docs/MULTIPLAYER-SETUP.md).
 
 ## Fiender
 
@@ -622,11 +635,13 @@ src/
   input/, audio/, storage/, pwa/, ui/
   net/                        multiplayer, delat av klient och server: binärt protokoll, rörelse,
                               regler (zoner, PvP, raider, klaner), byggregler
-  mp/                         multiplayer-klienten: lobby, inloggning, MpGame (förutsägelse och
-                              interpolering), paneler, chatt
+  mp/                         multiplayer-klienten: lobby, serverlista och koder, inloggning,
+                              MpGame (förutsägelse och interpolering), paneler, chatt
 server/                       spelservern (Node): simulering, strid, monster, loot, baser, klaner,
                               ögonblicksbilder, inloggning (Supabase JWT, gäster med lösenord),
-                              SQLite, Dockerfile
+                              databasen (game-db.js för alla SQLite-drivrutiner), Dockerfile
+cloud/                        den officiella servern på Cloudflare: Worker + Durable Object
+supabase/                     serverlistan: migrering och Edge-funktionen game-servers
 deploy/                       Caddy, systemd, backup-skript
 scripts/                      dev-server, precache-byggare, ikongenerator, lasttest,
                               share.mjs (server + Cloudflare-tunnel i ett kommando)

@@ -1,31 +1,113 @@
 # Så sätter du upp multiplayer
 
-Det finns två sätt, och båda är gratis:
+Allt är gratis, och inget av det kräver betalkort:
 
-| | **A. Från din dator** | **B. En server som alltid är på** |
+| Del | Var | Kostnad |
 |---|---|---|
-| Kommando | `npm run share` | Docker på en server i molnet |
-| Tid första gången | 5 minuter | ungefär en timme |
-| Konton som behövs | inga | Oracle Cloud (betalkort för verifiering, inget dras) och valfritt Supabase |
-| Länk till spelet | ny varje gång du startar | fast adress |
-| När ni kan spela | när din dator är på och kör `npm run share` | alltid |
-| Inloggning | namn och lösenord | namn och lösenord, eller e-post, Google och Discord via Supabase |
+| Spelet (webbsidan) | Netlify: <https://pixelgame-infinite-arsenal.netlify.app> (redan igång) | 0 kr |
+| Den officiella servern, alltid öppen | Cloudflare Workers, gratisplanen | 0 kr, inget kort |
+| Serverlistan, koderna och inloggning med Discord/Google | Supabase, gratisplanen | 0 kr |
+| Servrar som spelare kör själva | Spelarens egen dator (`npm run share`) | 0 kr |
 
-Börja med A. Byt till B när ni vill kunna spela utan att din dator är på. Allt följer med när
-ni byter: karaktärer, lösenord, klaner och baser (se *Flytta till en server* nedan).
+Gratisplanerna kan aldrig kosta pengar. Når man taket slutar tjänsten svara tills nästa dygn.
+
+Du gör steg 1 och 2 en gång. Sedan uppdateras webbsidan och den officiella servern av sig
+själva varje gång något pushas till GitHub.
 
 ---
 
-## A. Spela från din dator (`npm run share`)
+## 1. Supabase (serverlistan och inloggningen)
 
-Spelet och servern körs på din dator. En gratis Cloudflare-tunnel ger datorn en
-`https://`-adress som dina vänner kan öppna. Du behöver inget konto, inget betalkort och inga
-inställningar i routern.
+Supabase-projektet *Pixelgame* finns redan, och spelet känner till det (`src/config.js`).
+Två saker behöver läggas upp i det: tabellen för serverlistan och funktionen som tar emot
+servrar som spelare startar. Kör i spelets mapp, där du redan har kört `supabase link`:
+
+```bash
+git pull
+supabase db push
+supabase functions deploy game-servers --no-verify-jwt
+```
+
+- `db push` skapar serverlistan (`supabase/migrations/`). Svara ja om den frågar.
+- `functions deploy` laddar upp funktionen (`supabase/functions/game-servers/`). Om den
+  klagar på Docker, lägg till `--use-api` sist.
+
+### Valfritt: logga in med Discord eller Google
+
+Utan detta loggar alla in med namn och lösenord. Det fungerar bra. Konton gör att man kan spela
+med samma karaktär från alla sina enheter utan lösenord.
+
+1. **Authentication → URL Configuration**
+   - *Site URL:* `https://pixelgame-infinite-arsenal.netlify.app`
+   - *Redirect URLs:* lägg till `https://pixelgame-infinite-arsenal.netlify.app/?mp=auth`
+2. **Authentication → Sign In / Providers**
+   - **Discord:** skapa en app på <https://discord.com/developers/applications>. Under OAuth2
+     lägger du till Redirect `https://tqctqccltthwlhfdwkre.supabase.co/auth/v1/callback`.
+     Kopiera *Client ID* och *Client Secret* till Supabase och slå på Discord.
+   - **Google:** skapa en *OAuth client ID* av typen *Web application* i
+     <https://console.cloud.google.com/apis/credentials>, med samma Redirect URI. Kopiera
+     *Client ID* och *Client Secret* till Supabase och slå på Google.
+
+Knapparna dyker upp i lobbyn av sig själva när en inloggning är påslagen.
+
+**E-post** fungerar inte direkt. Supabases inbyggda e-post skickar bara till projektets egna
+medlemmar. Vill du ha det: lägg in en egen avsändare under **Authentication → Emails → SMTP**,
+till exempel Resend eller Brevo, som båda har gratisnivåer. Sätt sedan `emailLogin: true` i
+`src/config.js`.
+
+---
+
+## 2. Den officiella servern (Cloudflare, alltid öppen)
+
+Servern körs som en *Durable Object* på Cloudflares gratisplan. Det är samma serverkod som
+annars, med databasen i Cloudflare. När ingen spelar sover världen, och den vaknar på några
+millisekunder när någon ansluter. Du behöver ingen server och inget betalkort.
+
+1. Skapa ett gratiskonto på <https://dash.cloudflare.com/sign-up>.
+2. Lägg upp servern på ett av två sätt:
+   - **Utan terminal (rekommenderat):** gå till **Workers & Pages → Create → Import a
+     repository**. Koppla GitHub och välj `josephafif/Pixelgame`. Välj grenen
+     `ccr-416322ef-rg7mbc`, lämna *Build command* tomt och sätt *Deploy command* till
+     `npx wrangler deploy`. Sedan uppdateras servern vid varje push.
+   - **Med terminal:** kör `npx wrangler login` och sedan `npm run cloud:deploy`.
+3. Cloudflare visar adressen, till exempel `https://pixelgame.ditt-namn.workers.dev`. Öppna
+   `…/health`. Den ska svara `{"ok":true,…}`.
+4. Berätta för spelet var servern finns. Lägg till den i `src/config.js` och pusha:
+   ```js
+   servers: [{ name: 'Pixelgame', url: 'wss://pixelgame.ditt-namn.workers.dev/ws', official: true }],
+   ```
+   Du kan också bara skicka adressen till mig, så lägger jag in den.
+5. **Admin:** öppna **Workers & Pages → pixelgame → Settings → Variables and Secrets** och
+   lägg till variabeln `ADMINS`. Värdet är ditt spelarnamn, eller din e-post om du loggar in
+   med Discord eller Google. Skapa din karaktär först, så att ingen annan hinner ta namnet.
+
+### Gratisplanens gränser
+
+| Vad | Gräns per dygn | Vad det räcker till |
+|---|---|---|
+| Förfrågningar | 100 000. 20 meddelanden från spelare räknas som en | cirka 37 spelartimmar per dygn, till exempel 6 vänner som spelar 6 timmar var |
+| Körtid | 13 000 GB-s | en värld dygnet runt (cirka 28 timmar) |
+| Databas | 100 000 skrivna rader, 5 GB totalt | gott och väl |
+
+- Därför skickar spelet sin styrning 15 gånger i sekunden till den här servern, i stället för
+  30. Servern simulerar fortfarande 30 gånger i sekunden och skickar 30 uppdateringar i
+  sekunden till varje spelare. Det märks inte.
+- `/health` visar `requestsToday`, alltså ungefär hur mycket av dagens kvot som har gått åt.
+- Om taket nås slutar servern svara till midnatt UTC (klockan 01 eller 02 svensk tid). Inget
+  försvinner och inget kostar något.
+- Klanbasernas underhåll dras även för de timmar då världen sover.
+
+---
+
+## 3. Servrar som spelare kör själva (`npm run share`)
+
+Vem som helst kan köra en egen server på sin dator och spela med sina vänner via webbsidan.
+Det kräver inget konto och inga inställningar i routern.
 
 ### Första gången
 
 1. Installera **Node.js 22 eller nyare** från <https://nodejs.org> (välj LTS).
-2. Hämta spelet: `git clone https://github.com/josephafif/pixelgame.git`, eller **Code →
+2. Hämta spelet: `git clone https://github.com/josephafif/Pixelgame.git`, eller **Code →
    Download ZIP** på GitHub och packa upp.
 3. Öppna en terminal i mappen (på Windows: högerklicka i mappen → *Öppna i terminal*) och kör:
    ```bash
@@ -36,68 +118,57 @@ inställningar i routern.
    `server-data/bin/`. Har du redan `cloudflared` installerat används det.
 4. Efter några sekunder visas en ruta:
    ```
-   Skicka till dina vänner:   https://några-slumpade-ord.trycloudflare.com
-   Spela själv (admin):       http://localhost:8787
+   Serverns kod:           K7QX2M
+   Skicka länken:          https://pixelgame-infinite-arsenal.netlify.app/?join=K7QX2M
+   Spela själv (admin):    http://localhost:8787
    ```
 
 ### Spela
 
-- **Dina vänner** öppnar länken, trycker på **Multiplayer** och sedan **Spela som gäst**, och
-  väljer ett namn och ett lösenord.
+- **Dina vänner** öppnar länken, eller går till webbsidan och skriver koden under
+  **Multiplayer → Spela på en väns server**. De trycker på **Spela som gäst** och väljer ett namn
+  och ett lösenord.
 - **Du** öppnar <http://localhost:8787> på samma dator. Där är du admin: skriv `/help` i
-  chatten (öppnas med T) för att se kommandona, till exempel `/kick`, `/ban` och `/announce`.
-- **Stäng av** med Ctrl+C. Servern sparar allt först.
-
-### Nästa gång
-
-Kör `npm run share` igen. Länken blir en ny, så skicka den igen. Vännerna trycker på
-**Multiplayer → Logga in med namn** och skriver namnet och lösenordet de valde. Då får de
-tillbaka sin karaktär. Det fungerar också från en annan dator eller mobil. En gäst som spelar
-utan lösenord kan välja ett i spelets meny.
+  chatten (öppnas med T) för att se kommandona.
+- **Stäng av** med Ctrl+C. Servern sparar allt först och försvinner ur listan.
+- **Nästa gång:** kör `npm run share` igen. Koden och länken är desamma. Den som spelat förut
+  trycker på **Fortsätt som gäst**. Från en annan enhet: **Logga in med namn**.
+- **Visa servern för alla** i listan *Öppna servrar*: `npm run share -- --public`.
 
 ### Bra att veta
 
 - **Datorn måste vara på** och vaken medan ni spelar. Stäng av viloläget under tiden.
-- **Internet:** varje spelare använder cirka 10 kB/s (80 kbit/s) av din uppladdning. Första
-  gången någon öppnar länken hämtas spelet, cirka 1,2 MB, från din dator. 20 spelare klarar de
-  flesta bredband.
+- **Internet:** varje spelare använder cirka 10 kB/s (80 kbit/s) av din uppladdning. 20
+  spelare klarar de flesta bredband.
 - **Tunneln** är Cloudflares gratistjänst för tester (*Quick Tunnels*). Den har ingen
   drifttidsgaranti och tar högst 200 samtidiga anslutningar. Det räcker gott för en
-  kompisserver. Går tunneln ner startar skriptet en ny, med en ny länk.
+  kompisserver. Går tunneln ner startar skriptet en ny, och koden fortsätter att fungera.
 - **Säkerhet:** servern lyssnar bara på din egen dator, och tunneln är enda vägen in. Inga
-  portar öppnas i routern, och din IP-adress syns inte för spelarna. Lösenorden sparas som
-  saltade scrypt-hashar. Efter några felaktiga försök pausas inloggningen för det namnet en
-  stund.
+  portar öppnas i routern. Lösenorden sparas som saltade scrypt-hashar. Spelarnas
+  Discord- och Google-inloggning skickas aldrig till servrar som spelare kör, bara till den
+  officiella.
+- **Koden** och nyckeln som bevisar att den är din ligger i `server-data/host.json`. Radera
+  filen om du vill ha en ny kod.
 - **Sparat:** allt ligger i `server-data/pixelgame.db`. Varje dygn sparas en kopia i
   `server-data/backups/`.
-- **Inställningar:** `npm run share -- --name "Vår server"` byter serverns namn och
-  `npm run share -- --port 8788` byter port. `npm run share -- --no-tunnel` startar utan
-  tunnel, bara för din egen dator.
-- **Uppdatera spelet:** stäng servern, kör `git pull` (eller ladda ner en ny ZIP och kopiera
-  med dig mappen `server-data`) och starta igen.
+- **Inställningar:** `--name "Vår server"` byter namn, `--port 8788` byter port och
+  `--no-tunnel` startar bara för din egen dator. Skriv dem efter `npm run share --`.
+- **Utan serverlistan** (om Supabase inte svarar) skriver skriptet ut tunnelns egen länk i
+  stället. Den fungerar också, men byts varje gång.
 
-### Flytta till en server som alltid är på
+## 4. Alternativ: en egen Linux-server
 
-Följ del B och kopiera sedan `server-data/pixelgame.db` från din dator till
-`~/Pixelgame/server-data/` på servern innan du startar den. Alla karaktärer, lösenord, klaner och
-baser följer med. Sätt `ALLOW_GUESTS=1` i `server/.env` så att namn och lösenord fungerar även
-där.
-
----
-
-## B. En server som alltid är på
-
-Den här delen tar dig från noll till en server som du och dina vänner kan spela på dygnet
-runt, utan månadskostnad.
+Behövs bara om Cloudflares gratisplan inte räcker, till exempel med många spelare varje dag.
+Samma spel, med en vanlig server i stället för Cloudflare.
 
 | Del | Tjänst | Kostnad |
 |---|---|---|
-| Spelservern, som också levererar själva spelet | Oracle Cloud Always Free (en ARM-server i Stockholm) | 0 kr |
+| Spelservern, som också levererar själva spelet | Oracle Cloud Always Free (en ARM-server i Stockholm), eller en annan VPS | 0 kr hos Oracle, men kräver betalkort för verifiering |
 | En adress med HTTPS | DuckDNS och Caddy, eller en egen domän via Cloudflare | 0 kr, eller cirka 100 kr/år med egen domän |
-| Inloggning med e-post, Google och Discord (valfritt) | Supabase (gratisnivån) | 0 kr |
+| Inloggning med Discord och Google (valfritt) | Supabase-projektet från del 1 | 0 kr |
 
-Vill du klara dig utan Supabase: hoppa över steg 1 och sätt `ALLOW_GUESTS=1` i
-`server/.env`. Då loggar alla in med namn och lösenord, som i del A.
+Oracle stänger gratisservrar som verkar oanvända en vecka, om kontot inte är uppgraderat till
+*Pay As You Go*. Därför är Cloudflare (del 2) förstahandsvalet.
 
 ### Steg 0: prova lokalt (5 minuter)
 
@@ -124,38 +195,11 @@ node scripts/loadtest.mjs --bots 50 --seconds 30  # lasttest
 
 ---
 
-### Steg 1: Supabase (inloggningen, valfritt)
+### Steg 1: Supabase (valfritt)
 
-1. Skapa ett konto på <https://supabase.com> och skapa ett nytt projekt (**New
-   project**). Välj den region som ligger närmast, helst i Norden eller annars
-   Frankfurt. Lösenordet till databasen behövs inte för spelet.
-2. Gå till **Authentication → URL Configuration**:
-   - **Site URL:** adressen där spelet kommer att ligga, till exempel
-     `https://pixelgame.duckdns.org`.
-   - **Redirect URLs:** lägg till `https://pixelgame.duckdns.org/?mp=auth` och,
-     för lokala tester, `http://localhost:8787/?mp=auth`.
-3. Gå till **Authentication → Sign In / Providers**:
-   - **Email** är påslaget från början.
-   - **Discord:** skapa en app på <https://discord.com/developers/applications>.
-     Under OAuth2 lägger du till Redirect URI
-     `https://<ditt-projekt>.supabase.co/auth/v1/callback`. Kopiera sedan Client ID
-     och Client Secret till Supabase.
-   - **Google:** skapa en *OAuth client ID* av typen *Web application* i
-     <https://console.cloud.google.com/apis/credentials>, med samma Redirect URI
-     som för Discord. Kopiera Client ID och Client Secret till Supabase.
-4. Gå till **Authentication → Emails → Magic Link** och lägg till en rad i mallen:
-   `Din kod: {{ .Token }}`.
-   Då innehåller mejlet en sexsiffrig kod som spelaren kan skriva in. Det behövs
-   på mobiler där spelet är installerat som app, eftersom länken i mejlet då
-   öppnas i webbläsaren i stället för i appen.
-5. Gå till **Project Settings → API** och spara:
-   - **Project URL**, till exempel `https://abcd.supabase.co`;
-   - **anon/publishable key**. Den är tänkt att vara offentlig och får ligga i
-     spelet.
-
-Om ditt projekt är äldre och använder en delad *JWT Secret* behöver servern
-den också (`SUPABASE_JWT_SECRET`). Nya projekt signerar med publika nycklar, och
-då hämtar servern dem själv.
+Använd projektet från del 1. Servern behöver dess adress och publishable key, i
+`server/.env` (se steg 3). Lägg också till serverns adress, med `/?mp=auth` på slutet, under
+Redirect URLs om du vill kunna logga in med Discord eller Google där.
 
 ---
 
@@ -297,6 +341,18 @@ Om du vill att spelet laddas från Cloudflares CDN i stället:
 
 ## Drift
 
+### Den officiella servern (Cloudflare)
+
+| Vad | Hur |
+|---|---|
+| Se loggen | **Workers & Pages → pixelgame → Logs**, eller `npx wrangler tail` |
+| Hälsa och dagens kvot | `https://pixelgame.ditt-namn.workers.dev/health` |
+| Uppdatera | Pusha till GitHub (med Git-kopplingen), eller `npm run cloud:deploy`. Spelarna kopplas ifrån en kort stund och kommer tillbaka på samma ställe |
+| Ändra inställningar | **Settings → Variables and Secrets**, till exempel `ADMINS`, `MAX_PLAYERS` och `RULE_RAID_WINDOW` (samma namn som i `server/.env.example`) |
+| Prova lokalt | `npm run cloud:dev`, sedan `node scripts/loadtest.mjs --bots 5 --url ws://localhost:8787/ws` |
+
+### En egen Linux-server
+
 | Vad | Hur |
 |---|---|
 | Se loggen | `docker compose logs -f game` |
@@ -327,15 +383,29 @@ Om du vill att spelet laddas från Cloudflares CDN i stället:
 - **En vän har glömt sitt lösenord:** öppna <http://localhost:8787> och skriv
   `/password Namn nyttlösenord` i chatten.
 
+### Den officiella servern och serverlistan
+
+- **Lobbyn visar ingen officiell server:** adressen saknas i `src/config.js` (del 2, steg 4).
+- **"Svarar inte" vid den officiella servern:** öppna `…/health`. Svarar den inte har
+  dagens kvot kanske tagit slut (se `requestsToday`). Den kommer tillbaka vid midnatt UTC.
+  Kommer servern från en annan adress än Netlify-sidan måste den finnas i variabeln
+  `ALLOWED_ORIGINS`.
+- **"Ingen server har koden …":** värden har inte startat `npm run share` sedan serverlistan
+  lades upp, eller så är koden felskriven. Koder har sex tecken och aldrig 0, O, 1 eller I.
+- **`npm run share` skriver "Serverlistan svarade inte":** del 1 är inte gjord än
+  (`supabase db push` och `supabase functions deploy`). Länken som skrivs ut fungerar ändå.
+
 ### Server och inloggning
 
 - **"Inloggningen misslyckades: Wrong issuer":** `SUPABASE_URL` i
   `server/.env` stämmer inte med projektets adress. Den ska inte sluta med `/`.
 - **Inloggningen fastnar efter Google eller Discord:** adressen
   `.../?mp=auth` saknas under Redirect URLs i Supabase.
-- **"Servern svarar inte" i lobbyn:** kontrollera `/health`, öppna portar (alternativ
-  1) och att `ALLOWED_ORIGINS` innehåller sidans adress exakt, med `https://`.
+- **"Servern svarar inte" i lobbyn (egen Linux-server):** kontrollera `/health`, öppna
+  portar (alternativ 1) och att `ALLOWED_ORIGINS` innehåller sidans adress exakt, med
+  `https://`.
 - **Oracle har stängt servern:** starta den igen i konsolen och uppgradera till
   Pay As You Go (se steg 2).
-- **Supabase-projektet är pausat:** återställ det i Supabases konsol. Servern
-  skickar en förfrågan till Supabase två gånger per dygn för att undvika det.
+- **Supabase-projektet är pausat:** återställ det i Supabases konsol. Den officiella
+  servern skickar en förfrågan till Supabase en gång per dygn (och en egen Linux-server två
+  gånger per dygn) för att undvika det.

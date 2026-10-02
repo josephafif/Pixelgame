@@ -1,0 +1,26 @@
+// The official server on Cloudflare Workers (free plan). Deploy: npm run cloud:deploy
+// Variables set in the Cloudflare dashboard (for example ADMINS) are kept.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pixelgame",
+  "main": "cloud/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "keep_vars": true,
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "WORLD", "class_name": "World" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["World"] }],
+  // Keeps the Supabase project (login, server list) from pausing.
+  "triggers": { "crons": ["17 6 * * *"] },
+  "vars": {
+    "SERVER_NAME": "Pixelgame",
+    "ALLOW_GUESTS": "1",
+    "SUPABASE_URL": "https://tqctqccltthwlhfdwkre.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_vBLboWv3jCsSBPV8jg6ePA_TvCrsQn1",
+    "ALLOWED_ORIGINS": "https://pixelgame-infinite-arsenal.netlify.app",
+    "MAX_PLAYERS": "40"
+  }
+}

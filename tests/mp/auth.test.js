@@ -67,6 +67,35 @@ test('Supabase ES256 tokens are checked against the published keys (JWKS)', asyn
   await assert.rejects(auth.verify(make(payload, privateKey, 'unknown')));
 });
 
+test('Supabase RS256 tokens work too', async () => {
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'rsa-1', alg: 'RS256', use: 'sig' };
+  const auth = new Auth({ supabaseUrl: 'https://abc.supabase.co', fetch: async () => ({ ok: true, json: async () => ({ keys: [jwk] }) }) });
+  const head = b64({ alg: 'RS256', typ: 'JWT', kid: 'rsa-1' });
+  const body = b64({ sub: 'user-3', aud: 'authenticated', exp: now() + 600 });
+  const sig = sign('sha256', Buffer.from(`${head}.${body}`), privateKey).toString('base64url');
+  assert.equal((await auth.verify(`${head}.${body}.${sig}`)).id, 'sb:user-3');
+  await assert.rejects(auth.verify(`${head}.${body}.${sig.slice(0, -4)}AAAA`), /signature/);
+});
+
+test('HS256 without the project secret: Supabase is asked whose token it is', async () => {
+  const token = hs256({ sub: 'user-4', aud: 'authenticated', exp: now() + 600 }, 'unknown-secret');
+  const calls = [];
+  const fetchStub = async (url, init) => {
+    calls.push({ url, auth: init.headers.authorization, key: init.headers.apikey });
+    return init.headers.authorization === `Bearer ${token}`
+      ? { ok: true, status: 200, json: async () => ({ id: 'user-4' }) }
+      : { ok: false, status: 401, json: async () => ({}) };
+  };
+  const auth = new Auth({ supabaseUrl: 'https://abc.supabase.co', supabaseAnonKey: 'sb_publishable_x', fetch: fetchStub });
+  assert.equal((await auth.verify(token)).id, 'sb:user-4');
+  assert.deepEqual(calls[0], { url: 'https://abc.supabase.co/auth/v1/user', auth: `Bearer ${token}`, key: 'sb_publishable_x' });
+  const forged = hs256({ sub: 'user-4', aud: 'authenticated', exp: now() + 600 }, 'attacker');
+  await assert.rejects(auth.verify(forged), /signature/);
+  // Without a key to ask with, an HS256 token can't be checked at all.
+  await assert.rejects(new Auth({ supabaseUrl: 'https://abc.supabase.co' }).verify(token), /Unsupported/);
+});
+
 test('passwords: salted scrypt hashes, checked in constant time', async () => {
   const { hashPassword, checkPassword, DUMMY_HASH } = await import('../../server/auth.js');
   const a = await hashPassword('hemligt');

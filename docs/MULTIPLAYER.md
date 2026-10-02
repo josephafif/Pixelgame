@@ -16,19 +16,25 @@ de här besluten:
 Planens faser 0–6 är byggda. Så sätter du upp en egen server:
 [MULTIPLAYER-SETUP.md](MULTIPLAYER-SETUP.md).
 
-Det enklaste sättet att komma igång kräver inget konto och kostar ingenting: `npm run share`.
-Det kör servern på din egen dator och ger den en tillfällig `https://`-adress via en
-Cloudflare Quick Tunnel. Spelarna väljer namn och lösenord. Adressen byts vid varje start,
-och med namn och lösenord får man tillbaka sin karaktär på den nya adressen. Den som spelar på
-`localhost` är admin. Supabase och en egen server (Oracle) behövs först när servern ska vara på
-dygnet runt.
+Hur det körs nu, helt på gratisplaner och utan betalkort:
+
+- **Webbsidan** ligger på Netlify.
+- **Den officiella servern** är en Cloudflare Durable Object (`cloud/`) med samma serverkod och
+  databasen i objektets SQLite. Klienterna skickar sin styrning 15 gånger per sekund där, så
+  att gratisplanens 100 000 förfrågningar per dygn räcker till cirka 37 spelartimmar.
+- **Supabase** sköter serverlistan, koderna och inloggning med Discord och Google.
+- **Spelare kan köra egna servrar** med `npm run share`: Cloudflare Quick Tunnel, en kod som är
+  densamma varje gång, och inloggning med namn och lösenord. Spelarnas Supabase-token skickas
+  aldrig till sådana servrar.
+
+En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplanen inte räcker.
 
 | Del | Var i koden |
 |---|---|
 | Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
 | Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `net.js`, `auth.js`, `db.js`) |
 | Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
-| Drift | `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
+| Drift | `cloud/` och `wrangler.jsonc` (Cloudflare), `supabase/` (serverlistan), `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
 
 ### Uppmätt

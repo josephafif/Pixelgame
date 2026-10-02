@@ -8,3 +8,5 @@ tests
 docs
 *.log
 server/.env
+.wrangler
+supabase

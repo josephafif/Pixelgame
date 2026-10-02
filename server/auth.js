@@ -3,9 +3,11 @@
 // Supabase: the browser logs in with Supabase Auth (e-mail link/code,
 // Google, Discord) and sends its access token (a JWT) as the first message.
 // We verify the signature ourselves: new projects sign with an asymmetric
-// key published as JWKS (ES256/RS256); older ones with a shared secret
-// (HS256, SUPABASE_JWT_SECRET). The account id is the token's `sub` — never
-// anything the client says about itself.
+// key published as JWKS (ES256/RS256, checked with WebCrypto so this runs on
+// Node and on Cloudflare alike); older ones with a shared secret (HS256,
+// SUPABASE_JWT_SECRET). Without that secret, an HS256 token is checked by
+// asking Supabase who it belongs to. The account id is the token's `sub` —
+// never anything the client says about itself.
 //
 // Guests: for local testing (and friends trying it out) the server can hand
 // out its own signed guest tokens. Off by default when Supabase is set up.
@@ -13,7 +15,7 @@
 // with name + password from any address or device (the browser forgets the
 // guest token when the address changes, as it does with `npm run share`).
 
-import { createHmac, createPublicKey, timingSafeEqual, verify as cryptoVerify, randomBytes, scrypt } from 'node:crypto';
+import { createHmac, timingSafeEqual, randomBytes, scrypt } from 'node:crypto';
 
 const b64url = (buf) => Buffer.from(buf).toString('base64url');
 const fromB64url = (s) => Buffer.from(s, 'base64url');
@@ -37,10 +39,11 @@ function parseJwt(token) {
 
 export class Auth {
   /**
-   * @param {object} opts { supabaseUrl, supabaseJwtSecret, allowGuests, guestSecret, fetch }
+   * @param {object} opts { supabaseUrl, supabaseAnonKey, supabaseJwtSecret, allowGuests, guestSecret, fetch }
    */
-  constructor({ supabaseUrl = '', supabaseJwtSecret = '', allowGuests = false, guestSecret, fetch: fetchFn = globalThis.fetch } = {}) {
+  constructor({ supabaseUrl = '', supabaseAnonKey = '', supabaseJwtSecret = '', allowGuests = false, guestSecret, fetch: fetchFn = globalThis.fetch } = {}) {
     this.supabaseUrl = supabaseUrl;
+    this.anonKey = supabaseAnonKey;
     this.jwtSecret = supabaseJwtSecret;
     this.allowGuests = allowGuests;
     this.guestSecret = guestSecret ?? randomBytes(32).toString('hex');
@@ -60,17 +63,24 @@ export class Auth {
     const jwt = parseJwt(token);
     const { alg, kid } = jwt.header;
     let ok = false;
-    if (alg === 'HS256') {
-      if (!this.jwtSecret) throw new AuthError('Unsupported token');
+    if (alg === 'HS256' && this.jwtSecret) {
       const mac = createHmac('sha256', this.jwtSecret).update(jwt.signed).digest();
       ok = mac.length === jwt.sig.length && timingSafeEqual(mac, jwt.sig);
+    } else if (alg === 'HS256') {
+      ok = await this.#askSupabase(token, jwt.payload.sub);
     } else if (alg === 'ES256' || alg === 'RS256') {
       const jwk = await this.#key(kid);
       if (!jwk) throw new AuthError('Unknown signing key');
-      const key = createPublicKey({ key: jwk, format: 'jwk' });
-      ok = alg === 'ES256'
-        ? cryptoVerify('sha256', Buffer.from(jwt.signed), { key, dsaEncoding: 'ieee-p1363' }, jwt.sig)
-        : cryptoVerify('sha256', Buffer.from(jwt.signed), key, jwt.sig);
+      const algo = alg === 'ES256'
+        ? { import: { name: 'ECDSA', namedCurve: 'P-256' }, verify: { name: 'ECDSA', hash: 'SHA-256' } }
+        : { import: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, verify: { name: 'RSASSA-PKCS1-v1_5' } };
+      try {
+        const { kty, crv, x, y, n, e } = jwk;
+        const key = await crypto.subtle.importKey('jwk', { kty, crv, x, y, n, e, ext: true }, algo.import, false, ['verify']);
+        ok = await crypto.subtle.verify(algo.verify, key, jwt.sig, new TextEncoder().encode(jwt.signed));
+      } catch {
+        ok = false;
+      }
     } else {
       throw new AuthError('Unsupported token');
     }
@@ -89,6 +99,16 @@ export class Auth {
       name: typeof (meta.full_name ?? meta.name ?? meta.user_name) === 'string' ? (meta.full_name ?? meta.name ?? meta.user_name) : null,
       guest: false,
     };
+  }
+
+  /** HS256 without the project's secret: Supabase itself says whose token it is. */
+  async #askSupabase(token, sub) {
+    if (!this.supabaseUrl || !this.anonKey) throw new AuthError('Unsupported token');
+    const res = await this.fetch(`${this.supabaseUrl}/auth/v1/user`, { headers: { apikey: this.anonKey, authorization: `Bearer ${token}` } });
+    if (res.status === 401 || res.status === 403) return false;
+    if (!res.ok) throw new AuthError(`Could not check the login (${res.status})`);
+    const user = await res.json().catch(() => null);
+    return typeof user?.id === 'string' && user.id === sub;
   }
 
   async #key(kid) {

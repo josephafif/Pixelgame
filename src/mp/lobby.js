@@ -7,7 +7,10 @@ import { h, clear, $ } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { openModal, closeModal, replaceModalBody } from '../ui/modal.js';
 import { PROTOCOL_VERSION } from '../net/protocol.js';
-import { MpAuth, serverList, addServer, removeServer, infoUrl, sameOriginServer, loginWithPassword } from './auth.js';
+import { MpAuth, configuredServers, customServers, addServer, removeServer, infoUrl, sameOriginServer, loginWithPassword } from './auth.js';
+import {
+  registryEnabled, listServers, findServer, normalizeCode, serverUrlFrom, serverKey, recentCodes, rememberCode,
+} from './registry.js';
 import { passwordProblem } from '../net/rules.js';
 
 const JOIN_KEY = 'pg-mp-join';
@@ -38,71 +41,116 @@ async function probe(server) {
   }
 }
 
-/** Opens the lobby (called from the main menu). */
-export function openLobby(app, { message = null } = {}) {
+/** Opens the lobby (called from the main menu, or from a ?join=CODE / ?server=… link). */
+export function openLobby(app, { message = null, joinCode = null, serverUrl = null } = {}) {
   const auth = makeAuth();
+  const config = mpConfig();
   const local = sameOriginServer();
-  const state = { servers: [], infos: new Map(), sent: null, error: message, busy: false, login: null };
+  if (serverUrl && !customServers().some((c) => c.url === serverUrl)) addServer(new URL(serverUrl).host, serverUrl);
+  const state = {
+    local: null, official: [], open: [], custom: customServers(),
+    found: null, code: joinCode ?? '', codeError: null, codeBusy: false,
+    infos: new Map(), error: message, busy: false, login: null, providers: {}, sent: null, email: '',
+  };
 
-  const refreshServers = async () => {
-    const list = serverList(mpConfig());
-    // The page's own origin hosts a server when you play with `npm run mp`.
-    if (local && !list.some((s) => s.url === local.url)) {
-      const info = await probe(local);
-      if (info.ok) {
-        list.unshift(local);
-        state.infos.set(local.url, info);
-      }
+  const probeAll = (list) => Promise.all(list.map(async (s) => {
+    if (s.registry && !s.online) return;
+    if (!state.infos.has(s.url)) {
+      state.infos.set(s.url, await probe(s));
+      rerender();
     }
-    state.servers = list;
+  }));
+
+  const refresh = async () => {
+    const [registry, providers, localInfo] = await Promise.all([
+      listServers(),
+      auth.configured ? auth.providers() : {},
+      local ? probe(local) : null,
+    ]);
+    state.providers = providers;
+    if (localInfo?.ok) {
+      state.local = local;
+      state.infos.set(local.url, localInfo);
+    }
+    const official = configuredServers(config).filter((s) => s.official);
+    for (const r of registry.filter((x) => x.official)) if (!official.some((o) => o.url === r.url)) official.push(r);
+    state.official = official;
+    state.open = registry.filter((x) => !x.official && !official.some((o) => o.url === x.url));
+    state.custom = [...configuredServers(config).filter((s) => !s.official), ...customServers()];
     rerender();
-    await Promise.all(list.map(async (s) => {
-      if (!state.infos.has(s.url)) {
-        state.infos.set(s.url, await probe(s));
-        rerender();
-      }
-    }));
+    await probeAll([...state.official, ...state.open, ...state.custom]);
   };
 
   const join = (server, mode) => {
-    sessionStorage.setItem(JOIN_KEY, JSON.stringify({ server: { name: server.name, url: server.url }, mode }));
+    const { name, url, code = null, official = false } = server;
+    sessionStorage.setItem(JOIN_KEY, JSON.stringify({ server: { name, url, code, official, local: Boolean(server.local) }, mode }));
     location.href = `${location.pathname}?mp=play${DEBUG}`;
   };
 
+  const lookUp = async (text) => {
+    const code = normalizeCode(text);
+    state.code = String(text ?? '');
+    state.found = null;
+    if (!code) {
+      state.codeError = 'En kod har sex tecken, till exempel K7QX2M';
+      rerender();
+      return;
+    }
+    state.codeBusy = true;
+    state.codeError = null;
+    rerender();
+    try {
+      const server = await findServer(code);
+      if (!server) state.codeError = `Ingen server har koden ${code}`;
+      else {
+        state.found = server;
+        rememberCode(code, server.name);
+      }
+    } catch (err) {
+      state.codeError = err.message;
+    }
+    state.codeBusy = false;
+    rerender();
+    if (state.found?.online) {
+      state.infos.delete(state.found.url);
+      await probeAll([state.found]);
+    }
+  };
+
   function accountSection() {
-    // No e-mail/Google/Discord login set up: guests (with name + password) only.
     if (!auth.configured) return null;
     const email = auth.email;
     if (email || auth.session) {
-      return h('section.mp-account',
-        h('h3', 'Konto'),
-        h('p', 'Inloggad som ', h('b', email ?? 'ditt konto')),
-        h('button', { onclick: () => { auth.signOut(); rerender(); } }, 'Logga ut'));
+      return h('div.mp-account',
+        h('p', 'Inloggad som ', h('b', email ?? 'ditt konto'), ' ',
+          h('button.small', { onclick: () => { auth.signOut(); rerender(); } }, 'Logga ut')));
     }
+    const p = state.providers ?? {};
+    const emailOn = Boolean(config.emailLogin && p.email);
+    if (!p.google && !p.discord && !emailOn) return null;
     const emailInput = h('input', { type: 'email', placeholder: 'din@epost.se', autocomplete: 'email', value: state.email ?? '' });
     const codeInput = h('input', { type: 'text', inputmode: 'numeric', placeholder: '123456', maxlength: 10, autocomplete: 'one-time-code' });
-    return h('section.mp-account',
-      h('h3', 'Logga in'),
-      h('p.small.muted', 'Ditt multiplayer-konto: din karaktär och dina vapen sparas på servern. Din singleplayer-värld påverkas inte.'),
+    return h('div.mp-account',
+      h('p.small.muted', 'Logga in med ett konto, så kan du spela med samma karaktär från alla dina enheter. Eller spela med namn och lösenord.'),
       h('div.mp-oauth',
-        h('button', { onclick: () => { location.href = auth.oauthUrl('google', redirectUrl()); } }, 'Logga in med Google'),
-        h('button', { onclick: () => { location.href = auth.oauthUrl('discord', redirectUrl()); } }, 'Logga in med Discord')),
-      h('div.mp-email',
+        p.google ? h('button', { onclick: () => { location.href = auth.oauthUrl('google', redirectUrl()); } }, 'Logga in med Google') : null,
+        p.discord ? h('button', { onclick: () => { location.href = auth.oauthUrl('discord', redirectUrl()); } }, 'Logga in med Discord') : null),
+      emailOn ? h('div.mp-email',
         h('label.field', h('span', 'E-post'), emailInput),
         h('button.btn-primary', {
           disabled: state.busy,
           onclick: async () => {
-            const email = emailInput.value.trim();
-            if (!/^\S+@\S+\.\S+$/.test(email)) {
+            const value = emailInput.value.trim();
+            if (!/^\S+@\S+\.\S+$/.test(value)) {
               state.error = 'Skriv en giltig e-postadress';
               rerender();
               return;
             }
             state.busy = true;
-            state.email = email;
+            state.email = value;
             try {
-              await auth.sendEmail(email, redirectUrl());
-              state.sent = email;
+              await auth.sendEmail(value, redirectUrl());
+              state.sent = value;
               state.error = null;
             } catch (err) {
               state.error = err.message;
@@ -110,8 +158,8 @@ export function openLobby(app, { message = null } = {}) {
             state.busy = false;
             rerender();
           },
-        }, 'Skicka inloggningsmejl')),
-      state.sent ? h('div.mp-code',
+        }, 'Skicka inloggningsmejl')) : null,
+      emailOn && state.sent ? h('div.mp-code',
         h('p.small', `Vi skickade ett mejl till ${state.sent}. Klicka på länken i det, eller skriv in koden här:`),
         h('label.field', h('span', 'Kod'), codeInput),
         h('button.btn-primary', {
@@ -130,26 +178,29 @@ export function openLobby(app, { message = null } = {}) {
 
   function serverRow(s) {
     const info = state.infos.get(s.url);
+    const offline = s.registry && !s.online;
+    const status = offline ? h('span.muted', 'Inte igång just nu')
+      : !info ? h('span.muted', 'Kollar…')
+        : !info.ok ? h('span.warn', 'Svarar inte')
+          : info.protocol !== PROTOCOL_VERSION ? h('span.warn', 'Annan version')
+            : h('span', `${info.players}/${info.maxPlayers} spelare · ${info.ping} ms`);
+    const ready = !offline && info?.ok && info.protocol === PROTOCOL_VERSION;
+    // Your account's login token only ever goes to the official server: anyone can host the others.
+    const accountOk = ready && s.official && info.supabase && auth.configured;
     const loggedIn = Boolean(auth.session);
-    const status = !info ? h('span.muted', 'Kollar…')
-      : !info.ok ? h('span.warn', 'Svarar inte')
-        : info.protocol !== PROTOCOL_VERSION ? h('span.warn', 'Annan version')
-          : h('span', `${info.players}/${info.maxPlayers} spelare · ${info.ping} ms`);
-    const ready = info?.ok && info.protocol === PROTOCOL_VERSION;
+    const key = serverKey(s);
     return h('div.mp-server',
       h('div.mp-server-head',
         h('b', info?.name ?? s.name),
-        h('span.small.muted', s.url),
+        s.code && !s.official ? h('span.mp-code-tag', s.code) : null,
+        s.local || s.code ? null : h('span.small.muted', s.url),
         status),
       ready && info.rules ? h('p.small.muted', `Raidfönster: ${info.rules.raidWindow}. Fristaden är säker, vildmarken är PvP.`) : null,
+      offline ? h('p.small.muted', 'Be den som kör servern att starta den (npm run share). Koden är densamma nästa gång.') : null,
       h('div.row',
-        ready && info.supabase ? h('button.btn-primary', {
-          disabled: !loggedIn,
-          title: loggedIn ? null : 'Logga in först',
-          onclick: () => join(s, 'account'),
-        }, icon('players', 20), loggedIn ? 'Spela' : 'Logga in för att spela') : null,
-        ready && info.guests ? h(`button${info.supabase ? '' : '.btn-primary'}`, { onclick: () => join(s, 'guest') },
-          auth.guestToken(s.url) ? 'Fortsätt som gäst' : 'Spela som gäst') : null,
+        accountOk && loggedIn ? h('button.btn-primary', { onclick: () => join(s, 'account') }, icon('players', 20), 'Spela') : null,
+        ready && info.guests ? h(`button${accountOk && loggedIn ? '' : '.btn-primary'}`, { onclick: () => join(s, 'guest') },
+          auth.guestToken(key) ? 'Fortsätt som gäst' : 'Spela som gäst') : null,
         ready && info.logins ? h('button', {
           'aria-expanded': String(state.login?.url === s.url),
           onclick: () => {
@@ -158,7 +209,7 @@ export function openLobby(app, { message = null } = {}) {
             document.querySelector('.mp-login input')?.focus();
           },
         }, 'Logga in med namn') : null,
-        s.custom ? h('button.btn-danger', { onclick: () => { removeServer(s.url); refreshServers(); } }, 'Ta bort') : null),
+        s.custom ? h('button.btn-danger', { onclick: () => { removeServer(s.url); refresh(); } }, 'Ta bort') : null),
       ready && info.logins && state.login?.url === s.url ? loginForm(s) : null);
   }
 
@@ -177,7 +228,7 @@ export function openLobby(app, { message = null } = {}) {
       state.busy = true;
       try {
         const res = await loginWithPassword(s.url, form.name.trim(), form.password);
-        auth.setGuestToken(s.url, res.token);
+        auth.setGuestToken(serverKey(s), res.token);
         join(s, 'guest');
         return;
       } catch (err) {
@@ -194,7 +245,7 @@ export function openLobby(app, { message = null } = {}) {
       });
     }
     return h('div.mp-login',
-      h('p.small.muted', 'Har du spelat här förut, från en annan länk eller enhet? Logga in med namnet och lösenordet du valde.'),
+      h('p.small.muted', 'Har du spelat här förut, från en annan enhet? Logga in med namnet och lösenordet du valde.'),
       form.error ? h('p.warn', form.error) : null,
       h('div.mp-login-fields',
         h('label.field', h('span', 'Namn'), name),
@@ -202,34 +253,75 @@ export function openLobby(app, { message = null } = {}) {
         h('button.btn-primary', { disabled: state.busy, onclick: submit }, 'Logga in')));
   }
 
+  function friendsSection() {
+    const input = h('input', {
+      type: 'text', maxlength: 9, placeholder: 'K7QX2M', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false',
+      value: state.code, 'aria-label': 'Serverns kod', oninput: (e) => { state.code = e.target.value; },
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') lookUp(input.value);
+    });
+    const recent = recentCodes().filter((r) => r.code !== state.found?.code);
+    const registry = registryEnabled();
+    return h('section.mp-friends',
+      h('h3', 'Spela på en väns server'),
+      registry ? h('div.mp-join',
+        h('label.field', h('span', 'Kod'), input),
+        h('button.btn-primary', { disabled: state.codeBusy, onclick: () => lookUp(input.value) }, state.codeBusy ? 'Letar…' : 'Gå med')) : null,
+      state.codeError ? h('p.warn', state.codeError) : null,
+      state.found ? serverRow(state.found) : null,
+      registry && recent.length ? h('div.mp-recent',
+        h('span.small.muted', 'Senast:'),
+        recent.map((r) => h('button.small', { onclick: () => lookUp(r.code) }, `${r.name || r.code} (${r.code})`))) : null,
+      hostSection());
+  }
+
+  function hostSection() {
+    const repo = config.repoUrl || 'https://github.com/josephafif/Pixelgame';
+    return h('details.mp-host',
+      h('summary', 'Starta en egen server'),
+      h('p.small', 'Du kan köra en egen server på din dator, gratis och utan konto. Dina vänner går med här med en kod.'),
+      h('ol.small',
+        h('li', 'Installera Node.js 22 eller nyare från ', h('a', { href: 'https://nodejs.org', target: '_blank', rel: 'noopener' }, 'nodejs.org'), '.'),
+        h('li', 'Hämta spelet från ', h('a', { href: repo, target: '_blank', rel: 'noopener' }, 'GitHub'), ' (Code → Download ZIP) och packa upp det.'),
+        h('li', 'Öppna en terminal i mappen och kör ', h('code', 'npm install'), ' och sedan ', h('code', 'npm run share'), '.'),
+        h('li', 'Du får en kod och en länk. Skicka dem till dina vänner. Koden är densamma varje gång du startar.')),
+      h('p.small.muted', 'Vill du att alla ska se servern i listan här? Starta med ', h('code', 'npm run share -- --public'), '. Din dator måste vara på medan ni spelar.'));
+  }
+
   function addSection() {
-    const url = h('input', { type: 'url', placeholder: 'wss://spel.example.se/ws' });
+    const url = h('input', { type: 'text', placeholder: 'spel.example.se eller wss://spel.example.se/ws' });
     return h('details.mp-add',
-      h('summary', 'Lägg till en server'),
+      h('summary', 'Lägg till en server med adress'),
       h('label.field', h('span', 'Adress'), url),
       h('button', {
         onclick: () => {
-          const v = url.value.trim();
-          if (!/^wss?:\/\/.+/.test(v)) {
-            state.error = 'Adressen ska börja med wss:// (eller ws:// lokalt)';
+          const v = serverUrlFrom(url.value);
+          if (!v) {
+            state.error = 'Skriv serverns adress, till exempel spel.example.se';
             rerender();
             return;
           }
           addServer(new URL(v).host, v);
           state.infos.delete(v);
-          refreshServers();
+          refresh();
         },
       }, 'Lägg till'));
   }
 
   function build() {
+    const official = state.local ? [] : state.official;
     return h('div.mp-lobby',
       state.error ? h('p.warn', state.error) : null,
-      accountSection(),
-      h('section',
-        h('h3', 'Servrar'),
-        state.servers.length ? state.servers.map(serverRow) : h('p.small.muted', 'Inga servrar inställda än. Lägg till en adress nedan, eller starta en egen (se docs/MULTIPLAYER-SETUP.md).'),
-        addSection()),
+      state.local ? h('section', h('h3', 'Den här servern'), serverRow(state.local)) : null,
+      official.length ? h('section.mp-official',
+        h('h3', 'Officiell server'),
+        accountSection(),
+        official.map(serverRow)) : null,
+      friendsSection(),
+      state.open.length ? h('section', h('h3', 'Öppna servrar'), state.open.map(serverRow)) : null,
+      state.custom.length ? h('section', h('h3', 'Dina servrar'), state.custom.map(serverRow)) : null,
+      addSection(),
       h('section.mp-rules',
         h('h3', 'Så funkar det'),
         h('ul.small',
@@ -245,7 +337,8 @@ export function openLobby(app, { message = null } = {}) {
   }
 
   openModal({ title: 'Multiplayer', icon: 'players', body: build(), className: 'wide mp-lobby-panel' });
-  refreshServers();
+  refresh();
+  if (joinCode) lookUp(joinCode);
 }
 
 /** ?mp=auth: back from Google/Discord/the e-mail link. */
@@ -266,7 +359,7 @@ export function handleAuthRedirect(app) {
  * live in the browser, per address, so the password is how you get your
  * character back on a new link or another device.
  */
-function namePrompt(msg, send, { guest = false, last = {} } = {}) {
+function namePrompt(msg, send, { guest = false, last = {}, hosted = false } = {}) {
   const input = h('input', { type: 'text', maxlength: 16, value: last.name ?? msg.suggestion ?? '', autocomplete: 'username', autofocus: true });
   const password = guest ? h('input', { type: 'password', maxlength: 64, autocomplete: 'new-password', value: last.password ?? '' }) : null;
   const error = h('p.warn', { hidden: !msg.error }, msg.error ?? '');
@@ -297,6 +390,7 @@ function namePrompt(msg, send, { guest = false, last = {} } = {}) {
       h('label.field', h('span', 'Namn (3–16 tecken)'), input),
       password ? h('label.field', h('span', 'Lösenord (minst 4 tecken)'), password) : null,
       password ? h('p.small.muted', 'Med namnet och lösenordet kommer du tillbaka till din karaktär från en ny länk eller en annan enhet.') : null,
+      password && hosted ? h('p.small.warn', 'Servern körs av en spelare. Använd inte ett lösenord som du har någon annanstans.') : null,
       h('button.btn-primary', { onclick: submit }, 'Börja spela')),
   });
 }
@@ -342,7 +436,8 @@ export async function startMultiplayer(app) {
   }
   const auth = makeAuth();
   let token = null;
-  if (join.mode === 'guest') token = auth.guestToken(join.server.url) ?? 'guest';
+  const key = serverKey(join.server);
+  if (join.mode === 'guest') token = auth.guestToken(key) ?? 'guest';
   else token = await auth.token();
   if (!token) {
     failModal('Logga in igen', 'Din inloggning har gått ut. Logga in i Multiplayer-menyn igen.', { retry: false });
@@ -357,13 +452,13 @@ export async function startMultiplayer(app) {
   const last = {};
   try {
     await game.connect(join.server, token, {
-      onGuestToken: (t) => auth.setGuestToken(join.server.url, t),
+      onGuestToken: (t) => auth.setGuestToken(key, t),
       onNeedName: (msg, send) => namePrompt(msg, (name, password) => {
         last.name = name;
         last.password = password;
         connectingModal(join.server.name);
         send(name, password);
-      }, { guest: join.mode === 'guest', last }),
+      }, { guest: join.mode === 'guest', last, hosted: !join.server.official }),
     });
   } catch (err) {
     failModal('Kunde inte ansluta', err.message);
