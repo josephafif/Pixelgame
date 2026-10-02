@@ -65,8 +65,10 @@ export async function probe(fetchFn, url) {
 
 /**
  * @param {Request} req
- * @param {{ fetch: typeof fetch, rpc: (name: string, args: object) => Promise<any> }} deps
- *   rpc throws { status, code } when the database says no.
+ * @param {{ fetch: typeof fetch, db: object, now?: () => number }} deps
+ *   db: get(code) → { code, secret_hash, official } | null, insert(row) (throws
+ *   { code: '23505' } when the code is taken), update(code, fields),
+ *   offline(code, secretHash, lastSeenIso), cleanup(beforeIso).
  */
 export async function handle(req, deps) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -84,10 +86,11 @@ export async function handle(req, deps) {
   const given = body.code ? String(body.code).toUpperCase() : null;
   if (given && !CODE_RE.test(given)) return reply(400, { ok: false, error: 'Bad code' });
   const secretHash = await sha256Hex(secret);
+  const now = deps.now?.() ?? Date.now();
 
   if (body.action === 'offline') {
     if (!given) return reply(400, { ok: false, error: 'Bad code' });
-    await deps.rpc('game_server_offline', { p_code: given, p_secret_hash: secretHash });
+    await deps.db.offline(given, secretHash, new Date(now - 24 * 3600 * 1000).toISOString());
     return reply(200, { ok: true });
   }
   if (body.action !== 'register') return reply(400, { ok: false, error: 'Unknown action' });
@@ -95,21 +98,34 @@ export async function handle(req, deps) {
   if (!url) return reply(400, { ok: false, error: 'The address must be https://name.domain' });
   const info = await probe(deps.fetch, url);
   if (!info) return reply(422, { ok: false, error: 'The server does not answer like a Pixelgame server' });
+  const fields = {
+    name: info.name, url, listed: Boolean(body.listed), players: info.players, max_players: info.maxPlayers,
+    protocol: info.protocol, last_seen: new Date(now).toISOString(),
+  };
   for (let attempt = 0; attempt < 4; attempt++) {
     const code = given ?? newCode();
-    try {
-      await deps.rpc('upsert_game_server', {
-        p_code: code, p_secret_hash: secretHash, p_url: url, p_name: info.name, p_listed: Boolean(body.listed),
-        p_players: info.players, p_max_players: info.maxPlayers, p_protocol: info.protocol,
-      });
+    const existing = await deps.db.get(code);
+    if (existing) {
+      // The code is someone else's (or the official server's).
+      if (existing.official || existing.secret_hash !== secretHash) {
+        if (given) return reply(403, { ok: false, error: 'That code belongs to another server' });
+        continue;
+      }
+      await deps.db.update(code, fields);
       return reply(200, { ok: true, code, name: info.name });
+    }
+    try {
+      await deps.db.insert({ code, secret_hash: secretHash, ...fields });
     } catch (err) {
-      // A new random code that happens to be taken: draw another.
-      const taken = err?.code === '42501' || err?.code === '23505';
-      if (taken && !given) continue;
-      if (err?.code === '42501') return reply(403, { ok: false, error: 'That code belongs to another server' });
+      if (err?.code === '23505') {
+        if (given) return reply(403, { ok: false, error: 'That code belongs to another server' });
+        continue;
+      }
       throw err;
     }
+    // Servers nobody has run for two months are forgotten.
+    await deps.db.cleanup(new Date(now - 60 * 24 * 3600 * 1000).toISOString()).catch(() => {});
+    return reply(200, { ok: true, code, name: info.name });
   }
   return reply(503, { ok: false, error: 'Try again' });
 }

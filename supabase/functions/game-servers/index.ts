@@ -1,5 +1,6 @@
 // Edge Function: register servers that players host themselves (see logic.js).
-// Deploy without JWT checks (the host's secret is the authorization):
+// It writes public.game_servers with the project's secret key; nobody else
+// can. Deploy without JWT checks (the host's own secret is the authorization):
 //   supabase functions deploy game-servers --no-verify-jwt
 
 import { handle, CORS } from './logic.js';
@@ -16,22 +17,39 @@ function secretKey(): string {
   return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
-async function rpc(name: string, args: Record<string, unknown>) {
+/** A PostgREST call on the game_servers table with the secret key. */
+async function rest(method: string, query: string, body?: unknown) {
   const key = secretKey();
-  const headers: Record<string, string> = { apikey: key, 'content-type': 'application/json' };
+  const headers: Record<string, string> = { apikey: key, 'content-type': 'application/json', prefer: 'return=minimal' };
   // Legacy keys are JWTs and go in Authorization too; new secret keys must not.
   if (key.startsWith('eyJ')) headers.authorization = `Bearer ${key}`;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: 'POST', headers, body: JSON.stringify(args) });
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/game_servers${query}`, {
+    method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+  });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw { status: res.status, code: body.code, message: body.message };
+    const err = await res.json().catch(() => ({}));
+    throw { status: res.status, code: err.code, message: err.message };
   }
-  return res.status === 204 ? null : res.json();
+  return method === 'GET' ? res.json() : null;
 }
+
+const eq = (v: string) => `eq.${encodeURIComponent(v)}`;
+
+const db = {
+  async get(code: string) {
+    const rows = await rest('GET', `?select=code,secret_hash,official&code=${eq(code)}`);
+    return rows[0] ?? null;
+  },
+  insert: (row: Record<string, unknown>) => rest('POST', '', row),
+  update: (code: string, fields: Record<string, unknown>) => rest('PATCH', `?code=${eq(code)}`, fields),
+  offline: (code: string, hash: string, before: string) =>
+    rest('PATCH', `?code=${eq(code)}&secret_hash=${eq(hash)}&official=is.false`, { last_seen: before, players: 0 }),
+  cleanup: (before: string) => rest('DELETE', `?official=is.false&last_seen=lt.${encodeURIComponent(before)}`),
+};
 
 Deno.serve(async (req: Request) => {
   try {
-    return await handle(req, { fetch, rpc });
+    return await handle(req, { fetch, db });
   } catch (err) {
     console.error('game-servers', err);
     return new Response(JSON.stringify({ ok: false, error: 'Server error' }), { status: 500, headers: { 'content-type': 'application/json', ...CORS } });

@@ -20,20 +20,25 @@ function fakeDb() {
   return {
     rows,
     calls,
-    async rpc(name, args) {
-      calls.push({ name, args });
-      if (name === 'upsert_game_server') {
-        const row = rows.get(args.p_code);
-        if (row && row.secret_hash !== args.p_secret_hash) throw { status: 403, code: '42501' };
-        rows.set(args.p_code, { ...args, secret_hash: args.p_secret_hash, online: true });
-        return args.p_code;
-      }
-      if (name === 'game_server_offline') {
-        const row = rows.get(args.p_code);
-        if (row && row.secret_hash === args.p_secret_hash) row.online = false;
-        return null;
-      }
-      throw new Error(`unknown rpc ${name}`);
+    db: {
+      async get(code) {
+        calls.push(['get', code]);
+        return rows.get(code) ?? null;
+      },
+      async insert(row) {
+        calls.push(['insert', row.code]);
+        if (rows.has(row.code)) throw { status: 409, code: '23505' };
+        rows.set(row.code, { ...row, official: false });
+      },
+      async update(code, fields) {
+        calls.push(['update', code]);
+        Object.assign(rows.get(code), fields);
+      },
+      async offline(code, hash, before) {
+        const row = rows.get(code);
+        if (row && row.secret_hash === hash && !row.official) Object.assign(row, { last_seen: before, players: 0 });
+      },
+      async cleanup() {},
     },
   };
 }
@@ -46,30 +51,39 @@ const pixelgame = (info = INFO) => async (url) => {
 test('register: a running Pixelgame server gets a code, and keeps it with its secret', async () => {
   const db = fakeDb();
   const url = 'https://brave-otter-quiet-river.trycloudflare.com';
-  const res = await handle(post({ action: 'register', url, secret: SECRET, listed: true }), { fetch: pixelgame(), rpc: db.rpc });
+  const res = await handle(post({ action: 'register', url, secret: SECRET, listed: true }), { fetch: pixelgame(), db: db.db });
   assert.equal(res.status, 200);
   const { code, name } = await res.json();
   assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/);
   assert.equal(name, 'Annas server');
   const row = db.rows.get(code);
-  assert.equal(row.p_url, url);
-  assert.equal(row.p_listed, true);
-  assert.equal(row.p_players, 2);
+  assert.equal(row.url, url);
+  assert.equal(row.listed, true);
+  assert.equal(row.players, 2);
+  assert.equal(row.max_players, 50);
   assert.equal(row.secret_hash, await sha256Hex(SECRET), 'only the hash is stored');
+  assert.ok(!('secret' in row));
   // Next start: a new tunnel address, the same code.
-  const again = await handle(post({ action: 'register', url: `${url}/`, secret: SECRET, code }), { fetch: pixelgame(), rpc: db.rpc });
+  const again = await handle(post({ action: 'register', url: `${url}/`, secret: SECRET, code }), { fetch: pixelgame(), db: db.db });
   assert.equal((await again.json()).code, code);
   // Someone else can't take the code over.
-  const thief = await handle(post({ action: 'register', url, secret: 'b'.repeat(43), code }), { fetch: pixelgame(), rpc: db.rpc });
+  const thief = await handle(post({ action: 'register', url, secret: 'b'.repeat(43), code }), { fetch: pixelgame(), db: db.db });
   assert.equal(thief.status, 403);
-  // Stopping hides it.
-  await handle(post({ action: 'offline', code, secret: SECRET }), { fetch: pixelgame(), rpc: db.rpc });
-  assert.equal(db.rows.get(code).online, false);
+  // Stopping hides it (seen a day ago), but only its owner can do that.
+  await handle(post({ action: 'offline', code, secret: 'b'.repeat(43) }), { fetch: pixelgame(), db: db.db });
+  assert.equal(db.rows.get(code).players, 2);
+  await handle(post({ action: 'offline', code, secret: SECRET }), { fetch: pixelgame(), db: db.db });
+  assert.equal(db.rows.get(code).players, 0);
+  assert.ok(Date.parse(db.rows.get(code).last_seen) < Date.now() - 23 * 3600 * 1000);
+  // The official server's row can never be taken over, even with its hash.
+  db.rows.set('PXGAME', { code: 'PXGAME', secret_hash: await sha256Hex(SECRET), official: true });
+  const official = await handle(post({ action: 'register', url, secret: SECRET, code: 'PXGAME' }), { fetch: pixelgame(), db: db.db });
+  assert.equal(official.status, 403);
 });
 
 test('register: only addresses that answer like a Pixelgame server, and only public https names', async () => {
   const db = fakeDb();
-  const reg = (url, fetchFn) => handle(post({ action: 'register', url, secret: SECRET }), { fetch: fetchFn, rpc: db.rpc });
+  const reg = (url, fetchFn) => handle(post({ action: 'register', url, secret: SECRET }), { fetch: fetchFn, db: db.db });
   const notPixelgame = async () => ({ ok: true, json: async () => ({ hello: 'world' }) });
   assert.equal((await reg('https://brave-otter-quiet-river.trycloudflare.com', notPixelgame)).status, 422);
   const down = async () => { throw new Error('ECONNREFUSED'); };
@@ -79,10 +93,10 @@ test('register: only addresses that answer like a Pixelgame server, and only pub
   }
   assert.equal(db.rows.size, 0);
   // Bad secrets and codes are refused before anything else.
-  assert.equal((await handle(post({ action: 'register', url: 'https://a.b', secret: 'short' }), { fetch: pixelgame(), rpc: db.rpc })).status, 400);
-  assert.equal((await handle(post({ action: 'register', url: 'https://a.b', secret: SECRET, code: 'NOPE!' }), { fetch: pixelgame(), rpc: db.rpc })).status, 400);
-  assert.equal((await handle(new Request('https://x/', { method: 'GET' }), { fetch: pixelgame(), rpc: db.rpc })).status, 405);
-  assert.equal((await handle(new Request('https://x/', { method: 'OPTIONS' }), { fetch: pixelgame(), rpc: db.rpc })).status, 204);
+  assert.equal((await handle(post({ action: 'register', url: 'https://a.b', secret: 'short' }), { fetch: pixelgame(), db: db.db })).status, 400);
+  assert.equal((await handle(post({ action: 'register', url: 'https://a.b', secret: SECRET, code: 'NOPE!' }), { fetch: pixelgame(), db: db.db })).status, 400);
+  assert.equal((await handle(new Request('https://x/', { method: 'GET' }), { fetch: pixelgame(), db: db.db })).status, 405);
+  assert.equal((await handle(new Request('https://x/', { method: 'OPTIONS' }), { fetch: pixelgame(), db: db.db })).status, 204);
 });
 
 test('codes and addresses', () => {

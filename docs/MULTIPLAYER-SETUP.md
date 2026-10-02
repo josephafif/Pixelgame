@@ -18,37 +18,55 @@ själva varje gång något pushas till GitHub.
 
 ## 1. Supabase (serverlistan och inloggningen)
 
-Supabase-projektet *Pixelgame* finns redan, och spelet känner till det (`src/config.js`).
-Två saker behöver läggas upp i det: tabellen för serverlistan och funktionen som tar emot
-servrar som spelare startar. Kör i spelets mapp, där du redan har kört `supabase link`:
+Supabase-projektet *Pixelgame* finns, och spelet känner till det (`src/config.js`).
+Serverlistan är redan upplagd: tabellen `game_servers` med migreringarna i
+`supabase/migrations/`, och Edge-funktionen `game-servers` från
+`supabase/functions/game-servers/`. Behöver något läggas upp igen, kör i spelets mapp:
 
 ```bash
-git pull
 supabase db push
 supabase functions deploy game-servers --no-verify-jwt
 ```
 
-- `db push` skapar serverlistan (`supabase/migrations/`). Svara ja om den frågar.
-- `functions deploy` laddar upp funktionen (`supabase/functions/game-servers/`). Om den
-  klagar på Docker, lägg till `--use-api` sist.
+### Valfritt: logga in med Google
 
-### Valfritt: logga in med Discord eller Google
+Utan detta loggar alla in med namn och lösenord. Det fungerar bra. Med ett Google-konto kan
+man spela med samma karaktär från alla sina enheter utan lösenord. Supabase kan inte slå på
+Google själv: det behöver ett eget *OAuth-klient-ID* från ditt Google-konto. Så här gör du:
 
-Utan detta loggar alla in med namn och lösenord. Det fungerar bra. Konton gör att man kan spela
-med samma karaktär från alla sina enheter utan lösenord.
-
-1. **Authentication → URL Configuration**
+1. **Google Cloud.** Gå till <https://console.cloud.google.com> och logga in med ditt
+   Google-konto.
+   - Skapa ett projekt uppe till vänster (**Select a project → New project**), till exempel
+     *Pixelgame*.
+2. **Samtyckesskärmen.** Sök på *Google Auth Platform* (eller gå till **APIs & Services →
+   OAuth consent screen**) och tryck på **Get started**.
+   - *App name:* `Pixelgame`. *User support email:* din e-post.
+   - *Audience:* **External**. *Contact information:* din e-post. Godkänn villkoren och
+     tryck på **Create**.
+3. **Klienten.** Gå till **Clients → Create client** (eller **Credentials → Create
+   credentials → OAuth client ID**).
+   - *Application type:* **Web application**. *Name:* `Pixelgame`.
+   - *Authorized JavaScript origins:* `https://pixelgame-infinite-arsenal.netlify.app`
+   - *Authorized redirect URIs:* `https://tqctqccltthwlhfdwkre.supabase.co/auth/v1/callback`
+   - Tryck på **Create**. Kopiera **Client ID** och **Client secret**.
+4. **Publicera.** Under **Audience** trycker du på **Publish app**. Annars kan bara de
+   e-postadresser du lagt till som testanvändare logga in. Spelet ber bara om namn och
+   e-post, så Google behöver inte granska appen.
+5. **Supabase.** Öppna **Authentication → Sign In / Providers → Google**.
+   - Slå på **Enable Sign in with Google**.
+   - Klistra in Client ID i *Client IDs* och Client secret i *Client Secret (for OAuth)*.
+   - Tryck på **Save**. Det går inte att spara utan båda.
+6. **Supabase, adresser.** Under **Authentication → URL Configuration**:
    - *Site URL:* `https://pixelgame-infinite-arsenal.netlify.app`
    - *Redirect URLs:* lägg till `https://pixelgame-infinite-arsenal.netlify.app/?mp=auth`
-2. **Authentication → Sign In / Providers**
-   - **Discord:** skapa en app på <https://discord.com/developers/applications>. Under OAuth2
-     lägger du till Redirect `https://tqctqccltthwlhfdwkre.supabase.co/auth/v1/callback`.
-     Kopiera *Client ID* och *Client Secret* till Supabase och slå på Discord.
-   - **Google:** skapa en *OAuth client ID* av typen *Web application* i
-     <https://console.cloud.google.com/apis/credentials>, med samma Redirect URI. Kopiera
-     *Client ID* och *Client Secret* till Supabase och slå på Google.
 
-Knapparna dyker upp i lobbyn av sig själva när en inloggning är påslagen.
+Knappen **Logga in med Google** dyker upp i lobbyn under *Officiell server* av sig själv.
+Logga in där för att prova: lobbyn visar sedan *Inloggad som …*.
+
+**Discord** fungerar på samma sätt: skapa en app på
+<https://discord.com/developers/applications>. Under OAuth2 lägger du till Redirect
+`https://tqctqccltthwlhfdwkre.supabase.co/auth/v1/callback`. Kopiera *Client ID* och *Client
+Secret* till **Supabase → Sign In / Providers → Discord**.
 
 **E-post** fungerar inte direkt. Supabases inbyggda e-post skickar bara till projektets egna
 medlemmar. Vill du ha det: lägg in en egen avsändare under **Authentication → Emails → SMTP**,
@@ -65,10 +83,16 @@ millisekunder när någon ansluter. Du behöver ingen server och inget betalkort
 
 1. Skapa ett gratiskonto på <https://dash.cloudflare.com/sign-up>.
 2. Lägg upp servern på ett av två sätt:
-   - **Utan terminal (rekommenderat):** gå till **Workers & Pages → Create → Import a
-     repository**. Koppla GitHub och välj `josephafif/Pixelgame`. Välj grenen
-     `ccr-416322ef-rg7mbc`, lämna *Build command* tomt och sätt *Deploy command* till
-     `npx wrangler deploy`. Sedan uppdateras servern vid varje push.
+   - **Utan terminal (rekommenderat):** gå till **Workers & Pages** (under *Compute* i
+     menyn) och tryck på **Create → Import a repository**. Koppla GitHub och ge Cloudflare
+     tillgång till `josephafif/Pixelgame`. Välj repot och fyll i:
+     - *Project name:* `pixelgame`. Det måste vara exakt det namnet, annars stoppar bygget.
+     - *Build command:* lämna tomt.
+     - *Deploy command:* `npx wrangler deploy`
+     - Grenen är `ccr-416322ef-rg7mbc`, som är repots enda gren.
+     Tryck på **Create and deploy** och vänta ett par minuter. Sedan uppdateras servern vid
+     varje push. Frågar Cloudflare efter en *workers.dev-subdomän*, välj vad du vill, till
+     exempel ditt namn.
    - **Med terminal:** kör `npx wrangler login` och sedan `npm run cloud:deploy`.
 3. Cloudflare visar adressen, till exempel `https://pixelgame.ditt-namn.workers.dev`. Öppna
    `…/health`. Den ska svara `{"ok":true,…}`.

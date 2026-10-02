@@ -75,6 +75,7 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
     const official = configuredServers(config).filter((s) => s.official);
     for (const r of registry.filter((x) => x.official)) if (!official.some((o) => o.url === r.url)) official.push(r);
     state.official = official;
+    state.loaded = true;
     state.open = registry.filter((x) => !x.official && !official.some((o) => o.url === x.url));
     state.custom = [...configuredServers(config).filter((s) => !s.official), ...customServers()];
     rerender();
@@ -311,13 +312,17 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
 
   function build() {
     const official = state.local ? [] : state.official;
+    // On the game's website the official server always has its place (and its
+    // login buttons), even before it has been set up.
+    const showOfficial = official.length > 0 || (!state.local && registryEnabled());
     return h('div.mp-lobby',
       state.error ? h('p.warn', state.error) : null,
       state.local ? h('section', h('h3', 'Den här servern'), serverRow(state.local)) : null,
-      official.length ? h('section.mp-official',
+      showOfficial ? h('section.mp-official',
         h('h3', 'Officiell server'),
         accountSection(),
-        official.map(serverRow)) : null,
+        official.length ? official.map(serverRow)
+          : h('p.small.muted', state.loaded ? 'Den officiella servern är inte igång än. Spela på en väns server under tiden.' : 'Letar…')) : null,
       friendsSection(),
       state.open.length ? h('section', h('h3', 'Öppna servrar'), state.open.map(serverRow)) : null,
       state.custom.length ? h('section', h('h3', 'Dina servrar'), state.custom.map(serverRow)) : null,
