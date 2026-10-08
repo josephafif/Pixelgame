@@ -2,6 +2,7 @@
 // readable behaviours (chase, charge, shoot, cast, swoop, blink) and boss
 // attack patterns that every player near the altar fights together.
 
+import { SpatialGrid } from './grid.js';
 import { moveMode } from '../src/game/enemies.js';
 import { inSafeZone } from '../src/net/rules.js';
 import { mixHex } from '../src/weapons/visuals.js';
@@ -9,6 +10,8 @@ import * as combat from './combat.js';
 
 const LEASH = 1.8;
 const DESPAWN_DIST = 42;
+// Monsters farther than this from every player rest (beyond the 30-tile view).
+const REST_DIST = 34;
 const SPAWN_MIN = 13;
 const SPAWN_MAX = 18;
 
@@ -600,19 +603,24 @@ export function update(gs, dt) {
     }
     tickStatuses(gs, e, dt);
     if (e.dead) continue;
-    if (e.stunned) {
+    const near = gs.nearestPlayer(e.x, e.y, e.boss ? 45 : DESPAWN_DIST);
+    // Out of everyone's sight (and reach), a monster rests: nobody can see
+    // it, and thinking for it would only cost time every tick.
+    const resting = !e.boss && (!near || (near.x - e.x) ** 2 + (near.y - e.y) ** 2 > REST_DIST * REST_DIST);
+    if (resting) {
+      e.vx = e.vy = 0;
+    } else if (e.stunned) {
       e.vx = e.vy = 0;
     } else if (e.boss) {
       updateBoss(gs, e, dt);
     } else {
       behave(gs, e, dt);
     }
-    moveEnemy(gs, e, e.vx + e.kx, e.vy + e.ky, dt);
+    if (!resting || e.kx || e.ky) moveEnemy(gs, e, e.vx + e.kx, e.vy + e.ky, dt);
     const damp = 0.74; // exp(-9 / 30)
-    e.kx *= damp;
-    e.ky *= damp;
+    e.kx = Math.abs(e.kx) < 0.01 ? 0 : e.kx * damp;
+    e.ky = Math.abs(e.ky) < 0.01 ? 0 : e.ky * damp;
     // Nobody around: wander off the map (bosses go home after a while).
-    const near = gs.nearestPlayer(e.x, e.y, e.boss ? 45 : DESPAWN_DIST);
     e.lonely = near ? 0 : e.lonely + dt;
     if (e.lonely > (e.boss ? 20 : 8)) {
       gs.enemies.delete(e.id);
@@ -624,15 +632,9 @@ export function update(gs, dt) {
 
 /** Light separation so crowds don't merge into one sprite. */
 function separate(gs) {
-  const cells = new Map();
-  for (const e of gs.enemies.values()) {
-    if (e.dead) continue;
-    const key = (Math.floor(e.x / 2) * 73856093) ^ (Math.floor(e.y / 2) * 19349663);
-    let list = cells.get(key);
-    if (!list) cells.set(key, (list = []));
-    list.push(e);
-  }
-  for (const list of cells.values()) {
+  const grid = (gs.sepGrid ??= new SpatialGrid(2));
+  grid.rebuild(gs.enemies.values(), (e) => !e.dead);
+  for (const list of grid.cells.values()) {
     for (let i = 0; i < list.length; i++) {
       const a = list[i];
       for (let j = i + 1; j < list.length; j++) {
@@ -645,16 +647,17 @@ function separate(gs) {
         const d = Math.sqrt(d2);
         const push = (rr - d) * 0.5;
         const wa = a.boss ? 0 : b.boss ? 1 : 0.5;
-        const nudge = (e, px, py) => {
-          if (e.boss || gs.world.isFree(e.x + px, e.y + py, Math.min(e.r, 0.45), moveMode(e))) {
-            e.x += px;
-            e.y += py;
-          }
-        };
-        nudge(a, -(dx / d) * push * wa * 2, -(dy / d) * push * wa * 2);
-        nudge(b, (dx / d) * push * (1 - wa) * 2, (dy / d) * push * (1 - wa) * 2);
+        nudge(gs, a, -(dx / d) * push * wa * 2, -(dy / d) * push * wa * 2);
+        nudge(gs, b, (dx / d) * push * (1 - wa) * 2, (dy / d) * push * (1 - wa) * 2);
       }
     }
+  }
+}
+
+function nudge(gs, e, px, py) {
+  if (e.boss || gs.world.isFree(e.x + px, e.y + py, Math.min(e.r, 0.45), moveMode(e))) {
+    e.x += px;
+    e.y += py;
   }
 }
 

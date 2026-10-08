@@ -118,11 +118,14 @@ export class World extends DurableObject {
     // A rough count of today's billed requests, to see how close the free plan is.
     const usage = JSON.parse(this.db.meta('usage') ?? 'null');
     this.usage = usage?.day === this.#today() ? usage : { day: this.#today(), messages: 0, http: 0 };
-    const saveAll = gs.saveAll.bind(gs);
-    gs.saveAll = () => {
-      saveAll();
-      this.db.setMeta('usage', JSON.stringify(this.usage));
-    };
+    // Today's usage is saved along with the world (every SAVE_INTERVAL_MS and when it sleeps).
+    for (const name of ['saveAll', 'saveWorld']) {
+      const save = gs[name].bind(gs);
+      gs[name] = () => {
+        save();
+        this.db.setMeta('usage', JSON.stringify(this.usage));
+      };
+    }
   }
 
   #today() {

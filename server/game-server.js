@@ -13,8 +13,49 @@ import * as loot from './loot.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
 import { sendSnapshots } from './snapshots.js';
+import { SpatialGrid, PAD } from './grid.js';
 
 const HISTORY = 32; // ticks of positions kept for lag compensation (~1 s)
+
+/**
+ * Where each tick's time goes (milliseconds, smoothed), and what the slowest
+ * recent ticks spent it on: /health shows it, to find what makes it stutter.
+ */
+class TickProfile {
+  constructor() {
+    this.avg = {};
+    this.spikes = []; // the last few ticks over 15 ms, with their parts
+  }
+
+  begin() {
+    this.t0 = performance.now();
+    this.last = this.t0;
+    this.parts = {};
+  }
+
+  mark(name) {
+    const t = performance.now();
+    this.parts[name] = (this.parts[name] ?? 0) + (t - this.last);
+    this.last = t;
+  }
+
+  end() {
+    const total = this.last - this.t0;
+    for (const [k, v] of Object.entries(this.parts)) this.avg[k] = (this.avg[k] ?? v) * 0.98 + v * 0.02;
+    if (total > 15) {
+      const parts = {};
+      for (const [k, v] of Object.entries(this.parts)) if (v >= 1) parts[k] = Math.round(v * 10) / 10;
+      this.spikes.push({ at: Date.now(), ms: Math.round(total * 10) / 10, parts });
+      if (this.spikes.length > 8) this.spikes.shift();
+    }
+  }
+
+  report() {
+    const avg = {};
+    for (const [k, v] of Object.entries(this.avg)) avg[k] = Math.round(v * 100) / 100;
+    return { avg, spikes: this.spikes };
+  }
+}
 
 export class GameServer {
   constructor({ data, db, config, log = console }) {
@@ -35,6 +76,10 @@ export class GameServer {
     this.areas = new Map();
     this.timers = [];
     this.stats = { tickMs: 0, maxTickMs: 0, sent: 0 };
+    this.prof = new TickProfile();
+    this.playerGrid = new SpatialGrid(16);
+    this.chunkCache = new Map();
+    this.enemyGrid = new SpatialGrid(8);
 
     // The world seed is public (clients generate the terrain themselves);
     // the secret seed places loot and is never sent.
@@ -99,7 +144,7 @@ export class GameServer {
       this.timer = setTimeout(loop, Math.max(0, next - performance.now()));
     };
     loop();
-    this.saveTimer = setInterval(() => this.saveAll(), this.config.saveIntervalMs);
+    this.saveTimer = setInterval(() => this.saveWorld(), this.config.saveIntervalMs);
     this.#upkeep(Date.now());
   }
 
@@ -145,17 +190,29 @@ export class GameServer {
     this.tick++;
     this.time = this.tick * TICK_DT;
     const now = Date.now();
+    const prof = this.prof;
+    prof.begin();
     this.#runTimers();
+    prof.mark('timers');
     for (const p of this.players.values()) players.update(this, p, now);
+    this.reindexPlayers();
+    prof.mark('players');
     enemies.update(this, TICK_DT, now);
     if (this.tick % 15 === 0) enemies.spawn(this, now);
+    this.reindexEnemies();
+    prof.mark('enemies');
     combat.updateProjectiles(this, TICK_DT, now);
     combat.updateAreas(this, TICK_DT, now);
     loot.updatePickups(this, TICK_DT, now);
     building.update(this, TICK_DT, now);
     this.#recordHistory();
+    prof.mark('world');
     sendSnapshots(this, now);
+    prof.mark('snapshots');
+    this.#rollingSave(now);
     if (this.tick % (TICK_RATE * 30) === 0) this.#worldChores(now);
+    prof.mark('chores');
+    prof.end();
   }
 
   // --- Sessions -------------------------------------------------------------------------
@@ -275,9 +332,15 @@ export class GameServer {
 
   // --- Spatial queries -------------------------------------------------------------------
 
+  // Nearby queries use the spatial grids, except when scanning the list is
+  // cheaper (few players, or a radius that covers many cells).
+
   *playersNear(x, y, r) {
     const r2 = r * r;
-    for (const p of this.players.values()) {
+    const scan = this.playerGrid.cellsFor(r) > this.players.size;
+    const source = scan ? this.players.values() : this.playerGrid.near(x, y, r);
+    for (const p of source) {
+      if (!scan && this.players.get(p.id) !== p) continue;
       const dx = p.x - x;
       const dy = p.y - y;
       if (dx * dx + dy * dy <= r2) yield p;
@@ -286,26 +349,44 @@ export class GameServer {
 
   *enemiesNear(x, y, r) {
     const r2 = r * r;
-    for (const e of this.enemies.values()) {
-      if (e.dead) continue;
+    const scan = this.enemyGrid.cellsFor(r) > this.enemies.size;
+    const source = scan ? this.enemies.values() : this.enemyGrid.near(x, y, r);
+    for (const e of source) {
+      if (e.dead || (!scan && this.enemies.get(e.id) !== e)) continue;
       const dx = e.x - x;
       const dy = e.y - y;
       if (dx * dx + dy * dy <= r2) yield e;
     }
   }
 
-  nearestPlayer(x, y, r, pred = () => true) {
+  nearestPlayer(x, y, r, pred = null) {
     let best = null;
     let bestD = r * r;
-    for (const p of this.players.values()) {
-      if (p.dead || !pred(p)) continue;
+    const consider = (p) => {
+      if (p.dead || (pred && !pred(p))) return;
       const d = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d < bestD) {
         bestD = d;
         best = p;
       }
+    };
+    if (this.playerGrid.cellsFor(r) > this.players.size) {
+      for (const p of this.players.values()) consider(p);
+    } else {
+      this.playerGrid.each(x, y, r + PAD, (p) => {
+        if (this.players.get(p.id) === p) consider(p);
+      });
     }
     return best;
+  }
+
+  /** Brings the spatial indexes up to date (players and monsters move every tick). */
+  reindexPlayers() {
+    this.playerGrid.rebuild(this.players.values());
+  }
+
+  reindexEnemies() {
+    this.enemyGrid.rebuild(this.enemies.values(), (e) => !e.dead);
   }
 
   // --- Clans / claims -------------------------------------------------------------------
@@ -350,6 +431,7 @@ export class GameServer {
   /** Sends to everyone who has chunk (cx, cy) loaded. */
   broadcastChunk(cx, cy, msg) {
     const key = `${cx},${cy}`;
+    this.chunkCache.delete(key);
     for (const p of this.players.values()) if (p.conn && p.view.chunks.has(key)) p.conn.sendJson(msg);
   }
 
@@ -368,6 +450,23 @@ export class GameServer {
   }
 
   // --- World --------------------------------------------------------------------------------
+
+  /**
+   * The chunk's world data as a JSON string, cached: many players load the
+   * same chunks. Anything that changes a chunk goes out through
+   * broadcastChunk(), which drops its cached copy (and copies expire anyway,
+   * for things that change on a timer, like chests refilling).
+   */
+  chunkJson(cx, cy) {
+    const key = `${cx},${cy}`;
+    const now = Date.now();
+    const hit = this.chunkCache.get(key);
+    if (hit && hit.until > now) return hit.json;
+    const json = JSON.stringify(this.chunkPayload(cx, cy));
+    if (this.chunkCache.size > 3000) this.chunkCache.clear();
+    this.chunkCache.set(key, { json, until: now + 60 * 1000 });
+    return json;
+  }
 
   /** World data for one chunk, as the client needs it. */
   chunkPayload(cx, cy) {
@@ -410,6 +509,7 @@ export class GameServer {
   }
 
   setMark(key, kind, until = null) {
+    this.chunkCache.clear(); // altars and chests show in chunk data
     this.marks.set(key, { key, kind, at: Date.now(), until });
     this.db.setMark(key, kind, until);
   }
@@ -455,18 +555,53 @@ export class GameServer {
 
   // --- Persistence -----------------------------------------------------------------------------
 
+  /** Everything, now (shutting down, going to sleep). */
   saveAll() {
     try {
       this.db.tx(() => {
         for (const p of this.players.values()) players.persist(this, p);
-        building.persistDamage(this);
-        for (const c of this.clans.values()) if (c.dirty) {
-          this.db.saveClan(c);
-          c.dirty = false;
-        }
+        this.#saveWorldParts();
       });
     } catch (err) {
       this.log.error('[save] failed', err);
+    }
+  }
+
+  /** Clans and structure damage (players are saved a few at a time, every tick). */
+  saveWorld() {
+    try {
+      this.db.tx(() => this.#saveWorldParts());
+    } catch (err) {
+      this.log.error('[save] failed', err);
+    }
+  }
+
+  #saveWorldParts() {
+    building.persistDamage(this);
+    for (const c of this.clans.values()) if (c.dirty) {
+      this.db.saveClan(c);
+      c.dirty = false;
+    }
+  }
+
+  /**
+   * Saves the players whose last save is oldest, a few per tick, so each is
+   * saved about every saveIntervalMs without one tick doing them all.
+   */
+  #rollingSave(now) {
+    const every = this.config.saveIntervalMs;
+    const perTick = Math.max(1, Math.ceil((this.players.size * TICK_MS) / every));
+    let done = 0;
+    for (const p of this.players.values()) {
+      if (done >= perTick) break;
+      if (now - (p.lastSave ?? 0) < every) continue;
+      try {
+        players.persist(this, p);
+      } catch (err) {
+        this.log.error('[save] player', err);
+        p.lastSave = now;
+      }
+      done++;
     }
   }
 

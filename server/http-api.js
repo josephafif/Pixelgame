@@ -72,6 +72,7 @@ export function createApi(gs, auth, config, log) {
         ok: true, tick: gs.tick, players: online, bodies: gs.players.size - online, enemies: gs.enemies.size,
         projectiles: gs.projectiles.size, tickMs: Math.round(gs.stats.tickMs * 100) / 100, maxTickMs: Math.round(gs.stats.maxTickMs * 100) / 100,
         uptime: Math.round((Date.now() - startedAt) / 1000),
+        phases: gs.prof?.report(),
         ...extraHealth,
       }, req.origin);
     }

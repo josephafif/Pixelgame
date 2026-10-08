@@ -10,6 +10,7 @@ import {
 } from '../src/net/protocol.js';
 import { inSafeZone, claimAt } from '../src/net/rules.js';
 import * as players from './players.js';
+import { SpatialGrid } from './grid.js';
 
 const VIEW = 30; // tiles
 const FAR = 16;
@@ -83,7 +84,7 @@ function syncChunks(gs, p) {
       const k = `${x},${y}`;
       if (p.view.chunks.has(k)) continue;
       p.view.chunks.add(k);
-      gs.send(p, gs.chunkPayload(x, y));
+      p.conn?.sendText(gs.chunkJson(x, y));
     }
   }
   for (const k of p.view.chunks) {
@@ -100,11 +101,26 @@ export function sendSnapshots(gs, now) {
   for (const pr of gs.projectiles.values()) all.push({ id: pr.id, type: ET.PROJ, x: pr.x, y: pr.y, values: projValues(pr), ref: pr });
   for (const it of gs.pickups.values()) all.push({ id: it.id, type: ET.PICKUP, x: it.x, y: it.y, values: pickupValues(it), ref: it });
   for (const a of gs.areas.values()) all.push({ id: a.id, type: ET.AREA, x: a.x, y: a.y, values: areaValues(gs, a), ref: a });
+  // Bucketed by position: each player looks only at the cells around them.
+  const grid = (gs.snapGrid ??= new SpatialGrid(16));
+  grid.rebuild(all);
+  const nearby = (gs.snapNearby ??= []);
+  const collect = (ent) => nearby.push(ent);
   const claims = gs.claims();
   const r2 = VIEW * VIEW;
-  for (const p of gs.players.values()) {
+  // A tick's messages to a player (snapshot, events, world data) leave together.
+  for (const p of gs.players.values()) p.conn?.cork();
+  try {
+    for (const p of gs.players.values()) sendTo(gs, p, now, grid, nearby, collect, claims, r2);
+  } finally {
+    for (const p of gs.players.values()) p.conn?.uncork();
+  }
+}
+
+function sendTo(gs, p, now, grid, nearby, collect, claims, r2) {
+  {
     const conn = p.conn;
-    if (!conn) continue;
+    if (!conn) return;
     syncChunks(gs, p);
     if (p.meDirty) {
       p.meDirty = false;
@@ -116,13 +132,15 @@ export function sendSnapshots(gs, now) {
       conn.slowTicks = (conn.slowTicks ?? 0) + 1;
       if (conn.slowTicks > TICK_RATE * 20) conn.kick('Anslutningen är för långsam');
       p.events.length = 0;
-      continue;
+      return;
     }
     conn.slowTicks = 0;
     const known = p.view.known;
     const seen = new Set();
     const entities = [];
-    for (const ent of all) {
+    nearby.length = 0;
+    grid.each(p.x, p.y, VIEW, collect);
+    for (const ent of nearby) {
       if (ent.ref === p) continue;
       const dx = ent.x - p.x;
       const dy = ent.y - p.y;

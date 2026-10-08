@@ -56,6 +56,21 @@ export class Connection {
     this.ws.send(buf, { binary: true });
   }
 
+  /** A JSON message that is already a string (shared by many receivers). */
+  sendText(text) {
+    if (this.closed || this.ws.readyState !== 1) return;
+    this.ws.send(text);
+  }
+
+  /** Holds writes until uncork(): a tick's messages leave in one packet. */
+  cork() {
+    this.ws._socket?.cork?.();
+  }
+
+  uncork() {
+    this.ws._socket?.uncork?.();
+  }
+
   kick(reason) {
     if (this.closed) return;
     this.sendJson({ t: 'kick', reason });

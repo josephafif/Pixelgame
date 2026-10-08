@@ -560,6 +560,13 @@ export class World {
   }
 
   getChunk(cx, cy) {
+    // Most lookups ask for the same chunk as the one before (collision
+    // checks walk neighbouring tiles): skip building the key for those.
+    const last = this.lastChunk;
+    if (last && last.cx === cx && last.cy === cy) {
+      last.lastUsed = this.frame ?? 0;
+      return last;
+    }
     const key = `${cx},${cy}`;
     let chunk = this.chunks.get(key);
     if (!chunk) {
@@ -567,6 +574,7 @@ export class World {
       this.chunks.set(key, chunk);
     }
     chunk.lastUsed = this.frame ?? 0;
+    this.lastChunk = chunk;
     return chunk;
   }
 
@@ -575,7 +583,10 @@ export class World {
     this.frame = frame;
     if (this.chunks.size <= this.maxChunks) return;
     const sorted = [...this.chunks.entries()].sort((a, b) => a[1].lastUsed - b[1].lastUsed);
-    for (let i = 0; i < sorted.length - this.maxChunks; i++) this.chunks.delete(sorted[i][0]);
+    for (let i = 0; i < sorted.length - this.maxChunks; i++) {
+      if (sorted[i][1] === this.lastChunk) this.lastChunk = null;
+      this.chunks.delete(sorted[i][0]);
+    }
   }
 
   tile(tx, ty) {
