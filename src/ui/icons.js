@@ -2,6 +2,7 @@
 // game sprites) and turned into data URLs once. Keeps the interface in the
 // game's pixel style instead of mixing in platform emoji.
 
+import { scale2x } from '../render/hd.js';
 import { h } from './dom.js';
 
 const O = '#0e0c18';
@@ -520,7 +521,8 @@ function toDataUrl(name) {
       ctx.fillRect(x, y, 1, 1);
     }
   }
-  url = c.toDataURL();
+  // Smoothed 2× copy (the same as in the game world): finer at menu sizes.
+  url = scale2x(c).toDataURL();
   urlCache.set(name, url);
   return url;
 }

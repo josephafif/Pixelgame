@@ -1,7 +1,9 @@
-// Renders the game into a small low-resolution buffer (a few hundred game
-// pixels across) that is then scaled up by an integer factor. Everything —
-// including rotated weapons — lands on the same pixel grid, it stays cheap
-// on phones, and the view adapts to any screen size or orientation.
+// Renders the game into a small buffer (a few hundred game pixels across)
+// that is then scaled up by a whole number. In HD (the default) the buffer
+// has twice the art's resolution: sprites are drawn from smoothed 2× copies
+// (hd.js), and positions, rotated weapons, particles and lines get half-pixel
+// precision, so movement glides. The view adapts to any screen size or
+// orientation; the low quality setting draws the classic 1× pixel grid.
 
 import { createCanvas, ctx2d } from './canvas.js';
 import { renderChunk, TILE_PX } from './tiles-art.js';
@@ -20,6 +22,7 @@ import { currentPickaxe } from '../game/gathering.js';
 import { palSpecies } from '../game/pals.js';
 import { palSprites } from './creatures.js';
 import { drawPixelText } from './font.js';
+import { installHd, uninstallHd, hdFrame } from './hd.js';
 
 const T = TILE_PX;
 const shadeCache = new Map();
@@ -40,6 +43,25 @@ const TARGET_SHORT_SIDE = 230; // game pixels on the shorter screen side
 // little more on phones held upright, where the screen is narrow.
 const VIEW_TARGETS = { close: 190, normal: TARGET_SHORT_SIDE, wide: 300 };
 const NEW_CHUNKS_PER_FRAME = 4;
+
+/**
+ * HD scale: the whole number nearest `fit` (screen pixels per art pixel)
+ * that is a multiple of 2 or 3, so a 2× or 3× buffer scales up evenly.
+ * Between two, the smaller wins (a little more of the world).
+ */
+function hdScale(fit) {
+  let best = 2;
+  let bestCost = Infinity;
+  for (let s = 2; s <= Math.max(3, Math.ceil(fit) + 3); s++) {
+    if (s % 2 !== 0 && s % 3 !== 0) continue;
+    const cost = Math.abs(Math.log(fit / s)) + (s > fit ? 0.03 : 0);
+    if (cost < bestCost) {
+      best = s;
+      bestCost = cost;
+    }
+  }
+  return best;
+}
 const TAU = Math.PI * 2;
 
 const glowCache = new Map();
@@ -84,6 +106,8 @@ export class Renderer {
     this.view = createCanvas(1, 1);
     this.v = ctx2d(this.view);
     this.resolution = 1;
+    this.hd = true;
+    this.R = 1;
     this.viewSize = 'auto';
     this.pan = { x: 0, y: 0 };
     this.camX = 0;
@@ -97,6 +121,13 @@ export class Renderer {
 
   setResolution(r) {
     this.resolution = r;
+    this.resize();
+  }
+
+  /** HD (2× buffer, smoothed sprites) or the classic 1× pixel grid. */
+  setHd(on) {
+    if (this.hd === on) return;
+    this.hd = on;
     this.resize();
   }
 
@@ -115,11 +146,25 @@ export class Renderer {
     this.canvas.height = Math.max(1, Math.round(cssH * dpr));
     const phonePortrait = cssW <= 640 && cssH > cssW;
     const target = VIEW_TARGETS[this.viewSize] ?? (phonePortrait ? 270 : TARGET_SHORT_SIDE);
-    this.scale = Math.max(2, Math.round(Math.min(this.canvas.width, this.canvas.height) / target));
-    this.view.width = Math.ceil(this.canvas.width / this.scale);
-    this.view.height = Math.ceil(this.canvas.height / this.scale);
+    const fit = Math.min(this.canvas.width, this.canvas.height) / target;
+    const hd = this.hd && this.resolution >= 1;
+    this.scale = hd ? hdScale(fit) : Math.max(2, Math.round(fit));
+    // HD: the buffer has 2× (or 3×) the art's resolution, and it still grows
+    // to the screen by a whole number.
+    this.R = !hd ? 1 : this.scale % 2 === 0 ? 2 : 3;
+    this.W = Math.ceil(this.canvas.width / this.scale);
+    this.H = Math.ceil(this.canvas.height / this.scale);
+    this.view.width = this.W * this.R;
+    this.view.height = this.H * this.R;
     this.ctx = ctx2d(this.canvas);
     this.v = ctx2d(this.view);
+    if (hd) installHd(this.v, this.R);
+    else uninstallHd(this.v);
+  }
+
+  /** A position on the buffer's grid (half art pixels in HD). */
+  #snap(n) {
+    return Math.round(n * this.R) / this.R;
   }
 
   /** Jump the camera to the player (after teleports). */
@@ -156,9 +201,11 @@ export class Renderer {
   draw(game) {
     this.game = game;
     const v = this.v;
-    const W = this.view.width;
-    const H = this.view.height;
+    const W = this.W;
+    const H = this.H;
     const p = game.player;
+    hdFrame();
+    v.setTransform(this.R, 0, 0, this.R, 0, 0);
 
     // Camera follows the player smoothly; shake is cosmetic only. `pan`
     // offsets it (the main menu drifts slowly across the world).
@@ -177,8 +224,8 @@ export class Renderer {
       sx = (Math.random() - 0.5) * game.shake * 10;
       sy = (Math.random() - 0.5) * game.shake * 10;
     }
-    const cx = Math.round(this.camX + sx);
-    const cy = Math.round(this.camY + sy);
+    const cx = this.#snap(this.camX + sx);
+    const cy = this.#snap(this.camY + sy);
     this.cx = cx;
     this.cy = cy;
 
@@ -215,7 +262,7 @@ export class Renderer {
   }
 
   #sx(x) {
-    return Math.round(x * T - this.cx);
+    return this.#snap(x * T - this.cx);
   }
 
   /** Multiplayer: dashed borders of the safe town and clan claims nearby. */
@@ -240,7 +287,7 @@ export class Renderer {
   }
 
   #sy(y) {
-    return Math.round(y * T - this.cy);
+    return this.#snap(y * T - this.cy);
   }
 
   #drawWorld(game, cx, cy, W, H) {
@@ -454,8 +501,8 @@ export class Renderer {
     for (const o of game.others ?? []) if (!o.dead) list.push({ y: o.y, kind: 'remote', o });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
     list.sort((a, b) => a.y - b.y);
-    const W = this.view.width;
-    const H = this.view.height;
+    const W = this.W;
+    const H = this.H;
     for (const d of list) {
       const x = this.#sx(d.o.x);
       const y = this.#sy(d.o.y);
@@ -1652,7 +1699,7 @@ export class Renderer {
     for (const p of game.fx.particles) {
       v.globalAlpha = Math.min(1, p.life / p.max + 0.2);
       v.fillStyle = p.color;
-      v.fillRect(Math.round(p.x * T - this.cx), Math.round(p.y * T - this.cy), p.size, p.size);
+      v.fillRect(this.#snap(p.x * T - this.cx), this.#snap(p.y * T - this.cy), p.size, p.size);
     }
     v.globalAlpha = 1;
   }

@@ -183,6 +183,7 @@ export class MpGame {
     this.fx.damageNumbers = s.damageNumbers;
     this.setQuality(s.quality === 'low' ? 'low' : 'high');
     this.renderer.setViewSize?.(s.viewSize ?? 'auto');
+    this.renderer.setHd?.(s.pixels !== 'classic');
   }
 
   updateSettings(patch) {

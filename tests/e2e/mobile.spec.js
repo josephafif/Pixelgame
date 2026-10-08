@@ -210,7 +210,7 @@ test('phone HUD stays out of the way: compact notices, a quiet resource line, a 
   const errors = trackErrors(page);
   await startGame(page, { tap: true });
   // Upright phones see more of the world than the desktop default.
-  const tilesWide = await game(page, () => window.__pixelgame.game.renderer.view.width / 16);
+  const tilesWide = await game(page, () => window.__pixelgame.game.renderer.W / 16);
   expect(tilesWide).toBeGreaterThanOrEqual(16);
   // Notices: at most two, and repeats count up instead of stacking.
   await game(page, () => {

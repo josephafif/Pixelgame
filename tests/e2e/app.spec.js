@@ -767,7 +767,7 @@ test('the sea has sharks and serpents: they stay in the water, dive, and their l
 
 test('settings: the view size changes how much of the world you see', async ({ page }) => {
   await startGame(page);
-  const tiles = () => game(page, () => window.__pixelgame.game.renderer.view.width);
+  const tiles = () => game(page, () => window.__pixelgame.game.renderer.W);
   const normal = await tiles();
   await game(page, () => window.__pixelgame.game.updateSettings({ viewSize: 'wide' }));
   const wide = await tiles();

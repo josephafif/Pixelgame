@@ -1,5 +1,7 @@
 // Tiny DOM helpers (no framework).
 
+import { scale2x } from '../render/hd.js';
+
 /**
  * h('div.card#id', { onclick, style, ...attrs }, ...children)
  * Children may be strings, nodes, arrays, or null/false (skipped).
@@ -52,16 +54,26 @@ export function clear(el) {
   return el;
 }
 
-/** Wraps a canvas so CSS can scale it crisply. */
+/** Wraps a canvas so CSS can scale it crisply (a smoothed 2× copy, like the game world). */
 export function pixelCanvas(canvas, size) {
-  const c = document.createElement('canvas');
-  c.width = canvas.width;
-  c.height = canvas.height;
-  c.getContext('2d').drawImage(canvas, 0, 0);
+  let c;
+  try {
+    c = scale2x(canvas);
+  } catch {
+    c = document.createElement('canvas');
+    c.width = canvas.width * 2;
+    c.height = canvas.height * 2;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(canvas, 0, 0, c.width, c.height);
+  }
   c.className = 'pixel';
   if (size) {
     c.style.width = `${size}px`;
     c.style.height = `${size}px`;
+  } else {
+    // The copy has twice the pixels: show it at the original's size.
+    c.style.width = `${canvas.width}px`;
   }
   return c;
 }

@@ -240,6 +240,7 @@ export class Game {
     const level = s.quality === 'low' ? 'low' : s.quality === 'high' ? 'high' : this.qualityLevel;
     this.setQuality(level);
     this.renderer.setViewSize?.(s.viewSize ?? 'auto');
+    this.renderer.setHd?.(s.pixels !== 'classic');
   }
 
   updateSettings(patch) {
