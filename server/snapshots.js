@@ -5,7 +5,7 @@
 import { CHUNK } from '../src/game/world.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import {
-  ET, PF, EF, PRF, PKF, SF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS,
+  ET, PF, EF, PRF, PKF, SF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS,
   encodeSnapshot, changed, quantize, angleToByte, colorToInt,
 } from '../src/net/protocol.js';
 import { inSafeZone, claimAt } from '../src/net/rules.js';
@@ -28,6 +28,7 @@ function playerValues(gs, p, now) {
   if (p.inv.activeSlot === 'tool') flags |= PF.TOOL;
   if (p.inv.activeSlot === 'none') flags |= PF.EMPTY;
   if (now - p.lastHurtAt < 160) flags |= PF.HURT;
+  if (p.ascend?.until > gs.time) flags |= PF.ASCEND;
   return [quantize(p.x), quantize(p.y), angleToByte(p.facing), Math.ceil(Math.max(0, p.hp)), p.maxHp, flags, p.anim, SLOTS.indexOf(p.inv.activeSlot), p.ch.pickaxe];
 }
 
@@ -57,7 +58,19 @@ function pickupValues(it) {
 }
 
 function areaValues(gs, a) {
-  return [quantize(a.x), quantize(a.y), quantize(a.r), Math.max(0, AREA_KINDS.indexOf(a.kind)), colorToInt(a.color), a.t0, Math.round(a.dur * TICK_RATE)];
+  let extra = Math.min(AF.COUNT, a.count ?? 0);
+  if (a.big) extra |= AF.BIG;
+  if (a.flower) extra |= AF.FLOWER;
+  if (a.lava) extra |= AF.LAVA;
+  if (a.follow) extra |= AF.FOLLOW;
+  if (a.shape === 'line') extra |= AF.LINE;
+  if (a.spin) extra |= Math.min(15, Math.round(a.spin * 2)) << AF.SPIN_SHIFT;
+  return [quantize(a.x), quantize(a.y), quantize(a.r), Math.max(0, AREA_KINDS.indexOf(a.kind)), colorToInt(a.color), a.t0, Math.round(a.dur * TICK_RATE),
+    extra, a.owner ?? 0, quantize(a.x2 ?? a.x), quantize(a.y2 ?? a.y)];
+}
+
+function allyValues(a) {
+  return [quantize(a.x), quantize(a.y), angleToByte(a.facing), a.owner, a.anim, a.moving ? ALF.MOVING : 0];
 }
 
 function selfFlags(gs, p, now, claims) {
@@ -66,6 +79,7 @@ function selfFlags(gs, p, now, claims) {
   if (inSafeZone(gs.rules, p.x, p.y)) f |= SF.SAFE;
   if (p.protectUntil > now) f |= SF.PROTECTED;
   if (p.newbie) f |= SF.NEWBIE;
+  if (gs.tick - p.blinkTick <= 1) f |= SF.BLINK;
   const c = claimAt(gs.rules, claims, Math.floor(p.x), Math.floor(p.y));
   if (c && c.clanId === p.clanId) f |= SF.OWN_CLAIM;
   else if (c) f |= SF.FOREIGN_CLAIM;
@@ -101,6 +115,7 @@ export function sendSnapshots(gs, now) {
   for (const pr of gs.projectiles.values()) all.push({ id: pr.id, type: ET.PROJ, x: pr.x, y: pr.y, values: projValues(pr), ref: pr });
   for (const it of gs.pickups.values()) all.push({ id: it.id, type: ET.PICKUP, x: it.x, y: it.y, values: pickupValues(it), ref: it });
   for (const a of gs.areas.values()) all.push({ id: a.id, type: ET.AREA, x: a.x, y: a.y, values: areaValues(gs, a), ref: a });
+  for (const a of gs.allies.values()) all.push({ id: a.id, type: ET.ALLY, x: a.x, y: a.y, values: allyValues(a), ref: a });
   // Bucketed by position: each player looks only at the cells around them.
   const grid = (gs.snapGrid ??= new SpatialGrid(16));
   grid.rebuild(all);

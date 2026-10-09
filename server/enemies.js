@@ -135,23 +135,74 @@ export function spawnBoss(gs, bossId, x, y, altarKey) {
 
 // --- Statuses ---------------------------------------------------------------------------
 
+/** The same statuses as single player (src/game/status.js). */
 export function applyStatus(gs, e, id, sourceDamage, attacker) {
   const def = gs.data.statuses[id];
   if (!def || e.dead) return;
-  const until = gs.time + (def.duration ?? 2);
-  if (def.dotPct) {
-    const dps = (sourceDamage * def.dotPct) / 100;
-    const cur = e.statuses[id];
-    e.statuses[id] = { until, dps: Math.max(cur?.until > gs.time ? cur.dps : 0, dps), from: attacker?.id ?? 0 };
-  } else if (id === 'chill') {
-    const stacks = (e.statuses.chill?.until > gs.time ? e.statuses.chill.stacks : 0) + 1;
-    e.statuses.chill = { until, stacks };
-    if (!e.boss && stacks >= (def.freezeAt ?? 3)) {
-      e.statuses.freeze = { until: gs.time + (gs.data.statuses.freeze?.duration ?? 1.2) };
-      e.statuses.chill.stacks = 0;
+  const now = gs.time;
+  const s = e.statuses;
+  const until = now + (def.duration ?? 2);
+  const dot = Math.max(1, (sourceDamage * (def.dotPct ?? 0)) / 100);
+  const from = attacker?.id ?? 0;
+  switch (id) {
+    case 'burn':
+      s.burn = { until, dps: Math.max(dot, s.burn?.until > now ? s.burn.dps : 0), from };
+      break;
+    case 'poison':
+    case 'bleed': {
+      const prev = s[id]?.until > now ? s[id] : null;
+      s[id] = { until, stacks: Math.min(def.maxStacks ?? 1, (prev?.stacks ?? 0) + 1), dps: Math.max(dot, prev?.dps ?? 0), from };
+      break;
     }
-  } else if (id === 'stagger' && !e.boss) {
-    e.statuses.freeze = { until: gs.time + (def.duration ?? 0.5) };
+    case 'rift':
+      s.rift = { until, dps: dot, from };
+      break;
+    case 'chill': {
+      const stacks = (s.chill?.until > now ? s.chill.stacks : 0) + 1;
+      if (stacks >= (def.freezeAt ?? 3) && !e.boss) {
+        delete s.chill;
+        applyStatus(gs, e, 'freeze', sourceDamage, attacker);
+      } else {
+        s.chill = { until, stacks };
+      }
+      break;
+    }
+    case 'freeze':
+      if (e.boss) {
+        s.chill = { until, stacks: 1 };
+      } else {
+        s.freeze = { until };
+        s.chill = { until: until + 1, stacks: 0 };
+      }
+      break;
+    case 'shock':
+      s.shock = { until };
+      break;
+    case 'stagger':
+      if (!e.boss && !(s.staggerImmune > now)) {
+        s.stun = { until };
+        s.staggerImmune = now + (def.immunity ?? 2);
+      }
+      break;
+    case 'gust': {
+      if (e.boss || !attacker) break;
+      const d = Math.hypot(e.x - attacker.x, e.y - attacker.y) || 1;
+      e.kx += ((e.x - attacker.x) / d) * (def.knockback ?? 2) * 4;
+      e.ky += ((e.y - attacker.y) / d) * (def.knockback ?? 2) * 4;
+      break;
+    }
+    case 'smite':
+      gs.schedule(0.2, () => {
+        if (e.dead) return;
+        gs.event(e.x, e.y, { k: 'fx', fx: 'smite', x: e.x, y: e.y });
+        combat.damageEnemy(gs, e, (sourceDamage * (def.bonusPct ?? 25)) / 100, { attacker, element: 'holy', depth: 2, source: 'proc', canCrit: false });
+      });
+      break;
+    case 'mark':
+      s.mark = { until };
+      break;
+    default:
+      break;
   }
 }
 
@@ -166,11 +217,18 @@ function tickStatuses(gs, e, dt) {
       delete s[id];
       continue;
     }
-    dot += st.dps;
+    // Poison and bleeding stack; bleeding hurts more while running.
+    const moving = id === 'bleed' && Math.hypot(e.vx, e.vy) > 0.2 ? 1.3 : 1;
+    dot += st.dps * (st.stacks ?? 1) * moving;
     from = st.from || from;
   }
-  e.slowMult = s.chill?.until > gs.time ? 0.6 : 1;
-  e.stunned = s.freeze?.until > gs.time;
+  const statuses = gs.data.statuses;
+  let slow = 1;
+  if (s.chill?.until > gs.time) slow *= 1 - (statuses.chill?.slow ?? 40) / 100;
+  if (s.rift?.until > gs.time) slow *= 1 - (statuses.rift?.slow ?? 0) / 100;
+  if (e.warpUntil > gs.time) slow *= 1 - e.warpSlow / 100; // Time Warp, Absolute Zero
+  e.slowMult = slow;
+  e.stunned = s.freeze?.until > gs.time || s.stun?.until > gs.time;
   if (!dot) return;
   e.dotAcc = (e.dotAcc ?? 0) + dot * dt;
   if (e.dotAcc >= 1) {

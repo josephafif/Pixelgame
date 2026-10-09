@@ -12,11 +12,11 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
-export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5 };
+export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6 };
 
 /**
  * Fields per entity type, all integers on the wire. Position-like fields
@@ -27,18 +27,20 @@ export const FIELDS = {
   [ET.ENEMY]: ['x', 'y', 'facing', 'hp', 'maxHp', 'state', 'def', 'level', 'flags', 'element', 'anim'],
   [ET.PROJ]: ['x', 'y', 'vx', 'vy', 't0', 'sprite', 'color', 'size', 'owner', 'flags'],
   [ET.PICKUP]: ['x', 'y', 'kind', 'color', 'rarity', 'ref', 'flags'],
-  [ET.AREA]: ['x', 'y', 'r', 'kind', 'color', 't0', 'dur'],
+  [ET.AREA]: ['x', 'y', 'r', 'kind', 'color', 't0', 'dur', 'extra', 'owner', 'x2', 'y2'],
+  // Clones from the Mirror ability: who they copy, and their blows.
+  [ET.ALLY]: ['x', 'y', 'facing', 'owner', 'anim', 'flags'],
 };
-const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r']);
+const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
 
 /** Bit flags. */
-export const PF = { MOVING: 1, SPRINT: 2, DEAD: 4, ASLEEP: 8, PROTECTED: 16, TOOL: 32, EMPTY: 64, HURT: 128 };
+export const PF = { MOVING: 1, SPRINT: 2, DEAD: 4, ASLEEP: 8, PROTECTED: 16, TOOL: 32, EMPTY: 64, HURT: 128, ASCEND: 256 };
 export const EF = { ELITE: 1, BOSS: 2, SUBMERGED: 4, STUNNED: 8, FROZEN: 16, ALERT: 32 };
 export const PRF = { ENEMY: 1, LOB: 2, MINE: 4 };
 export const PKF = { LOCKED: 1, MINE: 2 };
 /** Your own state flags (snapshot self block). */
-export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FOREIGN_CLAIM: 32, ASLEEP: 64 };
+export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FOREIGN_CLAIM: 32, ASLEEP: 64, BLINK: 128 };
 /** Enemy animation states. */
 export const ESTATE = ['move', 'windup', 'charge', 'fade', 'cast', 'idle'];
 /** Pickup kinds. */
@@ -46,7 +48,14 @@ export const PICKUP_KINDS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shard
 /** Projectile sprites. */
 export const PROJ_SPRITES = ['orb', 'arrow', 'bolt', 'knife', 'blade', 'leafblade', 'shard', 'bullet', 'boomerang', 'chakram', 'wave', 'ball', 'spit', 'rock', 'fireball'];
 /** Area kinds. */
-export const AREA_KINDS = ['telegraph', 'hazard', 'cloud', 'quake', 'ring'];
+export const AREA_KINDS = ['telegraph', 'hazard', 'cloud', 'quake', 'ring', 'portal', 'bladering', 'timewarp', 'field', 'orbit', 'gravity'];
+/**
+ * An area's 'extra' field: a count (blades, orbs) in the low 4 bits, flags,
+ * and how fast it spins (× 2) from bit 9.
+ */
+export const AF = { COUNT: 15, BIG: 16, FLOWER: 32, LAVA: 64, FOLLOW: 128, LINE: 256, SPIN_SHIFT: 9 };
+/** Ally flags. */
+export const ALF = { MOVING: 1 };
 /** Slots on the wire. */
 export const SLOTS = ['main', 'secondary', 'tool', 'none'];
 /** One-shot commands carried by an input frame. */

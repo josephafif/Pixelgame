@@ -8,6 +8,7 @@ import { AuthError, hashPassword } from './auth.js';
 import * as players from './players.js';
 import * as commands from './commands.js';
 import * as clans from './clans.js';
+import * as abilities from './abilities.js';
 
 const MAX_TEXT = 8 * 1024;
 const MAX_BINARY = 256;
@@ -190,6 +191,7 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
     });
     conn.sendJson(players.inventoryPayload(gs, p));
     conn.sendJson(players.mePayload(gs, p));
+    conn.sendJson(abilities.cooldownPayload(p));
     conn.sendJson({ t: 'claims', claims: gs.claims() });
     const clan = gs.clanOf(p.accountId);
     if (clan) conn.sendJson(clans.clanPayload(gs, clan));

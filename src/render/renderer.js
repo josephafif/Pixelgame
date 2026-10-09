@@ -1237,9 +1237,12 @@ export class Renderer {
     const toolActive = remote ? c.slot === 'tool' : game.toolActive;
     const handsEmpty = remote ? c.slot === 'none' : game.handsEmpty;
     if (isClone || !sailing) this.#shadow(x + lx, y + 1 + ly, 5);
-    // Ascension: a radiant aura while the power lasts.
-    if (!isClone && game.ascend && game.ascend.until > game.time) {
-      this.#glow(x, y - 6, game.ascend.color, 20 + Math.sin(game.time * 8) * 3);
+    // Ascension: a radiant aura while the power lasts (other players' too, in multiplayer).
+    const ascend = isClone ? null
+      : remote ? (c.ascending ? '#ffd24a' : null)
+        : game.ascend && game.ascend.until > game.time ? game.ascend.color : null;
+    if (ascend) {
+      this.#glow(x, y - 6, ascend, 20 + Math.sin(game.time * 8) * 3);
       if (Math.random() < 0.4) game.fx.emit('arcane', c.x, c.y - 0.3, 1, 0.5, 1.5);
     }
     const behind = pose && Math.sin(pose.angle) < -0.35;

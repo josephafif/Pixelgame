@@ -296,8 +296,27 @@ test('turrets shoot monsters, over the clan walls next to them', async () => {
       res = await a.request({ t: 'build', id: 'wood_wall', x: wx, y: wy });
       assert.equal(res.ok, true, res.error);
     }
+    // Only our monster (the turret shoots the nearest one), in plain sight.
+    t.gs.config.maxEnemies = 0;
+    for (const o of t.gs.enemies.values()) o.dead = true;
     const { spawnEnemy } = await import('../../server/enemies.js');
-    const spot = t.gs.world.findFreeSpot(turret[0] + 4.5, turret[1] + 0.5, 0.4);
+    const { _test: { shotBlocked } } = await import('../../server/combat.js');
+    const [cx, cy] = [turret[0] + 0.5, turret[1] + 0.3];
+    const clear = (x, y) => {
+      for (let k = 1; k < 20; k++) {
+        const b = shotBlocked(t.gs, cx + ((x - cx) * k) / 20, cy + ((y - cy) * k) / 20);
+        if (b && !(b.st && b.st.clanId === p.clanId)) return false;
+      }
+      return t.gs.world.isFree(x, y, 0.45, 'enemy');
+    };
+    let spot = null;
+    for (const [dx, dy] of [[4, 0], [0, 4], [-4, 0], [0, -4], [3, 3], [-3, 3], [3, -3], [-3, -3], [3, 0], [0, 3]]) {
+      if (clear(cx + dx, cy + dy)) {
+        spot = { x: cx + dx, y: cy + dy };
+        break;
+      }
+    }
+    assert.ok(spot, 'a spot in plain sight of the turret');
     const e = spawnEnemy(t.gs, 'slime', spot.x, spot.y, { level: 1 });
     e.hp = e.maxHp = 5000;
     await sleep(3000);

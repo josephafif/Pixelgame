@@ -97,6 +97,42 @@ test('the inventory and forge open in multiplayer, and nobody can build in town'
   await a.ctx.close();
 });
 
+test('a legendary power in multiplayer: the button, its cooldown and its effects', async ({ browser }) => {
+  const a = await join(browser, 'Legenden');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Legenden');
+  // A legendary weapon, straight into the bag.
+  const loot = await import('../../server/loot.js');
+  const dna = loot.generate(srv.gs, { level: 20, minRarity: 'legendary', maxRarity: 'legendary', craft: {} });
+  loot.giveWeapon(srv.gs, p, dna, 'test');
+  await a.page.waitForTimeout(300);
+  await a.page.evaluate((id) => window.__pixelgame.game.equip(id, 'main'), dna.id);
+  await a.page.waitForFunction((id) => window.__pixelgame.game.weapon?.dna.id === id, dna.id);
+  // (The touch buttons only show on touch screens; on a computer it is the Q key.)
+  await expect(a.page.locator('#btn-ability')).not.toHaveAttribute('hidden', '');
+  await expect(a.page.locator('#btn-ability')).toHaveClass(/legendary/);
+  await expect(a.page.locator('#btn-ability')).toHaveClass(/ready/);
+  // Out in the wild with monsters around.
+  await a.page.evaluate(() => window.__pixelgame.game.chat('/tp 120.5 0.5'));
+  await a.page.waitForTimeout(600);
+  p.protectUntil = Date.now() + 60000;
+  const { spawnEnemy } = await import('../../server/enemies.js');
+  const foes = [[2, 0], [-2, 0.5], [0.5, 2]].map(([dx, dy]) => {
+    const spot = srv.gs.world.findFreeSpot(p.x + dx, p.y + dy, 0.4);
+    const e = spawnEnemy(srv.gs, 'slime', spot.x, spot.y, { level: 1 });
+    e.hp = e.maxHp = 1e6;
+    return e;
+  });
+  await a.page.waitForTimeout(300);
+  await a.page.keyboard.press('KeyQ');
+  // The cooldown shows on the button, and the power hurts the monsters.
+  await expect(a.page.locator('#btn-ability')).not.toHaveClass(/ready/, { timeout: 3000 });
+  await expect.poll(() => foes.filter((e) => e.hp < e.maxHp).length, { timeout: 8000 }).toBeGreaterThan(0);
+  expect(await a.page.evaluate(() => window.__pixelgame.game.hudState().ability?.ready)).toBe(false);
+  await a.page.waitForTimeout(1500);
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
 test('on a new link or device: log in with name and password and get your character back', async ({ browser }) => {
   const a = await join(browser, 'Doris', 'ostkaka');
   const level = await a.page.evaluate(() => window.__pixelgame.game.me?.level);

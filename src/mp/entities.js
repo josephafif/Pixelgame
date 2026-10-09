@@ -4,7 +4,7 @@
 // packets arrive unevenly).
 
 import {
-  ET, FIELDS, Q, PF, EF, PRF, PKF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS,
+  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS,
   byteToAngle, intToColor,
 } from '../net/protocol.js';
 import { TICK_RATE } from '../net/movement.js';
@@ -183,6 +183,7 @@ export function readPlayer(v) {
     asleep: Boolean(flags & PF.ASLEEP),
     protected: Boolean(flags & PF.PROTECTED),
     hurt: Boolean(flags & PF.HURT),
+    ascending: Boolean(flags & PF.ASCEND),
     anim: f('anim'),
     slot: SLOTS[f('slot')] ?? 'main',
     pickaxe: f('tool'),
@@ -224,15 +225,33 @@ export function readPickup(v) {
   };
 }
 
-export function readArea(v, rt) {
+/** An area at render tick `rt`; (x, y) is its (interpolated) position. */
+export function readArea(v, rt, x = field(ET.AREA, v, 'x') / Q, y = field(ET.AREA, v, 'y') / Q) {
   const f = (n) => field(ET.AREA, v, n);
+  const extra = f('extra') ?? 0;
   return {
     kind: AREA_KINDS[f('kind')] ?? 'telegraph',
-    x: f('x') / Q,
-    y: f('y') / Q,
+    x,
+    y,
     r: f('r') / Q,
     color: intToColor(f('color')),
     t: (rt - f('t0')) / TICK_RATE,
     dur: f('dur') / TICK_RATE,
+    count: extra & AF.COUNT,
+    big: Boolean(extra & AF.BIG),
+    flower: Boolean(extra & AF.FLOWER),
+    lava: Boolean(extra & AF.LAVA),
+    follow: Boolean(extra & AF.FOLLOW),
+    shape: extra & AF.LINE ? 'line' : 'circle',
+    spin: (extra >> AF.SPIN_SHIFT) / 2 || undefined,
+    owner: f('owner') ?? 0,
+    x2: (f('x2') ?? 0) / Q,
+    y2: (f('y2') ?? 0) / Q,
   };
+}
+
+/** A clone (Mirror ability). */
+export function readAlly(v) {
+  const f = (n) => field(ET.ALLY, v, n);
+  return { facing: byteToAngle(f('facing')), owner: f('owner'), anim: f('anim'), moving: Boolean(f('flags') & ALF.MOVING) };
 }

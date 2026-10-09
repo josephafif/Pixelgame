@@ -11,6 +11,7 @@ import { mpInventorySizes, MP_RESOURCE_KEYS, FRISTAD_LEVELS } from '../src/net/m
 import * as combat from './combat.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
+import * as abilities from './abilities.js';
 
 // Inputs waiting to be simulated; beyond this the oldest are dropped.
 const MAX_QUEUE = 12;
@@ -96,6 +97,9 @@ export function createPlayer(gs, account, ch, items) {
     statuses: {},
     buffs: [],
     protectUntil: 0,
+    invulnUntil: 0, // a moment after a Blink or a Phoenix rebirth
+    ascend: null, // Ascension: { until, color }
+    blinkTick: -1,
     combatUntil: 0,
     lastHurtAt: 0,
     asleep: false,
@@ -329,10 +333,7 @@ function applyFrame(gs, p, f, now) {
     if (p.inv.activeSlot === 'tool') toolSwing(gs, p, aim, now);
     else if (heldWeapon(p)) combat.tryAttack(gs, p, aim, f.target, now);
   }
-  if (f.buttons & BTN.ABILITY && !p.warnedAbility) {
-    p.warnedAbility = true;
-    gs.toast(p, 'Vapenförmågor finns inte i multiplayer än.', 'warn');
-  }
+  if (f.buttons & BTN.ABILITY && p.inv.activeSlot !== 'tool') abilities.cast(gs, p, aim, f.target, now);
 }
 
 function command(gs, p, cmd) {

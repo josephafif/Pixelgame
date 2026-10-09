@@ -12,6 +12,7 @@ import * as enemies from './enemies.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
+import * as abilities from './abilities.js';
 import { sendSnapshots } from './snapshots.js';
 import { SpatialGrid, PAD } from './grid.js';
 
@@ -74,6 +75,7 @@ export class GameServer {
     this.projectiles = new Map();
     this.pickups = new Map();
     this.areas = new Map();
+    this.allies = new Map(); // clones from the Mirror ability
     this.timers = [];
     this.stats = { tickMs: 0, maxTickMs: 0, sent: 0 };
     this.prof = new TickProfile();
@@ -200,6 +202,7 @@ export class GameServer {
     enemies.update(this, TICK_DT, now);
     if (this.tick % 15 === 0) enemies.spawn(this, now);
     this.reindexEnemies();
+    abilities.updateAllies(this, TICK_DT);
     prof.mark('enemies');
     combat.updateProjectiles(this, TICK_DT, now);
     combat.updateAreas(this, TICK_DT, now);

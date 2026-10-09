@@ -32,7 +32,7 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 | Del | Var i koden |
 |---|---|
 | Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
-| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `net.js`, `auth.js`, `db.js`) |
+| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
 | Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
 | Drift | `cloud/` och `wrangler.jsonc` (Cloudflare), `supabase/` (serverlistan), `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
@@ -47,10 +47,19 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 - **Fusk:** 300 inputs som skickas på en gång ger ingen extra fart, servern
   kickar den som skickar skräppaket, och spelare utanför synhåll skickas aldrig.
 
+### Vapenförmågor och legendariska krafter
+
+Alla förmågor och alla legendariska krafter finns i multiplayer, med samma
+siffror som i singleplayer (`server/abilities.js`). Servern kör dem, och alla i
+närheten ser effekterna. Klonerna är egna figurer. Kraften skadar monster men
+aldrig andra spelare, eftersom en legendarisk kraft annars skulle avgöra en
+PvP-strid på egen hand. Nedkylningen sparas med karaktären, så den nollställs
+inte om man loggar ut eller byter vapen. Fenix räddar dig en gång medan den är
+redo, precis som i singleplayer.
+
 ### Inte med i multiplayer än
 
 Följande finns i singleplayer men inte i multiplayer än:
-- vapenförmågor och legendariska krafter;
 - pals;
 - båtar, havsdjur och marknader;
 - forskning (smedjan har samma val för alla);

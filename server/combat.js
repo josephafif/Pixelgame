@@ -12,6 +12,7 @@ import * as players from './players.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
 import * as enemies from './enemies.js';
+import * as abilities from './abilities.js';
 
 const DEG = Math.PI / 180;
 const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE]);
@@ -33,8 +34,18 @@ export function damageEnemy(gs, e, amount, opts = {}) {
   if (e.dead || e.submerged || amount <= 0) return 0;
   const attacker = opts.attacker ?? null;
   const element = opts.element ?? 'physical';
-  const crit = opts.canCrit !== false && critRoll(attacker);
+  let crit = false;
+  if (opts.canCrit !== false && attacker?.stats) {
+    // A marked monster takes a sure critical hit (and loses the mark).
+    if (e.statuses.mark?.until > gs.time) {
+      crit = true;
+      delete e.statuses.mark;
+    } else {
+      crit = critRoll(attacker);
+    }
+  }
   let dmg = amount * (crit ? (attacker.stats.critDamage ?? 150) / 100 : 1);
+  if (e.statuses.shock?.until > gs.time) dmg *= 1 + (gs.data.statuses.shock?.vulnerability ?? 0) / 100;
   if (element !== 'physical' && e.element && e.element !== 'physical') {
     if (e.element === element) dmg *= 0.6;
     else if (gs.data.byId.elements.get(e.element)?.opposes.includes(element)) dmg *= 1.5;
@@ -98,7 +109,7 @@ export function heal(gs, p, amount) {
 export function hurtPlayer(gs, p, amount, { element = 'physical', fromX, fromY, attacker = null, dot = false, knock = 5 } = {}) {
   const now = Date.now();
   if (p.dead || amount <= 0) return 0;
-  if (!dot && p.protectUntil > now) return 0;
+  if (!dot && (p.protectUntil > now || p.invulnUntil > now)) return 0;
   let dmg = amount;
   if (!dot) {
     dmg *= 100 / (100 + p.stats.defense * 4);
@@ -121,6 +132,7 @@ export function hurtPlayer(gs, p, amount, { element = 'physical', fromX, fromY, 
     p.ky += ((p.y - fromY) / d) * knock;
   }
   gs.event(p.x, p.y, { k: 'hurt', id: p.id, n: dmg, by: attacker?.id ?? 0, dot });
+  if (p.hp <= 0 && abilities.tryPhoenixRevive(gs, p, now)) return dmg;
   if (p.hp <= 0) killPlayer(gs, p, attacker ?? (p.lastAttackerAt > now - 10000 ? gs.players.get(p.lastAttacker) : null));
   return dmg;
 }
@@ -205,6 +217,7 @@ export function tryAttack(gs, p, aim, targetId, now) {
   const strike = () => {
     if (p.dead || players.heldWeapon(p) !== w) return;
     executePattern(gs, p, w, { angle, damage, view });
+    abilities.ascendStrike(gs, p, angle);
     for (const h of w.hooks.attack) runAttackHook(gs, p, w, h, angle, damage);
     for (const h of w.hooks.nth) if (p.anim % h.n === 0) runAttackHook(gs, p, w, h, angle, damage);
   };
@@ -430,6 +443,8 @@ export function spawnProjectile(gs, o) {
     status: o.status ?? null,
     knockback: o.knockback ?? 0,
     source: o.source ?? 'weapon',
+    homing: o.homing ?? 0,
+    slow: 1, // a monster shot inside a Time Warp
     hit: new Set(),
     t0: gs.tick,
     x0: o.x,
@@ -442,6 +457,39 @@ export function spawnProjectile(gs, o) {
   }
   gs.projectiles.set(pr.id, pr);
   return pr;
+}
+
+/** Homing shots (Thousand Blades) turn towards the nearest monster they haven't hit. */
+function steerHoming(gs, pr, dt) {
+  let best = null;
+  let bestD = 36;
+  for (const e of gs.enemiesNear(pr.x, pr.y, 6)) {
+    if (e.dead || e.submerged || pr.hit.has(e.id)) continue;
+    const d = (e.x - pr.x) ** 2 + (e.y - pr.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  if (!best) return;
+  const cur = Math.atan2(pr.vy, pr.vx);
+  const want = Math.atan2(best.y - pr.y, best.x - pr.x);
+  const turn = (5 + pr.homing * 2) * dt;
+  const a = cur + Math.max(-turn, Math.min(turn, angleDiff(cur, want)));
+  pr.vx = Math.cos(a) * pr.speed;
+  pr.vy = Math.sin(a) * pr.speed;
+  // Clients draw shots on straight lines: a new line every other tick.
+  if (gs.tick % 2 === 0) rebase(gs, pr);
+}
+
+/** A monster shot entering or leaving a Time Warp changes speed (and the clients' line). */
+function slowInWarp(gs, pr) {
+  const slow = gs.areas.size ? abilities.shotSlowAt(gs, pr.x, pr.y) : 1;
+  if (slow === pr.slow) return;
+  pr.vx *= slow / pr.slow;
+  pr.vy *= slow / pr.slow;
+  pr.slow = slow;
+  rebase(gs, pr);
 }
 
 function rebase(gs, pr) {
@@ -491,9 +539,11 @@ export function updateProjectiles(gs, dt, now) {
         pr.vy = ((owner.y - pr.y) / d) * pr.speed;
         if (gs.tick % 3 === 0) rebase(gs, pr);
       }
+      if (pr.homing && pr.owner && s === 0) steerHoming(gs, pr, dt);
+      if (pr.enemy && s === 0) slowInWarp(gs, pr);
       pr.x += pr.vx * sdt;
       pr.y += pr.vy * sdt;
-      pr.traveled += pr.speed * sdt;
+      pr.traveled += Math.hypot(pr.vx, pr.vy) * sdt;
       if (pr.kind === 'lob') {
         if (pr.traveled >= Math.sqrt((pr.tx - pr.x0) ** 2 + (pr.ty - pr.y0) ** 2)) {
           explodeAt(gs, pr, pr.x, pr.y);
@@ -565,7 +615,7 @@ function projectileHits(gs, pr, now) {
       if (pr.kind !== 'boomerang' && pr.hit.size > pr.pierce) return false;
     }
   }
-  if (pr.owner) {
+  if (pr.owner && pr.source !== 'ability') {
     const shooter = gs.players.get(pr.owner);
     if (!shooter) return true;
     for (const v of gs.playersNear(pr.x, pr.y, 1.6)) {
@@ -615,6 +665,11 @@ export function spawnArea(gs, o) {
 export function updateAreas(gs, dt) {
   for (const a of gs.areas.values()) {
     a.t += dt;
+    if (a.ability) {
+      abilities.updateArea(gs, a, dt);
+      if (a.t >= a.dur) gs.areas.delete(a.id);
+      continue;
+    }
     if (a.kind === 'hazard') {
       a.tickT = (a.tickT ?? 0) - dt;
       if (a.tickT <= 0) {

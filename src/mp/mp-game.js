@@ -25,10 +25,13 @@ import { mpVirtualSave } from '../net/mpsave.js';
 import { inSafeZone, claimAt, canDo, bannerProblem, pvpBlock } from '../net/rules.js';
 import { Connection } from './connection.js';
 import {
-  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea,
+  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly,
 } from './entities.js';
+import { abilityProgress, abilityReadyIn } from '../game/abilities.js';
 
 const DEG = Math.PI / 180;
+// Effect shapes an ability may draw (anything else from a server is ignored).
+const FX_SHAPES = new Set(['ring', 'line', 'bolt', 'pillar', 'marker', 'meteor', 'slash', 'spike', 'beam', 'flash']);
 const QUALITY = {
   high: { particles: 650, glow: true, enemyFactor: 1, resolution: 1 },
   low: { particles: 220, glow: false, enemyFactor: 0.75, resolution: 0.8 },
@@ -82,6 +85,7 @@ export class MpGame {
     this.hitstop = 0;
     this.screenFlash = null;
     this.ascend = null;
+    this.abilityReadyAt = new Map(); // weapon id → this.time it is ready (the server's cooldowns)
     this.timers = [];
     this.pauseReasons = new Set();
     this.discoveryQueue = [];
@@ -459,6 +463,15 @@ export class MpGame {
           else this.eventQueue.push(ev);
         }
         break;
+      case 'abcd':
+        // Ability cooldowns: all of them when you join, one when you cast.
+        if (msg.all) {
+          this.abilityReadyAt.clear();
+          for (const [id, left] of Object.entries(msg.all)) this.abilityReadyAt.set(id, this.time + left);
+        } else {
+          this.abilityReadyAt.set(msg.id, this.time + msg.left);
+        }
+        break;
       case 'toast':
         this.toast(msg.text, msg.kind);
         break;
@@ -690,7 +703,8 @@ export class MpGame {
         this.corr.x = 0;
         this.corr.y = 0;
         this.prev = { x: pred.x, y: pred.y };
-        this.renderer.snapCamera?.();
+        // A Blink: you are there at once, and the camera glides after you.
+        if (!(s.flags & SF.BLINK)) this.renderer.snapCamera?.();
       } else {
         // Keep what's on screen where it is and glide the difference away.
         this.corr.x += dx;
@@ -754,7 +768,12 @@ export class MpGame {
         if (o && o.type !== 'harvest') this.suppressAttack = true;
         if (c === 'interact-or-attack' && !o) buttons |= BTN.ATTACK;
       } else if (c === 'ability') {
-        buttons |= BTN.ABILITY;
+        // The server decides; this only skips presses that can't work.
+        if (!this.toolActive && !this.handsEmpty && !p.dead && abilityReadyIn(this) === 0) {
+          buttons |= BTN.ABILITY;
+          const ab = this.weapon.ability ?? this.weapon.dna.ability;
+          this.abilityReadyAt.set(this.weapon.dna.id, this.time + ab.cooldown);
+        }
       } else if (c === 'slot1' || c === 'slot2' || c === 'slot3') {
         if (!this.build.active) cmd = { slot1: CMD.SLOT_MAIN, slot2: CMD.SLOT_SECONDARY, slot3: CMD.SLOT_TOOL }[c];
       } else if (c === 'slotNext' || c === 'slotPrev') {
@@ -1039,6 +1058,7 @@ export class MpGame {
     const projectiles = [];
     const pickups = [];
     const areas = [];
+    const allies = [];
     let boss = null;
     const myClan = this.me?.clan?.id ?? null;
     for (const ent of this.store.ents.values()) {
@@ -1121,8 +1141,38 @@ export class MpGame {
           break;
         }
         case ET.AREA: {
-          const a = readArea(s.v, rt);
+          const a = readArea(s.v, rt, s.x, s.y);
+          if (a.follow && a.owner) {
+            // Blade rings and blizzards stay on their caster as drawn here.
+            const o = a.owner === this.myId ? this.player : this.store.ents.get(a.owner)?.obj;
+            if (o) {
+              a.x = o.x;
+              a.y = o.y;
+            }
+          }
           if (a.t >= 0 && a.t <= a.dur) areas.push(a);
+          break;
+        }
+        case ET.ALLY: {
+          const info = readAlly(s.v);
+          let o = ent.obj;
+          if (!o) {
+            o = { id: ent.id, kind: 'clone', remote: true, r: PLAYER_RADIUS, attackT: -1, anim: info.anim, walkT: 0, guard: 1 };
+            ent.obj = o;
+          }
+          o.x = s.x;
+          o.y = s.y;
+          o.facing = info.facing;
+          o.moving = info.moving;
+          if (o.moving) o.walkT += dt * 9;
+          o.weapon = info.owner === this.myId ? this.weapon : this.pinfo.get(info.owner)?.compiled ?? null;
+          if (info.anim !== o.anim) {
+            o.anim = info.anim;
+            o.attackT = this.time;
+            const reach = Math.min(o.weapon?.stats.range ?? 2, 3);
+            this.fx.add({ type: 'slash', x: o.x, y: o.y, angle: o.facing, arc: 2, r: reach, color: '#cdb2ff', dur: 0.14, ghost: true });
+          }
+          allies.push(o);
           break;
         }
         default:
@@ -1134,6 +1184,7 @@ export class MpGame {
     this.projectiles = projectiles.concat(this.localShots);
     this.pickups = pickups;
     this.areas = areas;
+    this.allies = allies;
     if (boss !== this.boss) {
       this.boss = boss;
       this.emit('boss', boss ? { active: true, name: boss.bossDef.name } : { active: false });
@@ -1338,8 +1389,69 @@ export class MpGame {
       case 'blink':
         this.fx.emit('arcane', ev.x, ev.y, 24, 0.6, 3);
         break;
+      case 'smite':
+        this.fx.add({ type: 'pillar', x: ev.x, y: ev.y, r: 0.6, color: '#fff3b0', dur: 0.3 });
+        break;
+      case 'ab':
+        this.#abilityFx(ev);
+        break;
       default:
         break;
+    }
+  }
+
+  /**
+   * What a weapon ability looks and sounds like (server/abilities.js show()):
+   * the same shapes, particles and sounds as in single player. Shakes,
+   * flashes and vibration are only for the one who cast it.
+   */
+  #abilityFx(ev) {
+    const mine = ev.by === this.myId;
+    const heard = mine || dist2(ev.x ?? 0, ev.y ?? 0, this.player.x, this.player.y) < 16 * 16;
+    for (const op of Array.isArray(ev.ops) ? ev.ops : []) {
+      if (!Array.isArray(op)) continue;
+      switch (op[0]) {
+        case 'add':
+          if (op[1] && FX_SHAPES.has(op[1].type)) this.fx.add({ ...op[1] });
+          break;
+        case 'emit':
+          this.fx.emit(String(op[1]), op[2], op[3], Math.min(60, op[4] | 0), op[5], op[6]);
+          break;
+        case 'snd':
+          if (heard) this.audio.play(String(op[1]), op[2] ?? {});
+          break;
+        case 'text':
+          this.fx.text(op[1], op[2], String(op[3]).slice(0, 40), String(op[4]), Number(op[5]) || 1);
+          break;
+        case 'cone':
+          this.#breathFx(op, mine);
+          break;
+        case 'shake':
+          if (mine) this.shake = Math.max(this.shake, Number(op[1]) || 0);
+          break;
+        case 'flash':
+          if (mine) this.flash(String(op[1]), Number(op[2]) || 0.2);
+          break;
+        case 'vib':
+          if (mine) this.vibrate(Math.min(80, op[1] | 0));
+          break;
+        case 'ascend':
+          if (mine) this.ascend = { until: this.time + Number(op[1]), color: String(op[2]) };
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  /** Dragon's Breath: fire and sparks in a cone (from you as you see yourself). */
+  #breathFx([, x, y, a, radius, half], mine) {
+    const ox = mine ? this.player.x : x;
+    const oy = mine ? this.player.y : y;
+    for (let k = 0; k < 5; k++) {
+      const d = Math.random() * radius;
+      const off = (Math.random() - 0.5) * 2 * half * (d / radius);
+      this.fx.emit(k % 2 ? 'ember' : 'spark', ox + Math.cos(a + off) * d, oy + Math.sin(a + off) * d, 2, 0.3, 2.5);
     }
   }
 
@@ -1934,8 +2046,8 @@ export class MpGame {
       stone: s.resources.stone ?? 0,
       building: this.build.active,
       nearCamp: Boolean(this.me?.clan) && !(this.selfFlags & SF.SAFE),
-      ability: null,
-      abilityName: null,
+      ability: this.toolActive || this.handsEmpty ? null : abilityProgress(this),
+      abilityName: this.weapon?.ability?.name ?? null,
       sprinting: p.sprinting,
       boss: this.boss ? { name: this.boss.bossDef.name, hp: this.boss.hp, maxHp: this.boss.maxHp, phase: this.boss.hp < this.boss.maxHp * 0.5 ? 2 : 1 } : null,
       dead: p.dead,

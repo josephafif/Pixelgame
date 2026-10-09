@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { PROTOCOL_VERSION } from '../../src/net/protocol.js';
 
 /** Collects page errors and console errors so tests can assert none happened. */
 export function trackErrors(page) {
@@ -66,6 +67,6 @@ export async function stubSupabase(page, { servers = [], codes = {}, providers =
 }
 
 const official = {
-  name: 'Pixelgame', protocol: 1, players: 3, maxPlayers: 40, guests: true, logins: true, supabase: true,
+  name: 'Pixelgame', protocol: PROTOCOL_VERSION, players: 3, maxPlayers: 40, guests: true, logins: true, supabase: true,
   rules: { safeRadius: 24, claimRadius: 16, raidWindow: 'lördag 18:00–21:00', raidGraceMinutes: 15, clanMax: 8, hardcore: false },
 };
