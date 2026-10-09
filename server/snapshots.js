@@ -5,7 +5,7 @@
 import { CHUNK } from '../src/game/world.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import {
-  ET, PF, EF, PRF, PKF, SF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
+  ET, PF, EF, PRF, PKF, SF, AF, ALF, NPCF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   encodeSnapshot, changed, quantize, angleToByte, colorToInt,
 } from '../src/net/protocol.js';
 import { inSafeZone, claimAt } from '../src/net/rules.js';
@@ -126,6 +126,13 @@ export function sendSnapshots(gs, now) {
   for (const it of gs.pickups.values()) all.push({ id: it.id, type: ET.PICKUP, x: it.x, y: it.y, values: pickupValues(it), ref: it });
   for (const a of gs.areas.values()) all.push({ id: a.id, type: ET.AREA, x: a.x, y: a.y, values: areaValues(gs, a), ref: a });
   for (const a of gs.allies.values()) all.push({ id: a.id, type: ET.ALLY, x: a.x, y: a.y, values: allyValues(a), ref: a });
+  for (const m of gs.markets.values()) {
+    for (const n of m.npcs) {
+      if (n.dead) continue;
+      const flags = (n.moving ? NPCF.MOVING : 0) | (gs.time - n.hurtT < 0.15 ? NPCF.HURT : 0);
+      all.push({ id: n.eid, type: ET.NPC, x: n.x, y: n.y, values: [quantize(n.x), quantize(n.y), angleToByte(n.facing), flags, m.mx, m.my, n.idx, Math.ceil(n.hp)], ref: n });
+    }
+  }
   for (const p of gs.players.values()) {
     const pal = p.palEnt;
     if (pal && !pal.hidden) all.push({ id: pal.eid, type: ET.PAL, x: pal.x, y: pal.y, values: palValues(gs, pal), ref: pal });

@@ -12,6 +12,7 @@ import { hashPassword } from './auth.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
 import * as pals from './pals.js';
+import * as markets from './markets.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
 
@@ -85,6 +86,8 @@ export function handle(gs, p, msg) {
       gs.toast(p, `${def.name} är utforskad!`, 'component');
       return null;
     }
+    case 'market':
+      return markets.request(gs, p, msg);
     case 'recall':
       return players.recall(gs, p, msg.op === 'back' ? 'back' : 'go');
     case 'move':

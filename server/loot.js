@@ -245,8 +245,8 @@ function chestComponent(gs, p, o) {
   dropComponent(gs, p, pickOne([...biome.components, ...BLUEPRINTS]), o.x, o.y + 0.5);
 }
 
-/** Picking up a component. */
-function discoverComponent(gs, p, id) {
+/** Picking up (or buying) a component. */
+export function discoverComponent(gs, p, id) {
   const def = gs.data.byId.components.get(id);
   if (!def) return;
   p.ch.extra.components ??= {};

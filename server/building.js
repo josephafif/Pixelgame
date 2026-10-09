@@ -62,7 +62,7 @@ export function claimFor(gs, tx, ty) {
 
 /** May player `p` damage structure `st` right now? */
 export function canDamage(gs, p, st, now = Date.now()) {
-  if (!p || st.dead) return false;
+  if (!p || st.dead || st.marketId) return false; // markets' walls stand
   if (st.clanId && st.clanId === p.clanId) return false;
   if (inSafeZone(gs.rules, st.x + 0.5, st.y + 0.5)) return false;
   if (!st.clanId) return true; // abandoned
@@ -79,7 +79,7 @@ export function turretMayHit(gs, st, p, now = Date.now()) {
 }
 
 export function damageStructure(gs, st, amount, attacker) {
-  if (!st || st.dead || amount <= 0) return;
+  if (!st || st.dead || amount <= 0 || st.marketId) return;
   st.hp -= amount;
   st.rt.flash = 0.12;
   st.rt.lastHit = gs.time;
@@ -165,6 +165,7 @@ export function place(gs, p, defId, tx, ty) {
   if (!Number.isInteger(tx) || !Number.isInteger(ty) || Math.abs(tx) > 1e6 || Math.abs(ty) > 1e6) return 'Ogiltig plats';
   if (p.dead) return 'Du är död';
   if (p.sailing) return 'Gå i land för att bygga';
+  if (gs.world.marketAt(tx + 0.5, ty + 0.5, 3)) return 'Man kan inte bygga vid en marknad';
   const clan = p.clanId ? gs.clans.get(p.clanId) : null;
   if (!clan) return 'Gå med i eller skapa en klan för att bygga (även ensam)';
   const role = clan.members.get(p.accountId)?.role ?? 'member';

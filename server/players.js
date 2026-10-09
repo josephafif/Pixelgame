@@ -14,6 +14,7 @@ import * as loot from './loot.js';
 import * as building from './building.js';
 import * as abilities from './abilities.js';
 import * as discoveries from './discoveries.js';
+import * as markets from './markets.js';
 
 // Inputs waiting to be simulated; beyond this the oldest are dropped.
 const MAX_QUEUE = 12;
@@ -206,6 +207,7 @@ export function mePayload(gs, p) {
     found: p.ch.extra.found ?? [],
     recallAt: p.ch.extra.recallAt ?? 0,
     components: p.ch.extra.components ?? {},
+    markets: p.ch.extra.markets ?? {},
     recallFrom: p.ch.extra.recallFrom ?? null,
     stats: p.stats,
     kills: p.ch.kills,
@@ -421,6 +423,16 @@ export function interact(gs, p, now) {
     }
     bestD = d;
     best = o;
+  }
+  // A merchant at a market: trade (unless they are angry with you).
+  const merchant = markets.merchantNear(gs, p, 2.4);
+  if (merchant) {
+    if (markets.isHostile(p, merchant.entry.def.id, now)) {
+      gs.toast(p, `${merchant.entry.def.name} vill inte handla med dig just nu.`, 'warn');
+    } else {
+      gs.send(p, { t: 'ui', panel: { name: 'market', marketId: merchant.entry.def.id } });
+    }
+    return true;
   }
   const banner = building.ownBannerNear(gs, p, 2.2);
   if (banner && (!best || (banner.x + 0.5 - p.x) ** 2 + (banner.y + 0.5 - p.y) ** 2 < bestD)) {

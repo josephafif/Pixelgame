@@ -217,6 +217,32 @@ test('sailing in multiplayer: set sail at the shore and sail smoothly (predicted
   await a.ctx.close();
 });
 
+test('markets in multiplayer: walls and merchants, the market panel, buying', async ({ browser }) => {
+  const a = await join(browser, 'Kunden');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Kunden');
+  p.protectUntil = Date.now() + 10 * 60 * 1000;
+  const m = srv.gs.world.firstMarket;
+  await a.page.evaluate(([x, y]) => window.__pixelgame.game.chat(`/tp ${x} ${y}`), [m.x + 0.5, m.y + m.r + 3]);
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.markets.structures.length)).toBeGreaterThan(10);
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.markets.npcs.length)).toBeGreaterThan(1);
+  const entry = srv.gs.markets.get(m.id);
+  const merchant = entry.npcs.find((n) => n.role === 'merchant');
+  p.ch.resources.gold = 5000;
+  const players = await import('../../server/players.js');
+  players.markMe(p);
+  await a.page.evaluate(([x, y]) => window.__pixelgame.game.chat(`/tp ${x} ${y}`), [merchant.x, merchant.y + 1.3]);
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.interactTarget?.type)).toBe('merchant');
+  await a.page.keyboard.press('KeyE');
+  await expect(a.page.locator('.market-panel')).toBeVisible();
+  const wood0 = p.ch.resources.wood ?? 0;
+  const row = a.page.locator('.market-panel .mrow', { hasText: 'Wood' }).first();
+  await row.locator('button').click();
+  await expect.poll(() => p.ch.resources.wood ?? 0).toBe(wood0 + 20);
+  await expect(row.locator('.badge')).toHaveText('Sold');
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
 test('on a new link or device: log in with name and password and get your character back', async ({ browser }) => {
   const a = await join(browser, 'Doris', 'ostkaka');
   const level = await a.page.evaluate(() => window.__pixelgame.game.me?.level);

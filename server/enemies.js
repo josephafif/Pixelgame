@@ -806,7 +806,7 @@ export function spawn(gs) {
       const x = p.x + Math.cos(a) * d;
       const y = p.y + Math.sin(a) * d;
       if (inSafeZone(gs.rules, x, y) || (x * x + y * y) < (gs.rules.safeRadius + 6) ** 2) continue;
-      if (!gs.world.isFree(x, y, 0.45, 'enemy') || inBase(x, y)) continue;
+      if (!gs.world.isFree(x, y, 0.45, 'enemy') || inBase(x, y) || gs.world.marketAt(x, y, 8)) continue;
       // Never right next to another player.
       if (gs.nearestPlayer(x, y, 10)) continue;
       const biome = gs.world.biomeAt(Math.floor(x), Math.floor(y));

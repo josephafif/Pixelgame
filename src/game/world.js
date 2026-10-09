@@ -660,8 +660,8 @@ export class World {
     const st = this.structures.get(tileKey(tx, ty));
     if (!st || st.def.walkable) return false;
     if (st.def.kind === 'gate' && (mode === 'player' || mode === 'pal')) {
-      // Multiplayer: a clan's gates open only for its own members.
-      return this.gateFilter ? !this.gateFilter(st) : false;
+      // Multiplayer: a clan's gates open only for its own members (a market's for everyone).
+      return this.gateFilter && !st.marketId ? !this.gateFilter(st) : false;
     }
     return true;
   }

@@ -32,7 +32,7 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 | Del | Var i koden |
 |---|---|
 | Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
-| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `bosses.js`, `pals.js`, `discoveries.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
+| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `bosses.js`, `pals.js`, `discoveries.js`, `markets.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
 | Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
 | Drift | `cloud/` och `wrangler.jsonc` (Cloudflare), `supabase/` (serverlistan), `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
@@ -79,12 +79,20 @@ gå. Hajar och sjöormar dyker upp runt den som seglar och anfaller bara folk i
 båtar. Sjöormar kan ge ett Pal-ägg. Galeonens skrov tar en del av skadan, och
 andra spelare ser din båt.
 
+### Marknader
+
+Marknaderna finns i multiplayer (`server/markets.js`, `src/mp/markets.js`).
+Världen bestämmer var de står och hur de ser ut, så servern och varje klient
+bygger samma murar, grindar och torn. Klienten krockar därför med dem direkt.
+Servern styr tornen och folket och kontrollerar varje affär. Varje spelare har
+sitt eget lager, som byts var tjugonde minut, och sitt eget rykte hos varje
+marknad. Skadar du någon där vänder sig tornen mot dig, och ingen handlar med
+dig på några minuter. Man kan inte bygga vid en marknad eller riva dess murar.
+
 ### Inte med i multiplayer än
 
-Följande finns i singleplayer men inte i multiplayer än:
-- marknader;
-- forskning (smedjan har samma val för alla);
-- WebTransport (allt går via WebSocket).
+Allt i singleplayer finns nu också i multiplayer. Det enda som saknas är
+WebTransport (allt går via WebSocket).
 
 ### Bossar, upptäckter, vägstenen och forskning
 

@@ -4,7 +4,7 @@
 // packets arrive unevenly).
 
 import {
-  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
+  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, NPCF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   byteToAngle, intToColor,
 } from '../net/protocol.js';
 import { TICK_RATE } from '../net/movement.js';
@@ -276,6 +276,16 @@ export function readPal(v, data) {
     work: f('work'),
     down: f('down'),
     facing: f('facing') ? -1 : 1,
+  };
+}
+
+/** A person at a market. */
+export function readNpc(v) {
+  const f = (n) => field(ET.NPC, v, n);
+  const flags = f('flags');
+  return {
+    facing: byteToAngle(f('facing')), moving: Boolean(flags & NPCF.MOVING), hurt: Boolean(flags & NPCF.HURT),
+    mx: f('mx'), my: f('my'), idx: f('idx'), hp: f('hp'),
   };
 }
 

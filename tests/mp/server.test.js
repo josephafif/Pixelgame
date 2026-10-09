@@ -5,6 +5,13 @@ import assert from 'node:assert/strict';
 import { testServer, sleep } from './helpers.js';
 import { BTN, ET, angleToByte } from '../../src/net/protocol.js';
 
+/** An x out in the wild (on the y = 0.5 line) with no market nearby (nobody builds at markets). */
+function wildX(gs, from = 100) {
+  let x = from;
+  while (gs.world.marketAt(x, 0.5, 20)) x += 25;
+  return x;
+}
+
 async function walk(bot, frames, frame = {}) {
   for (let i = 0; i < frames; i++) {
     bot.input(frame);
@@ -199,8 +206,8 @@ test('bases: banners claim land, only the clan builds there, raids follow the ru
     let res = await owner.request({ t: 'build', id: 'banner', x: 12, y: 3 });
     assert.match(res.error, /Fristaden|nära/);
     // Out in the wild: banner, then walls inside the claim.
-    t.place(owner, 100.5, 0.5);
-    let bx = 101;
+    t.place(owner, wildX(t.gs) + 0.5, 0.5);
+    let bx = Math.floor(t.player(owner).x) + 1;
     let by = 0;
     for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1], [2, 0]]) {
       if (!t.gs.world.blockAt(Math.floor(po.x) + dx, Math.floor(po.y) + dy)) {
@@ -280,7 +287,7 @@ test('turrets shoot monsters, over the clan walls next to them', async () => {
     p.ch.level = 40;
     p.ch.resources = { wood: 500, stone: 500, scrap: 500, essence: 500 };
     await a.request({ t: 'clan', op: 'create', name: 'Tornen', tag: 'TRN' });
-    let x = 100;
+    let x = wildX(t.gs);
     while (!t.gs.world.isFree(x, 0.5, 1.2)) x += 1;
     t.place(a, x, 0.5);
     const banner = freeTile(t.gs, p.x, p.y);
@@ -678,7 +685,7 @@ test('Cloudflare: base upkeep is charged for the hours the world slept', async (
     p.ch.resources.wood = 200;
     p.ch.resources.scrap = 50;
     assert.equal((await a.request({ t: 'clan', op: 'create', name: 'Sovarna', tag: 'SOV' })).ok, true);
-    t.place(a, 100.5, 0.5);
+    t.place(a, wildX(t.gs) + 0.5, 0.5);
     let built = false;
     for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1], [2, 0], [0, 2]]) {
       const res = await a.request({ t: 'build', id: 'banner', x: Math.floor(p.x) + dx, y: Math.floor(p.y) + dy });

@@ -14,6 +14,7 @@ import * as building from './building.js';
 import * as clans from './clans.js';
 import * as abilities from './abilities.js';
 import * as pals from './pals.js';
+import * as markets from './markets.js';
 import { sendSnapshots } from './snapshots.js';
 import { SpatialGrid, PAD } from './grid.js';
 
@@ -77,6 +78,7 @@ export class GameServer {
     this.pickups = new Map();
     this.areas = new Map();
     this.allies = new Map(); // clones from the Mirror ability
+    this.markets = new Map(); // markets someone is near (their walls, turrets and people)
     this.timers = [];
     this.stats = { tickMs: 0, maxTickMs: 0, sent: 0 };
     this.prof = new TickProfile();
@@ -210,6 +212,7 @@ export class GameServer {
     combat.updateAreas(this, TICK_DT, now);
     loot.updatePickups(this, TICK_DT, now);
     building.update(this, TICK_DT, now);
+    markets.update(this, TICK_DT);
     this.#recordHistory();
     prof.mark('world');
     sendSnapshots(this, now);

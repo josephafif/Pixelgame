@@ -14,6 +14,7 @@ import * as building from './building.js';
 import * as enemies from './enemies.js';
 import * as abilities from './abilities.js';
 import * as bosses from './bosses.js';
+import * as markets from './markets.js';
 
 const DEG = Math.PI / 180;
 const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE]);
@@ -276,6 +277,8 @@ function meleeHits(gs, p, { x, y, reach, damage, view, knockback = 0, crit = tru
     hurtPlayer(gs, v, dmg, { element, fromX: x, fromY: y, attacker: p, knock: 3 + knockback * 2 });
     if (!tool && w) for (const h of w.hooks.hit) if (h.do === 'heal' && chance(h)) heal(gs, p, h.pct ? (dmg * h.pct * gs.rules.pvpDamage) / 100 : h.flat ?? 0);
   }
+  // People at markets (a careless swing: the market turns on you).
+  if (!tool) markets.hitNpcs(gs, p, x, y, reach, damage, inside);
   // Walls, gates and turrets of other clans (only while their base can be raided).
   const r = Math.ceil(reach + 1);
   for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
@@ -439,6 +442,7 @@ export function spawnProjectile(gs, o) {
     owner: o.owner ?? 0,
     enemy: o.enemy ?? 0,
     turret: o.turret ?? 0,
+    market: o.market ?? null, // a market turret's shot
     clanId: o.clanId ?? null, // a turret's clan: its shots fly over the clan's own walls
     kind: o.kind ?? 'shot',
     pierce: o.pierce ?? 0,
@@ -506,6 +510,7 @@ function rebase(gs, pr) {
  * turrets (as in single player); everyone else's shots hit them.
  */
 function ownStructure(gs, pr, st) {
+  if (pr.market) return st.marketId === pr.market;
   if (!st.clanId) return false;
   const clanId = pr.turret ? pr.clanId : pr.owner ? gs.players.get(pr.owner)?.clanId : null;
   return clanId === st.clanId;
@@ -588,11 +593,12 @@ export function updateProjectiles(gs, dt, now) {
 /** Checks what the projectile touches; returns false when it is used up. */
 function projectileHits(gs, pr, now) {
   const rad = 0.18 + pr.size * 0.04;
-  if (pr.enemy || pr.turret) {
-    // Monster shots (and turrets defending against raiders) hit players.
+  if (pr.enemy || pr.turret || pr.market) {
+    // Monster shots (and turrets defending against raiders, or an angry market) hit players.
     for (const p of gs.playersNear(pr.x, pr.y, 1.6)) {
       if (p.dead || pr.hit.has(p.id)) continue;
       if ((p.x - pr.x) ** 2 + (p.y - pr.y) ** 2 > (rad + p.r) ** 2) continue;
+      if (pr.market && !markets.isHostile(p, pr.market, now)) continue;
       if (pr.turret) {
         const st = gs.structures.get(pr.turret);
         if (!st || !building.turretMayHit(gs, st, p, now)) continue;
@@ -605,7 +611,7 @@ function projectileHits(gs, pr, now) {
     }
     if (pr.enemy) return true;
   }
-  if (pr.owner || pr.turret) {
+  if (pr.owner || pr.turret || pr.market) {
     for (const e of gs.enemiesNear(pr.x, pr.y, 3)) {
       if (pr.hit.has(e.id)) continue;
       if ((e.x - pr.x) ** 2 + (e.y - pr.y) ** 2 > (rad + e.r) ** 2) continue;
@@ -621,6 +627,7 @@ function projectileHits(gs, pr, now) {
   if (pr.owner && pr.source !== 'ability') {
     const shooter = gs.players.get(pr.owner);
     if (!shooter) return true;
+    if (gs.markets.size && markets.hitNpcs(gs, shooter, pr.x, pr.y, 1, pr.damage, (x, y, r) => (x - pr.x) ** 2 + (y - pr.y) ** 2 <= (rad + r) ** 2)) return false;
     for (const v of gs.playersNear(pr.x, pr.y, 1.6)) {
       if (v === shooter || v.dead || pr.hit.has(v.id)) continue;
       if ((v.x - pr.x) ** 2 + (v.y - pr.y) ** 2 > (rad + v.r) ** 2) continue;

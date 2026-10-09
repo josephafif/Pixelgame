@@ -25,8 +25,9 @@ import { mpVirtualSave } from '../net/mpsave.js';
 import { inSafeZone, claimAt, canDo, bannerProblem, pvpBlock } from '../net/rules.js';
 import { Connection } from './connection.js';
 import {
-  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal,
+  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal, readNpc,
 } from './entities.js';
+import { MpMarkets } from './markets.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
 import { POI, isPoi, poiFound } from '../game/discoveries.js';
 import { currentBoat, boatMode, boatDefs, findLaunch, findLanding } from '../game/sailing.js';
@@ -102,7 +103,7 @@ export class MpGame {
     this.qualityLevel = 'high';
     this.frameMs = 16;
     this.godMode = false;
-    this.markets = { npcs: [], structures: [], isHostile: () => false, merchantNear: () => null, hostileSecondsLeft: () => 0 };
+    this.markets = new MpMarkets(this);
     this.build = { active: false, selected: 'banner', tool: 'place', ghost: null, reason: null, hover: null, hoverAt: -99, painting: false, lastTile: null };
     this.player = {
       x: 0.5, y: 2.6, r: PLAYER_RADIUS, vx: 0, vy: 0, kx: 0, ky: 0, facing: 0, hp: 1, maxHp: 100, dead: false,
@@ -242,6 +243,7 @@ export class MpGame {
     s.pals = me.pals ?? emptyPals();
     s.world.found = me.found ?? [];
     s.components = me.components ?? {};
+    s.markets = me.markets ?? {};
     s.base.buildings.den = mpDenLevel(this.data, { level: me.level, extra: { bosses: me.bosses ?? {} } });
     if (me.stats) this.pstats = me.stats;
     this.xpNext = me.xpNext;
@@ -342,6 +344,7 @@ export class MpGame {
     this.rules = w.rules;
     this.serverInfo = w.server;
     this.worldSeed = w.seed;
+    this.save.worldSeed = w.seed; // (market stock is drawn from the world's seed)
     this.save.worldSeed = w.seed;
     this.world = new World(this.data, w.seed, { hideObjects: true, maxChunks: 220 });
     // Server objects (chests, shrines) join the world's own (town, altars).
@@ -1039,6 +1042,7 @@ export class MpGame {
     this.#updateLocalShots(dt);
     this.#drainEvents();
     this.#updateGates(dt);
+    this.markets.update(dt);
     for (const st of this.structById.values()) if (st.rt.flash > 0) st.rt.flash -= dt;
     // Interaction hints and build preview.
     this.interactT = (this.interactT ?? 0) - dt;
@@ -1091,6 +1095,7 @@ export class MpGame {
     const areas = [];
     const allies = [];
     const otherPals = [];
+    const npcs = [];
     let myPal = null;
     let boss = null;
     const myClan = this.me?.clan?.id ?? null;
@@ -1187,6 +1192,14 @@ export class MpGame {
           if (a.t >= 0 && a.t <= a.dur) areas.push(a);
           break;
         }
+        case ET.NPC: {
+          const info = readNpc(s.v);
+          info.x = s.x;
+          info.y = s.y;
+          ent.obj = this.markets.person(ent.obj, info, dt, this.time);
+          if (ent.obj) npcs.push(ent.obj);
+          break;
+        }
         case ET.PAL: {
           const info = readPal(s.v, this.data);
           let o = ent.obj;
@@ -1262,6 +1275,7 @@ export class MpGame {
     this.allies = allies;
     this.pal = myPal;
     this.otherPals = otherPals;
+    this.markets.npcs = npcs;
     if (boss !== this.boss) {
       this.boss = boss;
       this.emit('boss', boss ? { active: true, name: boss.bossDef.name } : { active: false });
@@ -1401,6 +1415,17 @@ export class MpGame {
         this.fx.emit(ev.wood ? 'leaf' : 'stone', ev.x, ev.y - 0.3, 14, 0.9, 2.5);
         this.audio.play('fell');
         break;
+      case 'mturret':
+        this.markets.turretFired(ev);
+        break;
+      case 'npchurt': {
+        const o = this.store.ents.get(ev.id)?.obj;
+        if (o) {
+          this.fx.number(o.x, o.y - 0.6, ev.n, { color: '#ff8a8a' });
+          this.fx.emit('blood', o.x, o.y - 0.3, 4, 0.3, 2);
+        }
+        break;
+      }
       case 'palhurt': {
         const o = this.store.ents.get(ev.id)?.obj;
         if (o) this.fx.number(o.x, o.y - 0.8, ev.n, { color: '#ffb0b0' });
@@ -1573,6 +1598,9 @@ export class MpGame {
     if (this.build.active || p.dead) return null;
     // Out on the water: Use takes you ashore.
     if (this.sailing) return findLanding(this);
+    // A merchant at a market (reachable across the stall's counter).
+    const npc = this.markets.merchantNear(p.x, p.y, 2.4);
+    if (npc) return { type: 'merchant', key: `npc:${npc.marketId}:${npc.name}`, npc, x: npc.x, y: npc.y };
     let best = null;
     let bestD = INTERACT_RADIUS * INTERACT_RADIUS;
     for (const o of this.world.objectsNear(p.x, p.y, 1)) {
@@ -1607,6 +1635,9 @@ export class MpGame {
       case 'building': return BUILDING_LABELS[o.buildingId] ?? 'Använd';
       case 'banner': return 'Klanbanéret (klan och valv)';
       case 'launch': return `Segla ut (${o.boat.name})`;
+      case 'merchant': return this.markets.isHostile(o.npc.marketId)
+        ? `${o.npc.name} vill inte handla (${Math.ceil(this.markets.hostileSecondsLeft(o.npc.marketId) / 60)} min)`
+        : `Handla med ${o.npc.name}`;
       case 'bones': return 'Leta bland kvarlevorna';
       case 'signpost': return 'Läs skylten';
       case 'mushrooms': return 'Ät en glödhatt';
@@ -1635,7 +1666,12 @@ export class MpGame {
   // --- What the renderer needs -----------------------------------------------------------------------------
 
   structuresForDraw() {
-    return [...this.structById.values()];
+    const mine = [...this.structById.values()];
+    return this.markets.structures.length ? mine.concat(this.markets.structures) : mine;
+  }
+
+  marketRequest(msg) {
+    this.#ask({ t: 'market', ...msg });
   }
 
   hitNpcs() {

@@ -12,11 +12,11 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
-export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, PAL: 7 };
+export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, PAL: 7, NPC: 8 };
 
 /**
  * Fields per entity type, all integers on the wire. Position-like fields
@@ -32,6 +32,8 @@ export const FIELDS = {
   [ET.ALLY]: ['x', 'y', 'facing', 'owner', 'anim', 'flags'],
   // Pals: species is its index in the game data; anim/work count its bites and chops.
   [ET.PAL]: ['x', 'y', 'facing', 'owner', 'species', 'level', 'hp', 'maxHp', 'state', 'anim', 'work', 'down'],
+  // People at markets: their market's cell (mx, my) and their place in its layout say who they are.
+  [ET.NPC]: ['x', 'y', 'facing', 'flags', 'mx', 'my', 'idx', 'hp'],
 };
 const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
@@ -58,6 +60,8 @@ export const AREA_KINDS = ['telegraph', 'hazard', 'cloud', 'quake', 'ring', 'por
  * and how fast it spins (× 2) from bit 9.
  */
 export const AF = { COUNT: 15, BIG: 16, FLOWER: 32, LAVA: 64, FOLLOW: 128, LINE: 256, SPIN_SHIFT: 9 };
+/** Market people's flags. */
+export const NPCF = { MOVING: 1, HURT: 2 };
 /** Ally flags. */
 export const ALF = { MOVING: 1 };
 /** Slots on the wire. */

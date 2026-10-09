@@ -16,6 +16,7 @@ const loaders = {
   settings: () => import('../ui/settings.js'),
   pals: () => import('../ui/pals.js'),
   research: () => import('../ui/research.js'),
+  market: () => import('../ui/market.js'),
 };
 
 const DOCK = {
