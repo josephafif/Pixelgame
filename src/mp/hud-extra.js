@@ -14,7 +14,8 @@ export class MpHud {
     this.zone = h('div.mp-zone', { 'aria-live': 'polite' });
     this.chatLog = h('div.mp-chat-log', { 'aria-live': 'polite' });
     this.chatBtn = h('button.mp-chat-btn', { 'aria-label': 'Chatt', onclick: (e) => { e.currentTarget.blur(); this.openChat(); } }, icon('chat', 20));
-    this.debug = h('div.mp-debug', { hidden: !new URLSearchParams(location.search).has('debug') });
+    const dbg = new URLSearchParams(location.search).get('debug');
+    this.debug = h('div.mp-debug', { hidden: dbg === null || dbg === '0' });
     hud.append(this.zone, this.chatLog, this.chatBtn, this.debug);
     this.net = $('#net-status');
     game.on('hud', (s) => this.update(s));
@@ -34,7 +35,13 @@ export class MpHud {
     const z = s.zone;
     if (z) {
       const text = `${z.label}${z.protectedNow ? ' · skyddad' : z.newbie ? ' · nybörjarskydd' : ''}`;
-      if (this.zone.textContent !== text) this.zone.textContent = text;
+      if (this.zone.textContent !== text) {
+        this.zone.textContent = text;
+        // (On a phone it shows for a while when it changes, then gets out of the way.)
+        this.zone.classList.remove('quiet');
+        clearTimeout(this.zoneT);
+        this.zoneT = setTimeout(() => this.zone.classList.add('quiet'), 5000);
+      }
       this.zone.dataset.kind = z.kind;
     }
     if (this.net) {

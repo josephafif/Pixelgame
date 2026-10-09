@@ -41,10 +41,10 @@ function pct(f) {
   return p < 1 ? `${p.toFixed(1)}%` : `${Math.round(p)}%`;
 }
 
-// In multiplayer the Den is Fristaden's, and your level decides how far pals grow.
+// In multiplayer the Den stands in your clan's base.
 const MP_TEXT = [
-  [/^Build a Pal Den first$/, 'The Pal Den in Fristaden takes you in from level 6'],
-  [/^Upgrade the Pal Den to raise pals past level (\d+)$/, 'Reach a higher level (or beat a boss) to raise pals past level $1'],
+  [/^Build a Pal Den first$/, "Build a Pal Den in your clan's base first"],
+  [/^Upgrade the Pal Den to raise pals past level (\d+)$/, "Upgrade your base's Pal Den to raise pals past level $1"],
 ];
 
 function mpText(game, text) {
@@ -155,7 +155,7 @@ export function open(game, app) {
     return h('div.pals',
       h('p.small.muted', 'Pals follow you around and fight at your side or gather wood and stone. '
         + 'They hatch from rare Pal Eggs, and grow stronger with essence and materials.'),
-      den < 1 && game.mp ? h('div.notice', icon('lock', 16), ' The Pal Den in Fristaden takes you in from level 6: then you can hatch eggs and raise pals.') : null,
+      den < 1 && game.mp ? h('div.notice', icon('lock', 16), " Build a Pal Den in your clan's base (Build menu, on your land) to hatch eggs and raise pals.") : null,
       den < 1 && !game.mp ? h('div.notice',
         icon('lock', 16), ' Build a Pal Den at your camp to hatch eggs and raise pals.',
         h('button', { onclick: () => app.panels.show('base', { focus: 'den' }) }, icon('home', 20), 'Camp')) : null,

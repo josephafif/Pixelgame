@@ -550,7 +550,7 @@ export async function startMultiplayer(app) {
   game.toast(`Välkommen till ${join.server.name}, ${game.myName}!`, 'component');
   if (!game.me || game.me.level <= 1) {
     game.schedule(2.5, () => {
-      if (game.zoneInfo().kind === 'safe') game.toast('Du är i Fristaden (säker). Smedjan, förrådet och härden finns här. Pilen visar vägen till närmaste boss.', 'info');
+      if (game.zoneInfo().kind === 'safe') game.toast('Du är i Fristaden (säker). Här finns en smedja och handlare. Bygg din egen bas ute i vildmarken (B).', 'info');
     });
   }
   void clear;

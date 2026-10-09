@@ -473,6 +473,9 @@ export class MpGame {
         this.clan = msg.id ? msg : null;
         this.syncBase();
         this.emit('clan', this.clan);
+        // The base's buildings decide what the pals and forge panels offer.
+        this.emit('pals');
+        this.emit('base');
         break;
       case 'invsize':
         Object.assign(this.save.inventory, { bagSize: msg.bagSize, storageSize: msg.storageSize });

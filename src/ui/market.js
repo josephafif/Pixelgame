@@ -57,7 +57,9 @@ export function open(game, app, { marketId } = {}) {
   function head() {
     const mins = Math.max(1, Math.ceil((stock.restockAt - Date.now()) / 60000));
     return h('div.market-head',
-      h('div.market-title', { style: { '--mcolor': m.color } }, h('span.flag'), `${LAYOUT_NAMES[m.layout] ?? 'Trading post'} · ${game.world.biomeById.get(m.biome)?.name ?? 'Wilds'}`),
+      h('div.market-title', { style: { '--mcolor': m.color } }, h('span.flag'), m.town
+        ? 'Traders on the town square · up to rare'
+        : `${LAYOUT_NAMES[m.layout] ?? 'Trading post'} · ${game.world.biomeById.get(m.biome)?.name ?? 'Wilds'}`),
       h('span.cost.gold', { title: 'Gold' }, icon('coin', 20), gold().toLocaleString()),
       h('span.small.muted', `New stock in ${mins} min`),
       hostile() ? h('p.market-hostile', icon('skull', 16), ` Nobody here will trade with you for ${Math.ceil(game.markets.hostileSecondsLeft(m.id) / 60)} more minutes.`) : null);

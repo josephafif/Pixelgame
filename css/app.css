@@ -611,7 +611,23 @@ body[data-input="touch"] .hslot { width: 50px; height: 50px; }
 .menu { display: flex; flex-direction: column; gap: 8px; }
 .menu button { justify-content: flex-start; font-size: 18px; min-height: 54px; }
 .menu button kbd { margin-left: auto; }
-.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.menu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.menu-grid > button { min-width: 0; }
+.menu-grid > button span { overflow-wrap: anywhere; text-align: left; }
+body[data-input="touch"] .menu kbd { display: none; }
+@media (max-width: 640px) {
+  .menu button { font-size: 15px; min-height: 46px; padding-left: 8px; padding-right: 8px; gap: 6px; }
+  .menu-grid { gap: 6px; }
+  /* Phones: tiles with the icon above the label, so every label fits. */
+  .menu-grid > button { flex-direction: column; justify-content: center; align-items: center; min-height: 64px; gap: 2px; font-size: 14px; }
+  .menu-grid > button span { text-align: center; overflow-wrap: break-word; line-height: 1.15; }
+}
+@media (max-width: 380px) {
+  .tab .icon { display: none; }
+  .tab { font-size: 13px; }
+}
+/* With a panel open, only the newest notice shows (the panel stays readable). */
+body:has(#overlay-root .backdrop) .toasts .toast:not(:last-child) { display: none; }
 .menu-foot { margin: 6px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
 
 @media (max-width: 640px) {
@@ -734,6 +750,13 @@ body[data-input="touch"] .hslot { width: 50px; height: 50px; }
 .inv-toolbar .group { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .inv-toolbar .label { font-size: 13px; color: var(--muted); margin-right: 2px; }
 .inv-toolbar .spacer { flex: 1; }
+@media (max-width: 640px) {
+  /* Phones: sort and filter each on one row that scrolls sideways, smaller chips. */
+  .inv-toolbar { flex-direction: column; align-items: stretch; gap: 4px; }
+  .inv-toolbar .group { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .inv-toolbar .group::-webkit-scrollbar { display: none; }
+  .inv-toolbar .chip { flex: none; min-height: 34px; padding: 0 9px; font-size: 13px; border-width: 4px; border-image-width: 4px; }
+}
 .inv-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
 @media (max-width: 800px) { .inv-layout { grid-template-columns: 1fr; } }
 .inv-count { font-size: 14px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -1049,8 +1072,10 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 @media (max-width: 640px) {
   .map-panel { height: 100%; }
   .map-status { flex-basis: 100%; margin: 0; }
-  .map-tools { gap: 4px; }
-  .map-tools button { min-height: 40px; padding: 2px 10px; font-size: 15px; }
+  .map-tools { gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .map-tools::-webkit-scrollbar { display: none; }
+  .map-tools button { flex: none; min-height: 40px; padding: 2px 10px; font-size: 15px; }
+  .map-tools .map-status { flex: none; white-space: nowrap; }
   .map-legend { font-size: 13px; gap: 2px 10px; }
   /* The case roll is a compact strip in the middle of the screen, not a full page. */
   .panel.case-panel { align-self: center; border-width: 9px; border-image: var(--frame-panel) 3 fill / 9px / 0 stretch; }
@@ -1179,14 +1204,16 @@ body.mp .key-hints { display: none !important; }
 @media (max-width: 640px) {
   .vault-row { grid-template-columns: 1fr 52px 52px; }
   .vault-btns { grid-column: 1 / -1; justify-content: stretch; }
-  .vault-btns button.small { flex: 1; min-height: 36px; }
+  .vault-btns button.small { flex: 1; min-height: 36px; min-width: 0; padding: 0 4px; white-space: nowrap; }
   .mp-base-grid { grid-template-columns: 1fr; }
 }
 button.small { min-height: 30px; padding: 0 8px; font-size: 13px; }
 .mp-players ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .mp-name, .mp-fail, .mp-connecting { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 640px), (max-height: 520px) {
-  .mp-zone { font-size: 11px; top: calc(4px + var(--safe-t)); border-width: 4px; border-image-width: 4px; }
+  .mp-zone { font-size: 11px; top: calc(70px + var(--safe-t)); border-width: 4px; border-image-width: 4px; transition: opacity 0.6s; }
+  .mp-zone.quiet { opacity: 0; }
+  body.mp .toasts { top: calc(94px + var(--safe-t)); }
   .mp-chat-log { font-size: 11px; width: 60vw; bottom: calc(42% + var(--safe-b)); }
   .mp-chat-btn, body.mp:has(.hud-pal:not([hidden])) .mp-chat-btn { top: calc(78px + var(--safe-t)); left: calc(6px + var(--safe-l)); }
   .mp-debug { font-size: 9px; white-space: normal; width: 96vw; text-align: center; }
