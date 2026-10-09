@@ -180,7 +180,8 @@ export function updateProjectiles(game, dt) {
       if (!remove && p.kind !== 'boomerang') {
         const tx = Math.floor(p.x);
         const ty = Math.floor(p.y);
-        if (game.world.isSolid(tx, ty) && !PASS_THROUGH.has(game.world.tile(tx, ty).block)) {
+        // Trees and rocks stop shots at their trunk or stone, not across their whole tile.
+        if (game.world.isSolid(tx, ty) && !PASS_THROUGH.has(game.world.tile(tx, ty).block) && game.world.propAt(p.x, p.y)) {
           game.fx.emit('hit', p.x, p.y, 3, 0.2, 1.5);
           expire(game, p);
           remove = true;

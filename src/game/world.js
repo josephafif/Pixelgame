@@ -59,6 +59,17 @@ export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).m
 const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
 /** Water a boat can float on (lakes, coastal sea, open sea). */
 export const SAILABLE = new Set([T.WATER, T.SEA, T.DEEP]);
+/**
+ * Trees, rocks and the like only block where they stand: a circle around
+ * the trunk or the foot of the stone ([radius, centre height in the tile]),
+ * not their whole tile. You can walk close by, slip between trees that
+ * stand diagonally, and the art still looks solid.
+ */
+export const PROP_SHAPE = new Map([
+  [T.TREE, [0.3, 0.68]], [T.PINE, [0.28, 0.7]], [T.PALM, [0.26, 0.72]], [T.CACTUS, [0.3, 0.6]],
+  [T.ROCK, [0.36, 0.58]], [T.ORE, [0.36, 0.58]], [T.OBSIDIAN, [0.36, 0.58]],
+  [T.CRYSTAL, [0.34, 0.6]], [T.STARSTONE, [0.34, 0.6]],
+]);
 
 /** Numeric key for a tile (fast Map lookups for structures). */
 export function tileKey(tx, ty) {
@@ -609,6 +620,17 @@ export class World {
     return this.blockAt(tx, ty) !== 0;
   }
 
+  /** Does a tree, rock or the like stand at (x, y)? Only its trunk or stone (PROP_SHAPE), not its whole tile. */
+  propAt(x, y) {
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    const shape = PROP_SHAPE.get(this.blockAt(tx, ty));
+    if (!shape) return false;
+    const dx = x - (tx + 0.5);
+    const dy = y - (ty + shape[1]);
+    return dx * dx + dy * dy < shape[0] * shape[0];
+  }
+
   structureAt(tx, ty) {
     return this.structures.size ? this.structures.get(tileKey(tx, ty)) ?? null : null;
   }
@@ -650,9 +672,21 @@ export class World {
     const x1 = Math.floor(x + r);
     const y0 = Math.floor(y - r);
     const y1 = Math.floor(y + r);
+    // Walkers only bump into the trunk or foot of a tree or rock (see
+    // PROP_SHAPE); water, lava and walls block their whole tile. Only
+    // +, * and comparisons: client and server agree bit for bit.
+    const props = mode === 'player' || mode === 'enemy';
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
-        if (this.blockedFor(tx, ty, mode)) return false;
+        if (!this.blockedFor(tx, ty, mode)) continue;
+        const shape = props ? PROP_SHAPE.get(this.blockAt(tx, ty)) : undefined;
+        if (shape) {
+          const dx = x - (tx + 0.5);
+          const dy = y - (ty + shape[1]);
+          const rr = r + shape[0];
+          if (dx * dx + dy * dy >= rr * rr) continue;
+        }
+        return false;
       }
     }
     return true;

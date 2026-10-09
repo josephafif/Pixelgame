@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { prepareGameData } from '../../src/data/gamedata.js';
-import { World } from '../../src/game/world.js';
+import { World, T, tileKey } from '../../src/game/world.js';
 import { stepMove, quantizeAxis, inputDirection, TICK_RATE } from '../../src/net/movement.js';
 
 const data = prepareGameData(JSON.parse(readFileSync(new URL('../../data/v1/gamedata.json', import.meta.url), 'utf8')));
@@ -71,4 +71,47 @@ test('server (with the secret seed) and clients (without) see the same terrain',
   const loot = (w) => [...w.chunks.values()].flatMap((c) => c.objects).filter((o) => o.type === 'chest' || o.type === 'treasure').length;
   assert.ok(loot(server) > 0);
   assert.equal(loot(client), 0);
+});
+
+/** A lone tree (open ground on every side) to walk around. */
+function loneTree(world) {
+  for (let ty = -60; ty < 60; ty++) {
+    for (let tx = 20; tx < 200; tx++) {
+      if (world.blockAt(tx, ty) !== T.TREE) continue;
+      let open = true;
+      for (let dy = -2; dy <= 2 && open; dy++) {
+        for (let dx = -2; dx <= 2 && open; dx++) if ((dx || dy) && world.blockAt(tx + dx, ty + dy)) open = false;
+      }
+      if (open) return { tx, ty };
+    }
+  }
+  return null;
+}
+
+test('trees only block at the trunk: you walk close by and slip around them', () => {
+  const world = new World(data, 1234);
+  const t = loneTree(world);
+  assert.ok(t, 'found a lone tree');
+  const r = 0.32;
+  // The trunk still blocks…
+  assert.equal(world.isFree(t.tx + 0.5, t.ty + 0.7, r), false);
+  // …but its whole tile no longer does: you can stand right at its side.
+  assert.equal(world.isFree(t.tx + 1.15, t.ty + 0.7, r), true);
+  assert.equal(world.isFree(t.tx + 1.1, t.ty + 0.1, r), true);
+  // Walking straight at the edge of the trunk, you slip past instead of stopping.
+  const s = { x: t.tx - 1.5, y: t.ty + 0.85, kx: 0, ky: 0 };
+  for (let i = 0; i < 40; i++) stepMove(world, s, { mx: 127, my: 0, buttons: 0 }, 4.4, 1.6);
+  assert.ok(s.x > t.tx + 1.5, `got past the tree (x ${s.x.toFixed(2)} vs tree ${t.tx})`);
+  // Boats still treat the shore as land (whole tiles).
+  assert.equal(world.isFree(t.tx + 1.15, t.ty + 0.7, r, 'boat'), false);
+});
+
+test('straight into a wall you stop (no slipping through walls)', () => {
+  const world = new World(data, 1234);
+  const t = loneTree(world);
+  // A wall three tiles tall in front of you.
+  for (let dy = -1; dy <= 1; dy++) world.structures.set(tileKey(t.tx + 4, t.ty + dy), { def: { kind: 'wall' } });
+  const s = { x: t.tx + 2.5, y: t.ty + 0.5, kx: 0, ky: 0 };
+  for (let i = 0; i < 40; i++) stepMove(world, s, { mx: 127, my: 0, buttons: 0 }, 4.4, 1.6);
+  assert.ok(s.x < t.tx + 4 - 0.3 + 1e-9, `stopped at the wall (x ${s.x.toFixed(2)})`);
 });

@@ -31,6 +31,7 @@ import {
 import { Construction, buildRadius, structureDef, structureDefs, structureLock } from './construction.js';
 import { Markets } from './markets.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
+import { slideMove } from '../net/movement.js';
 import { POI, isPoi, poiFound, interactPoi } from './discoveries.js';
 import {
   updatePal, syncPalEntity, hatchReady, rollEgg, addEgg, startHatch, upgradePal, palSpecies, findPal, PAL_MODES,
@@ -1696,11 +1697,8 @@ export class Game {
     const damp = Math.exp(-10 * dt);
     p.kx *= damp;
     p.ky *= damp;
-    const nx = p.x + vx * dt;
-    const ny = p.y + vy * dt;
-    const mode = this.moveMode;
-    if (this.world.isFree(nx, p.y, p.r, mode)) p.x = nx;
-    if (this.world.isFree(p.x, ny, p.r, mode)) p.y = ny;
+    // Slides along walls and slips around trees and corners (as in multiplayer).
+    slideMove(this.world, p, vx * dt, vy * dt, p.r, this.moveMode);
     p.moving = moving;
     if (moving) p.walkT += dt * (p.sprinting ? 14 : 9);
     if (sailing) {

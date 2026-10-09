@@ -51,9 +51,55 @@ export function stepMove(world, s, frame, speed, sprintMult, r = PLAYER_RADIUS, 
   }
   const x0 = s.x;
   const y0 = s.y;
-  const nx = s.x + vx * TICK_DT;
-  if (world.isFree(nx, s.y, r, mode)) s.x = nx;
-  const ny = s.y + vy * TICK_DT;
-  if (world.isFree(s.x, ny, r, mode)) s.y = ny;
+  slideMove(world, s, vx * TICK_DT, vy * TICK_DT, r, mode);
   return s.x !== x0 || s.y !== y0;
+}
+
+/**
+ * Moves `s` by (dx, dy), one axis at a time so you slide along walls. When
+ * you walk straight into the edge of a tree, a rock or a wall's corner,
+ * you slip around it instead of stopping dead.
+ */
+export function slideMove(world, s, dx, dy, r, mode = 'player') {
+  const nx = s.x + dx;
+  if (world.isFree(nx, s.y, r, mode)) s.x = nx;
+  else if (dx !== 0 && (dy < 0 ? -dy : dy) < (dx < 0 ? -dx : dx) * 0.5) slip(world, s, dx, 0, r, mode);
+  const ny = s.y + dy;
+  if (world.isFree(s.x, ny, r, mode)) s.y = ny;
+  else if (dy !== 0 && (dx < 0 ? -dx : dx) < (dy < 0 ? -dy : dy) * 0.5) slip(world, s, 0, dy, r, mode);
+}
+
+// How far to the side an opening may be for you to slip towards it (tiles).
+const SLIP_MAX = 0.45;
+
+/**
+ * Blocked going (dx, dy) along one axis: if there is an opening just to
+ * the side (the round edge of a trunk, a wall's corner), step sideways
+ * towards the nearest one. A straight wall has none, so you stop there.
+ */
+function slip(world, s, dx, dy, r, mode) {
+  const step = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
+  const inc = step > 0.05 ? step : 0.05;
+  let best = 0;
+  let bestK = SLIP_MAX + 1;
+  for (const sgn of [1, -1]) {
+    for (let k = inc; k <= SLIP_MAX; k += inc) {
+      const ox = dx === 0 ? sgn * k : 0;
+      const oy = dy === 0 ? sgn * k : 0;
+      if (world.isFree(s.x + ox + dx, s.y + oy + dy, r, mode)) {
+        if (k < bestK) {
+          bestK = k;
+          best = sgn;
+        }
+        break;
+      }
+    }
+  }
+  if (!best) return false;
+  const ox = dx === 0 ? best * step : 0;
+  const oy = dy === 0 ? best * step : 0;
+  if (!world.isFree(s.x + ox, s.y + oy, r, mode)) return false;
+  s.x += ox;
+  s.y += oy;
+  return true;
 }

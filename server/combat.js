@@ -514,7 +514,7 @@ function shotBlocked(gs, x, y) {
   const tx = Math.floor(x);
   const ty = Math.floor(y);
   const b = gs.world.blockAt(tx, ty);
-  if (b && BLOCKS_SHOTS.has(b)) return { tx, ty, st: null };
+  if (b && BLOCKS_SHOTS.has(b) && gs.world.propAt(x, y)) return { tx, ty, st: null };
   const st = gs.world.structureAt(tx, ty);
   if (st && !st.def.walkable) return { tx, ty, st };
   return null;
