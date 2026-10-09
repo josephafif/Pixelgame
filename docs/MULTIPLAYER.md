@@ -106,9 +106,12 @@ blixtnedslag, rusningar, cirklande klot, dubbelgångare, gravitationsbrunnar,
 rötter, sporer, sandvågor, vattenväggar och virvlar. Attackerna siktar på
 bossens mål eller sprids över spelarna runt den, och de skadar alla som står där
 de landar. Upptäcktsplatserna (benrester, vägskyltar, flaskpost, vrak, idoler,
-begravda skatter) hittar var och en för sig. Vägstenen tar dig hem och tillbaka
-från menyn. Komponenter forskas fram i Fristadens bibliotek och ger fler val i
-smedjan och vid drops.
+begravda skatter) och de större platserna (utsiktstorn, ruiner, gamla gruvor och
+runstenar) hittar var och en för sig. De skickas till klienten med världen runt
+omkring. Gamla kartor och utsiktstorn avslöjar terräng bara på din egen karta:
+servern skickar `{ t: 'reveal' }` och nålar till dig. Vägstenen i er bas tar dig
+hem och tillbaka. Komponenter forskas fram från menyn (R), billigare med ett
+bibliotek i basen, och ger fler val i smedjan och vid drops.
 
 ---
 

@@ -144,6 +144,7 @@ export function onEnemyKilledLoot(game, e) {
   for (let i = 0; i < orbs; i++) addPickup(game, 'essence', e.x, e.y, { value, color: '#7ae0ff' });
   if (Math.random() < (e.elite ? 0.8 : 0.15)) addPickup(game, 'scrap', e.x, e.y, { value: 1 + (e.elite ? 1 : 0), color: '#b8bcc8' });
   if (Math.random() < 0.04) addPickup(game, 'heart', e.x, e.y, { color: '#e8364a' });
+  if (e.elite && !e.summoned && Math.random() < 0.03) addPickup(game, 'mapscroll', e.x, e.y, { color: '#ecdcb0' });
   // Gold (spent at markets) mostly comes from selling weapons; a little drops.
   const coins = e.boss ? 40 + ((Math.random() * 40) | 0) : e.elite && Math.random() < 0.4 ? 1 + ((Math.random() * 3) | 0) : 0;
   if (coins) addPickup(game, 'gold', e.x, e.y, { value: coins, color: '#ffd24a' });
@@ -197,6 +198,8 @@ export function openChestLoot(game, obj, { richness = 1 } = {}) {
   const scrap = Math.round((3 + ((Math.random() * 4) | 0)) * richness);
   for (let i = 0; i < scrap; i++) addPickup(game, 'scrap', obj.x, obj.y + 0.5, { value: 1 + (level >= 10 ? 1 : 0), color: '#b8bcc8' });
   addPickup(game, 'gold', obj.x, obj.y + 0.5, { value: Math.round((3 + ((Math.random() * 6) | 0)) * richness), color: '#ffd24a' });
+  // Now and then an old map (it shows a new part of the world).
+  if (Math.random() < 0.06) addPickup(game, 'mapscroll', obj.x, obj.y + 0.5, { color: '#ecdcb0' });
   if (Math.random() < 0.35 + game.pstats.luck * 0.005) {
     const id = pickComponent(game, [...biome.components, 'bp_scythe', 'bp_gun', 'bp_cannon', 'bp_chakram', 'bp_warfan', 'bp_crossbow']);
     if (id && game.data.byId.components.has(id)) addPickup(game, 'component', obj.x, obj.y + 0.5, { componentId: id, color: componentColor(game, id) });

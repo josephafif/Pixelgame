@@ -8,6 +8,7 @@ import { parseRaidWindow, raidState, inSafeZone } from '../src/net/rules.js';
 import { structureDef } from '../src/game/construction.js';
 import { TOWN_LEVELS } from '../src/net/mpbase.js';
 import { townMarket } from '../src/game/markets.js';
+import { isPoi } from '../src/game/discoveries.js';
 import * as players from './players.js';
 import * as combat from './combat.js';
 import * as enemies from './enemies.js';
@@ -503,9 +504,10 @@ export class GameServer {
         if (s) structures.push(building.structurePayload(s, this));
       }
     }
+    // Chests and shrines (shared), and the points of interest and sites to
+    // explore (each player's own: the client knows what you have found).
     const objects = chunk.objects
-      .filter((o) => o.type !== 'building' && o.type !== 'altar')
-      .filter((o) => o.type === 'chest' || o.type === 'shrine')
+      .filter((o) => o.type === 'chest' || o.type === 'shrine' || isPoi(o.type))
       .map((o) => ({ type: o.type, key: o.key, x: o.x, y: o.y, rich: o.rich ?? false, used: this.objectUsed(o.key) }));
     const altars = chunk.objects.filter((o) => o.type === 'altar').map((o) => ({ key: o.key, spent: this.altarSpent(o.key) }));
     return { t: 'chunk', cx, cy, harvested, structures, objects, altars };

@@ -62,8 +62,12 @@ test('sailing: build a boat at the forge, set sail, meet the sharks, go ashore',
     t.place(bot, shore.land.x, shore.land.y);
     const aim = angleToByte(Math.atan2(shore.dir.y, shore.dir.x));
     await walk(bot, 3, { aim });
-    bot.input({ buttons: BTN.INTERACT, aim });
-    await sleep(300);
+    // Use sets sail (pressed again if the first press came before the turn, as a player would).
+    for (let i = 0; i < 3 && !p.sailing; i++) {
+      bot.input({ buttons: BTN.INTERACT, aim });
+      await sleep(300);
+      if (!p.sailing) await walk(bot, 2, { aim });
+    }
     assert.equal(p.sailing, true, 'sailing');
     assert.ok(SAILABLE.has(t.gs.world.blockAt(Math.floor(p.x), Math.floor(p.y))), 'on the water');
     assert.ok(bot.self.flags & SF.SAILING, 'the snapshot says so');

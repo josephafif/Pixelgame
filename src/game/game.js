@@ -32,7 +32,7 @@ import { Construction, buildRadius, structureDef, structureDefs, structureLock }
 import { Markets } from './markets.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
 import { slideMove } from '../net/movement.js';
-import { POI, isPoi, poiFound, interactPoi } from './discoveries.js';
+import { POI, isPoi, poiFound, interactPoi, readOldMap, chunksAround } from './discoveries.js';
 import {
   updatePal, syncPalEntity, hatchReady, rollEgg, addEgg, startHatch, upgradePal, palSpecies, findPal, PAL_MODES,
 } from './pals.js';
@@ -815,6 +815,18 @@ export class Game {
     if (added) this.emit('explored');
   }
 
+  /** Shows the land within r chunks of (x, y) on your map (towers, old maps, runestones). */
+  revealArea(x, y, r) {
+    let added = false;
+    for (const key of chunksAround(x, y, r)) {
+      if (this.explored.has(key)) continue;
+      this.explored.add(key);
+      this.save.world.explored.push(key);
+      added = true;
+    }
+    if (added) this.emit('explored');
+  }
+
   /** A traveller's tip about the nearest market: it shows up on the map. */
   #rumourOfMarket() {
     const m = this.world.firstMarket;
@@ -870,6 +882,11 @@ export class Game {
       case 'heart':
         healPlayer(this, this.pstats.maxHp * 0.2);
         this.audio.play('pickup');
+        break;
+      case 'mapscroll':
+        this.audio.play('discover', { rarity: 2 });
+        readOldMap(this);
+        this.requestSave();
         break;
       case 'component':
         this.discoverComponent(it.componentId);

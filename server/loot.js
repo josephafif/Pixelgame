@@ -13,6 +13,7 @@ import { inSafeZone } from '../src/net/rules.js';
 import * as players from './players.js';
 import * as pals from './pals.js';
 import * as base from './base.js';
+import * as discoveries from './discoveries.js';
 
 const MAGNET = 2.6;
 const COLLECT = 0.6;
@@ -21,7 +22,7 @@ const DESPAWN_MS = 5 * 60 * 1000;
 const BAG_MS = 10 * 60 * 1000;
 const MAX_PICKUPS = 900;
 
-export const RESOURCE_COLORS = { essence: '#7ae0ff', scrap: '#c8ccd8', wood: '#b07a48', stone: '#b8bcc8', gold: '#ffd24a', shard: '#ffd24a', heart: '#ff5a6a', bag: '#c89a5a' };
+export const RESOURCE_COLORS = { essence: '#7ae0ff', scrap: '#c8ccd8', wood: '#b07a48', stone: '#b8bcc8', gold: '#ffd24a', shard: '#ffd24a', heart: '#ff5a6a', bag: '#c89a5a', mapscroll: '#ecdcb0' };
 
 export function harvestInfoFor(gs, tileId) {
   return harvestInfo(gs.data, tileId);
@@ -123,6 +124,8 @@ export function onEnemyKilled(gs, e, killer) {
     dropComponent(gs, owner, pickOne(biome.components), e.x, e.y);
   }
   if (owner && e.elite) pals.dropEgg(gs, owner, 'elite', e.x, e.y);
+  // Now and then an elite carries an old map.
+  if (owner && e.elite && Math.random() < 0.03) addPickup(gs, 'mapscroll', e.x, e.y, { owner: owner.id, lockUntil: now + LOCK_MS });
   const source = e.elite ? 'elite' : 'drop';
   if (Math.random() < WEAPON_DROP_CHANCE[source] * (1 + luck * 0.01)) {
     const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, roll: source, unlocked: researchedOf(owner) });
@@ -193,6 +196,7 @@ export function openChest(gs, p, o, now) {
   for (let i = 0; i < 4 * rich; i++) addPickup(gs, 'essence', o.x, o.y, { value: 1 + Math.floor(level / 6), owner: p.id, lockUntil: now + LOCK_MS });
   for (let i = 0; i < 2 * rich; i++) addPickup(gs, 'scrap', o.x, o.y, { value: 2 + Math.floor(level / 4), owner: p.id, lockUntil: now + LOCK_MS });
   if (Math.random() < 0.4) addPickup(gs, 'gold', o.x, o.y, { value: 3 + ((Math.random() * 8) | 0), owner: p.id, lockUntil: now + LOCK_MS });
+  if (Math.random() < 0.06) addPickup(gs, 'mapscroll', o.x, o.y, { owner: p.id, lockUntil: now + LOCK_MS });
   if (Math.random() < WEAPON_DROP_CHANCE.chest * rich) {
     const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', roll: 'chest', unlocked: researchedOf(p) });
     dropWeapon(gs, dna, o.x, o.y + 0.6, p);
@@ -404,6 +408,9 @@ function collect(gs, p, it) {
       return true;
     case 'component':
       discoverComponent(gs, p, it.componentId);
+      return true;
+    case 'mapscroll':
+      discoveries.readMap(gs, p);
       return true;
     default:
       return true;

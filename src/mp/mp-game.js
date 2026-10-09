@@ -29,7 +29,7 @@ import {
 } from './entities.js';
 import { MpMarkets } from './markets.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
-import { POI, isPoi, poiFound } from '../game/discoveries.js';
+import { POI, isPoi, poiFound, chunksAround } from '../game/discoveries.js';
 import { currentBoat, boatMode, boatDefs, findLaunch, findLanding } from '../game/sailing.js';
 import { emptyPals } from '../net/mpsave.js';
 import { TOWN_LEVELS, clanLevels, buildingOfStruct, BUILDING_SV } from '../net/mpbase.js';
@@ -493,6 +493,10 @@ export class MpGame {
         this.addPin(msg.x, msg.y, msg.label);
         this.emit('explored');
         break;
+      case 'reveal':
+        // A watchtower, an old map or a runestone: land shows on your map.
+        this.revealArea(msg.x, msg.y, msg.r);
+        break;
       case 'unpin': {
         const i = this.save.world.pins.findIndex((pp) => pp.label === msg.label && Math.hypot(pp.x - msg.x, pp.y - msg.y) < 2);
         if (i >= 0) this.removePin(i);
@@ -613,6 +617,7 @@ export class MpGame {
     const chests = new Set(this.save.world.chests);
     const shrines = new Set(this.save.world.shrines);
     for (const o of msg.objects) {
+      if (o.type !== 'chest' && o.type !== 'shrine') continue; // (points of interest: what you found is in `me`)
       const set = o.type === 'chest' ? chests : shrines;
       if (o.used) set.add(o.key);
       else set.delete(o.key);
@@ -1675,6 +1680,10 @@ export class MpGame {
       case 'wreck': return 'Leta i vraket';
       case 'idol': return 'Rör vid idolen';
       case 'treasure': return 'Gräv upp skatten';
+      case 'tower': return 'Klättra upp i utsiktstornet';
+      case 'ruins': return 'Leta i ruinerna';
+      case 'mine': return 'Gräv i den gamla gruvan';
+      case 'runestone': return 'Läs runstenen';
       case 'land': return 'Gå i land';
       case 'shore': return null;
       default: return null;
@@ -2274,6 +2283,21 @@ export class MpGame {
         this.save.world.explored.push(key);
         added = true;
       }
+    }
+    if (added) {
+      this.emit('explored');
+      if (this.explored.size < 20000) writeStore(this.exploredKey, this.save.world.explored);
+    }
+  }
+
+  /** Shows the land within r chunks of (x, y) on your map. */
+  revealArea(x, y, r) {
+    let added = false;
+    for (const key of chunksAround(x, y, r)) {
+      if (this.explored.has(key)) continue;
+      this.explored.add(key);
+      this.save.world.explored.push(key);
+      added = true;
     }
     if (added) {
       this.emit('explored');

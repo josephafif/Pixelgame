@@ -197,6 +197,30 @@ test('your clan base: the camp buildings, the base panel, upgrades and the vault
   await a.ctx.close();
 });
 
+test('exploring in multiplayer: sites and small finds show up, a watchtower reveals the land on your map', async ({ browser }) => {
+  const a = await join(browser, 'Kartläsaren');
+  const gs = srv.gs;
+  const p = [...gs.players.values()].find((x) => x.name === 'Kartläsaren');
+  p.protectUntil = Date.now() + 10 * 60 * 1000;
+  const sites = gs.world.sitesNear(0, 0, 500).filter((s) => s.type === 'tower').sort((x, y) => Math.hypot(x.x, x.y) - Math.hypot(y.x, y.y));
+  let tower = null;
+  for (const s of sites) {
+    tower = gs.world.getChunk(Math.floor(s.x / 16), Math.floor(s.y / 16)).objects.find((o) => o.key === s.key);
+    if (tower) break;
+  }
+  Object.assign(p, { x: tower.x, y: tower.y + 1.1 });
+  gs.send(p, { t: 'teleport', x: p.x, y: p.y });
+  // The client gets the tower with the world around it, and can use it.
+  await a.page.waitForFunction(() => window.__pixelgame.game.interactTarget?.type === 'tower');
+  await expect(a.page.locator('#interact-hint')).toContainText('utsiktstornet');
+  const before = await a.page.evaluate(() => window.__pixelgame.game.explored.size);
+  await a.page.keyboard.press('KeyE');
+  await a.page.waitForFunction((n) => window.__pixelgame.game.explored.size > n + 80, before);
+  await a.page.waitForFunction(() => window.__pixelgame.game.save.world.pins.length > 0);
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
 test('pals in multiplayer: your pal walks with you, shows in the HUD, and the pals panel works', async ({ browser }) => {
   const a = await join(browser, 'Djurvan');
   const p = [...srv.gs.players.values()].find((x) => x.name === 'Djurvan');

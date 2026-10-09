@@ -106,3 +106,61 @@ test('research: components drop for you, the library researches them, and the fo
     await t.close();
   }
 });
+
+/** The site of a kind nearest the town, as it stands in the world. */
+function findSite(gs, type) {
+  const list = gs.world.sitesNear(0, 0, 500).filter((s) => s.type === type).sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y));
+  for (const s of list) {
+    const o = gs.world.getChunk(Math.floor(s.x / CHUNK), Math.floor(s.y / CHUNK)).objects.find((x) => x.key === s.key);
+    if (o) return o;
+  }
+  return null;
+}
+
+test('sites to explore: a watchtower shows the land, ruins wake their guardians, an old map leads somewhere new', async () => {
+  const t = await testServer({ worldSeed: 42 });
+  try {
+    const a = await t.bot('Upptäckaren');
+    const p = t.player(a);
+    p.protectUntil = Date.now() + 10 * 60 * 1000;
+    // Clients get the sites (and the small finds) with the world around them.
+    const tower = findSite(t.gs, 'tower');
+    assert.ok(tower, 'a watchtower');
+    t.place(a, tower.x, tower.y + 0.8);
+    await a.waitFor((m) => m.t === 'chunk' && m.objects.some((o) => o.key === tower.key));
+    // Climb it: the land around shows on your map, and places worth a visit are pinned.
+    a.input({ buttons: BTN.INTERACT });
+    const reveal = await a.waitFor((m) => m.t === 'reveal');
+    assert.equal(reveal.r, 7);
+    await a.waitFor((m) => m.t === 'pin');
+    assert.ok(p.ch.extra.found.includes(tower.key));
+    // Ruins: rich loot, and two elite guardians wake up.
+    const ruins = findSite(t.gs, 'ruins');
+    Object.assign(p, { x: ruins.x, y: ruins.y + 0.6, kx: 0, ky: 0 });
+    p.queue.length = 0;
+    await sleep(200);
+    const before = [...t.gs.enemiesNear(ruins.x, ruins.y, 6)].filter((e) => e.elite).length;
+    for (let i = 0; i < 3 && !p.ch.extra.found.includes(ruins.key); i++) {
+      Object.assign(p, { x: ruins.x, y: ruins.y + 0.6 });
+      a.input({ buttons: BTN.INTERACT });
+      await sleep(300);
+    }
+    assert.ok(p.ch.extra.found.includes(ruins.key));
+    const after = [...t.gs.enemiesNear(ruins.x, ruins.y, 6)].filter((e) => e.elite).length;
+    assert.ok(after > before, 'the guardians are awake');
+    assert.ok([...t.gs.pickups.values()].some((it) => it.owner === p.id), 'loot for the finder');
+    // An old map: picked up, it shows a new place (pinned) and the land around it.
+    const loot = await import('../../server/loot.js');
+    t.place(a, 140.5, 20.5);
+    for (const e of t.gs.enemiesNear(p.x, p.y, 20)) e.dead = true;
+    const pins = a.json.filter((m) => m.t === 'pin').length;
+    loot.addPickup(t.gs, 'mapscroll', p.x + 0.4, p.y, { owner: p.id, lockUntil: Date.now() + 60000, vx: 0, vy: 0 });
+    const shown = await a.waitFor((m) => m.t === 'reveal' && m.r === 5);
+    assert.ok(Math.hypot(shown.x - p.x, shown.y - p.y) > 30, 'somewhere else');
+    await sleep(100);
+    assert.ok(a.json.filter((m) => m.t === 'pin').length > pins, 'pinned');
+    assert.ok(p.ch.extra.shown.length >= 1, 'remembered, so the next map shows something new');
+  } finally {
+    await t.close();
+  }
+});

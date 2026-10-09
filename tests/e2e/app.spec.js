@@ -1055,3 +1055,48 @@ test('camp: turrets stand on floors, and vertical walls join into one wall', asy
   expect(seams.woodAlone[0]).toBeLessThan(16);
   expect(errors).toEqual([]);
 });
+
+test('exploring: a watchtower shows the land around, a runestone points somewhere new, an old map reveals more', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const goTo = (type) => game(page, (type) => {
+    const g = window.__pixelgame.game;
+    const sites = g.world.sitesNear(0, 0, 500).filter((s) => s.type === type).sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y));
+    for (const s of sites) {
+      const o = g.world.getChunk(Math.floor(s.x / 16), Math.floor(s.y / 16)).objects.find((x) => x.key === s.key);
+      if (!o) continue;
+      g.player.x = o.x;
+      g.player.y = o.y + 1.1;
+      return o.key;
+    }
+    return null;
+  }, type);
+  const explored = () => game(page, () => window.__pixelgame.game.explored.size);
+  const pins = () => game(page, () => window.__pixelgame.game.save.world.pins.length);
+  // The watchtower: climb it.
+  const tower = await goTo('tower');
+  expect(tower).toBeTruthy();
+  await expect.poll(() => game(page, () => window.__pixelgame.game.interactTarget?.type)).toBe('tower');
+  await expect(page.locator('#interact-hint, .interact-hint').first()).toContainText('watchtower');
+  const e0 = await explored();
+  await page.keyboard.press('KeyE');
+  await expect.poll(explored).toBeGreaterThan(e0 + 80);
+  expect(await pins()).toBeGreaterThan(0);
+  expect(await game(page, (k) => window.__pixelgame.game.save.world.found.includes(k), tower)).toBe(true);
+  // A runestone: stronger for a while, and it tells of a place.
+  const pins0 = await pins();
+  await goTo('runestone');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.interactTarget?.type)).toBe('runestone');
+  await page.keyboard.press('KeyE');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.buffs?.some((b) => b.stat === 'attackPower') ?? true)).toBe(true);
+  await expect.poll(pins).toBeGreaterThan(pins0);
+  // An old map: picked up, a new part of the world shows on yours.
+  const e1 = await explored();
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.pickups.push({ kind: 'mapscroll', x: g.player.x + 0.3, y: g.player.y, t: 1, vx: 0, vy: 0, z: 0, vz: 0, color: '#ecdcb0' });
+  });
+  await expect.poll(explored).toBeGreaterThan(e1 + 60);
+  await expect(page.locator('.toast').last()).toContainText('old map');
+  expect(errors).toEqual([]);
+});

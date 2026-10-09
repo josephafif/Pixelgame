@@ -479,6 +479,17 @@ const MAPS = {
     'okkkkko',
     '.ooooo.',
   ],
+  // A torn old map (a rare find: it shows a new part of the world).
+  mapscroll: [
+    '.oooooooo.',
+    'oGwwwwwwGo',
+    'owwrwwwwwo',
+    'owwwwrwwwo',
+    'owrwwwwrwo',
+    'owwwwrwwwo',
+    'oGwwwwwwGo',
+    '.oooooooo.',
+  ],
   // A dropped sack (multiplayer death bag).
   bag: [
     '...ooo...',
@@ -599,7 +610,7 @@ export function objectSprite(kind, accent = '#ffd24a') {
   return build(`obj:${kind}:${accent}`, () => {
     const pal = {
       o: OUTLINE, w: '#8d8a9e', k: '#5d5a6e', y: '#e0b040', G: accent, g: shadeHex(accent, 0.5),
-      r: '#ff6a2a', b: '#6b4a2a', B: '#4a3018', W: '#ece4d0', u: '#7ac8e8',
+      r: '#ff6a2a', b: '#6b4a2a', B: '#4a3018', W: '#ece4d0', u: '#7ac8e8', n: '#15121f',
     };
     if (kind === 'treasure') pal.r = '#d8342a';
     if (kind === 'wreck' || kind === 'signpost') Object.assign(pal, { b: '#8a5a33', B: '#5a3a1e' });
@@ -617,6 +628,7 @@ export function pickupSprite(kind, color) {
     if (kind === 'wood') Object.assign(pal, { b: '#b07a48', B: '#7a4a28', w: '#e8c890' });
     if (kind === 'stone') Object.assign(pal, { w: '#b8bcc8', k: '#7d7a8e' });
     if (kind === 'egg') Object.assign(pal, { w: '#f4ecd8', g: '#d8ccb0' });
+    if (kind === 'mapscroll') Object.assign(pal, { w: '#ecdcb0', r: '#c8364a' });
     return spriteFromMap(MAPS[kind], pal);
   });
 }

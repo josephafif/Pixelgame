@@ -188,7 +188,9 @@ zoomas mycket långt ut (tusentals rutor); då ritas varje område som en färg,
 Markeringarna visar **hotspots**: lägret, bossar (bleka tills du har utforskat där, överkryssade
 när de är besegrade), marknader du har sett, helgedomar, kistor du inte har öppnat, Waystonens
 återvändarpunkt och dina egna **nålar** (tryck på *Pin* och sedan på kartan; tryck på en nål för
-att ta bort den). Kod: `src/ui/map.js`.
+att ta bort den). Utsiktstorn, runstenar och **gamla kartor** (se Upptäckter) avslöjar stora
+områden på en gång. I multiplayer syns också din klans bas och dina klanmedlemmar. Kod:
+`src/ui/map.js`.
 
 ## Hav, öar och båtar
 
@@ -243,6 +245,21 @@ utforska (`src/game/discoveries.js`):
 | Skeppsvrak | Stränder och öar | Trä, scrap och guld |
 | Idol | Öar | +2 max-HP, permanent |
 | Nedgrävd skatt | Öar | Grävs upp med hackan: som en mycket rik kista, ibland en Star Shard |
+
+Större **platser att utforska** står i de flesta hörn av världen (cirka 50 inom 400 rutor från
+lägret, den närmaste en bit utanför). De ritas som riktiga landmärken (`src/render/sites.js`):
+
+| Plats | Vad händer |
+| --- | --- |
+| Utsiktstorn | Klättra upp: landet runt omkring syns på kartan, och två platser värda ett besök nålas fast |
+| Ruiner | Rik skatt (ibland en gammal karta eller en Star Shard), men två elitväktare vaknar |
+| Gammal gruva | Gräv med hackan: sten, scrap, essence, guld och ibland en Star Shard |
+| Runsten | +15 % skada i 5 minuter; runorna berättar om en plats i närheten (nålas fast) |
+
+**Gamla kartor** är ett sällsynt fynd: ur kistor, kvarlevor, ruiner, gruvor och ibland elitfiender.
+En gammal karta visar en plats du inte har sett (ett torn, ruiner, en gruva, en runsten eller ett
+stort bossaltare) och landet runt den, och nålar fast den. Samma platser och kartor finns i
+multiplayer.
 
 Dessutom finns det liv runt omkring dig: fjärilar på ängarna, eldflugor i skogen och fiskar som
 hoppar ute på havet.

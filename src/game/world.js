@@ -16,6 +16,10 @@ const LANDMARK_RADIUS = 22;
 // Every altar can be beaten once; after that you look for a new one.
 export const ALTAR_CELL = 200;
 const ALTAR_CHANCE = 0.55;
+// Sites to explore (watchtowers, ruins, old mines, runestones): one per cell, often.
+const SITE_CELL = 72;
+const SITE_CHANCE = 0.6;
+export const SITE_KINDS = ['tower', 'ruins', 'mine', 'runestone'];
 const ALTAR_CLEAR = 5;
 const MAX_CHUNKS = 160;
 // Markets: at most one per big cell of the world, and only in some cells.
@@ -174,6 +178,7 @@ export class World {
       };
     });
     this.altarCache = new Map();
+    this.siteCache = new Map();
     // One market is guaranteed within reach, in a direction no boss uses.
     this.marketCache = new Map();
     const [fx, fy] = COMPASS[(start + 1) % 8];
@@ -246,6 +251,45 @@ export class World {
     }
     this.altarCache.set(key, altar);
     return altar;
+  }
+
+  // --- Sites to explore ------------------------------------------------------------------
+
+  /**
+   * The site in a world cell, or null: a watchtower, ruins, an old mine or a
+   * runestone (deterministic per world, cheap: no terrain is generated).
+   * The object itself stands on the nearest open tile when its chunk is made.
+   */
+  siteForCell(sx, sy) {
+    const key = `${sx},${sy}`;
+    if (this.siteCache.has(key)) return this.siteCache.get(key);
+    let site = null;
+    const h = hashInts(this.objSeed, sx, sy, 0x5173);
+    if ((h % 1000) / 1000 < SITE_CHANCE) {
+      const x = sx * SITE_CELL + 10 + ((h >>> 10) % (SITE_CELL - 20)) + 0.5;
+      const y = sy * SITE_CELL + 10 + ((h >>> 20) % (SITE_CELL - 20)) + 0.5;
+      const far = x * x + y * y > 70 * 70;
+      const land = far && this.seaAt(x, y) <= SEA.ISLE && !this.#nearLandmark(x, y, LANDMARK_RADIUS + 6);
+      if (land && !this.marketAt(x, y, 8) && !this.altarsNear(x, y, 14).length) {
+        const roll = (h >>> 4) % 100;
+        const type = roll < 28 ? 'runestone' : roll < 54 ? 'tower' : roll < 80 ? 'ruins' : 'mine';
+        site = { type, key: `site:${key}`, x, y, site: true };
+      }
+    }
+    this.siteCache.set(key, site);
+    return site;
+  }
+
+  /** Sites within `range` tiles of (x, y) (where the cells say they are). */
+  sitesNear(x, y, range) {
+    const out = [];
+    for (let sy = Math.floor((y - range) / SITE_CELL); sy <= Math.floor((y + range) / SITE_CELL); sy++) {
+      for (let sx = Math.floor((x - range) / SITE_CELL); sx <= Math.floor((x + range) / SITE_CELL); sx++) {
+        const s = this.siteForCell(sx, sy);
+        if (s && (s.x - x) ** 2 + (s.y - y) ** 2 <= range * range) out.push(s);
+      }
+    }
+    return out;
   }
 
   /** Lesser altars within `range` tiles of (x, y). */
@@ -512,7 +556,31 @@ export class World {
       const p = this.#freeTileIn(chunk, 2);
       if (p) chunk.objects.push({ type: 'shrine', key: `s:${key}`, ...p });
     }
+    if (far) this.#placeSites(chunk);
     if (far) this.#placeCuriosities(chunk);
+  }
+
+  /** A site whose cell puts it in this chunk stands on the nearest open tile. */
+  #placeSites(chunk) {
+    const { cx, cy } = chunk;
+    for (const s of this.sitesNear(cx * CHUNK + CHUNK / 2, cy * CHUNK + CHUNK / 2, CHUNK)) {
+      if (Math.floor(s.x / CHUNK) !== cx || Math.floor(s.y / CHUNK) !== cy) continue;
+      const lx0 = Math.floor(s.x) - cx * CHUNK;
+      const ly0 = Math.floor(s.y) - cy * CHUNK;
+      let spot = null;
+      for (let r = 0; r <= 3 && !spot; r++) {
+        for (let dy = -r; dy <= r && !spot; dy++) {
+          for (let dx = -r; dx <= r && !spot; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const lx = lx0 + dx;
+            const ly = ly0 + dy;
+            if (lx < 1 || ly < 1 || lx >= CHUNK - 1 || ly >= CHUNK - 1) continue;
+            if (!chunk.block[ly * CHUNK + lx]) spot = { x: cx * CHUNK + lx + 0.5, y: cy * CHUNK + ly + 0.5 };
+          }
+        }
+      }
+      if (spot) chunk.objects.push({ ...s, ...spot });
+    }
   }
 
   /** Small points of interest (see discoveries.js) and island content. */

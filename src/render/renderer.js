@@ -13,6 +13,7 @@ import { playerSprites, objectSprite, pickupSprite, tintedSprite } from './sprit
 import { weaponSprite, weaponIcon } from './weapon-sprite.js';
 import { weaponPose } from './weapon-anim.js';
 import { buildingSprite, BUILDING_W, BUILDING_H } from './buildings.js';
+import { siteSprite, SITE_TYPES } from './sites.js';
 import { buildingLevel, wellPending } from '../game/base.js';
 import {
   structureSprite, isFlat, drawFlame, drawTurretHead, pickaxeSprite, STRUCT_H, LEFT, RIGHT, UP, DOWN,
@@ -788,6 +789,10 @@ export class Renderer {
       case 'wreck':
       case 'idol':
       case 'treasure':
+      case 'tower':
+      case 'ruins':
+      case 'mine':
+      case 'runestone':
         this.#drawCuriosity(game, o, x, y);
         break;
       case 'building': {
@@ -811,6 +816,10 @@ export class Renderer {
     const v = this.v;
     const found = game.save.world.found?.includes(o.key);
     const t = game.time;
+    if (SITE_TYPES.includes(o.type)) {
+      this.#drawSite(game, o, x, y, found, t);
+      return;
+    }
     let kind = o.type;
     let accent;
     if (kind === 'camp') kind = found ? 'campOut' : 'campfire';
@@ -841,6 +850,34 @@ export class Renderer {
       case 'treasure':
       case 'bottle':
         if (Math.random() < 0.04) game.fx.emit('glint', o.x, o.y - 0.2, 1, 0.3, 0.4, ['#ffffff', '#ffe890']);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** A watchtower, ruins, an old mine or a runestone: a landmark, drawn big. */
+  #drawSite(game, o, x, y, found, t) {
+    const v = this.v;
+    const s = siteSprite(o.type, found);
+    this.#shadow(x, y + 2, Math.max(6, s.width >> 2));
+    v.drawImage(s, x - (s.width >> 1), y + 4 - s.height);
+    if (found) return;
+    switch (o.type) {
+      case 'runestone':
+        this.#glow(x, y - 12, '#7ae0ff', 11 + Math.sin(t * 2 + o.x) * 2);
+        if (Math.random() < 0.06) game.fx.emit('arcane', o.x, o.y - 0.9, 1, 0.3, 0.5);
+        break;
+      case 'mine':
+        this.#glow(x - 8, y - 11, '#ffd060', 8 + Math.sin(t * 7) * 1.5);
+        this.#glow(x + 11, y - 7, '#7ae0ff', 6);
+        break;
+      case 'ruins':
+        this.#glow(x - 7, y - 9, '#ffe890', 6 + Math.sin(t * 3) * 1.5);
+        if (Math.random() < 0.03) game.fx.emit('glint', o.x - 0.4, o.y - 0.5, 1, 0.3, 0.5, ['#ffe890', '#ffffff']);
+        break;
+      case 'tower':
+        if (Math.random() < 0.02) game.fx.emit('leaf', o.x + 0.5, o.y - 2.4, 1, 0.2, 0.4);
         break;
       default:
         break;
@@ -895,6 +932,10 @@ export class Renderer {
     this.#shadow(x, y + 2, 2);
     v.drawImage(s, x - (s.width >> 1), y - s.height - 1 + bob);
     if (it.kind === 'component') this.#glow(x, y - 4 + bob, it.color, 10);
+    if (it.kind === 'mapscroll') {
+      this.#glow(x, y - 4 + bob, '#ffe890', 12 + Math.sin(game.time * 4) * 2);
+      if (Math.random() < 0.06) game.fx.emit('glint', it.x, it.y - 0.4, 1, 0.4, 0.6, ['#ffe890', '#ffffff']);
+    }
     if (it.kind === 'egg') {
       this.#glow(x, y - 4 + bob, it.color, 14 + Math.sin(game.time * 4) * 2);
       if (Math.random() < 0.08) game.fx.emit('glint', it.x, it.y - 0.4, 1, 0.4, 0.6, [it.color, '#ffffff']);
