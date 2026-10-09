@@ -1135,10 +1135,21 @@ test('horses: tame a wild horse, gallop over trees, leave it in camp, find it in
   });
   expect(ride.speed).toBeGreaterThan(ride.walk);
   // Home to camp and off: it stays there, and the camp panel lists it.
-  await game(page, () => {
+  await game(page, async () => {
+    // A free spot in camp with nothing else to use next to it.
+    const { inBuildArea } = await import('/src/game/construction.js');
     const g = window.__pixelgame.game;
-    g.player.x = 3.5;
-    g.player.y = 6.5;
+    for (let r = 3; r < 12; r++) {
+      for (let a = 0; a < 16; a++) {
+        const x = Math.floor(Math.cos((a / 16) * Math.PI * 2) * r) + 0.5;
+        const y = Math.floor(Math.sin((a / 16) * Math.PI * 2) * r) + 0.5;
+        if (!inBuildArea(g.data, g.save, Math.floor(x), Math.floor(y)) || !g.world.isFree(x, y, 0.4)) continue;
+        if ([...g.world.objectsNear(x, y, 1)].some((o) => Math.hypot(o.x - x, o.y - y) < 2.5)) continue;
+        g.player.x = x;
+        g.player.y = y;
+        return;
+      }
+    }
   });
   await expect(page.locator('#interact-hint')).toContainText(/Get off/);
   await page.keyboard.press('e');

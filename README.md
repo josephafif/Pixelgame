@@ -19,7 +19,8 @@ npm test             # enhetstester (node:test, inga beroenden)
 npm run build        # uppdaterar precache-manifest.js efter ändringar i appfiler
 npm run check        # verifierar att precache-manifestet är aktuellt + enhetstester
 npm install && npm run test:e2e   # Playwright: desktop, mobil (touch), offline, uppdatering, multiplayer
-npm run share        # kör en egen multiplayer-server på din dator: ger en kod och en länk att skicka (se nedan)
+npm run host         # serverhanteraren: kör en egen server med en kontrollpanel i webbläsaren (eller dubbelklicka Starta-server)
+npm run share        # samma server utan panel, i terminalen: ger en kod och en länk att skicka (se nedan)
 npm run cloud:deploy # lägger upp den officiella servern på Cloudflare (gratisplanen)
 npm run cloud:dev    # kör Cloudflare-servern lokalt (workerd), för att prova
 npm run mp           # multiplayer lokalt: spelserver + spelet på http://localhost:8787 (gäster, admin för alla)
@@ -230,6 +231,29 @@ Kod: `src/game/sailing.js` (båtar, sjösättning, landstigning), `World#seaAt` 
 `src/game/world.js` (hav och öar), `src/render/boats.js` (grafik), hajar och sjöormar i
 `src/game/enemies.js`.
 
+## Hästar
+
+Små flockar med **vilda hästar** betar här och där i världen, långt från lägret (några få i varje
+stor region, så de är inte lätta att hitta). Gå fram till en häst och tryck **Use** för att rida
+den: då är den din. Till häst är du mycket snabbare, galopperar när du springer, har extra hälsa
+och **hoppar över träd och stenar** (men aldrig över vatten eller murar). Tryck Use igen för att
+kliva av.
+
+| Ras | Var | Fart | Galopp | Extra hälsa |
+| --- | --- | --- | --- | --- |
+| Ponny | Slätt, skog, högland | 6,0 | ×1,25 | +10 |
+| Fjordhäst | Slätt, högland, snö, skog | 6,6 | ×1,3 | +30 |
+| Fullblod | Slätt, öken, vulkanland | 7,8 | ×1,4 | +5 |
+| Snösto | Snö (sällsynt) | 7,2 | ×1,35 | +25 |
+| Skugghingst | Voidreach och vulkanland (mycket sällsynt) | 8,4 | ×1,4 | +35 |
+
+Varje häst har lite egna värden (±8 % fart, ±10 hälsa) och ett eget namn. **Lämna hästen i lägret**
+(multiplayer: på er klans mark) så stannar den där för alltid. Lämnar du den någon annanstans och
+går långt bort springer den iväg efter några minuter. Du kan ha sex hästar; lägerpanelen
+(multiplayer: Meny → Hästar) visar var de är och låter dig släppa en fri. Kartan visar var du
+lämnade dem. Kod: `src/game/horses.js` (raser, flockar, regler), `src/game/riding.js`
+(singleplayer), `server/horses.js` (multiplayer), `src/render/horses.js` (grafik).
+
 ## Småsaker att hitta
 
 Utspritt i världen finns små saker som inte ändrar spelet mycket, men som gör det roligare att
@@ -328,7 +352,10 @@ legendariskt.
 
 **Golv** ligger i ett eget lager: torn, murar, facklor och fällor kan stå på ett golv, och ett
 golv kan läggas under något som redan står. River du tar verktyget det översta först och golvet
-sedan. **Murar sitter ihop** åt alla håll: en mur som byggs lodrätt blir en sammanhängande mur
+sedan. **Bygg på vatten:** ett golv på grunt vatten (sjöar, åar och kustvatten) blir en bro eller
+brygga som du kan gå på, och på golvet kan du sedan bygga murar, grindar, torn och facklor. Båtar
+och havsdjur kommer inte förbi. Går golvet sönder faller det som står på det i vattnet. Djupt hav
+går inte att bygga på, och lägrets byggnader står alltid på fast mark. **Murar sitter ihop** åt alla håll: en mur som byggs lodrätt blir en sammanhängande mur
 utan spetsar och kanter mellan rutorna, både i trä och sten.
 
 Lägrets byggyta växer med varje Hearth-uppgradering. Fiender som blockeras av en vägg hugger på
@@ -360,10 +387,16 @@ Lobbyn på webbsidan har tre delar:
   inbjudningslänk (`?join=K7QX2M`).
 - **Öppna servrar**: servrar som spelare har valt att visa för alla.
 
-**Kör en egen server** på din dator, gratis och utan konto: `npm run share`. Det startar
-spelservern och en Cloudflare-tunnel och registrerar servern i serverlistan (Supabase). Där får
-den en kod som är densamma varje gång. Med `--public` visas den för alla. Du spelar själv på
-`http://localhost:8787` och är admin där. Allt sparas i `server-data/pixelgame.db`.
+**Kör en egen server** på din dator, gratis och utan konto: dubbelklicka på **Starta-server**
+(Windows), **Starta-server.command** (Mac) eller kör `./starta-server.sh` (Linux), eller `npm run
+host`. Saknas Node.js hjälper filen dig att installera det. Då öppnas **serverhanteraren** i
+webbläsaren: en kontrollpanel där du startar och stoppar servern, ser koden och inbjudningslänken
+till dina vänner, ser vem som är inne (sparka ut, stäng av, gör till admin, ge någon ett nytt
+lösenord), skickar meddelanden till alla, ändrar inställningar (namn, regler, synlig för alla,
+spelare i samma wifi), tar och återställer säkerhetskopior och kan starta en ny värld. Bakom
+panelen körs samma server som `npm run share`: spelservern, en Cloudflare-tunnel och en kod i
+serverlistan (Supabase) som är densamma varje gång. Du spelar själv på `http://localhost:8787`
+och är admin där. Allt sparas i `server-data/`.
 
 Inloggningstoken från Discord eller Google skickas bara till den officiella servern. På andra
 servrar loggar man in med namn och lösenord.

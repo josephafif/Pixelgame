@@ -107,8 +107,24 @@ export async function startServer(overrides = {}) {
     wss.handleUpgrade(req, socket, head, (ws) => handleConnection(gs, auth, config, ws, req, perIp));
   });
 
+  // A busy port is an error the caller can explain (not a crash).
+  try {
+    await new Promise((resolve, reject) => {
+      http.once('error', reject);
+      http.listen(config.port, config.host, () => {
+        http.off('error', reject);
+        resolve();
+      });
+    });
+  } catch (err) {
+    wss.close();
+    db.close();
+    throw err;
+  }
+
   // Daily backups (a consistent copy while the server runs), last 14 kept.
   let backupTimer = null;
+  let firstBackup = null;
   if (config.backupDir) {
     const backup = async () => {
       try {
@@ -124,20 +140,20 @@ export async function startServer(overrides = {}) {
       }
     };
     backupTimer = setInterval(backup, 24 * 60 * 60 * 1000);
-    setTimeout(backup, 60 * 1000);
+    firstBackup = setTimeout(backup, 60 * 1000);
   }
 
   // Supabase pauses free projects after a week without requests: a small
   // request twice a day keeps the login service awake.
   let keepAlive = null;
+  let firstPing = null;
   if (config.supabaseUrl && config.supabaseAnonKey) {
     const ping = () => fetch(`${config.supabaseUrl}/auth/v1/health`, { headers: { apikey: config.supabaseAnonKey }, signal: AbortSignal.timeout(10000) })
       .catch((err) => log.warn('[supabase] keep-alive failed', err.message));
     keepAlive = setInterval(ping, 12 * 60 * 60 * 1000);
-    setTimeout(ping, 5000);
+    firstPing = setTimeout(ping, 5000);
   }
 
-  await new Promise((resolve) => http.listen(config.port, config.host, resolve));
   const port = http.address().port;
   gs.start();
   log.info(`[server] ${config.serverName} on :${port} — world seed ${gs.worldSeed}, guests ${auth.allowGuests ? 'on' : 'off'}, Supabase ${auth.supabaseEnabled ? 'on' : 'off'}`);
@@ -150,7 +166,9 @@ export async function startServer(overrides = {}) {
     for (const p of gs.players.values()) p.conn?.kick('Servern startar om, välkommen tillbaka om en stund');
     gs.saveAll();
     clearInterval(backupTimer);
+    clearTimeout(firstBackup);
     clearInterval(keepAlive);
+    clearTimeout(firstPing);
     wss.close();
     await new Promise((resolve) => http.close(resolve));
     db.close();

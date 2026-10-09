@@ -23,8 +23,9 @@ Hur det körs nu, helt på gratisplaner och utan betalkort:
   databasen i objektets SQLite. Klienterna skickar sin styrning 15 gånger per sekund där, så
   att gratisplanens 100 000 förfrågningar per dygn räcker till cirka 37 spelartimmar.
 - **Supabase** sköter serverlistan, koderna och inloggning med Discord och Google.
-- **Spelare kan köra egna servrar** med `npm run share`: Cloudflare Quick Tunnel, en kod som är
-  densamma varje gång, och inloggning med namn och lösenord. Spelarnas Supabase-token skickas
+- **Spelare kan köra egna servrar** med serverhanteraren (dubbelklicka `Starta-server`, eller
+  `npm run host`: en kontrollpanel i webbläsaren) eller `npm run share` i terminalen: Cloudflare
+  Quick Tunnel, en kod som är densamma varje gång, och inloggning med namn och lösenord. Spelarnas Supabase-token skickas
   aldrig till sådana servrar.
 
 En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplanen inte räcker.
@@ -32,9 +33,9 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 | Del | Var i koden |
 |---|---|
 | Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
-| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `bosses.js`, `pals.js`, `discoveries.js`, `markets.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
+| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `bosses.js`, `pals.js`, `discoveries.js`, `markets.js`, `horses.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
 | Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
-| Drift | `cloud/` och `wrangler.jsonc` (Cloudflare), `supabase/` (serverlistan), `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
+| Drift | `cloud/` och `wrangler.jsonc` (Cloudflare), `supabase/` (serverlistan), `scripts/host.mjs` och `scripts/host-panel.html` (serverhanteraren, `Starta-server.bat`/`.command`/`starta-server.sh`), `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
 
 ### Uppmätt
@@ -82,6 +83,25 @@ och farten kommer med varje snapshot), så seglingen känns lika direkt som att
 gå. Hajar och sjöormar dyker upp runt den som seglar och anfaller bara folk i
 båtar. Sjöormar kan ge ett Pal-ägg. Galeonens skrov tar en del av skadan, och
 andra spelare ser din båt.
+
+En flotte kan byggas i Fristadens smedja; slupen och galeonen kräver en bättre
+smedja i klanens bas (nivå 3 och 5).
+
+### Hästar och bygge på vatten
+
+Vilda hästflockar vaknar på servern när någon spelare kommer nära
+(`server/horses.js`, regler i `src/game/horses.js`). Den som rider en vild häst
+får den. Ryttaren rör sig med läget `horse` (över träd och stenar, aldrig över
+vatten eller murar) med hästens egen fart och galopp, som kommer med varje
+snapshot, så klienten förutsäger ridandet precis som att gå. Andra ser ryttaren
+på sin häst (fältet `horse` i spelarens entitet) och hästarna som egna
+entiteter (`ET.HORSE`). Kliver du av på klanens mark stannar hästen; annars
+springer den iväg om du är långt borta (eller utloggad) i några minuter. Dina
+hästar finns i världen medan du är inne. Meny → Hästar visar dem.
+
+Golv på grunt vatten blir broar och bryggor (kontrolleras både av servern och
+klientens förutsägelse); murar och annat byggs på golvet, och går golvet sönder
+faller det som står på det.
 
 ### Marknader
 

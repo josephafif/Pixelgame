@@ -94,8 +94,15 @@ export class Connection {
 
 /** The player's real address (behind Cloudflare Tunnel or Caddy it is in a header). */
 export function clientIp(req, config) {
-  const forwarded = config.trustProxy ? (req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) : '';
+  // trustProxy 'loopback': only a tunnel on this computer adds the address
+  // headers (players in the same home network connect directly).
+  const trusted = config.trustProxy === 'loopback' ? isLoopback(req.socket.remoteAddress) : Boolean(config.trustProxy);
+  const forwarded = trusted ? (req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) : '';
   return forwarded || req.socket.remoteAddress || '?';
+}
+
+function isLoopback(addr) {
+  return /^(127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/.test(addr ?? '');
 }
 
 /**
@@ -104,8 +111,7 @@ export function clientIp(req, config) {
  * x-forwarded-for) and never send a localhost Host.
  */
 export function isLocalRequest(req) {
-  const addr = req.socket.remoteAddress ?? '';
-  if (!/^(127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/.test(addr)) return false;
+  if (!isLoopback(req.socket.remoteAddress)) return false;
   const hd = req.headers;
   if (hd['cf-ray'] || hd['cf-connecting-ip'] || hd['x-forwarded-for'] || hd['x-real-ip'] || hd.forwarded) return false;
   return /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(String(hd.host ?? ''));

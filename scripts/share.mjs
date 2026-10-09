@@ -102,7 +102,7 @@ async function download(asset) {
 }
 
 /** cloudflared from PATH, from an earlier download, or downloaded now. */
-async function findCloudflared() {
+export async function findCloudflared() {
   if (process.env.CLOUDFLARED && works(process.env.CLOUDFLARED)) return process.env.CLOUDFLARED;
   if (works('cloudflared')) return 'cloudflared';
   const asset = cloudflaredAsset();
@@ -117,7 +117,7 @@ async function findCloudflared() {
  * Runs the quick tunnel; calls onUrl(url) once it carries traffic. Restarts
  * it (with a new address) if it stops.
  */
-function runTunnel(bin, port, { onUrl, onDown }) {
+export function runTunnel(bin, port, { onUrl, onDown }) {
   let child = null;
   let stopped = false;
   let failures = 0;
@@ -175,10 +175,10 @@ function runTunnel(bin, port, { onUrl, onDown }) {
 // --- The server list ---------------------------------------------------------------------
 
 const HOST_FILE = join(root, 'server-data', 'host.json');
-const HEARTBEAT_MS = 2 * 60 * 1000;
+export const HEARTBEAT_MS = 2 * 60 * 1000;
 
 /** This computer's server identity: its join code and the secret that proves it owns it. */
-function loadHost() {
+export function loadHost() {
   let host = {};
   try {
     host = JSON.parse(readFileSync(HOST_FILE, 'utf8'));
@@ -189,7 +189,7 @@ function loadHost() {
   return host;
 }
 
-function saveHost(host) {
+export function saveHost(host) {
   mkdirSync(dirname(HOST_FILE), { recursive: true });
   writeFileSync(HOST_FILE, `${JSON.stringify(host, null, 2)}\n`);
 }

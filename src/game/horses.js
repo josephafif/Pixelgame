@@ -53,10 +53,11 @@ export function herdForCell(world, hx, hy) {
     if (far && world.seaAt(x, y) === SEA.LAND && !world.marketAt(x, y, 12)) {
       const biome = world.biomeAt(Math.floor(x), Math.floor(y)).id;
       const local = BREEDS.filter((b) => b.biomes.includes(biome));
-      if (local.length) {
-        const rng = createRng(h);
+      const total = local.reduce((s, b) => s + b.weight, 0);
+      const rng = createRng(h);
+      // Where only rare breeds live (Voidreach), herds are rare too.
+      if (local.length && rng.next() < Math.min(1, total / 40)) {
         const size = 1 + Math.floor(rng.next() * 3);
-        const total = local.reduce((s, b) => s + b.weight, 0);
         const breeds = [];
         for (let i = 0; i < size; i++) {
           let r = rng.next() * total;
@@ -92,13 +93,13 @@ export function herdsNear(world, x, y, range) {
 
 /**
  * One horse: its breed's numbers with a little of its own (±8 % speed,
- * ±10 health), and a name. The same seed always gives the same horse.
+ * ±10 health but at least half the breed's), and a name. The same seed always gives the same horse.
  */
 export function horseStats(breedId, seed) {
   const b = BREED_BY_ID.get(breedId) ?? BREEDS[0];
   const rng = createRng(seed >>> 0);
   const speed = Math.round(b.speed * (0.92 + rng.next() * 0.16) * 100) / 100;
-  const hp = Math.max(0, b.hp + Math.round((rng.next() - 0.5) * 20));
+  const hp = Math.max(Math.round(b.hp / 2), b.hp + Math.round((rng.next() - 0.5) * 20));
   const name = NAMES[Math.floor(rng.next() * NAMES.length)];
   return { breed: b.id, speed, gallop: b.gallop, hp, name };
 }

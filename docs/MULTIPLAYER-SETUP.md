@@ -7,7 +7,7 @@ Allt är gratis, och inget av det kräver betalkort:
 | Spelet (webbsidan) | Netlify: <https://pixelgame-infinite-arsenal.netlify.app> (redan igång) | 0 kr |
 | Den officiella servern, alltid öppen | Cloudflare Workers, gratisplanen | 0 kr, inget kort |
 | Serverlistan, koderna och inloggning med Discord/Google | Supabase, gratisplanen | 0 kr |
-| Servrar som spelare kör själva | Spelarens egen dator (`npm run share`) | 0 kr |
+| Servrar som spelare kör själva | Spelarens egen dator (serverhanteraren `Starta-server`, eller `npm run share`) | 0 kr |
 
 Gratisplanerna kan aldrig kosta pengar. Når man taket slutar tjänsten svara tills nästa dygn.
 
@@ -123,29 +123,59 @@ millisekunder när någon ansluter. Du behöver ingen server och inget betalkort
 
 ---
 
-## 3. Servrar som spelare kör själva (`npm run share`)
+## 3. Servrar som spelare kör själva (serverhanteraren)
 
 Vem som helst kan köra en egen server på sin dator och spela med sina vänner via webbsidan.
-Det kräver inget konto och inga inställningar i routern.
+Det kräver inget konto och inga inställningar i routern. **Serverhanteraren** gör det utan
+terminal: en kontrollpanel i webbläsaren där allt finns.
 
 ### Första gången
 
-1. Installera **Node.js 22 eller nyare** från <https://nodejs.org> (välj LTS).
-2. Hämta spelet: `git clone https://github.com/josephafif/Pixelgame.git`, eller **Code →
-   Download ZIP** på GitHub och packa upp.
-3. Öppna en terminal i mappen (på Windows: högerklicka i mappen → *Öppna i terminal*) och kör:
-   ```bash
-   npm install
-   npm run share
-   ```
-   Första gången hämtas Cloudflares tunnelprogram (`cloudflared`, cirka 40 MB) till
-   `server-data/bin/`. Har du redan `cloudflared` installerat används det.
-4. Efter några sekunder visas en ruta:
-   ```
-   Serverns kod:           K7QX2M
-   Skicka länken:          https://pixelgame-infinite-arsenal.netlify.app/?join=K7QX2M
-   Spela själv (admin):    http://localhost:8787
-   ```
+1. Hämta spelet: **Code → Download ZIP** på <https://github.com/josephafif/Pixelgame> och packa
+   upp det (eller `git clone`).
+2. Dubbelklicka i mappen:
+   - **Windows:** `Starta-server` (`Starta-server.bat`). Saknas Node.js installeras det med
+     winget (godkänn frågan) och sedan startar du filen igen. Frågar Windows SmartScreen:
+     **Mer information → Kör ändå**.
+   - **Mac:** `Starta-server.command`. Första gången: högerklicka → **Öppna** (macOS frågar om
+     filer från internet). Saknas Node.js installeras det med Homebrew om du har det, annars
+     öppnas <https://nodejs.org>.
+   - **Linux:** kör `./starta-server.sh` i en terminal (installera Node.js 22 eller nyare först).
+
+   Första gången installeras serverns enda beroende (`npm install --omit=dev`) och Cloudflares
+   tunnelprogram (`cloudflared`, cirka 40 MB) hämtas till `server-data/bin/`.
+3. Kontrollpanelen öppnas i webbläsaren och servern startar. Under **Bjud in vänner** står
+   serverns kod och en länk att skicka, till exempel
+   `https://pixelgame-infinite-arsenal.netlify.app/?join=K7QX2M`.
+
+Öppnas inte panelen: kopiera länken som står i fönstret (`http://localhost:8790/#key=…`). Låt
+fönstret vara öppet medan ni spelar.
+
+### Kontrollpanelen
+
+| Del | Vad du kan göra |
+| --- | --- |
+| Servern | Starta, stoppa och starta om. **Spela själv** öppnar spelet på den här datorn (där är du admin) |
+| Bjud in vänner | Koden och länken (med en kopieringsknapp), och adresser för spelare i samma wifi om det är påslaget |
+| Spelare online | Vem som är inne, nivå, klan och var de är. Sparka ut, gör till admin |
+| Verktyg | Meddelande till alla, spara nu, säkerhetskopiera nu, nytt lösenord åt någon som glömt sitt, stäng av eller släpp in en spelare |
+| Världen | Världsfrö, antal spelare och klaner, belastning. Säkerhetskopior (en görs varje dygn) som kan **återställas**, och **en helt ny värld** (den gamla sparas bland kopiorna) |
+| Inställningar | Namn, max antal spelare, port, världsfrö, *dela via internet*, *visa servern för alla*, *spelare i samma nätverk*, *starta direkt*, regler (hur mycket som tappas vid död, nybörjarskydd, klanstorlek, raidfönster, hårdkärna) och admins. Sparar du medan servern kör startar den om |
+| Logg | Vad servern gör just nu |
+
+Panelen svarar bara på den här datorn och bara med nyckeln i länken (den sparas i
+`server-data/panel.json`). Inställningarna sparas i `server-data/settings.json`.
+
+### I terminalen (`npm run share`)
+
+Samma server utan panel: kör `npm install` och sedan `npm run share` i spelets mapp. Efter
+några sekunder visas en ruta:
+
+```
+Serverns kod:           K7QX2M
+Skicka länken:          https://pixelgame-infinite-arsenal.netlify.app/?join=K7QX2M
+Spela själv (admin):    http://localhost:8787
+```
 
 ### Spela
 
@@ -154,8 +184,9 @@ Det kräver inget konto och inga inställningar i routern.
   och ett lösenord.
 - **Du** öppnar <http://localhost:8787> på samma dator. Där är du admin: skriv `/help` i
   chatten (öppnas med T) för att se kommandona.
-- **Stäng av** med Ctrl+C. Servern sparar allt först och försvinner ur listan.
-- **Nästa gång:** kör `npm run share` igen. Koden och länken är desamma. Den som spelat förut
+- **Stäng av** med knappen i panelen, Ctrl+C eller genom att stänga fönstret. Servern sparar
+  allt först och försvinner ur listan.
+- **Nästa gång:** dubbelklicka på Starta-server (eller kör `npm run share`) igen. Koden och länken är desamma. Den som spelat förut
   trycker på **Fortsätt som gäst**. Från en annan enhet: **Logga in med namn**.
 - **Visa servern för alla** i listan *Öppna servrar*: `npm run share -- --public`.
 
@@ -390,12 +421,16 @@ Om du vill att spelet laddas från Cloudflares CDN i stället:
 
 ## Felsökning
 
-### `npm run share`
+### Serverhanteraren och `npm run share`
 
+- **Panelen säger "Öppna länken från serverfönstret":** kopiera länken med `#key=` från
+  fönstret där servern startade.
+- **Fönstret stängs direkt (Windows):** öppna en terminal i mappen och kör `node
+  scripts/host.mjs` för att se felet.
 - **"Servern behöver Node.js 22 eller nyare":** installera den senaste LTS-versionen från
   <https://nodejs.org> och öppna en ny terminal.
-- **"Port 8787 används redan":** servern körs redan i ett annat fönster. Stäng det, eller kör
-  `npm run share -- --port 8788`.
+- **"Port 8787 används redan":** servern körs redan i ett annat fönster. Stäng det, eller välj
+  en annan port under Inställningar (`npm run share -- --port 8788` i terminalen).
 - **"Tunneln startade inte":** kontrollera internetanslutningen. Vissa skol- och
   jobbnätverk stoppar port 7844, som tunneln använder. Prova ett annat nät, till exempel
   mobilen som surfzon.
@@ -404,8 +439,8 @@ Om du vill att spelet laddas från Cloudflares CDN i stället:
   `npm run share` igen.
 - **Länken visar ett Cloudflare-fel (530 eller 1033):** tunneln har stängts. Titta i
   terminalen: skriptet startar en ny och skriver ut den nya länken.
-- **En vän har glömt sitt lösenord:** öppna <http://localhost:8787> och skriv
-  `/password Namn nyttlösenord` i chatten.
+- **En vän har glömt sitt lösenord:** Verktyg → *Nytt lösenord* i panelen, eller öppna
+  <http://localhost:8787> och skriv `/password Namn nyttlösenord` i chatten.
 
 ### Den officiella servern och serverlistan
 

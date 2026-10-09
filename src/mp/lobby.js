@@ -293,11 +293,10 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
       h('summary', 'Starta en egen server'),
       h('p.small', 'Du kan köra en egen server på din dator, gratis och utan konto. Dina vänner går med här med en kod.'),
       h('ol.small',
-        h('li', 'Installera Node.js 22 eller nyare från ', h('a', { href: 'https://nodejs.org', target: '_blank', rel: 'noopener' }, 'nodejs.org'), '.'),
         h('li', 'Hämta spelet från ', h('a', { href: repo, target: '_blank', rel: 'noopener' }, 'GitHub'), ' (Code → Download ZIP) och packa upp det.'),
-        h('li', 'Öppna en terminal i mappen och kör ', h('code', 'npm install'), ' och sedan ', h('code', 'npm run share'), '.'),
-        h('li', 'Du får en kod och en länk. Skicka dem till dina vänner. Koden är densamma varje gång du startar.')),
-      h('p.small.muted', 'Vill du att alla ska se servern i listan här? Starta med ', h('code', 'npm run share -- --public'), '. Din dator måste vara på medan ni spelar.'));
+        h('li', 'Dubbelklicka på ', h('b', 'Starta-server'), ' i mappen (på Mac: ', h('b', 'Starta-server.command'), '). Saknas Node.js hjälper den dig att installera det.'),
+        h('li', 'Serverhanteraren öppnas i webbläsaren och startar servern. Där finns koden och länken till dina vänner, vem som är inne, inställningar och säkerhetskopior.')),
+      h('p.small.muted', 'Datorn måste vara på medan ni spelar. Vana vid terminalen kan i stället köra ', h('code', 'npm run share'), '.'));
   }
 
   function addSection() {
