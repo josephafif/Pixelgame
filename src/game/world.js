@@ -739,12 +739,13 @@ export class World {
     // Sea creatures: sharks swim anywhere in the sea, serpents only in the deep.
     if (mode === 'swim') return b !== T.SEA && b !== T.DEEP;
     if (mode === 'deepswim') return b !== T.DEEP;
-    // Flyers (and pals, who slip through the undergrowth) pass trees and rocks.
-    if (b && ((mode !== 'fly' && mode !== 'pal') || LIQUID.has(b))) return true;
+    // Flyers (and pals, who slip through the undergrowth) pass trees and rocks;
+    // so do horses, jumping them.
+    if (b && ((mode !== 'fly' && mode !== 'pal' && mode !== 'horse') || LIQUID.has(b))) return true;
     if (!this.structures.size) return false;
     const st = this.structures.get(tileKey(tx, ty));
     if (!st || st.def.walkable) return false;
-    if (st.def.kind === 'gate' && (mode === 'player' || mode === 'pal')) {
+    if (st.def.kind === 'gate' && (mode === 'player' || mode === 'pal' || mode === 'horse')) {
       // Multiplayer: a clan's gates open only for its own members (a market's for everyone).
       return this.gateFilter && !st.marketId ? !this.gateFilter(st) : false;
     }

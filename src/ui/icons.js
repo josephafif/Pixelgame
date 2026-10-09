@@ -189,6 +189,23 @@ const ICONS = {
     ],
     pal: { o: O, b: '#7ae0ff', B: '#3a8ab0', y: '#ffffff' },
   },
+  horse: {
+    map: [
+      '............',
+      '.....oo.....',
+      '....oxxoo...',
+      '...omxxxxo..',
+      '..ommxxoxxo.',
+      '..omxxxxxxxo',
+      '.ommxxxxoooo',
+      '.omxxxxo....',
+      '.omxxxxo....',
+      'ommxxxxo....',
+      'oxxxxxxo....',
+      'oooooooo....',
+    ],
+    pal: { o: O, x: '#c8945a', m: '#5b3a21' },
+  },
   star: {
     map: [
       '.....oo.....',

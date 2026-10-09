@@ -6,6 +6,8 @@ import { h, pixelCanvas } from './dom.js';
 import { icon, costChips } from './icons.js';
 import { openModal, replaceModalBody, closeModal } from './modal.js';
 import { buildingSprite } from '../render/buildings.js';
+import { horseSprite } from '../render/horses.js';
+import { describeHorse, MAX_HORSES } from '../game/horses.js';
 import {
   buildingDefs, buildingLevel, maxLevel, nextLevelInfo, upgradeBlockers, describeBonus, campRank,
   wellPending, baseBonuses,
@@ -124,6 +126,35 @@ export function open(game, app, { focus = null } = {}) {
       ...extraActions(def, level)));
   }
 
+  /** Your horses: where each one is, and letting one go. */
+  function horses() {
+    const st = save.horses;
+    if (!st?.owned.length) return null;
+    return h('section.horse-list',
+      h('h3', `Horses (${st.owned.length} / ${MAX_HORSES})`),
+      h('p.small.muted', 'Leave a horse in camp and it stays. Left out in the wild, it wanders off if you go far away for long.'),
+      st.owned.map((rec) => {
+        const art = pixelCanvas(horseSprite(rec.breed, 0, true));
+        art.style.width = '45px';
+        art.style.height = '36px';
+        const where = rec.id === st.riding ? 'Riding' : rec.stabled ? 'In camp' : 'Out in the world';
+        return h('div.horse-row',
+          art,
+          h('div',
+            h('b', rec.name),
+            h('div.small.muted', `${describeHorse(rec)} · ${where}`)),
+          h('span.spacer'),
+          rec.id === st.riding ? null : h('button', {
+            onclick: () => {
+              if (game.stable.release(rec.id)) {
+                game.toast(`${rec.name} gallops off into the wild.`, 'info');
+                rerender();
+              }
+            },
+          }, 'Let go'));
+      }));
+  }
+
   function build() {
     const defs = buildingDefs(data);
     const maxRank = defs.reduce((s, d) => s + maxLevel(d), 0);
@@ -141,10 +172,11 @@ export function open(game, app, { focus = null } = {}) {
         }, icon('hammer', 20), 'Build walls & turrets'),
         h('span.small.muted', 'Camp area grows with every Hearth upgrade. Chop trees and break rocks with a pickaxe (Forge) for wood and stone.')),
       h('p.small.muted', 'Upgrade buildings with scrap, essence, wood and stone. Walk up to a building in camp to use it.'),
-      h('div.base-grid', defs.map(card)));
+      h('div.base-grid', defs.map(card)),
+      horses());
   }
 
-  const offs = [game.on('base', rerender), game.on('inventory', rerender)];
+  const offs = [game.on('base', rerender), game.on('inventory', rerender), game.on('riding', rerender)];
   openModal({
     title: 'Camp', icon: 'home', body: build(), className: 'wide base-panel',
     onDispose: () => offs.forEach((off) => off()),

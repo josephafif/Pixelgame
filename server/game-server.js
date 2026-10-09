@@ -17,6 +17,7 @@ import * as building from './building.js';
 import * as clans from './clans.js';
 import * as abilities from './abilities.js';
 import * as pals from './pals.js';
+import * as horses from './horses.js';
 import * as markets from './markets.js';
 import { sendSnapshots } from './snapshots.js';
 import { SpatialGrid, PAD } from './grid.js';
@@ -210,6 +211,7 @@ export class GameServer {
     this.reindexEnemies();
     abilities.updateAllies(this, TICK_DT);
     pals.update(this, TICK_DT);
+    horses.update(this, TICK_DT, now);
     prof.mark('enemies');
     combat.updateProjectiles(this, TICK_DT, now);
     combat.updateAreas(this, TICK_DT, now);
@@ -281,6 +283,7 @@ export class GameServer {
     this.db.touchAccount(account.id, account.email);
     clans.memberJoined(this, account.id);
     pals.sync(this, p);
+    horses.joined(this, p);
     return p;
   }
 

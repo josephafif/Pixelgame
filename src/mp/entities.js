@@ -4,13 +4,14 @@
 // packets arrive unevenly).
 
 import {
-  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, NPCF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
+  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, NPCF, HF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   byteToAngle, intToColor,
 } from '../net/protocol.js';
 import { TICK_RATE } from '../net/movement.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
 import { creatureSprites, hasCreature } from '../render/creatures.js';
 import { mixHex } from '../weapons/visuals.js';
+import { BREEDS } from '../game/horses.js';
 
 const IDX = Object.fromEntries(Object.entries(FIELDS).map(([type, list]) => [type, Object.fromEntries(list.map((f, i) => [f, i]))]));
 const KEEP_TICKS = 40;
@@ -196,6 +197,7 @@ export function readPlayer(v) {
     hurt: Boolean(flags & PF.HURT),
     ascending: Boolean(flags & PF.ASCEND),
     boat: f('boat') ?? 0, // the boat tier while sailing (0 on land)
+    horse: BREEDS[(f('horse') ?? 0) - 1]?.id ?? null, // the breed you ride
     anim: f('anim'),
     slot: SLOTS[f('slot')] ?? 'main',
     pickaxe: f('tool'),
@@ -276,6 +278,16 @@ export function readPal(v, data) {
     work: f('work'),
     down: f('down'),
     facing: f('facing') ? -1 : 1,
+  };
+}
+
+/** A horse (wild, or someone's: owner is their player id, ref the horse's id in their stable). */
+export function readHorse(v) {
+  const f = (n) => field(ET.HORSE, v, n);
+  const flags = f('flags');
+  return {
+    facing: f('facing') ? Math.PI : 0, breed: BREEDS[f('breed') - 1]?.id ?? BREEDS[0].id,
+    moving: Boolean(flags & HF.MOVING), saddle: Boolean(flags & HF.SADDLE), owner: f('owner'), ref: f('ref'),
   };
 }
 

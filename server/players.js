@@ -16,6 +16,7 @@ import * as abilities from './abilities.js';
 import * as discoveries from './discoveries.js';
 import * as markets from './markets.js';
 import * as base from './base.js';
+import * as horses from './horses.js';
 
 // Inputs waiting to be simulated; beyond this the oldest are dropped.
 const MAX_QUEUE = 12;
@@ -211,6 +212,7 @@ export function mePayload(gs, p) {
     components: p.ch.extra.components ?? {},
     markets: p.ch.extra.markets ?? {},
     recallFrom: p.ch.extra.recallFrom ?? null,
+    horses: horses.payload(p),
     stats: p.stats,
     kills: p.ch.kills,
     deaths: p.ch.deaths,
@@ -444,6 +446,13 @@ export function interact(gs, p, now) {
   // Your clan's buildings (forge, vault, well …).
   const bst = base.buildingNear(gs, p);
   if (bst && (!best || (bst.x + 0.5 - p.x) ** 2 + (bst.y + 0.5 - p.y) ** 2 < bestD)) return base.use(gs, p, bst);
+  // Horses: climb on one next to you; on horseback, Use (with nothing else near) gets you off.
+  if (horses.ridingOf(p)) {
+    if (!best) return horses.dismount(gs, p, now);
+  } else {
+    const horse = horses.near(gs, p);
+    if (horse && (!best || horse.d < bestD)) return horses.mount(gs, p, horse.h, now);
+  }
   if (!best) return tryLaunch(gs, p);
   if (discoveries.isPoi(best.type)) return discoveries.interact(gs, p, best, now);
   switch (best.type) {
@@ -486,6 +495,8 @@ export function boatOf(gs, p) {
  * same numbers (they come with every snapshot).
  */
 export function moveParams(gs, p) {
+  const horse = horses.moveParams(gs, p);
+  if (horse) return horse;
   const boat = p.sailing ? boatOf(gs, p) : null;
   if (!boat) return { speed: p.speed, sprint: gs.data.player.sprintMultiplier, mode: 'player' };
   const chilled = p.statuses.chill?.until > gs.time;

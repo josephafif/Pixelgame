@@ -32,6 +32,8 @@ import { Construction, buildRadius, structureDef, structureDefs, structureLock }
 import { Markets } from './markets.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
 import { slideMove } from '../net/movement.js';
+import { Stable } from './riding.js';
+import { BREED_BY_ID } from './horses.js';
 import { POI, isPoi, poiFound, interactPoi, readOldMap, chunksAround } from './discoveries.js';
 import {
   updatePal, syncPalEntity, hatchReady, rollEgg, addEgg, startHatch, upgradePal, palSpecies, findPal, PAL_MODES,
@@ -97,6 +99,7 @@ export class Game {
     this.damageEnemy = (e, amount, opts) => dealDamage(this, e, amount, opts);
     this.construction = new Construction(this);
     this.markets = new Markets(this);
+    this.stable = new Stable(this);
     // Build mode (camp construction) and gathering state.
     this.build = {
       active: false, selected: structureDefs(data)[0]?.id ?? null, tool: 'place',
@@ -378,8 +381,19 @@ export class Game {
     return currentBoat(this.data, this.save);
   }
 
-  /** Collision mode for the player right now (on foot or afloat). */
+  /** The horse you ride (its saved record), or null. */
+  get riding() {
+    return this.stable?.riding ?? null;
+  }
+
+  /** Horses to draw (wild ones around you and yours). */
+  get horses() {
+    return this.stable?.list ?? [];
+  }
+
+  /** Collision mode for the player right now (on foot, on horseback or afloat). */
   get moveMode() {
+    if (this.riding) return 'horse';
     return this.sailing ? boatMode(this.boat) : 'player';
   }
 
@@ -988,6 +1002,8 @@ export class Game {
     const p = this.player;
     if (p.dead) return;
     if (tryPhoenixRevive(this)) return;
+    // You fall off; the horse waits where you fell.
+    this.stable.dismount({ quiet: true });
     p.dead = true;
     p.hp = 0;
     p.respawnT = 2.5;
@@ -1051,6 +1067,21 @@ export class Game {
         ? prev
         : { type: 'merchant', x: npc.x, y: npc.y, npc, hostile };
     }
+    // A horse next to you: climb on (or, riding, get off when nothing else is near).
+    if (!this.build.active) {
+      if (this.riding) {
+        if (!best) {
+          const prev = this.interactTarget;
+          return prev?.type === 'dismount' ? prev : { type: 'dismount', x: p.x, y: p.y };
+        }
+      } else {
+        const h = this.stable.near(p.x, p.y);
+        if (h && (!best || dist2(p.x, p.y, h.x, h.y) < bestD)) {
+          const prev = this.interactTarget;
+          return prev?.type === 'horse' && prev.horse.key === h.key ? prev : { type: 'horse', horse: h, x: h.x, y: h.y };
+        }
+      }
+    }
     // With the pickaxe in hand, trees and rocks next to you can be harvested.
     if (!best && !this.build.active && this.toolActive) {
       const h = findHarvestTarget(this);
@@ -1074,6 +1105,8 @@ export class Game {
     if (!o) return null;
     switch (o.type) {
       case 'launch': return `Set sail (${o.boat.name})`;
+      case 'horse': return this.stable.label(o.horse);
+      case 'dismount': return `Get off ${this.riding?.name ?? 'your horse'}`;
       case 'treasure': return currentPickaxe(this.data, this.save) ? POI.treasure.label : 'Something is buried here (needs a pickaxe)';
       case 'shore': return o.reason;
       case 'land': return 'Go ashore';
@@ -1547,6 +1580,12 @@ export class Game {
       case 'launch':
         this.#setSail(o);
         return true;
+      case 'horse':
+        this.stable.mount(o.horse);
+        return true;
+      case 'dismount':
+        this.stable.dismount();
+        return true;
       case 'land':
         this.#goAshore(o);
         return true;
@@ -1704,9 +1743,12 @@ export class Game {
     const moving = Math.abs(sample.moveX) + Math.abs(sample.moveY) > 0.01;
     p.sprinting = sample.sprint && moving;
     const sailing = this.sailing;
+    const horse = this.riding;
     const speed = sailing
       ? (this.boat?.speed ?? 3.5) * (p.sprinting ? 1.2 : 1) * slow
-      : this.pstats.moveSpeed * (p.sprinting ? this.data.player.sprintMultiplier : 1) * slow;
+      : horse
+        ? horse.speed * (p.sprinting ? horse.gallop : 1) * slow
+        : this.pstats.moveSpeed * (p.sprinting ? this.data.player.sprintMultiplier : 1) * slow;
     const vx = sample.moveX * speed + p.kx;
     const vy = sample.moveY * speed + p.ky;
     p.vx = vx; // bosses lead their shots with this
@@ -1723,7 +1765,7 @@ export class Game {
       if (moving && Math.random() < 0.6) {
         this.fx.emit('glint', p.x - Math.cos(p.facing) * 0.8, p.y + 0.25, 1, 0.3, 0.6, ['#e8f8ff', '#9ad8f4']);
       }
-    } else if (p.sprinting && Math.random() < 0.3) {
+    } else if ((p.sprinting || (horse && moving)) && Math.random() < 0.3) {
       this.fx.emit('dust', p.x, p.y + 0.3, 1, 0.2, 0.5);
     }
 
@@ -1802,6 +1844,7 @@ export class Game {
     updatePickups(this, dt);
     this.construction.update(dt);
     this.markets.update(dt);
+    this.stable.update(dt);
     this.#ambience(dt);
     this.exploreT -= dt;
     if (this.exploreT <= 0) {

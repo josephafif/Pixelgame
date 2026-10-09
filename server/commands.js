@@ -12,6 +12,7 @@ import { hashPassword } from './auth.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
 import * as pals from './pals.js';
+import * as horses from './horses.js';
 import * as markets from './markets.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
@@ -68,6 +69,8 @@ export function handle(gs, p, msg) {
       return equip(gs, p, String(msg.id ?? ''), msg.slot === 'secondary' ? 'secondary' : 'main');
     case 'pal':
       return pals.request(gs, p, msg);
+    case 'horse':
+      return horses.request(gs, p, msg);
     case 'research': {
       const def = gs.data.byId.components.get(String(msg.id ?? ''));
       const entry = def ? p.ch.extra.components?.[def.id] : null;

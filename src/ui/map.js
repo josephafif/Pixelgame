@@ -80,6 +80,7 @@ export function open(game) {
     h('span', h('i.lg.you'), 'You'), h('span', h('i.lg.camp'), 'Camp'), h('span', h('i.lg.boss'), 'Boss'),
     h('span', h('i.lg.market'), 'Market'), h('span', h('i.lg.shrine'), 'Shrine'), h('span', h('i.lg.chest'), 'Chest'),
     h('span', h('i.lg.pin'), 'Your pins'), h('span', h('i.lg.sea'), 'Sea'),
+    save.horses?.owned.length ? h('span', h('i.lg.horse'), game.mp ? 'Hästar' : 'Horses') : null,
     game.mapMarkers ? h('span', h('i.lg.mate'), 'Klan') : null);
 
   const markers = () => {
@@ -111,6 +112,10 @@ export function open(game) {
     }
     if (save.base.recall) out.push({ kind: 'portal', x: save.base.recall.x, y: save.base.recall.y, label: 'Waystone return point' });
     save.world.pins.forEach((pin, i) => out.push({ kind: 'pin', x: pin.x, y: pin.y, index: i, label: pin.label || 'Pin' }));
+    // Where you left your horses.
+    for (const hr of save.horses?.owned ?? []) {
+      if (hr.id !== save.horses.riding && Number.isFinite(hr.x)) out.push({ kind: 'horse', x: hr.x, y: hr.y, label: hr.name });
+    }
     // Multiplayer: your clan's base and your clanmates.
     out.push(...(game.mapMarkers?.() ?? []));
     return out;
@@ -260,6 +265,17 @@ export function open(game) {
           g.lineTo(x + 1, y);
           g.closePath();
           g.fill();
+          g.stroke();
+          break;
+        case 'horse':
+          // A horseshoe.
+          g.strokeStyle = '#0e0c18';
+          g.lineWidth = 5;
+          g.beginPath();
+          g.arc(x, y, Math.max(3, r - 2), Math.PI * 0.85, Math.PI * 2.15);
+          g.stroke();
+          g.strokeStyle = '#d89a50';
+          g.lineWidth = 3;
           g.stroke();
           break;
         case 'mate':

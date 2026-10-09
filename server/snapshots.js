@@ -5,11 +5,12 @@
 import { CHUNK } from '../src/game/world.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import {
-  ET, PF, EF, PRF, PKF, SF, AF, ALF, NPCF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
+  ET, PF, EF, PRF, PKF, SF, AF, ALF, NPCF, HF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   encodeSnapshot, changed, quantize, angleToByte, colorToInt,
 } from '../src/net/protocol.js';
 import { inSafeZone, claimAt } from '../src/net/rules.js';
 import * as players from './players.js';
+import * as horses from './horses.js';
 import { SpatialGrid } from './grid.js';
 
 const VIEW = 30; // tiles
@@ -30,7 +31,8 @@ function playerValues(gs, p, now) {
   if (now - p.lastHurtAt < 160) flags |= PF.HURT;
   if (p.ascend?.until > gs.time) flags |= PF.ASCEND;
   const boat = p.sailing ? p.ch.extra.boat ?? 0 : 0;
-  return [quantize(p.x), quantize(p.y), angleToByte(p.facing), Math.ceil(Math.max(0, p.hp)), p.maxHp, flags, p.anim, SLOTS.indexOf(p.inv.activeSlot), p.ch.pickaxe, boat];
+  const horse = p.sailing ? 0 : horses.breedIndex(horses.ridingOf(p)?.breed);
+  return [quantize(p.x), quantize(p.y), angleToByte(p.facing), Math.ceil(Math.max(0, p.hp)), p.maxHp, flags, p.anim, SLOTS.indexOf(p.inv.activeSlot), p.ch.pickaxe, boat, Math.max(0, horse)];
 }
 
 function enemyValues(gs, e) {
@@ -90,6 +92,7 @@ function selfFlags(gs, p, now, claims) {
   if (p.newbie) f |= SF.NEWBIE;
   if (gs.tick - p.blinkTick <= 1) f |= SF.BLINK;
   if (p.sailing) f |= SF.SAILING;
+  else if (horses.ridingOf(p)) f |= SF.RIDING;
   const c = claimAt(gs.rules, claims, Math.floor(p.x), Math.floor(p.y));
   if (c && c.clanId === p.clanId) f |= SF.OWN_CLAIM;
   else if (c) f |= SF.FOREIGN_CLAIM;
@@ -132,6 +135,10 @@ export function sendSnapshots(gs, now) {
       const flags = (n.moving ? NPCF.MOVING : 0) | (gs.time - n.hurtT < 0.15 ? NPCF.HURT : 0);
       all.push({ id: n.eid, type: ET.NPC, x: n.x, y: n.y, values: [quantize(n.x), quantize(n.y), angleToByte(n.facing), flags, m.mx, m.my, n.idx, Math.ceil(n.hp)], ref: n });
     }
+  }
+  for (const h of gs.horses?.values() ?? []) {
+    const flags = (h.moving ? HF.MOVING : 0) | (h.own ? HF.SADDLE : 0);
+    all.push({ id: h.eid, type: ET.HORSE, x: h.x, y: h.y, values: [quantize(h.x), quantize(h.y), h.facing < 0 ? 1 : 0, horses.breedIndex(h.breed), flags, h.own ? h.owner : 0, h.own ? h.rec.id : 0], ref: h });
   }
   for (const p of gs.players.values()) {
     const pal = p.palEnt;

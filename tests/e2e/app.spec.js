@@ -1100,3 +1100,51 @@ test('exploring: a watchtower shows the land around, a runestone points somewher
   await expect(page.locator('.toast').last()).toContainText('old map');
   expect(errors).toEqual([]);
 });
+
+test('horses: tame a wild horse, gallop over trees, leave it in camp, find it in the camp panel', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  // Off to the nearest herd (far from camp: not easy to find).
+  const herd = await game(page, async () => {
+    const { herdsNear } = await import('/src/game/horses.js');
+    const g = window.__pixelgame.game;
+    const h = herdsNear(g.world, 0, 0, 800).sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y))[0];
+    g.player.x = h.x + 3;
+    g.player.y = h.y;
+    g.player.invuln = 999;
+    return { x: h.x, y: h.y, dist: Math.hypot(h.x, h.y) };
+  });
+  expect(herd.dist).toBeGreaterThan(90);
+  await expect.poll(() => game(page, () => window.__pixelgame.game.horses.length)).toBeGreaterThan(0);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    const h = g.horses[0];
+    h.wanderT = 99;
+    h.tx = h.x;
+    h.ty = h.y;
+    g.player.x = h.x + 0.6;
+    g.player.y = h.y;
+  });
+  await expect(page.locator('#interact-hint')).toContainText(/Ride the wild/);
+  await page.keyboard.press('e');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.moveMode)).toBe('horse');
+  // Faster than on foot; trees and rocks are no obstacle.
+  const ride = await game(page, () => {
+    const g = window.__pixelgame.game;
+    return { speed: g.riding.speed, walk: g.pstats.moveSpeed };
+  });
+  expect(ride.speed).toBeGreaterThan(ride.walk);
+  // Home to camp and off: it stays there, and the camp panel lists it.
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.player.x = 3.5;
+    g.player.y = 6.5;
+  });
+  await expect(page.locator('#interact-hint')).toContainText(/Get off/);
+  await page.keyboard.press('e');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.horses.owned[0]?.stabled)).toBe(true);
+  await page.keyboard.press('b');
+  await expect(page.locator('.horse-row')).toHaveCount(1);
+  await expect(page.locator('.horse-row')).toContainText('In camp');
+  expect(errors).toEqual([]);
+});

@@ -12,18 +12,19 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
-export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, PAL: 7, NPC: 8 };
+export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, PAL: 7, NPC: 8, HORSE: 9 };
 
 /**
  * Fields per entity type, all integers on the wire. Position-like fields
  * ('q') are tiles × 64 and sent as deltas; the rest are sent as values.
  */
 export const FIELDS = {
-  [ET.PLAYER]: ['x', 'y', 'facing', 'hp', 'maxHp', 'flags', 'anim', 'slot', 'tool', 'boat'],
+  // horse: the breed you ride (its place in BREEDS + 1; 0 on foot).
+  [ET.PLAYER]: ['x', 'y', 'facing', 'hp', 'maxHp', 'flags', 'anim', 'slot', 'tool', 'boat', 'horse'],
   [ET.ENEMY]: ['x', 'y', 'facing', 'hp', 'maxHp', 'state', 'def', 'level', 'flags', 'element', 'anim'],
   [ET.PROJ]: ['x', 'y', 'vx', 'vy', 't0', 'sprite', 'color', 'size', 'owner', 'flags'],
   [ET.PICKUP]: ['x', 'y', 'kind', 'color', 'rarity', 'ref', 'flags'],
@@ -34,6 +35,8 @@ export const FIELDS = {
   [ET.PAL]: ['x', 'y', 'facing', 'owner', 'species', 'level', 'hp', 'maxHp', 'state', 'anim', 'work', 'down'],
   // People at markets: their market's cell (mx, my) and their place in its layout say who they are.
   [ET.NPC]: ['x', 'y', 'facing', 'flags', 'mx', 'my', 'idx', 'hp'],
+  // Horses: wild ones, and players' own (owner = the player's id, ref = the horse's id in their stable).
+  [ET.HORSE]: ['x', 'y', 'facing', 'breed', 'flags', 'owner', 'ref'],
 };
 const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
@@ -44,7 +47,7 @@ export const EF = { ELITE: 1, BOSS: 2, SUBMERGED: 4, STUNNED: 8, FROZEN: 16, ALE
 export const PRF = { ENEMY: 1, LOB: 2, MINE: 4 };
 export const PKF = { LOCKED: 1, MINE: 2 };
 /** Your own state flags (snapshot self block). */
-export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FOREIGN_CLAIM: 32, ASLEEP: 64, BLINK: 128, SAILING: 256 };
+export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FOREIGN_CLAIM: 32, ASLEEP: 64, BLINK: 128, SAILING: 256, RIDING: 512 };
 /** Enemy animation states. */
 export const ESTATE = ['move', 'windup', 'charge', 'fade', 'cast', 'idle'];
 /** Pickup kinds. */
@@ -62,6 +65,8 @@ export const AREA_KINDS = ['telegraph', 'hazard', 'cloud', 'quake', 'ring', 'por
 export const AF = { COUNT: 15, BIG: 16, FLOWER: 32, LAVA: 64, FOLLOW: 128, LINE: 256, SPIN_SHIFT: 9 };
 /** Market people's flags. */
 export const NPCF = { MOVING: 1, HURT: 2 };
+/** Horse flags. */
+export const HF = { MOVING: 1, SADDLE: 2 };
 /** Ally flags. */
 export const ALF = { MOVING: 1 };
 /** Slots on the wire. */

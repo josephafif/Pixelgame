@@ -2,12 +2,14 @@
 // single player, plus the clan panel, the player list and the rules, and a
 // multiplayer pause menu (the world never pauses: it's shared).
 
-import { h } from '../ui/dom.js';
+import { h, pixelCanvas } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { openModal, closeModal, isModalOpen, isModalLocked, replaceModalBody } from '../ui/modal.js';
 import { BuildBar } from '../ui/build.js';
 import { describeRaidWindow, parseRaidWindow } from '../net/rules.js';
 import { clanPanelBody } from './base-panel.js';
+import { horseSprite } from '../render/horses.js';
+import { MAX_HORSES } from '../game/horses.js';
 
 const loaders = {
   inventory: () => import('../ui/inventory.js'),
@@ -109,6 +111,7 @@ export class MpPanels {
       case 'menu': return this.#menu();
       case 'clan': return this.#clan();
       case 'players': return this.#players();
+      case 'horses': return this.#horses();
       case 'town': return this.#town();
       case 'password': return this.#password();
       case 'crafting':
@@ -147,6 +150,7 @@ export class MpPanels {
         item('book', 'Forskning', go('research'), 'R'),
         item('hammer', 'Bygg', () => { closeModal(); g.toggleBuildMode(true); }, 'G'),
         item('pal', 'Pals', go('pals'), 'H'),
+        item('horse', 'Hästar', go('horses')),
         item('chat', 'Chatt', () => { closeModal(); this.app.mpHud?.openChat(); }, 'T'),
         item('players', 'Spelare online', go('players')),
         item('book', 'Regler', go('town'))),
@@ -188,6 +192,45 @@ export class MpPanels {
       }, icon('portal', 24), h('span', 'Tillbaka genom vägstenen')));
     }
     return buttons.length ? h('div.menu-grid', buttons) : null;
+  }
+
+  // --- Horses --------------------------------------------------------------------------------
+
+  /** Your horses: where each one is, and letting one go. */
+  #horses() {
+    const g = this.game;
+    const build = () => {
+      const st = g.save.horses ?? { owned: [], riding: null };
+      if (!st.owned.length) {
+        return h('div.horse-list',
+          h('p', 'Du har inga hästar än.'),
+          h('p.small.muted', 'Vilda hästar betar här och där i vildmarken, långt från Fristaden (inte lätta att hitta). Gå fram till en och tryck Använd för att rida den: då är den din. Till häst är du snabbare, tål mer och hoppar över träd och stenar. Lämna hästen på er klans mark så stannar den där.'));
+      }
+      return h('div.horse-list',
+        h('h3', `Dina hästar (${st.owned.length} / ${MAX_HORSES})`),
+        h('p.small.muted', 'På er klans mark stannar en häst för alltid. Ute i vildmarken springer den iväg om du är borta länge.'),
+        st.owned.map((rec) => {
+          const art = pixelCanvas(horseSprite(rec.breed, 0, true));
+          art.style.width = '45px';
+          art.style.height = '36px';
+          const where = rec.id === st.riding ? 'Du rider den' : rec.stabled ? 'I er bas' : 'Ute i världen';
+          return h('div.horse-row',
+            art,
+            h('div',
+              h('b', rec.name),
+              h('div.small.muted', `${g.describeHorse(rec)} · ${where}`)),
+            h('span.spacer'),
+            rec.id === st.riding ? null : h('button', {
+              onclick: async () => {
+                if (await g.releaseHorse(rec.id)) replaceModalBody(build());
+              },
+            }, 'Släpp fri'));
+        }));
+    };
+    const off = g.on('riding', () => {
+      if (this.open === 'horses' && isModalOpen()) replaceModalBody(build());
+    });
+    openModal({ title: 'Hästar', icon: 'horse', body: build(), className: 'horses-panel', onDispose: off, onClose: () => { this.open = null; } });
   }
 
   // --- Password (guests) -----------------------------------------------------------------

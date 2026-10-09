@@ -15,6 +15,7 @@ import * as enemies from './enemies.js';
 import * as abilities from './abilities.js';
 import * as bosses from './bosses.js';
 import * as markets from './markets.js';
+import * as horses from './horses.js';
 
 const DEG = Math.PI / 180;
 const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE]);
@@ -144,6 +145,7 @@ export function hurtPlayer(gs, p, amount, { element = 'physical', fromX, fromY, 
 export function killPlayer(gs, p, killer) {
   if (p.dead) return;
   const now = Date.now();
+  horses.dismount(gs, p, now, { quiet: true }); // you fall off; the horse waits there
   p.dead = true;
   p.hp = 0;
   p.respawnAt = now + 5000;

@@ -8,6 +8,7 @@
 import { createCanvas, ctx2d } from './canvas.js';
 import { renderChunk, TILE_PX } from './tiles-art.js';
 import { boatSprite } from './boats.js';
+import { horseSprite, HORSE_W, HORSE_H } from './horses.js';
 import { CHUNK } from '../game/world.js';
 import { playerSprites, objectSprite, pickupSprite, tintedSprite } from './sprites.js';
 import { weaponSprite, weaponIcon } from './weapon-sprite.js';
@@ -501,6 +502,7 @@ export class Renderer {
     for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
     if (game.pal && !game.pal.hidden) list.push({ y: game.pal.y, kind: 'pal', o: game.pal });
     for (const o of game.otherPals ?? []) list.push({ y: o.y, kind: 'pal', o }); // multiplayer
+    for (const h of game.horses ?? []) list.push({ y: h.y, kind: 'horse', o: h });
     for (const o of game.others ?? []) if (!o.dead) list.push({ y: o.y, kind: 'remote', o });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
     list.sort((a, b) => a.y - b.y);
@@ -518,6 +520,7 @@ export class Renderer {
         case 'enemy': this.#drawEnemy(game, d.o, x, y); break;
         case 'ally': this.#drawCharacter(game, d.o, x, y, true); break;
         case 'pal': this.#drawPal(game, d.o, x, y); break;
+        case 'horse': this.#drawHorse(d.o.breed, x, y, Math.cos(d.o.facing ?? 0) >= 0, d.o.moving ? 1 + (Math.floor(d.o.walkT ?? 0) % 2) : 0, 0, d.o.saddle); break;
         case 'player': this.#drawCharacter(game, p, x, y, false); break;
         case 'remote': this.#drawRemote(game, d.o, x, y); break;
         default: break;
@@ -1255,8 +1258,9 @@ export class Renderer {
     this.#drawCharacter(game, c, x, y, false);
     v.globalAlpha = 1;
     const label = c.tag ? `[${c.tag}] ${c.name}` : c.name;
-    drawPixelText(v, label.toUpperCase(), x, y - 27, c.nameColor ?? '#e8e8f0');
-    if (c.hp < c.maxHp) this.#healthBar(x, y - 18, 14, Math.max(0, c.hp) / c.maxHp, c.friendly ? '#6cd66c' : '#ff6a5a');
+    const up = c.horse ? 12 : 0; // on horseback
+    drawPixelText(v, label.toUpperCase(), x, y - 27 - up, c.nameColor ?? '#e8e8f0');
+    if (c.hp < c.maxHp) this.#healthBar(x, y - 18 - up, 14, Math.max(0, c.hp) / c.maxHp, c.friendly ? '#6cd66c' : '#ff6a5a');
     if (c.asleep) {
       v.fillStyle = '#e8f0ff';
       const k = (game.time * 0.8) % 1;
@@ -1287,14 +1291,24 @@ export class Renderer {
     const lx = pose ? Math.round(Math.cos(lungeAngle) * pose.lunge) : 0;
     const ly = pose ? Math.round(Math.sin(lungeAngle) * pose.lunge) : 0;
     const right = Math.cos(c.facing) >= 0;
-    const frame = c.moving ? 1 + (Math.floor(c.walkT) % 2) : 0;
+    const sailing = remote ? Boolean(c.boatDef) : game.sailing;
+    // On horseback: the horse below, you in the saddle (up in the air over trees and rocks).
+    const horse = isClone || sailing ? null : remote ? c.horse : game.riding?.breed;
+    const walking = c.moving && !horse;
+    const frame = walking ? 1 + (Math.floor(c.walkT) % 2) : 0;
     let img = (right ? sprites.right : sprites.left)[isClone ? 0 : frame];
     if (!isClone && c.hurtFlash > 0) img = sprites.flash;
-    const bob = c.moving ? (Math.floor(c.walkT) % 2) : 0;
-    const sailing = remote ? Boolean(c.boatDef) : game.sailing;
+    const bob = walking ? (Math.floor(c.walkT) % 2) : 0;
     const toolActive = remote ? c.slot === 'tool' : game.toolActive;
     const handsEmpty = remote ? c.slot === 'none' : game.handsEmpty;
-    if (isClone || !sailing) this.#shadow(x + lx, y + 1 + ly, 5);
+    if (horse) {
+      const lift = this.#rideLift(game, c);
+      const gallop = c.moving ? 1 + (Math.floor((c.walkT ?? 0) * 0.5) % 2) : 0;
+      this.#drawHorse(horse, x, y, right, lift > 2 ? 1 : gallop, lift, true);
+      y -= 12 + Math.round(lift) + (gallop === 2 ? 1 : 0);
+    } else if (isClone || !sailing) {
+      this.#shadow(x + lx, y + 1 + ly, 5);
+    }
     // Ascension: a radiant aura while the power lasts (other players' too, in multiplayer).
     const ascend = isClone ? null
       : remote ? (c.ascending ? '#ffd24a' : null)
@@ -1328,6 +1342,40 @@ export class Renderer {
     v.drawImage(img, x - 5 + lx, y - 12 - bob + ly);
     if (!behind) this.#drawHeldWeapon(game, pose, hand, isClone, w, remote);
     v.globalAlpha = 1;
+  }
+
+  /** A horse standing at (x, y) (its hooves), `lift` pixels up in a jump. */
+  #drawHorse(breed, x, y, right, frame, lift = 0, saddle = false) {
+    const v = this.v;
+    const art = horseSprite(breed, frame, saddle);
+    this.#shadow(x, y + 1, lift > 2 ? 8 : 10);
+    const top = y + 1 - HORSE_H - Math.round(lift);
+    if (right) {
+      v.drawImage(art, x - (HORSE_W >> 1), top);
+      return;
+    }
+    v.save();
+    v.translate(x + (HORSE_W >> 1), top);
+    v.scale(-1, 1);
+    v.drawImage(art, 0, 0);
+    v.restore();
+  }
+
+  /** How high a horse is in its jump: up over trees and rocks, down again after. */
+  #rideLift(game, c) {
+    const w = game.world;
+    let over = false;
+    for (const dx of [-0.3, 0, 0.3]) {
+      const tx = Math.floor(c.x + dx);
+      const ty = Math.floor(c.y);
+      if (w.blockedFor(tx, ty, 'player') && !w.blockedFor(tx, ty, 'horse')) over = true;
+    }
+    const dt = Math.min(0.1, Math.max(0, game.time - (c.rideT ?? game.time)));
+    c.rideT = game.time;
+    const target = over ? 8 : 0;
+    const lift = c.rideLift ?? 0;
+    c.rideLift = target > lift ? Math.min(target, lift + dt * 70) : Math.max(target, lift - dt * 45);
+    return c.rideLift;
   }
 
   /** You in your boat: mast and sails behind, hull in front of your legs. */

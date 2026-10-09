@@ -25,8 +25,9 @@ import { mpVirtualSave } from '../net/mpsave.js';
 import { inSafeZone, claimAt, canDo, bannerProblem, pvpBlock } from '../net/rules.js';
 import { Connection } from './connection.js';
 import {
-  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal, readNpc,
+  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal, readNpc, readHorse,
 } from './entities.js';
+import { BREED_BY_ID, describeHorse, HORSE_MODE } from '../game/horses.js';
 import { MpMarkets } from './markets.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
 import { POI, isPoi, poiFound, chunksAround } from '../game/discoveries.js';
@@ -93,6 +94,7 @@ export class MpGame {
     this.mates = [];
     this.pal = null;
     this.otherPals = []; // other players' pals
+    this.horses = []; // wild horses and players' own nearby
     this.boss = null;
     this.shake = 0;
     this.hitstop = 0;
@@ -248,6 +250,7 @@ export class MpGame {
     s.codex.abilities = me.codex?.abilities ?? [];
     s.counters.craft = me.crafts ?? 0;
     s.pals = me.pals ?? emptyPals();
+    s.horses = me.horses ?? { owned: [], riding: null };
     s.world.found = me.found ?? [];
     s.components = me.components ?? {};
     s.markets = me.markets ?? {};
@@ -257,6 +260,7 @@ export class MpGame {
     this.emit('tools');
     this.emit('pals');
     this.emit('components');
+    this.emit('riding', {});
     this.emit('me', me);
   }
 
@@ -718,8 +722,14 @@ export class MpGame {
     const s = snap.self;
     const wasDead = this.player.dead;
     const wasSailing = this.sailing;
+    const wasRiding = Boolean(this.selfFlags & SF.RIDING);
     this.selfFlags = s.flags;
     if (this.sailing !== wasSailing) this.#sailingChanged();
+    if (Boolean(s.flags & SF.RIDING) !== wasRiding) {
+      this.interactTarget = null;
+      this.interactT = 0;
+      this.emit('riding', { on: !wasRiding });
+    }
     this.speed = s.speed;
     this.sprintMult = s.sprint;
     const p = this.player;
@@ -864,9 +874,11 @@ export class MpGame {
     this.#withGates(() => stepMove(this.world, this.pred, frame, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode));
     p.moving = mx !== 0 || my !== 0;
     p.sprinting = p.moving && (buttons & BTN.SPRINT) !== 0;
-    // Foam in the wake.
+    // Foam in the wake; dust under hooves.
     if (this.sailing && p.moving && Math.random() < 0.6) {
       this.fx.emit('glint', p.x - Math.cos(p.facing) * 0.8, p.y + 0.25, 1, 0.3, 0.6, ['#e8f8ff', '#9ad8f4']);
+    } else if (this.riding && p.moving && Math.random() < 0.3) {
+      this.fx.emit('dust', p.x, p.y + 0.3, 1, 0.2, 0.5);
     }
     if (!p.attackAnim) p.facing = aim;
     if ((buttons & BTN.ATTACK) && !this.suppressAttack) this.#predictAttack(aim);
@@ -1118,6 +1130,7 @@ export class MpGame {
     const areas = [];
     const allies = [];
     const otherPals = [];
+    const horses = [];
     const npcs = [];
     let myPal = null;
     let boss = null;
@@ -1162,6 +1175,7 @@ export class MpGame {
           o.weapon = info.slot === 'main' || info.slot === 'secondary' ? pi?.compiled ?? null : null;
           o.pickaxeDef = pickaxeDefs(this.data).find((d) => d.tier === info.pickaxe) ?? null;
           o.boatDef = info.boat ? boatDefs(this.data).find((b) => b.tier === info.boat) ?? null : null;
+          o.horse = o.boatDef ? null : info.horse;
           o.friendly = Boolean(myClan && o.clanId === myClan);
           o.cloak = o.friendly ? '#3fa86a' : '#c8364a';
           o.nameColor = o.friendly ? '#8ef0a0' : o.protected ? '#c8c8d8' : '#ffb0a0';
@@ -1264,6 +1278,20 @@ export class MpGame {
           }
           break;
         }
+        case ET.HORSE: {
+          const info = readHorse(s.v);
+          let o = ent.obj;
+          if (!o) {
+            o = { key: `h:${ent.id}`, eid: ent.id, walkT: 0 };
+            ent.obj = o;
+          }
+          Object.assign(o, info, { x: s.x, y: s.y });
+          o.own = info.owner === this.myId;
+          o.record = o.own ? this.save.horses?.owned.find((r) => r.id === info.ref) ?? null : null;
+          if (o.moving) o.walkT += dt * 5;
+          horses.push(o);
+          break;
+        }
         case ET.ALLY: {
           const info = readAlly(s.v);
           let o = ent.obj;
@@ -1298,6 +1326,7 @@ export class MpGame {
     this.allies = allies;
     this.pal = myPal;
     this.otherPals = otherPals;
+    this.horses = horses;
     this.markets.npcs = npcs;
     if (boss !== this.boss) {
       this.boss = boss;
@@ -1528,6 +1557,10 @@ export class MpGame {
       case 'blink':
         this.fx.emit('arcane', ev.x, ev.y, 24, 0.6, 3);
         break;
+      case 'dust':
+        // Someone climbed onto a horse.
+        this.fx.emit('dust', ev.x, ev.y + 0.3, 8, 0.6, 1.2);
+        break;
       case 'smite':
         this.fx.add({ type: 'pillar', x: ev.x, y: ev.y, r: 0.6, color: '#fff3b0', dur: 0.3 });
         break;
@@ -1649,9 +1682,31 @@ export class MpGame {
     if (bst && (!best || dist2(p.x, p.y, bst.x + 0.5, bst.y + 0.5) < bestD)) {
       return { type: 'basebuilding', key: `b:${bst.sid}`, st: bst, x: bst.x + 0.5, y: bst.y + 0.5 };
     }
+    // Horses (the server decides the same way): climb on, or get off when nothing else is near.
+    if (this.riding) {
+      if (!best) return { type: 'dismount', key: 'dismount', x: p.x, y: p.y };
+    } else {
+      const h = this.#horseNear();
+      if (h && (!best || dist2(p.x, p.y, h.x, h.y) < bestD)) return { type: 'horse', key: h.key, horse: h, x: h.x, y: h.y };
+    }
     if (!best && this.toolActive) return findHarvestTarget({ player: p, world: this.world, data: this.data });
     // At the water's edge: launch your boat (or learn why you can't).
     return best ?? findLaunch(this);
+  }
+
+  #horseNear() {
+    const p = this.player;
+    let best = null;
+    let bestD = 1.8 * 1.8;
+    for (const h of this.horses) {
+      if (h.saddle && !h.own) continue;
+      const d = dist2(p.x, p.y, h.x, h.y);
+      if (d < bestD) {
+        bestD = d;
+        best = h;
+      }
+    }
+    return best;
   }
 
   interactLabel(o) {
@@ -1689,6 +1744,12 @@ export class MpGame {
       case 'runestone': return 'Läs runstenen';
       case 'land': return 'Gå i land';
       case 'shore': return null;
+      case 'horse': {
+        if (o.horse.own) return `Rid ${o.horse.record?.name ?? 'din häst'}`;
+        const breed = BREED_BY_ID.get(o.horse.breed);
+        return `Tämj den vilda hästen (${breed?.sv.toLowerCase() ?? 'häst'})`;
+      }
+      case 'dismount': return `Kliv av ${this.riding?.name ?? 'hästen'}`;
       default: return null;
     }
   }
@@ -1805,7 +1866,25 @@ export class MpGame {
   }
 
   get moveMode() {
+    if (this.riding) return HORSE_MODE;
     return this.sailing ? boatMode(this.boat) : 'player';
+  }
+
+  /** The horse you ride (its record), or null (the server says so in every snapshot). */
+  get riding() {
+    if (!(this.selfFlags & SF.RIDING)) return null;
+    const st = this.save.horses;
+    return st?.owned.find((h) => h.id === st.riding) ?? { id: 0, breed: 'pony', name: 'hästen', speed: 6, gallop: 1.25, hp: 0 };
+  }
+
+  /** Lets one of your horses go (back to the wild). */
+  async releaseHorse(id) {
+    const res = await this.#ask({ t: 'horse', op: 'release', id });
+    return res.ok;
+  }
+
+  describeHorse(h) {
+    return describeHorse(h, true);
   }
 
   get heldWeapon() {

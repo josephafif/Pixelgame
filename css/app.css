@@ -888,6 +888,11 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 .bcard.unbuilt .bcard-art canvas { opacity: 0.8; }
 .base-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
 .bcard { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.horse-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.horse-list h3 { margin: 0; }
+.horse-row { display: flex; align-items: center; gap: 10px; padding: 4px 8px; background: rgba(255, 255, 255, 0.04); border-radius: 4px; }
+.horse-row canvas { flex: none; image-rendering: pixelated; }
+.horse-row .spacer { flex: 1; }
 .bcard.focus { animation: focus-flash 0.5s steps(2) 3; }
 @keyframes focus-flash { 50% { filter: brightness(1.5); } }
 .bcard-top { display: flex; gap: 10px; align-items: center; }
@@ -1069,6 +1074,7 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 .lg.pin { background: #e8364a; border-radius: 50%; }
 .lg.sea { background: #2f8fc4; }
 .lg.mate { background: #7ae07a; border-radius: 50%; }
+.lg.horse { background: transparent; border: 3px solid #d89a50; border-bottom-color: transparent; border-radius: 50%; }
 @media (max-width: 640px) {
   .map-panel { height: 100%; }
   .map-status { flex-basis: 100%; margin: 0; }
