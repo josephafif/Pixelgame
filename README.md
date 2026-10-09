@@ -685,9 +685,10 @@ src/
   game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger,
                               insamling (gathering.js), byggen (construction.js),
                               marknader (markets.js), ekonomi och vapenvärde (economy.js),
-                              segling (sailing.js), småfynd (discoveries.js), pals (pals.js)
+                              segling (sailing.js), småfynd (discoveries.js), pals (pals.js),
+                              hästar (horses.js, riding.js)
   render/                     renderer, pixelsprites, animerade monster och pals (creatures.js),
-                              tiles, vapensprites, byggnader, konstruktioner, båtar, animationer
+                              tiles, vapensprites, byggnader, konstruktioner, båtar, hästar, animationer
   input/, audio/, storage/, pwa/, ui/
   net/                        multiplayer, delat av klient och server: binärt protokoll, rörelse,
                               regler (zoner, PvP, raider, klaner), byggregler
@@ -700,7 +701,10 @@ cloud/                        den officiella servern på Cloudflare: Worker + Du
 supabase/                     serverlistan: migrering och Edge-funktionen game-servers
 deploy/                       Caddy, systemd, backup-skript
 scripts/                      dev-server, precache-byggare, ikongenerator, lasttest,
-                              share.mjs (server + Cloudflare-tunnel i ett kommando)
+                              share.mjs (server + Cloudflare-tunnel i ett kommando),
+                              host.mjs + host-panel.html (serverhanteraren med kontrollpanel)
+Starta-server.bat, Starta-server.command, starta-server.sh
+                              dubbelklicka för att köra en egen server (Windows, Mac, Linux)
 tests/unit/, tests/e2e/, tests/mp/
 ```
 
