@@ -10,7 +10,7 @@
 import { World, CHUNK, tileKey } from '../game/world.js';
 import { Fx } from '../game/fx.js';
 import { compileWeapon } from '../game/combat.js';
-import { structureDef, structureDefs } from '../game/construction.js';
+import { structureDef, structureDefs, groundProblem, onWater } from '../game/construction.js';
 import { currentPickaxe, findHarvestTarget, harvestInfo, pickaxeDefs } from '../game/gathering.js';
 import { canAfford, shortfalls, baseBonuses } from '../game/base.js';
 import { salvageValue } from '../game/loot.js';
@@ -2114,8 +2114,11 @@ export class MpGame {
       const c = claimAt(this.rules, this.claims, tx, ty);
       if (!c || c.clanId !== this.me?.clan?.id) return 'Utanför er klans mark';
     }
-    const block = this.world.blockAt(tx, ty);
-    if (block) return [20, 21, 27, 28].includes(block) ? 'Det går inte att bygga på vatten' : 'Hugg bort trädet eller stenen först';
+    const ground = groundProblem(this.world, def, tx, ty);
+    if (ground === 'water') return 'Lägg ett golv på vattnet först, sedan kan du bygga på det';
+    if (ground === 'deep') return 'För djupt (eller för hett) att bygga här';
+    if (ground) return 'Hugg bort trädet eller stenen först';
+    if (def.kind === 'building' && onWater(this.world, tx, ty)) return 'Byggnader står på fast mark';
     if (def.kind === 'floor' ? this.world.floorAt(tx, ty) : this.world.structureAt(tx, ty)) return 'Här står redan något';
     if (!def.walkable) {
       const inside = (x, y, r) => x + r > tx && x - r < tx + 1 && y + r > ty && y - r < ty + 1;

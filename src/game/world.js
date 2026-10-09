@@ -65,6 +65,9 @@ export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).m
 export const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
 /** Water a boat can float on (lakes, coastal sea, open sea). */
 export const SAILABLE = new Set([T.WATER, T.SEA, T.DEEP]);
+// Shallow water (lakes, rivers, the coast) takes a floor: a bridge or a dock
+// you can walk on and build on. Deep sea and lava don't.
+export const BRIDGEABLE = new Set([T.WATER, T.SEA]);
 /**
  * Trees, rocks and the like only block where they stand: a circle around
  * the trunk or the foot of the stone ([radius, centre height in the tile]),
@@ -724,7 +727,12 @@ export class World {
    * creatures: the sea, or only the deep sea).
    */
   blockedFor(tx, ty, mode = 'player') {
-    const b = this.blockAt(tx, ty);
+    let b = this.blockAt(tx, ty);
+    // A floor on shallow water is a bridge: walkers cross it, boats and fish don't.
+    if (this.floors.size && BRIDGEABLE.has(b) && this.floors.has(tileKey(tx, ty))) {
+      if (mode === 'boat' || mode === 'raft' || mode === 'swim' || mode === 'deepswim') return true;
+      b = 0;
+    }
     // Boats float on water only; a raft stays out of the deep sea.
     if (mode === 'boat') return !SAILABLE.has(b);
     if (mode === 'raft') return !SAILABLE.has(b) || b === T.DEEP;

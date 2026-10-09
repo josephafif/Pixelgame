@@ -235,3 +235,38 @@ test('salvaging is a trickle: never more than a fraction of crafting costs', () 
   const legendary = salvageValue(dna('legendary', 20));
   assert.ok(legendary.essence < data.catalysts.find((c) => c.id === 'legendary').essence / 20);
 });
+
+test('building on water: a floor on shallow water is a bridge, and walls stand on it', () => {
+  const save = richSave();
+  const g = stubGame(save);
+  const w = g.world;
+  // Make a little pond next to the player (lakes do this in the wild).
+  const pond = [[2, 2], [3, 2], [2, 3], [3, 3]];
+  for (const [x, y] of pond) {
+    const chunk = w.getChunk(0, 0);
+    chunk.block[y * 16 + x] = T.WATER;
+  }
+  g.player.x = 1.5;
+  g.player.y = 1.5;
+  const c = g.construction;
+  assert.equal(w.blockedFor(2, 2, 'player'), true, 'water blocks walking');
+  assert.match(c.placementProblem(structureDef(data, 'wood_wall'), 2, 2), /floor/, 'no wall straight on water');
+  assert.equal(c.place('wood_floor', 2, 2).ok, true, 'a floor goes on water');
+  assert.equal(w.blockedFor(2, 2, 'player'), false, 'a bridge: you walk on it');
+  assert.equal(w.blockedFor(2, 2, 'boat'), true, 'boats bump into it (a dock)');
+  assert.equal(w.blockedFor(3, 2, 'boat'), false, 'the water next to it still floats boats');
+  assert.equal(c.place('wood_wall', 2, 2).ok, true, 'a wall on the floor');
+  assert.equal(w.blockedFor(2, 2, 'player'), true, 'and the wall blocks');
+  // Taking it down: the wall first (it's on top), then the floor.
+  c.remove(2, 2);
+  assert.equal(w.structureAt(2, 2), null);
+  assert.ok(w.floorAt(2, 2), 'the floor is still there');
+  // A floor that breaks takes what stands on it down with it.
+  assert.equal(c.place('wood_wall', 2, 2).ok, true);
+  c.damage(w.floorAt(2, 2), 9999);
+  assert.equal(w.floorAt(2, 2), null);
+  assert.equal(w.structureAt(2, 2), null, 'the wall fell in');
+  // Deep sea and lava never take a floor.
+  w.getChunk(0, 0).block[3 * 16 + 3] = T.DEEP;
+  assert.match(c.placementProblem(structureDef(data, 'wood_floor'), 3, 3), /deep/i);
+});

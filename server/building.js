@@ -3,8 +3,8 @@
 // (someone in the clan online or just logged out, or the raid window).
 // Turrets and spike traps defend against monsters and intruders.
 
-import { tileKey, T } from '../src/game/world.js';
-import { structureDef, refundFor } from '../src/game/construction.js';
+import { tileKey } from '../src/game/world.js';
+import { structureDef, refundFor, groundProblem, onWater } from '../src/game/construction.js';
 import { canAfford, pay, shortfalls } from '../src/game/base.js';
 import { inSafeZone, bannerProblem, claimAt, canDo } from '../src/net/rules.js';
 import { mpStructureLock } from '../src/net/mpbuild.js';
@@ -17,7 +17,6 @@ import * as clans from './clans.js';
 
 const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });
 const MAX_CLAN_STRUCTURES = 400;
-const WATER = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
 
 function layerOf(def) {
   return def.kind === 'floor' ? 'floor' : 'top';
@@ -135,6 +134,11 @@ export function destroyStructure(gs, st, attacker) {
   gs.db.deleteStructure(st.sid);
   gs.broadcastTile(st.x, st.y, { t: 'wd', k: 'st-', sid: st.sid, x: st.x, y: st.y, broken: Boolean(attacker !== undefined) });
   if (st.id === 'banner' && st.clanId) bannerLost(gs, st, attacker);
+  // A floor on water was all that held up what stood on it.
+  if (st.def.kind === 'floor' && onWater(gs.world, st.x, st.y)) {
+    const top = gs.world.structureAt(st.x, st.y);
+    if (top && !top.dead && !top.marketId && top.def.kind !== 'building') destroyStructure(gs, top, attacker);
+  }
 }
 
 /** The banner fell: the claim is gone and raiders get the unprotected vault. */
@@ -194,8 +198,11 @@ export function place(gs, p, defId, tx, ty) {
     if (claim.clanId !== clan.id) return 'Det här är en annan klans mark';
     if (!canDo(role, 'build')) return 'Du får inte bygga här';
   }
-  const block = gs.world.blockAt(tx, ty);
-  if (block) return WATER.has(block) ? 'Det går inte att bygga på vatten' : 'Hugg bort trädet eller stenen först';
+  const ground = groundProblem(gs.world, def, tx, ty);
+  if (ground === 'water') return 'Lägg ett golv på vattnet först, sedan kan du bygga på det';
+  if (ground === 'deep') return 'För djupt (eller för hett) att bygga här';
+  if (ground) return 'Hugg bort trädet eller stenen först';
+  if (def.kind === 'building' && onWater(gs.world, tx, ty)) return 'Byggnader står på fast mark';
   if (def.kind === 'floor' ? gs.world.floorAt(tx, ty) : gs.world.structureAt(tx, ty)) return 'Här står redan något';
   if (!def.walkable) {
     const inside = (x, y, r) => x + r > tx && x - r < tx + 1 && y + r > ty && y - r < ty + 1;

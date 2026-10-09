@@ -7,7 +7,7 @@
 // runtime adds non-enumerable `def` and `rt` fields that never get saved.
 // Floors are a layer of their own: a wall, turret or torch can stand on one.
 
-import { tileKey, T } from './world.js';
+import { tileKey, BRIDGEABLE, LIQUID } from './world.js';
 import { buildingLevel, buildingDef, canAfford, pay, shortfalls, COST_KEYS } from './base.js';
 import { dist2 } from '../core/math.js';
 
@@ -38,6 +38,23 @@ export function structureLock(data, save, def) {
     }
   }
   return null;
+}
+
+/**
+ * What's wrong with the ground at (tx, ty) for `def`, or null: 'tree' (cut it
+ * down first), 'deep' (deep sea or lava), or 'water' (shallow water takes a
+ * floor first; then walls, turrets and the rest can stand on it).
+ */
+export function groundProblem(world, def, tx, ty) {
+  const block = world.blockAt(tx, ty);
+  if (!block) return null;
+  if (BRIDGEABLE.has(block)) return def.kind === 'floor' || world.floorAt(tx, ty) ? null : 'water';
+  return LIQUID.has(block) ? 'deep' : 'tree';
+}
+
+/** Is (tx, ty) water with a floor on it (whatever stands there falls in when the floor goes)? */
+export function onWater(world, tx, ty) {
+  return BRIDGEABLE.has(world.blockAt(tx, ty));
 }
 
 /** Tiles next to the camp buildings stay free so you can always reach them. */
@@ -178,8 +195,10 @@ export class Construction {
     if (!inBuildArea(data, save, tx, ty)) return 'Outside your camp. Upgrade the Hearth to expand it';
     if (dist2(player.x, player.y, tx + 0.5, ty + 0.5) > (data.building.reach + 0.5) ** 2) return 'Too far away';
     if (reservedTile(data, tx, ty)) return 'Too close to a camp building';
-    const block = world.blockAt(tx, ty);
-    if (block) return [T.WATER, T.LAVA, T.SEA, T.DEEP].includes(block) ? 'Can’t build on water' : 'Clear the tree or rock first (pickaxe)';
+    const ground = groundProblem(world, def, tx, ty);
+    if (ground === 'water') return 'Lay a floor on the water first, then build on it';
+    if (ground === 'deep') return 'Too deep (or too hot) to build on';
+    if (ground) return 'Clear the tree or rock first (pickaxe)';
     // Floors go under things; everything else stands on top (a floor is fine).
     if (def.kind === 'floor' ? world.floorAt(tx, ty) : world.structureAt(tx, ty)) return 'Something is already built here';
     if (!def.walkable) {
@@ -213,6 +232,7 @@ export class Construction {
   remove(tx, ty) {
     const st = this.at(tx, ty);
     if (!st) return null;
+    // (A floor on water goes last: what stands on it comes down first, `at` gives the top.)
     const refund = refundFor(this.game.data, st.def);
     for (const [k, v] of Object.entries(refund)) this.game.save.resources[k] += v;
     this.#destroy(st, false);
@@ -229,6 +249,11 @@ export class Construction {
     if (layer.get(tileKey(st.x, st.y)) === st) layer.delete(tileKey(st.x, st.y));
     this.damaged.delete(st);
     st.dead = true;
+    // A floor on water was all that held up what stood on it.
+    if (st.def.kind === 'floor' && onWater(g.world, st.x, st.y)) {
+      const top = g.world.structureAt(st.x, st.y);
+      if (top && !top.dead) this.#destroy(top, byEnemy);
+    }
     g.fx.emit(st.def.kind === 'wall' && st.id.startsWith('stone') ? 'stone' : 'wood', st.x + 0.5, st.y + 0.5, 12, 0.8, 2.5);
     g.fx.emit('smoke', st.x + 0.5, st.y + 0.5, 6, 0.6, 1);
     if (byEnemy) {

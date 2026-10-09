@@ -166,3 +166,43 @@ test('clan bases: members share the buildings; leaving the clan leaves them behi
     await t.close();
   }
 });
+
+test('building on water: floors make bridges and docks, walls stand on them, and fall in with them', async () => {
+  const t = await testServer();
+  try {
+    const a = await t.bot('Bryggbyggaren');
+    const p = t.player(a);
+    const { banner } = await t.clanBase(a, {});
+    const { T, CHUNK } = await import('../../src/game/world.js');
+    // A pond inside the claim.
+    const w = t.gs.world;
+    const pond = [[3, 0], [4, 0], [3, 1], [4, 1]].map(([dx, dy]) => ({ x: banner.x + dx, y: banner.y + dy }));
+    for (const { x, y } of pond) {
+      const chunk = w.getChunk(Math.floor(x / CHUNK), Math.floor(y / CHUNK));
+      chunk.block[(y - chunk.cy * CHUNK) * CHUNK + (x - chunk.cx * CHUNK)] = T.WATER;
+    }
+    Object.assign(p, { x: banner.x + 1.5, y: banner.y + 1.5 });
+    Object.assign(p.ch.resources, { wood: 500, stone: 500, scrap: 500 });
+    const [tile] = pond;
+    let res = await a.request({ t: 'build', id: 'wood_wall', x: tile.x, y: tile.y });
+    assert.match(res.error, /golv/, 'no wall straight on water');
+    res = await a.request({ t: 'build', id: 'wood_floor', x: tile.x, y: tile.y });
+    assert.equal(res.ok, true, res.error);
+    assert.equal(w.isFree(tile.x + 0.5, tile.y + 0.5, 0.32), true, 'you can stand on the bridge');
+    assert.equal(w.isFree(tile.x + 0.5, tile.y + 0.5, 0.4, 'boat'), false, 'boats bump into it');
+    res = await a.request({ t: 'build', id: 'wood_wall', x: tile.x, y: tile.y });
+    assert.equal(res.ok, true, res.error);
+    // The floor breaks: the wall falls into the water with it.
+    const building = await import('../../server/building.js');
+    building.destroyStructure(t.gs, w.floorAt(tile.x, tile.y), null);
+    assert.equal(w.structureAt(tile.x, tile.y), null, 'the wall fell in');
+    // Clan buildings stay on dry land.
+    res = await a.request({ t: 'build', id: 'wood_floor', x: pond[1].x, y: pond[1].y });
+    assert.equal(res.ok, true, res.error);
+    p.ch.level = 30;
+    res = await a.request({ t: 'build', id: 'b_hearth', x: pond[1].x, y: pond[1].y });
+    assert.match(res.error, /fast mark/);
+  } finally {
+    await t.close();
+  }
+});
