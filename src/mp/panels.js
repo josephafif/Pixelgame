@@ -15,6 +15,7 @@ const loaders = {
   map: () => import('../ui/map.js'),
   settings: () => import('../ui/settings.js'),
   pals: () => import('../ui/pals.js'),
+  research: () => import('../ui/research.js'),
 };
 
 const DOCK = {
@@ -84,7 +85,8 @@ export class MpPanels {
       this.game.toggleBuildMode(false);
       return;
     }
-    const alias = { base: 'clan', research: 'players' }[name];
+    // (R shows the players here; research is at Fristaden's library, or in the menu.)
+    const alias = { base: 'clan', research: 'players', library: 'research' }[name];
     const target = alias === undefined ? name : alias;
     if (isModalOpen() && this.open === target && !Object.keys(arg).length) {
       closeModal();
@@ -139,7 +141,9 @@ export class MpPanels {
         item('players', 'Spelare', go('players'), 'R'),
         item('chat', 'Chatt', () => { closeModal(); this.app.mpHud?.openChat(); }, 'T'),
         item('hammer', 'Bygg', () => { closeModal(); g.toggleBuildMode(true); }, 'G'),
+        item('book', 'Forskning', go('research')),
         item('book', 'Regler', go('town'))),
+      this.#waystone(),
       h('div.menu-grid',
         item('gear', 'Inställningar', go('settings')),
         g.account?.guest ? item('lock', g.account.password ? 'Byt lösenord' : 'Välj lösenord', go('password')) : null,
@@ -149,6 +153,33 @@ export class MpPanels {
         })),
       h('p.menu-foot', `${g.server?.name ?? ''} · ${g.myName ?? ''} · ${Math.round(g.conn?.rtt ?? 0)} ms`));
     openModal({ title: 'Meny', body, className: 'menu-panel', onClose: () => { this.open = null; } });
+  }
+
+  /** Fristaden's Waystone from anywhere: home, and back to where you were. */
+  #waystone() {
+    const g = this.game;
+    const left = Math.ceil(g.recallReadyIn());
+    const home = g.zoneInfo().kind === 'safe' || g.zoneInfo().kind === 'own';
+    const back = g.me?.recallFrom;
+    const buttons = [];
+    if (!home) {
+      buttons.push(h('button', {
+        disabled: left > 0,
+        onclick: () => {
+          closeModal();
+          g.recall();
+        },
+      }, icon('portal', 24), h('span', left > 0 ? `Res hem (${left} s)` : 'Res hem med vägstenen')));
+    }
+    if (back && home) {
+      buttons.push(h('button', {
+        onclick: () => {
+          closeModal();
+          g.recallBack();
+        },
+      }, icon('portal', 24), h('span', 'Tillbaka genom vägstenen')));
+    }
+    return buttons.length ? h('div.menu-grid', buttons) : null;
   }
 
   // --- Password (guests) -----------------------------------------------------------------

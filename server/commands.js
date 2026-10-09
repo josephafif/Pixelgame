@@ -5,6 +5,7 @@
 import { validateCraft, craftCost, buildCraftRequest } from '../src/weapons/crafting.js';
 import { forgePickaxe } from '../src/game/gathering.js';
 import { buildBoat } from '../src/game/sailing.js';
+import { researchCost } from '../src/game/base.js';
 import { mpVirtualSave, mpInventorySizes, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
 import { inSafeZone, describeRaidWindow, passwordProblem } from '../src/net/rules.js';
 import { hashPassword } from './auth.js';
@@ -70,6 +71,22 @@ export function handle(gs, p, msg) {
       return equip(gs, p, String(msg.id ?? ''), msg.slot === 'secondary' ? 'secondary' : 'main');
     case 'pal':
       return pals.request(gs, p, msg);
+    case 'research': {
+      const def = gs.data.byId.components.get(String(msg.id ?? ''));
+      const entry = def ? p.ch.extra.components?.[def.id] : null;
+      if (!def || !entry) return 'Den komponenten har du inte hittat';
+      if (entry.researched) return 'Redan utforskad';
+      const cost = researchCost(gs.data, vsave(gs, p), def);
+      if ((p.ch.resources.essence ?? 0) < cost) return `Kräver ${cost} essens`;
+      p.ch.resources.essence -= cost;
+      entry.researched = true;
+      players.persist(gs, p);
+      players.markMe(p);
+      gs.toast(p, `${def.name} är utforskad!`, 'component');
+      return null;
+    }
+    case 'recall':
+      return players.recall(gs, p, msg.op === 'back' ? 'back' : 'go');
     case 'move':
       return moveItem(gs, p, String(msg.id ?? ''), msg.to === 'storage' ? 'storage' : 'bag');
     case 'salvage': {

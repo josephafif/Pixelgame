@@ -28,6 +28,7 @@ import {
   EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal,
 } from './entities.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
+import { POI, isPoi, poiFound } from '../game/discoveries.js';
 import { currentBoat, boatMode, boatDefs, findLaunch, findLanding } from '../game/sailing.js';
 import { emptyPals, mpDenLevel } from '../net/mpsave.js';
 import { abilityProgress, abilityReadyIn } from '../game/abilities.js';
@@ -239,12 +240,15 @@ export class MpGame {
     s.codex.abilities = me.codex?.abilities ?? [];
     s.counters.craft = me.crafts ?? 0;
     s.pals = me.pals ?? emptyPals();
+    s.world.found = me.found ?? [];
+    s.components = me.components ?? {};
     s.base.buildings.den = mpDenLevel(this.data, { level: me.level, extra: { bosses: me.bosses ?? {} } });
     if (me.stats) this.pstats = me.stats;
     this.xpNext = me.xpNext;
     this.emit('inventory');
     this.emit('tools');
     this.emit('pals');
+    this.emit('components');
     this.emit('me', me);
   }
 
@@ -471,6 +475,15 @@ export class MpGame {
           else this.eventQueue.push(ev);
         }
         break;
+      case 'pin':
+        this.addPin(msg.x, msg.y, msg.label);
+        this.emit('explored');
+        break;
+      case 'unpin': {
+        const i = this.save.world.pins.findIndex((pp) => pp.label === msg.label && Math.hypot(pp.x - msg.x, pp.y - msg.y) < 2);
+        if (i >= 0) this.removePin(i);
+        break;
+      }
       case 'pal-born':
         this.audio.play('levelup');
         this.emit('pals');
@@ -1394,6 +1407,10 @@ export class MpGame {
         break;
       }
       case 'pick':
+        if (ev.kind === 'component' && ev.id === this.myId) {
+          this.audio.play('discover');
+          break;
+        }
         if (ev.kind === 'egg' && ev.id === this.myId) {
           this.audio.play('discover', { rarity: 3 });
           this.flash('#9cf07a', 0.3);
@@ -1556,7 +1573,11 @@ export class MpGame {
     let bestD = INTERACT_RADIUS * INTERACT_RADIUS;
     for (const o of this.world.objectsNear(p.x, p.y, 1)) {
       if ((o.type === 'chest' || o.type === 'shrine') && o.used) continue;
-      if (!['chest', 'shrine', 'altar', 'building'].includes(o.type)) continue;
+      if (isPoi(o.type)) {
+        if (POI[o.type].once && poiFound(this.save, o)) continue;
+      } else if (!['chest', 'shrine', 'altar', 'building'].includes(o.type)) {
+        continue;
+      }
       if (o.type === 'altar' && this.boss) continue;
       const d = dist2(p.x, p.y, o.x, o.y);
       if (d < bestD) {
@@ -1582,6 +1603,14 @@ export class MpGame {
       case 'building': return BUILDING_LABELS[o.buildingId] ?? 'Använd';
       case 'banner': return 'Klanbanéret (klan och valv)';
       case 'launch': return `Segla ut (${o.boat.name})`;
+      case 'bones': return 'Leta bland kvarlevorna';
+      case 'signpost': return 'Läs skylten';
+      case 'mushrooms': return 'Ät en glödhatt';
+      case 'camp': return 'Vila vid det gamla lägret';
+      case 'bottle': return 'Öppna flaskan';
+      case 'wreck': return 'Leta i vraket';
+      case 'idol': return 'Rör vid idolen';
+      case 'treasure': return 'Gräv upp skatten';
       case 'land': return 'Gå i land';
       case 'shore': return null;
       default: return null;
@@ -1742,6 +1771,11 @@ export class MpGame {
   }
 
   // --- Pals (the server keeps them with your character) -----------------------------------------
+
+  research(id) {
+    this.#ask({ t: 'research', id });
+    return true;
+  }
 
   hatchEgg(id) {
     this.#ask({ t: 'pal', op: 'hatch', id });
@@ -2217,10 +2251,22 @@ export class MpGame {
     };
   }
 
-  // Single-player hooks the shared UI may call.
+  // --- The Waystone: home and back -------------------------------------------------------------
+
+  /** Seconds until the Waystone can take you home again. */
   recallReadyIn() {
-    return 0;
+    return Math.max(0, ((this.me?.recallAt ?? 0) - Date.now()) / 1000);
   }
+
+  recall() {
+    this.#ask({ t: 'recall', op: 'go' });
+  }
+
+  recallBack() {
+    this.#ask({ t: 'recall', op: 'back' });
+  }
+
+  // Single-player hooks the shared UI may call.
 
   atCamp() {
     return inSafeZone(this.rules ?? { safeRadius: 24 }, this.player.x, this.player.y);

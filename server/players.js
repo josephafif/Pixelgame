@@ -13,6 +13,7 @@ import * as combat from './combat.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
 import * as abilities from './abilities.js';
+import * as discoveries from './discoveries.js';
 
 // Inputs waiting to be simulated; beyond this the oldest are dropped.
 const MAX_QUEUE = 12;
@@ -133,7 +134,7 @@ export function createPlayer(gs, account, ch, items) {
 
 // Everyone shares Fristaden, so its buildings' bonuses apply to every player.
 function statSave(p) {
-  return { player: { level: p.ch.level, bonusLuck: 0 }, base: { buildings: FRISTAD_LEVELS } };
+  return { player: { level: p.ch.level, bonusLuck: 0, bonusHp: p.ch.extra?.bonusHp ?? 0 }, base: { buildings: FRISTAD_LEVELS } };
 }
 
 export function recomputeStats(gs, p) {
@@ -202,6 +203,10 @@ export function mePayload(gs, p) {
     codex: p.ch.extra.codex,
     crafts: p.ch.extra.crafts ?? 0,
     pals: p.ch.extra.pals ?? null,
+    found: p.ch.extra.found ?? [],
+    recallAt: p.ch.extra.recallAt ?? 0,
+    components: p.ch.extra.components ?? {},
+    recallFrom: p.ch.extra.recallFrom ?? null,
     stats: p.stats,
     kills: p.ch.kills,
     deaths: p.ch.deaths,
@@ -409,6 +414,8 @@ export function interact(gs, p, now) {
     if (d >= bestD) continue;
     if (o.type === 'chest' || o.type === 'shrine') {
       if (gs.objectUsed(o.key)) continue;
+    } else if (discoveries.isPoi(o.type)) {
+      if (o.type !== 'signpost' && discoveries.isFound(p, o)) continue;
     } else if (o.type !== 'altar' && o.type !== 'building') {
       continue;
     }
@@ -421,6 +428,7 @@ export function interact(gs, p, now) {
     return true;
   }
   if (!best) return tryLaunch(gs, p);
+  if (discoveries.isPoi(best.type)) return discoveries.interact(gs, p, best, now);
   switch (best.type) {
     case 'chest':
       loot.openChest(gs, p, best, now);
@@ -438,7 +446,7 @@ export function interact(gs, p, now) {
       combat.summonBoss(gs, p, best, now);
       return true;
     case 'building': {
-      const panel = { forge: 'crafting', vault: 'storage', hearth: 'town', library: 'town', training: 'town' }[best.buildingId] ?? 'town';
+      const panel = { forge: 'crafting', vault: 'storage', hearth: 'town', library: 'library', training: 'town' }[best.buildingId] ?? 'town';
       if (best.buildingId === 'hearth') p.hp = p.maxHp;
       gs.send(p, { t: 'ui', panel, building: best.buildingId });
       return true;
@@ -541,13 +549,69 @@ function toolSwing(gs, p, aim, now) {
 
 // --- Death / respawn -----------------------------------------------------------------------
 
-export function respawn(gs, p, now) {
-  let spot = null;
+/** Where you come back to life (and where the Waystone takes you): your clan's banner or Fristaden. */
+function homeSpot(gs, p) {
   if ((p.ch.extra.spawnAt ?? 'banner') === 'banner' && p.clanId) {
     const banner = building.bannerOf(gs, p.clanId);
-    if (banner) spot = { x: banner.x + 0.5, y: banner.y + 1.6 };
+    if (banner) return { x: banner.x + 0.5, y: banner.y + 1.6 };
   }
-  spot ??= { x: TOWN_SPAWN.x + (Math.random() - 0.5) * 3, y: TOWN_SPAWN.y + Math.random() * 2 };
+  return { x: TOWN_SPAWN.x + (Math.random() - 0.5) * 3, y: TOWN_SPAWN.y + Math.random() * 2 };
+}
+
+/** Moves a player somewhere else at once (on land unless the boat floats there). */
+function teleport(gs, p, x, y, { sailing = false } = {}) {
+  gs.event(p.x, p.y, { k: 'fx', fx: 'blink', x: p.x, y: p.y }, 24);
+  const boat = sailing ? boatOf(gs, p) : null;
+  if (boat && gs.world.isFree(x, y, p.r, boatMode(boat))) {
+    p.sailing = true;
+  } else {
+    p.sailing = false;
+    gs.world.gateFilter = (st) => Boolean(st.clanId) && st.clanId === p.clanId;
+    ({ x, y } = gs.world.findFreeSpot(x, y, p.r, 'player', TOWN_SPAWN));
+    gs.world.gateFilter = null;
+  }
+  p.x = x;
+  p.y = y;
+  p.kx = p.ky = 0;
+  p.queue.length = 0;
+  gs.send(p, { t: 'teleport', x: p.x, y: p.y });
+  gs.event(p.x, p.y, { k: 'fx', fx: 'blink', x: p.x, y: p.y }, 24);
+  markMe(p);
+}
+
+/**
+ * Fristaden's Waystone, from anywhere: home to your banner (or the town),
+ * then back again through it to where you left. Not in the middle of a
+ * fight with another player.
+ */
+export function recall(gs, p, op, now = Date.now()) {
+  if (p.dead) return 'Du är död';
+  if (p.combatUntil > now) return 'Du kan inte resa mitt i en strid mot andra spelare';
+  const ex = p.ch.extra;
+  if (op === 'back') {
+    const back = ex.recallFrom;
+    if (!back) return 'Ingen väg tillbaka just nu';
+    const home = homeSpot(gs, p);
+    if (!inSafeZone(gs.rules, p.x, p.y) && Math.hypot(home.x - p.x, home.y - p.y) > 20) return 'Gå hem först (Fristaden eller ert banér)';
+    ex.recallFrom = null;
+    teleport(gs, p, back.x, back.y, { sailing: back.sailing });
+    gs.toast(p, 'Genom vägstenen, tillbaka dit du var.');
+    return null;
+  }
+  const left = (ex.recallAt ?? 0) - now;
+  if (left > 0) return `Vägstenen laddas om: ${Math.ceil(left / 1000)} s kvar`;
+  const home = homeSpot(gs, p);
+  if (Math.hypot(home.x - p.x, home.y - p.y) < 20) return 'Du är redan hemma';
+  ex.recallFrom = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, sailing: Boolean(p.sailing) };
+  ex.recallAt = now + (gs.data.base.recallCooldown ?? 60) * 1000;
+  teleport(gs, p, home.x, home.y);
+  gs.toast(p, 'Vägstenen för dig hem. Res tillbaka från menyn när du vill.', 'component');
+  persist(gs, p);
+  return null;
+}
+
+export function respawn(gs, p, now) {
+  const spot = homeSpot(gs, p);
   gs.world.gateFilter = (st) => Boolean(st.clanId) && st.clanId === p.clanId;
   const free = gs.world.findFreeSpot(spot.x, spot.y, p.r, 'player', TOWN_SPAWN);
   gs.world.gateFilter = null;

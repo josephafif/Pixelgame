@@ -106,16 +106,44 @@ export function onEnemyKilled(gs, e, killer) {
   }
   if (e.minion) return;
   const owner = killer ?? null;
+  if (e.def.sea) {
+    seaLoot(gs, e, owner, now);
+    return;
+  }
   const luck = owner?.stats?.luck ?? 0;
   const value = 1 + Math.floor(e.level / 8);
   const orbs = e.elite ? 6 : 1 + (Math.random() < 0.5 ? 1 : 0);
   for (let i = 0; i < orbs; i++) addPickup(gs, 'essence', e.x, e.y, { value, owner: owner?.id ?? 0, lockUntil: owner ? now + LOCK_MS : 0 });
   if (Math.random() < (e.elite ? 1 : 0.35)) addPickup(gs, 'scrap', e.x, e.y, { value: 1 + Math.floor(e.level / 6), owner: owner?.id ?? 0, lockUntil: owner ? now + LOCK_MS : 0 });
   if (Math.random() < 0.05) addPickup(gs, 'heart', e.x, e.y, {});
-  if (owner && (e.elite || e.kind === 'serpent')) pals.dropEgg(gs, owner, e.kind === 'serpent' ? 'serpent' : 'elite', e.x, e.y);
+  // Now and then a component to research (more often from elites).
+  if (owner && Math.random() < (e.elite ? 0.08 : 0.012) + luck * 0.0004) {
+    const biome = gs.world.biomeAt(Math.floor(e.x), Math.floor(e.y));
+    dropComponent(gs, owner, pickOne(biome.components), e.x, e.y);
+  }
+  if (owner && e.elite) pals.dropEgg(gs, owner, 'elite', e.x, e.y);
   const source = e.elite ? 'elite' : 'drop';
   if (Math.random() < WEAPON_DROP_CHANCE[source] * (1 + luck * 0.01)) {
-    const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, roll: source });
+    const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, roll: source, unlocked: researchedOf(owner) });
+    dropWeapon(gs, dna, e.x, e.y, owner);
+  }
+}
+
+/** Sharks and serpents: essence, scrap and coins; serpents are a real catch (as in single player). */
+function seaLoot(gs, e, owner, now) {
+  const big = Boolean(e.def.bigLoot);
+  const lock = owner ? { owner: owner.id, lockUntil: now + LOCK_MS } : {};
+  const value = 1 + Math.floor(e.level / 8);
+  for (let i = 0; i < (big ? 8 : 2); i++) addPickup(gs, 'essence', e.x, e.y, { value, ...lock });
+  for (let i = 0; i < (big ? 5 : Math.random() < 0.5 ? 1 : 0); i++) addPickup(gs, 'scrap', e.x, e.y, { value: 1 + (big ? 1 : 0), ...lock });
+  const coins = big ? 20 + ((Math.random() * 26) | 0) : Math.random() < 0.35 ? 1 + ((Math.random() * 4) | 0) : 0;
+  if (coins) addPickup(gs, 'gold', e.x, e.y, { value: coins, ...lock });
+  if (big && Math.random() < 0.08) addPickup(gs, 'shard', e.x, e.y, { value: 1, ...lock });
+  if (owner && e.kind === 'serpent') pals.dropEgg(gs, owner, 'serpent', e.x, e.y);
+  const luck = owner?.stats?.luck ?? 0;
+  const source = big ? 'elite' : 'drop';
+  if (Math.random() < (big ? 0.35 : WEAPON_DROP_CHANCE.drop) * (1 + luck * 0.01)) {
+    const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, minRarity: big ? 'uncommon' : null, roll: source, unlocked: researchedOf(owner) });
     dropWeapon(gs, dna, e.x, e.y, owner);
   }
 }
@@ -140,7 +168,10 @@ function bossDefeated(gs, b, now) {
     // Personal loot: everyone who fought gets their own reward.
     const dna = generate(gs, {
       level: b.level, luck: Math.floor(p.stats.luck), source: 'boss', minRarity: def.drop?.minRarity ?? 'rare', theme: def.drop?.theme ?? null, roll: 'boss',
+      unlocked: researchedOf(p),
     });
+    // The boss's core: new weapon possibilities at the forge.
+    if (def.drop?.component) dropComponent(gs, p, def.drop.component, b.x, b.y);
     dropWeapon(gs, dna, b.x + (Math.random() - 0.5) * 2, b.y + (Math.random() - 0.5) * 2, p);
     for (let i = 0; i < 12; i++) addPickup(gs, 'essence', b.x, b.y, { value: 2 + Math.floor(b.level / 5), owner: p.id, lockUntil: now + 60000 });
     addPickup(gs, 'shard', b.x, b.y, { value: 1, owner: p.id, lockUntil: now + 60000 });
@@ -162,9 +193,78 @@ export function openChest(gs, p, o, now) {
   for (let i = 0; i < 2 * rich; i++) addPickup(gs, 'scrap', o.x, o.y, { value: 2 + Math.floor(level / 4), owner: p.id, lockUntil: now + LOCK_MS });
   if (Math.random() < 0.4) addPickup(gs, 'gold', o.x, o.y, { value: 3 + ((Math.random() * 8) | 0), owner: p.id, lockUntil: now + LOCK_MS });
   if (Math.random() < WEAPON_DROP_CHANCE.chest * rich) {
-    const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', roll: 'chest' });
+    const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', roll: 'chest', unlocked: researchedOf(p) });
     dropWeapon(gs, dna, o.x, o.y + 0.6, p);
   }
+  chestComponent(gs, p, o);
+}
+
+/** A stash only for `p` (buried treasure): like a chest, `rich` times as much. */
+export function personalChest(gs, p, o, now, rich = 1) {
+  gs.event(o.x, o.y, { k: 'fx', fx: 'chest', x: o.x, y: o.y });
+  const level = gs.world.worldLevel(o.x, o.y);
+  const lock = { owner: p.id, lockUntil: now + LOCK_MS };
+  for (let i = 0; i < Math.round(4 * rich); i++) addPickup(gs, 'essence', o.x, o.y, { value: 1 + Math.floor(level / 6), ...lock });
+  for (let i = 0; i < Math.round(2 * rich); i++) addPickup(gs, 'scrap', o.x, o.y, { value: 2 + Math.floor(level / 4), ...lock });
+  addPickup(gs, 'gold', o.x, o.y, { value: Math.round((3 + ((Math.random() * 8) | 0)) * rich), ...lock });
+  if (Math.random() < WEAPON_DROP_CHANCE.chest * rich) {
+    const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', roll: 'chest', unlocked: researchedOf(p) });
+    dropWeapon(gs, dna, o.x, o.y + 0.6, p);
+  }
+  chestComponent(gs, p, o);
+}
+
+// --- Components (research at the library, as in single player) ---------------------------
+
+const BLUEPRINTS = ['bp_scythe', 'bp_gun', 'bp_cannon', 'bp_chakram', 'bp_warfan', 'bp_crossbow'];
+
+function pickOne(list) {
+  return list?.length ? list[(Math.random() * list.length) | 0] : null;
+}
+
+/** The components a character has researched (they widen what drops and what the forge can make). */
+export function researchedOf(p) {
+  if (!p?.ch?.extra?.components) return [];
+  return Object.entries(p.ch.extra.components).filter(([, c]) => c.researched).map(([id]) => id).sort();
+}
+
+function componentColor(gs, id) {
+  const c = gs.data.byId.components.get(id);
+  if (c?.element) return gs.data.byId.elements.get(c.element)?.glow ?? '#ffffff';
+  return gs.data.byId.rarities.get(c?.rarity)?.color ?? '#ffffff';
+}
+
+export function dropComponent(gs, p, id, x, y) {
+  if (!id || !gs.data.byId.components.has(id)) return;
+  addPickup(gs, 'component', x, y, { componentId: id, color: componentColor(gs, id), owner: p.id, lockUntil: Date.now() + 60000 });
+}
+
+function chestComponent(gs, p, o) {
+  if (Math.random() >= 0.35 + (p.stats?.luck ?? 0) * 0.005) return;
+  const biome = gs.world.biomeAt(Math.floor(o.x), Math.floor(o.y));
+  dropComponent(gs, p, pickOne([...biome.components, ...BLUEPRINTS]), o.x, o.y + 0.5);
+}
+
+/** Picking up a component. */
+function discoverComponent(gs, p, id) {
+  const def = gs.data.byId.components.get(id);
+  if (!def) return;
+  p.ch.extra.components ??= {};
+  const entry = p.ch.extra.components[id] ?? { found: 0, researched: false };
+  p.ch.extra.components[id] = entry;
+  entry.found += 1;
+  if (entry.found > 1 && entry.researched) {
+    p.ch.resources.essence = (p.ch.resources.essence ?? 0) + 10;
+    gs.toast(p, `${def.name} (dubblett) → +10 essens`);
+  } else if (def.research === 0 && !entry.researched) {
+    entry.researched = true;
+    gs.toast(p, `Bosskärna: ${def.name}! Nya vapenmöjligheter i smedjan.`, 'legendary');
+  } else if (entry.found === 1) {
+    gs.toast(p, `Ny komponent: ${def.name}. Forska på den i biblioteket för att få fler val i smedjan.`, 'component');
+  }
+  gs.event(p.x, p.y, { k: 'pick', id: p.id, kind: 'component' }, 12);
+  players.markMe(p);
+  players.persist(gs, p);
 }
 
 // --- Gathering ---------------------------------------------------------------------------
@@ -300,6 +400,9 @@ function collect(gs, p, it) {
       return openBag(gs, p, it);
     case 'egg':
       pals.collectEgg(gs, p, it);
+      return true;
+    case 'component':
+      discoverComponent(gs, p, it.componentId);
       return true;
     default:
       return true;
