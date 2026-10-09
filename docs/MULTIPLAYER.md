@@ -39,9 +39,13 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 
 ### Uppmätt
 
-- **50 botar** som springer och slåss i vildmarken: servern lägger i snitt
-  cirka 7 ms per tick (budgeten är 33 ms) och skickar cirka 10 kB/s per spelare.
-  Det som är långt bort uppdateras 10 gånger per sekund i stället för 30.
+- **50 botar** som springer och slåss i vildmarken bland cirka 450–500 monster,
+  med allt från singleplayer påslaget (förmågor, pals, bossar och marknader):
+  servern lägger i snitt cirka 10 ms per tick. 99 % av alla tick tar under
+  22 ms (budgeten är 33 ms). Servern skickar cirka 9 kB/s per spelare.
+  Det som är långt bort uppdateras 10 gånger per sekund i stället för 30. Den
+  enda längre ticken kommer när alla 50 hoppar till nya platser samtidigt och
+  världen där skapas.
 - **Förutsägelse:** i webbläsartesterna blev det inga stora rättningar av den
   egna rörelsen. Små rättningar förekommer bara vid knuffar från träffar.
 - **Fusk:** 300 inputs som skickas på en gång ger ingen extra fart, servern

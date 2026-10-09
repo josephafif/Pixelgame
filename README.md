@@ -329,10 +329,10 @@ driver världen sakta förbi.
 ## Multiplayer
 
 **Multiplayer** i huvudmenyn öppnar lobbyn. Där loggar du in (e-post, Google eller Discord via
-Supabase) eller spelar som gäst på servrar som tillåter det, och väljer server. Du får en egen
-multiplayer-karaktär som sparas på servern. Din singleplayer-värld påverkas inte. En gäst väljer
-ett lösenord tillsammans med sitt namn. Med namn och lösenord loggar man in igen från en ny
-länk eller en annan enhet.
+Supabase), eller skapar en karaktär med namn och lösenord på servrar som tillåter det, och väljer
+server. Du får en egen multiplayer-karaktär som sparas på servern. Din singleplayer-värld
+påverkas inte. Spelet kommer ihåg vilken karaktär du spelar på varje server (**Spela som …**).
+Med namn och lösenord loggar man in igen från en ny länk eller en annan enhet.
 
 Lobbyn på webbsidan har tre delar:
 
@@ -370,7 +370,10 @@ servrar loggar man in med namn och lösenord.
 - **Död i vildmarken:** hälften av det du bär hamnar i en säck. Loggar du ut där ligger din
   kropp kvar en halv minut.
 - **Bossar:** altaret förbrukas för hela servern. Alla som gjort minst 10 % av skadan får
-  egen loot.
+  egen loot. Bossarna har alla sina attacker från singleplayer.
+- **Allt från singleplayer:** vapenförmågor och legendariska krafter, pals, båtar och havsdjur,
+  marknader (med egen handel och fientlighet per spelare), upptäcktsplatser, forskning,
+  Waystone-hemresan och turrets i basen. Se [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md).
 - **Chatt:** T eller pratbubblan, och `/c` för klanchatt. Med `?debug=1` visas ett
   nätverksöverlägg med ping, interpolering och rättningar.
 
@@ -657,8 +660,8 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 
 ## Kända begränsningar och nästa steg
 
-- Multiplayer har ännu inte vapenförmågor, pals, båtar och marknader. Bossarna har enklare
-  attackmönster än i singleplayer. Se [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md).
+- Multiplayer går över WebSocket. WebTransport (UDP-liknande, mindre lagg vid paketförlust) vore
+  ett naturligt nästa steg. Se [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md).
 - Du kan bara ha en pal med dig åt gången, och pals har inga egna förmågor utöver bett, zap och
   insamling. Fler sorter och specialförmågor vore ett naturligt nästa steg.
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
