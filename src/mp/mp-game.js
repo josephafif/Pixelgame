@@ -1111,7 +1111,7 @@ export class MpGame {
           updateEnemy(ent.obj, s.v, s.x, s.y, dt, this.time);
           this.#keepOffMe(ent.obj);
           enemies.push(ent.obj);
-          if (ent.obj.boss && (!boss || dist2(boss.x, boss.y, this.player.x, this.player.y) > dist2(ent.obj.x, ent.obj.y, this.player.x, this.player.y))) boss = ent.obj;
+          if (ent.obj.boss && !ent.obj.clone && (!boss || dist2(boss.x, boss.y, this.player.x, this.player.y) > dist2(ent.obj.x, ent.obj.y, this.player.x, this.player.y))) boss = ent.obj;
           break;
         }
         case ET.PLAYER: {
@@ -1494,6 +1494,10 @@ export class MpGame {
       case 'ab':
         this.#abilityFx(ev);
         break;
+      case 'boss':
+        // A boss's attack: the screen shakes for everyone close by.
+        this.#abilityFx(ev, true);
+        break;
       default:
         break;
     }
@@ -1504,8 +1508,8 @@ export class MpGame {
    * the same shapes, particles and sounds as in single player. Shakes,
    * flashes and vibration are only for the one who cast it.
    */
-  #abilityFx(ev) {
-    const mine = ev.by === this.myId;
+  #abilityFx(ev, felt = false) {
+    const mine = ev.by === this.myId || (felt && dist2(ev.x ?? 0, ev.y ?? 0, this.player.x, this.player.y) < 14 * 14);
     const heard = mine || dist2(ev.x ?? 0, ev.y ?? 0, this.player.x, this.player.y) < 16 * 16;
     for (const op of Array.isArray(ev.ops) ? ev.ops : []) {
       if (!Array.isArray(op)) continue;

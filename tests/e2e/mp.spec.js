@@ -103,7 +103,11 @@ test('a legendary power in multiplayer: the button, its cooldown and its effects
   const p = [...srv.gs.players.values()].find((x) => x.name === 'Legenden');
   // A legendary weapon, straight into the bag.
   const loot = await import('../../server/loot.js');
-  const dna = loot.generate(srv.gs, { level: 20, minRarity: 'legendary', maxRarity: 'legendary', craft: {} });
+  // (One whose power hurts on its own: Ascension only makes you stronger.)
+  const { effectiveAbility } = await import('../../src/weapons/legendary.js');
+  let dna;
+  do dna = loot.generate(srv.gs, { level: 20, minRarity: 'legendary', maxRarity: 'legendary', craft: {} });
+  while (!effectiveAbility(srv.gs.data, dna) || effectiveAbility(srv.gs.data, dna).action === 'ascend');
   loot.giveWeapon(srv.gs, p, dna, 'test');
   await a.page.waitForTimeout(300);
   await a.page.evaluate((id) => window.__pixelgame.game.equip(id, 'main'), dna.id);

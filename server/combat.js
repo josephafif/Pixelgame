@@ -13,6 +13,7 @@ import * as loot from './loot.js';
 import * as building from './building.js';
 import * as enemies from './enemies.js';
 import * as abilities from './abilities.js';
+import * as bosses from './bosses.js';
 
 const DEG = Math.PI / 180;
 const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE]);
@@ -672,6 +673,11 @@ export function updateAreas(gs, dt) {
       if (a.t >= a.dur) gs.areas.delete(a.id);
       continue;
     }
+    if (a.kind === 'orbit' || a.kind === 'gravity') {
+      bosses.updateArea(gs, a, dt);
+      if (a.t >= a.dur) gs.areas.delete(a.id);
+      continue;
+    }
     if (a.kind === 'hazard') {
       a.tickT = (a.tickT ?? 0) - dt;
       if (a.tickT <= 0) {
@@ -682,8 +688,9 @@ export function updateAreas(gs, dt) {
     if (a.t >= a.dur) {
       gs.areas.delete(a.id);
       if (a.kind === 'telegraph') {
-        for (const p of gs.playersNear(a.x, a.y, a.r + 0.3)) hurtPlayer(gs, p, a.damage, { element: a.element, fromX: a.x, fromY: a.y });
-        gs.event(a.x, a.y, { k: 'fx', fx: 'boom', x: a.x, y: a.y, r: a.r, color: a.color });
+        if (a.damage > 0) for (const p of gs.playersNear(a.x, a.y, a.r + 0.3)) hurtPlayer(gs, p, a.damage, { element: a.element, fromX: a.x, fromY: a.y });
+        // (Boss attacks with their own look show it themselves.)
+        if (!a.quiet) gs.event(a.x, a.y, { k: 'fx', fx: 'boom', x: a.x, y: a.y, r: a.r, color: a.color });
         a.after?.();
       }
     }

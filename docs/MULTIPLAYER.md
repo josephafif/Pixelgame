@@ -32,7 +32,7 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 | Del | Var i koden |
 |---|---|
 | Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
-| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `pals.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
+| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `bosses.js`, `pals.js`, `discoveries.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
 | Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
 | Drift | `cloud/` och `wrangler.jsonc` (Cloudflare), `supabase/` (serverlistan), `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
@@ -86,7 +86,17 @@ Följande finns i singleplayer men inte i multiplayer än:
 - forskning (smedjan har samma val för alla);
 - WebTransport (allt går via WebSocket).
 
-Bossarnas attackmönster är förenklade jämfört med singleplayer.
+### Bossar, upptäckter, vägstenen och forskning
+
+Alla bossar har samma attacker som i singleplayer (`server/bosses.js`), med
+samma tider och siffror: meteorregn, isringar med en lucka, piggrader,
+blixtnedslag, rusningar, cirklande klot, dubbelgångare, gravitationsbrunnar,
+rötter, sporer, sandvågor, vattenväggar och virvlar. Attackerna siktar på
+bossens mål eller sprids över spelarna runt den, och de skadar alla som står där
+de landar. Upptäcktsplatserna (benrester, vägskyltar, flaskpost, vrak, idoler,
+begravda skatter) hittar var och en för sig. Vägstenen tar dig hem och tillbaka
+från menyn. Komponenter forskas fram i Fristadens bibliotek och ger fler val i
+smedjan och vid drops.
 
 ---
 

@@ -107,6 +107,7 @@ export function makeEnemy(data, v, time) {
     def,
     bossDef: boss ? def : null,
     boss,
+    clone: Boolean(flags & EF.CLONE), // the Void Herald's mirror images
     elite,
     x: 0,
     y: 0,

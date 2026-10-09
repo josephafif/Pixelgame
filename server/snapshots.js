@@ -37,13 +37,14 @@ function enemyValues(gs, e) {
   let flags = 0;
   if (e.elite) flags |= EF.ELITE;
   if (e.boss) flags |= EF.BOSS;
+  if (e.cloneOf) flags |= EF.BOSS | EF.CLONE; // the Void Herald's mirror images look like it
   if (e.submerged) flags |= EF.SUBMERGED;
   if (e.stunned) flags |= EF.STUNNED;
   if (e.statuses.freeze?.until > gs.time) flags |= EF.FROZEN;
   if (e.target) flags |= EF.ALERT;
   const state = e.castT !== undefined && gs.time - e.castT < 0.3 && e.state === 'move' ? 'cast' : e.state;
   return [quantize(e.x), quantize(e.y), e.facing >= 0 ? 0 : 1, Math.ceil(Math.max(0, e.hp)), e.maxHp, Math.max(0, ESTATE.indexOf(state)),
-    e.defIdx, e.level, flags, e.elementIdx, e.anim];
+    e.cloneOf ? e.cloneDefIdx : e.defIdx, e.level, flags, e.elementIdx, e.anim];
 }
 
 function projValues(pr) {

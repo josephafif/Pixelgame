@@ -7,6 +7,7 @@ import { moveMode } from '../src/game/enemies.js';
 import { inSafeZone } from '../src/net/rules.js';
 import { mixHex } from '../src/weapons/visuals.js';
 import * as combat from './combat.js';
+import { updateBoss, expireClones } from './bosses.js';
 
 const LEASH = 1.8;
 const DESPAWN_DIST = 42;
@@ -127,6 +128,9 @@ export function spawnBoss(gs, bossId, x, y, altarKey) {
     phase: 1,
     patternIdx: 0,
     patternCd: 2.5,
+    submerged: false,
+    chargeX: 0,
+    chargeY: 0,
     anchorX: x,
     anchorY: y,
     altarKey,
@@ -623,163 +627,10 @@ function serpent(gs, e, p, dx, dy, d, speed, dt) {
 
 // --- Bosses ------------------------------------------------------------------------------------
 
-const BOSS_MOVES = {
-  ring: 'ring', icering: 'ring', orbs: 'ring', spiral: 'spiral', bonefan: 'fan', sandspit: 'fan', spores: 'ring',
-  breath: 'fan', wave: 'fan', charge: 'charge', dash: 'charge', burrow: 'charge', slam: 'slam', quake: 'slam',
-  roots: 'meteors', spikes: 'meteors', geysers: 'meteors', strikes: 'meteors', meteors: 'meteors', gravity: 'slam',
-  curse: 'meteors', whirlpool: 'slam', reroot: 'slam', summon: 'summon', raise: 'summon', clones: 'summon',
-  blink: 'blink', chain: 'chain',
-};
-
-function bossMove(gs, b, p) {
-  const def = b.def;
-  const name = def.patterns[b.patternIdx % def.patterns.length];
-  b.patternIdx++;
-  const move = BOSS_MOVES[name] ?? 'ring';
-  const glow = gs.data.byId.elements.get(b.element)?.glow ?? b.color;
-  const enraged = b.phase === 2;
-  b.anim = (b.anim + 1) & 255;
-  b.castT = gs.time;
-  switch (move) {
-    case 'ring':
-    case 'spiral': {
-      const n = enraged ? 18 : 12;
-      const twist = move === 'spiral' ? gs.time : 0;
-      for (let i = 0; i < n; i++) {
-        combat.spawnProjectile(gs, {
-          x: b.x, y: b.y, angle: (i / n) * Math.PI * 2 + twist, speed: 5.5, damage: b.dmg * 0.7, range: 14,
-          element: b.element, sprite: 'orb', size: 4, enemy: b.id, color: glow,
-        });
-      }
-      break;
-    }
-    case 'fan': {
-      const base = Math.atan2(p.y - b.y, p.x - b.x);
-      const n = enraged ? 9 : 7;
-      for (let i = 0; i < n; i++) {
-        combat.spawnProjectile(gs, {
-          x: b.x, y: b.y, angle: base + (i / (n - 1) - 0.5) * 1.1, speed: 7, damage: b.dmg * 0.75, range: 13,
-          element: b.element, sprite: 'orb', size: 3, enemy: b.id, color: glow,
-        });
-      }
-      break;
-    }
-    case 'charge': {
-      b.state = 'windup';
-      b.stateT = 0;
-      const d = Math.sqrt((p.x - b.x) ** 2 + (p.y - b.y) ** 2) || 1;
-      b.chargeX = (p.x - b.x) / d;
-      b.chargeY = (p.y - b.y) / d;
-      break;
-    }
-    case 'slam':
-      combat.spawnArea(gs, { x: b.x, y: b.y, r: b.r + 3, kind: 'telegraph', dur: 1.1, color: glow, damage: b.dmg * 1.3, element: b.element });
-      break;
-    case 'meteors': {
-      const targets = [...gs.playersNear(b.x, b.y, 22)].filter((o) => !o.dead).slice(0, 6);
-      for (const o of targets) {
-        for (let k = 0; k < (enraged ? 3 : 2); k++) {
-          const jx = k ? (Math.random() - 0.5) * 4 : 0;
-          const jy = k ? (Math.random() - 0.5) * 4 : 0;
-          combat.spawnArea(gs, { x: o.x + o.kx * 0.2 + jx, y: o.y + jy, r: 1.6, kind: 'telegraph', dur: 1, color: glow, damage: b.dmg, element: b.element });
-        }
-      }
-      break;
-    }
-    case 'summon': {
-      const biome = gs.world.biomeAt(Math.floor(b.x), Math.floor(b.y));
-      const ids = biome.enemies.filter((id) => !gs.data.byId.enemies.get(id)?.sea);
-      for (let i = 0; i < (enraged ? 4 : 3); i++) {
-        const a = Math.random() * Math.PI * 2;
-        const x = b.x + Math.cos(a) * (b.r + 1.5);
-        const y = b.y + Math.sin(a) * (b.r + 1.5);
-        if (!ids.length || !gs.world.isFree(x, y, 0.4, 'enemy')) continue;
-        const e = spawnEnemy(gs, ids[(Math.random() * ids.length) | 0], x, y, { level: Math.max(1, b.level - 2), biome });
-        if (e) {
-          e.target = p.id;
-          e.alertUntil = gs.time + 30;
-          e.minion = true;
-        }
-      }
-      break;
-    }
-    case 'blink': {
-      const a = Math.random() * Math.PI * 2;
-      b.x = p.x + Math.cos(a) * 4;
-      b.y = p.y + Math.sin(a) * 4;
-      gs.event(b.x, b.y, { k: 'fx', fx: 'blink', x: b.x, y: b.y, color: glow });
-      break;
-    }
-    case 'chain': {
-      const targets = [...gs.playersNear(b.x, b.y, 12)].filter((o) => !o.dead).slice(0, 3);
-      const points = [[b.x, b.y]];
-      for (const o of targets) {
-        points.push([o.x, o.y]);
-        combat.hurtPlayer(gs, o, b.dmg * 0.6, { element: b.element, fromX: b.x, fromY: b.y });
-      }
-      gs.event(b.x, b.y, { k: 'fx', fx: 'chain', points, color: glow });
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-function updateBoss(gs, b, dt) {
-  const p = pickTargetBoss(gs, b);
-  if (b.phase === 1 && b.hp < b.maxHp * 0.5) {
-    b.phase = 2;
-    gs.event(b.x, b.y, { k: 'boss', id: b.id, name: b.def.name, active: true, enraged: true }, 60);
-  }
-  if (!p) {
-    b.vx = b.vy = 0;
-    return;
-  }
-  b.stateT += dt;
-  if (b.state === 'windup') {
-    b.vx = b.vy = 0;
-    if (b.stateT > 0.7) {
-      b.state = 'charge';
-      b.stateT = 0;
-    }
-  } else if (b.state === 'charge') {
-    b.vx = b.chargeX * b.speed * 4.5;
-    b.vy = b.chargeY * b.speed * 4.5;
-    if (b.stateT > 0.8) {
-      b.state = 'move';
-      b.stateT = 0;
-    }
-  } else {
-    // Stay near the altar while fighting.
-    const home = (b.x - b.anchorX) ** 2 + (b.y - b.anchorY) ** 2 > 18 * 18;
-    goToward(gs, b, home ? b.anchorX : p.x, home ? b.anchorY : p.y, b.speed * (b.phase === 2 ? 1.2 : 1) * (b.slowMult ?? 1));
-  }
-  b.patternCd -= dt;
-  if (b.patternCd <= 0 && b.state === 'move') {
-    b.patternCd = (b.phase === 2 ? 2.1 : 3) + Math.random() * 0.8;
-    bossMove(gs, b, p);
-  }
-  for (const o of gs.playersNear(b.x, b.y, b.r + 1)) {
-    if (o.dead || (o.bossHitAt ?? 0) > gs.time) continue;
-    if ((o.x - b.x) ** 2 + (o.y - b.y) ** 2 < (b.r + o.r) ** 2) {
-      o.bossHitAt = gs.time + 0.8;
-      combat.hurtPlayer(gs, o, b.dmg * (b.state === 'charge' ? 1.6 : 1), { element: b.element, fromX: b.x, fromY: b.y, knock: 8 });
-    }
-  }
-}
-
-function pickTargetBoss(gs, b) {
-  let t = b.target ? gs.players.get(b.target) : null;
-  if (!t || t.dead || (t.x - b.x) ** 2 + (t.y - b.y) ** 2 > 30 * 30 || Math.random() < 0.004) {
-    t = gs.nearestPlayer(b.x, b.y, 30);
-  }
-  b.target = t?.id ?? 0;
-  return t;
-}
-
 // --- Update + spawning --------------------------------------------------------------------------
 
 export function update(gs, dt) {
+  if (gs.tick % 10 === 0) expireClones(gs);
   for (const e of gs.enemies.values()) {
     if (e.dead) {
       gs.enemies.delete(e.id);
