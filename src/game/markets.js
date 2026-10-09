@@ -37,6 +37,19 @@ function defFor(data, id) {
   return MARKET_DEFS[id] ?? structureDef(data, id);
 }
 
+// --- Fristaden (multiplayer) -------------------------------------------------------------
+
+/** Market cell that stands for Fristaden's square (people there say they belong to it). */
+export const TOWN_CELL = 1 << 20;
+
+/** Fristaden's traders: a market without walls or turrets on the town square. */
+export function townMarket(worldSeed) {
+  return {
+    id: 'town', town: true, x: 0, y: 0, r: 8, seed: hashInts(worldSeed >>> 0, 0x70a1) >>> 0,
+    layout: 'town', material: 'wood', name: 'Fristaden', color: '#ffd24a', biome: 'plains',
+  };
+}
+
 // --- Layouts -------------------------------------------------------------------------
 
 /**
@@ -127,6 +140,16 @@ export function marketLayout(m) {
       put('banner', 0, 0);
       break;
     }
+    case 'town': {
+      // Three stalls around Fristaden's square (the forge and the fire keep their places).
+      stall(4, -2);
+      stall(-7, 2);
+      stall(0, -6);
+      put('crate', 6, -2);
+      put('crate', -8, 2);
+      put('crate', 2, -6);
+      break;
+    }
     default: { // oasis: open fence ring, lots of turrets
       for (let a = 0; a < 48; a++) {
         if (Math.floor(a / 4) % 2) continue; // gaps between fence runs
@@ -183,10 +206,11 @@ export function marketStock(data, save, m, now = Date.now()) {
   const level = Math.max(1, save.player.level);
   const items = [];
   for (let i = 0; i < 3; i++) {
-    // Now and then a trader has a legendary on display, at a fortune.
-    const legendary = i === 0 && rng.next() < 0.04;
+    // Now and then a trader has a legendary on display, at a fortune
+    // (never in Fristaden: its traders, like its forge, go up to rare).
+    const legendary = !m.town && i === 0 && rng.next() < 0.04;
     // Epics are a rare sight too; most stock is uncommon or rare.
-    const epic = !legendary && rng.next() < EPIC_CHANCE.market;
+    const epic = !m.town && !legendary && rng.next() < EPIC_CHANCE.market;
     const minRarity = legendary ? 'legendary' : epic ? 'epic' : rng.next() < 0.35 ? 'rare' : 'uncommon';
     items.push({
       kind: 'weapon',
@@ -209,7 +233,7 @@ export function marketStock(data, save, m, now = Date.now()) {
     const c = pool[Math.floor(rng.next() * pool.length)];
     items.push({ kind: 'component', id: c.id, price: Math.round(150 + researchCost(data, save, c) * 1.5) });
   }
-  if (rng.next() < 0.35) items.push({ kind: 'shard', qty: 1, price: 4000 });
+  if (!m.town && rng.next() < 0.35) items.push({ kind: 'shard', qty: 1, price: 4000 });
   return { period, items, restockAt: (period + 1) * RESTOCK_MS };
 }
 

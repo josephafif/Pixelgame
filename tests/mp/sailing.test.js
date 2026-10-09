@@ -41,15 +41,17 @@ test('sailing: build a boat at the forge, set sail, meet the sharks, go ashore',
     const bot = await t.bot('Sjöfararen');
     const p = t.player(bot);
     p.protectUntil = Date.now() + 10 * 60 * 1000;
-    // Boats are built at the forge in Fristaden.
+    // A raft from Fristaden's forge; a real ship needs a better forge (in your base).
     p.ch.resources = { essence: 9999, scrap: 9999, wood: 9999, stone: 9999, gold: 0, shards: 0 };
+    const forge = [...t.gs.world.objectsNear(0, 0, 3)].find((o) => o.type === 'building' && o.buildingId === 'forge');
+    t.place(bot, forge.x, forge.y + 1);
     let res = await bot.request({ t: 'boat', tier: 1 });
-    if (!res.ok) {
-      const forge = [...t.gs.world.objectsNear(0, 0, 3)].find((o) => o.type === 'building' && o.buildingId === 'forge');
-      t.place(bot, forge.x, forge.y + 1);
-      res = await bot.request({ t: 'boat', tier: 1 });
-    }
     assert.equal(res.ok, true, res.error);
+    res = await bot.request({ t: 'boat', tier: 2 });
+    assert.equal(res.ok, false, 'the town forge is too simple for a sloop');
+    const { spots } = await t.clanBase(bot, { forge: 3 });
+    p.ch.resources = { essence: 9999, scrap: 9999, wood: 9999, stone: 9999, gold: 0, shards: 0 };
+    t.nextTo(bot, spots.forge);
     res = await bot.request({ t: 'boat', tier: 2 });
     assert.equal(res.ok, true, res.error);
     assert.equal(p.ch.extra.boat, 2, 'a Sailing Sloop (crosses the open sea)');

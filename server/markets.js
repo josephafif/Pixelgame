@@ -8,14 +8,14 @@
 // player) and their own standing with each market: hurt someone there and its
 // turrets turn on you, and nobody trades with you, for a few minutes.
 
-import { marketLayout, marketStock, weaponPrice, sellPrice, SELL_BUNDLES } from '../src/game/markets.js';
+import { marketLayout, marketStock, weaponPrice, sellPrice, SELL_BUNDLES, TOWN_CELL } from '../src/game/markets.js';
 import { structureDef } from '../src/game/construction.js';
 import { tileKey, MARKET_CELL } from '../src/game/world.js';
 import { generateWeapon } from '../src/weapons/generator.js';
-import { mpVirtualSave, mpInventorySizes } from '../src/net/mpsave.js';
 import * as combat from './combat.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
+import * as base from './base.js';
 
 const ACTIVATE = 46;
 const DEACTIVATE = 72;
@@ -36,6 +36,7 @@ function defFor(data, id) {
 
 /** The market cell (mx, my) a market belongs to (clients find it with world.marketForCell). */
 export function marketCell(m) {
+  if (m.town) return { mx: TOWN_CELL, my: TOWN_CELL };
   return { mx: Math.floor(m.x / MARKET_CELL), my: Math.floor(m.y / MARKET_CELL) };
 }
 
@@ -109,8 +110,14 @@ function deactivate(gs, id) {
 export function update(gs, dt) {
   if (gs.tick % 15 === 0) {
     const near = new Set();
+    const town = gs.world.town;
     for (const p of gs.players.values()) {
       if (p.asleep || !p.conn) continue;
+      // Fristaden's traders, on the town square.
+      if (town && p.x * p.x + p.y * p.y < ACTIVATE * ACTIVATE) {
+        near.add(town.id);
+        if (!gs.markets.has(town.id)) activate(gs, town);
+      }
       for (const m of gs.world.marketsNear(p.x, p.y, ACTIVATE)) {
         near.add(m.id);
         if (!gs.markets.has(m.id)) activate(gs, m);
@@ -246,6 +253,7 @@ export function hitNpcs(gs, p, x, y, reach, damage, inside) {
   if (!gs.markets.size) return false;
   let hit = false;
   for (const entry of gs.markets.values()) {
+    if (entry.def.town) continue; // nobody gets hurt in Fristaden
     if ((entry.def.x - x) ** 2 + (entry.def.y - y) ** 2 > (entry.def.r + reach + 4) ** 2) continue;
     for (const n of entry.npcs) {
       if (n.dead || !inside(n.x, n.y, n.r)) continue;
@@ -312,7 +320,7 @@ export function request(gs, p, msg) {
   const m = near.entry.def;
   if (isHostile(p, m.id)) return 'Ingen här vill handla med dig just nu';
   const r = p.ch.resources;
-  const save = mpVirtualSave(gs.data, gs.worldSeed, p.ch, p.inv);
+  const save = base.saveFor(gs, p);
   const st = state(p, m.id);
   if (msg.op === 'buy') {
     const stock = marketStock(gs.data, save, m);
@@ -331,7 +339,7 @@ export function request(gs, p, msg) {
       price = Math.max(0, price - sellPrice(tradeIn));
     }
     if ((r.gold ?? 0) < price) return `Kräver ${price - (r.gold ?? 0)} guld till`;
-    const sizes = mpInventorySizes(gs.data);
+    const sizes = base.sizesFor(gs, p);
     if (item.kind === 'weapon' && !tradeIn && p.inv.bag.length >= sizes.bagSize) return 'Väskan är full';
     r.gold -= price;
     if (tradeIn) removeWeapon(gs, p, tradeIn.id);

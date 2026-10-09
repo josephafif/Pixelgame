@@ -1,5 +1,5 @@
-// Pals in multiplayer: eggs, hatching in Fristaden's Den, growing them, and
-// the pal that walks with you (fighting, gathering, napping when beaten).
+// Pals in multiplayer: eggs, hatching in your clan's Pal Den, growing them,
+// and the pal that walks with you (fighting, gathering, napping when beaten).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ async function wild(t, name) {
   return { bot, p };
 }
 
-test('pals: an egg from a boss, hatched in the Den, grows with your level and fights with you', async () => {
+test('pals: an egg from a boss, hatched in your base\'s Den, grows with the Den and fights with you', async () => {
   const t = await testServer();
   try {
     const { bot, p } = await wild(t, 'Herden');
@@ -26,12 +26,15 @@ test('pals: an egg from a boss, hatched in the Den, grows with your level and fi
     assert.equal(pals.dropEgg(t.gs, p, 'bossFirst', p.x + 0.6, p.y), true);
     await sleep(900);
     assert.equal(p.ch.extra.pals.eggs.length, 1, 'the egg is in your pals');
-    // Hatching needs the Den, which takes you in from level 6.
+    // Hatching needs a Pal Den in your clan's base.
     p.ch.resources.essence = 1000;
     let res = await bot.request({ t: 'pal', op: 'hatch', id: p.ch.extra.pals.eggs[0].id });
     assert.equal(res.ok, false);
-    assert.match(res.error, /Den/);
-    p.ch.level = 6;
+    assert.match(res.error, /Den|djurhus/i);
+    const wildSpot = { x: p.x, y: p.y };
+    await t.clanBase(bot, { den: 1 });
+    t.place(bot, wildSpot.x, wildSpot.y);
+    p.ch.resources.essence = 1000;
     res = await bot.request({ t: 'pal', op: 'hatch', id: p.ch.extra.pals.eggs[0].id });
     assert.equal(res.ok, true, res.error);
     assert.equal(p.ch.resources.essence, 1000 - t.gs.data.pals.hatchEssence, 'warming costs essence');
@@ -45,14 +48,14 @@ test('pals: an egg from a boss, hatched in the Den, grows with your level and fi
     // Everyone around sees it.
     await sleep(200);
     assert.ok([...bot.known.values()].some((k) => k.type === ET.PAL), 'pals are sent in snapshots');
-    // Growing: level 6 lets pals reach level 2, not further.
+    // Growing: a level 1 Den lets pals reach level 2, not further.
     p.ch.resources = { essence: 5000, scrap: 5000, wood: 5000, stone: 5000, gold: 0, shards: 0 };
     const id = p.ch.extra.pals.owned[0].id;
     res = await bot.request({ t: 'pal', op: 'upgrade', id });
     assert.equal(res.ok, true, res.error);
     assert.equal(p.ch.extra.pals.owned[0].level, 2);
     res = await bot.request({ t: 'pal', op: 'upgrade', id });
-    assert.equal(res.ok, false, 'capped by your level');
+    assert.equal(res.ok, false, 'capped by the Den');
     // Fighting at your side.
     await bot.request({ t: 'pal', op: 'mode', mode: 'fight' });
     const { spawnEnemy } = await import('../../server/enemies.js');

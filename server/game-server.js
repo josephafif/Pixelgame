@@ -6,6 +6,8 @@ import { World, CHUNK, tileKey } from '../src/game/world.js';
 import { TICK_RATE, TICK_DT, TICK_MS } from '../src/net/movement.js';
 import { parseRaidWindow, raidState, inSafeZone } from '../src/net/rules.js';
 import { structureDef } from '../src/game/construction.js';
+import { TOWN_LEVELS } from '../src/net/mpbase.js';
+import { townMarket } from '../src/game/markets.js';
 import * as players from './players.js';
 import * as combat from './combat.js';
 import * as enemies from './enemies.js';
@@ -100,7 +102,7 @@ export class GameServer {
     }
     if (!db.meta('guestSecret')) db.setMeta('guestSecret', randomBytes(32).toString('hex'));
     this.worldSeed = seed >>> 0;
-    this.world = new World(data, this.worldSeed, { secretSeed: secret >>> 0, maxChunks: 900 });
+    this.world = new World(data, this.worldSeed, { secretSeed: secret >>> 0, maxChunks: 900, townBuildings: Object.keys(TOWN_LEVELS), townMarket: townMarket(this.worldSeed) });
 
     // Harvested trees/rocks, spent altars, opened chests.
     for (const h of db.loadHarvested()) this.world.harvested[`${h.x},${h.y}`] = [h.at, h.tile];
@@ -218,6 +220,7 @@ export class GameServer {
     sendSnapshots(this, now);
     prof.mark('snapshots');
     this.#rollingSave(now);
+    if (this.tick % TICK_RATE === 7) clans.sendMates(this);
     if (this.tick % (TICK_RATE * 30) === 0) this.#worldChores(now);
     prof.mark('chores');
     prof.end();
@@ -496,8 +499,8 @@ export class GameServer {
         const k = tileKey(x, y);
         const f = this.world.floors.get(k);
         const s = this.world.structures.get(k);
-        if (f) structures.push(building.structurePayload(f));
-        if (s) structures.push(building.structurePayload(s));
+        if (f) structures.push(building.structurePayload(f, this));
+        if (s) structures.push(building.structurePayload(s, this));
       }
     }
     const objects = chunk.objects

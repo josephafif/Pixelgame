@@ -12,7 +12,7 @@ import { Fx } from '../game/fx.js';
 import { compileWeapon } from '../game/combat.js';
 import { structureDef, structureDefs } from '../game/construction.js';
 import { currentPickaxe, findHarvestTarget, harvestInfo, pickaxeDefs } from '../game/gathering.js';
-import { canAfford, shortfalls } from '../game/base.js';
+import { canAfford, shortfalls, baseBonuses } from '../game/base.js';
 import { salvageValue } from '../game/loot.js';
 import { angleTo, dist2 } from '../core/math.js';
 import { attackDuration, impactDelay, MELEE_PATTERNS } from '../render/weapon-anim.js';
@@ -31,7 +31,9 @@ import { MpMarkets } from './markets.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
 import { POI, isPoi, poiFound } from '../game/discoveries.js';
 import { currentBoat, boatMode, boatDefs, findLaunch, findLanding } from '../game/sailing.js';
-import { emptyPals, mpDenLevel } from '../net/mpsave.js';
+import { emptyPals } from '../net/mpsave.js';
+import { TOWN_LEVELS, clanLevels, buildingOfStruct, BUILDING_SV } from '../net/mpbase.js';
+import { townMarket } from '../game/markets.js';
 import { abilityProgress, abilityReadyIn } from '../game/abilities.js';
 
 const DEG = Math.PI / 180;
@@ -43,7 +45,11 @@ const QUALITY = {
 };
 const INTERACT_RADIUS = 1.6;
 const SNAP_DIST = 2; // corrections bigger than this jump instead of gliding
-const BUILDING_LABELS = { hearth: 'Fristadens härd', forge: 'Smedjan', vault: 'Förrådet', library: 'Biblioteket', training: 'Träningsplatsen', well: 'Brunnen', den: 'Djurhuset', waystone: 'Vägstenen' };
+const BUILDING_LABELS = { hearth: 'Vila vid Fristadens eld', forge: 'Smid i Fristadens smedja (upp till sällsynt)' };
+const BASE_LABELS = {
+  hearth: 'Vila vid härden', forge: 'Smid', vault: 'Förrådet', library: 'Forska', training: 'Träningsplatsen',
+  well: 'Hämta essens', den: 'Djurhuset (pals)', waystone: 'Vägstenen',
+};
 const SOUND_KINDS = { essence: 'pickup', scrap: 'pickup', wood: 'pickup', stone: 'pickup', gold: 'pickup' };
 
 function readStore(key, fallback) {
@@ -84,6 +90,7 @@ export class MpGame {
     this.pickups = [];
     this.allies = [];
     this.others = [];
+    this.mates = [];
     this.pal = null;
     this.otherPals = []; // other players' pals
     this.boss = null;
@@ -244,7 +251,6 @@ export class MpGame {
     s.world.found = me.found ?? [];
     s.components = me.components ?? {};
     s.markets = me.markets ?? {};
-    s.base.buildings.den = mpDenLevel(this.data, { level: me.level, extra: { bosses: me.bosses ?? {} } });
     if (me.stats) this.pstats = me.stats;
     this.xpNext = me.xpNext;
     this.emit('inventory');
@@ -346,7 +352,7 @@ export class MpGame {
     this.worldSeed = w.seed;
     this.save.worldSeed = w.seed; // (market stock is drawn from the world's seed)
     this.save.worldSeed = w.seed;
-    this.world = new World(this.data, w.seed, { hideObjects: true, maxChunks: 220 });
+    this.world = new World(this.data, w.seed, { hideObjects: true, maxChunks: 220, townBuildings: Object.keys(TOWN_LEVELS), townMarket: townMarket(w.seed) });
     // Server objects (chests, shrines) join the world's own (town, altars).
     const own = this.world.objectsNear.bind(this.world);
     this.world.objectsNear = (x, y, radius = 1) => {
@@ -465,7 +471,12 @@ export class MpGame {
         break;
       case 'clan':
         this.clan = msg.id ? msg : null;
+        this.syncBase();
         this.emit('clan', this.clan);
+        break;
+      case 'invsize':
+        Object.assign(this.save.inventory, { bagSize: msg.bagSize, storageSize: msg.storageSize });
+        this.emit('inventory');
         break;
       case 'invites':
         this.invites = msg.list;
@@ -511,6 +522,10 @@ export class MpGame {
         break;
       case 'who':
         this.emit('who', msg.list);
+        break;
+      case 'mates':
+        // Clanmates anywhere in the world (once a second): the map and the edge arrows.
+        this.mates = msg.list;
         break;
       case 'levelup':
         this.emit('levelup', { level: msg.level });
@@ -564,7 +579,7 @@ export class MpGame {
     if (!def) return null;
     const old = this.structById.get(raw.sid);
     if (old) this.#detachStructure(old);
-    const st = { sid: raw.sid, id: raw.id, x: raw.x, y: raw.y, hp: raw.hp, clanId: raw.clanId || null };
+    const st = { sid: raw.sid, id: raw.id, x: raw.x, y: raw.y, hp: raw.hp, clanId: raw.clanId || null, lv: raw.lv ?? 0 };
     Object.defineProperty(st, 'def', { value: def, enumerable: false, writable: true });
     Object.defineProperty(st, 'rt', { value: { cd: 0, aim: -Math.PI / 2, flash: 0, trig: -9, open: 0 }, enumerable: false, writable: true });
     const layer = def.kind === 'floor' ? this.world.floors : this.world.structures;
@@ -1621,6 +1636,11 @@ export class MpGame {
     if (banner && dist2(p.x, p.y, banner.x + 0.5, banner.y + 0.5) < 2.2 * 2.2) {
       return { type: 'banner', key: `banner:${banner.sid}`, x: banner.x + 0.5, y: banner.y + 0.5 };
     }
+    // A building in a clan base (your own: use it).
+    const bst = this.#baseBuildingNear();
+    if (bst && (!best || dist2(p.x, p.y, bst.x + 0.5, bst.y + 0.5) < bestD)) {
+      return { type: 'basebuilding', key: `b:${bst.sid}`, st: bst, x: bst.x + 0.5, y: bst.y + 0.5 };
+    }
     if (!best && this.toolActive) return findHarvestTarget({ player: p, world: this.world, data: this.data });
     // At the water's edge: launch your boat (or learn why you can't).
     return best ?? findLaunch(this);
@@ -1633,7 +1653,16 @@ export class MpGame {
       case 'shrine': return 'Be vid helgedomen';
       case 'altar': return this.altarSpent(o) ? 'Ett tyst altare' : `Väck ${this.data.byId.bosses.get(o.bossId)?.name ?? 'bossen'}`;
       case 'building': return BUILDING_LABELS[o.buildingId] ?? 'Använd';
-      case 'banner': return 'Klanbanéret (klan och valv)';
+      case 'banner': return 'Klanbanéret (bas och valv)';
+      case 'basebuilding': {
+        const id = buildingOfStruct(o.st.id);
+        if (!this.isOwnStructure(o.st)) return `${BUILDING_SV[id]} (en annan klans)`;
+        if (id === 'well') {
+          const n = Math.floor(this.clan?.base?.well ?? 0);
+          return n > 0 ? `Hämta ${n} essens` : 'Brunnen fylls…';
+        }
+        return `${BASE_LABELS[id] ?? BUILDING_SV[id]} · nivå ${this.structureLevel(o.st)}`;
+      }
       case 'launch': return `Segla ut (${o.boat.name})`;
       case 'merchant': return this.markets.isHostile(o.npc.marketId)
         ? `${o.npc.name} vill inte handla (${Math.ceil(this.markets.hostileSecondsLeft(o.npc.marketId) / 60)} min)`
@@ -1704,6 +1733,27 @@ export class MpGame {
 
   get lastCompass() {
     return this.compass ?? null;
+  }
+
+  // --- The map: the town, your base and your clanmates ---------------------------------------------------
+
+  get campLabel() {
+    return 'Fristaden';
+  }
+
+  /** Your clan's banner, or null. */
+  mapHome() {
+    const clanId = this.me?.clan?.id;
+    const c = clanId ? this.claims.find((x) => x.clanId === clanId) : null;
+    return c ? { x: c.x, y: c.y } : null;
+  }
+
+  mapMarkers() {
+    const out = [];
+    const home = this.mapHome();
+    if (home) out.push({ kind: 'base', x: home.x, y: home.y, label: this.clan ? `[${this.clan.tag}] bas` : 'Er bas' });
+    for (const m of this.mates) out.push({ kind: 'mate', x: m.x, y: m.y, dead: Boolean(m.dead), label: m.n });
+    return out;
   }
 
   // --- Loadout -----------------------------------------------------------------------------------------
@@ -1898,9 +1948,21 @@ export class MpGame {
 
   // --- Forge ------------------------------------------------------------------------------------------------
 
-  nearForge() {
+  /** The forge you stand at: your clan's ({ level }) or Fristaden's ({ town, level 1 }), or null. */
+  forgeHere() {
+    const p = this.player;
+    const own = this.#ownBuilding('forge');
+    if (own && dist2(own.x + 0.5, own.y + 0.5, p.x, p.y) <= 3.4 * 3.4) return { town: false, level: this.baseLevels.forge ?? 1 };
     const b = this.data.base.buildings.find((x) => x.id === 'forge');
-    return inSafeZone(this.rules, this.player.x, this.player.y) && dist2(b.x, b.y, this.player.x, this.player.y) <= 36;
+    if (dist2(b.x, b.y, p.x, p.y) <= 36) return { town: true, level: TOWN_LEVELS.forge };
+    return null;
+  }
+
+  /** At a forge? The forge panel then shows what that forge can make. */
+  nearForge() {
+    const f = this.forgeHere();
+    this.save.base.buildings.forge = f ? f.level : this.baseLevels.forge ?? 0;
+    return Boolean(f);
   }
 
   async craft(choice) {
@@ -2016,6 +2078,7 @@ export class MpGame {
   structureLock(def) {
     const lock = mpStructureLock(def, this.save.player.level);
     if (lock) return lock;
+    if (def.kind === 'building' && this.clan?.base?.placed?.[def.building]) return 'Står redan i basen (riv den för att flytta den)';
     const claim = this.#claimHere();
     if (def.id === 'banner') {
       if (this.#ownBannerAnywhere()) return 'Er klan har redan ett banér';
@@ -2046,8 +2109,29 @@ export class MpGame {
       const inside = (x, y, r) => x + r > tx && x - r < tx + 1 && y + r > ty && y - r < ty + 1;
       if (inside(p.x, p.y, p.r)) return 'Du står där';
     }
-    if (!canAfford(this.save.resources, def.cost)) return shortfalls(this.save.resources, def.cost)[0];
+    if (def.kind === 'building') {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) if (this.world.structureAt(tx + dx, ty + dy)?.def?.kind === 'building') return 'För nära en annan byggnad';
+      }
+    }
+    const cost = this.structureCost(def);
+    const wallet = this.buildWallet(def);
+    if (!canAfford(wallet, cost)) return shortfalls(wallet, cost)[0];
     return null;
+  }
+
+  /** What a structure costs now (a clan building built before moves for free). */
+  structureCost(def) {
+    if (def.kind === 'building' && (this.clan?.base?.levels?.[def.building] ?? 0) > 0) return {};
+    return def.cost;
+  }
+
+  /** What pays for it: your pockets, or for a clan building the vault and your pockets together. */
+  buildWallet(def) {
+    if (def?.kind !== 'building') return this.save.resources;
+    const out = { ...this.save.resources };
+    for (const [k, v] of Object.entries(this.clan?.vault ?? {})) out[k] = (out[k] ?? 0) + v;
+    return out;
   }
 
   buildAt(tx, ty, tool = this.build.tool) {
@@ -2304,6 +2388,74 @@ export class MpGame {
 
   recallBack() {
     this.#ask({ t: 'recall', op: 'back' });
+  }
+
+  // --- Your clan's base: the camp's buildings ---------------------------------------------------------------
+
+  /** Levels of the buildings that stand in your clan's base ({} without). */
+  get baseLevels() {
+    const b = this.clan?.base;
+    return b ? clanLevels({ buildings: b.levels }, b.placed) : {};
+  }
+
+  /** The single-player save's base mirrors your clan's (bonuses, the panel, the well). */
+  syncBase() {
+    const s = this.save;
+    s.base.buildings = { hearth: 0, ...this.baseLevels };
+    const rate = baseBonuses(this.data, s).essencePerHour;
+    const n = this.clan?.base?.well ?? 0;
+    s.base.wellAt = Date.now() - (rate > 0 ? (n / rate) * 3600 * 1000 : 0);
+  }
+
+  #ownBuilding(id) {
+    const at = this.clan?.base?.placed?.[id];
+    if (!at) return null;
+    return { x: at[0], y: at[1] };
+  }
+
+  #baseBuildingNear() {
+    const p = this.player;
+    let best = null;
+    let bestD = 1.9 * 1.9;
+    const tx = Math.floor(p.x);
+    const ty = Math.floor(p.y);
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const st = this.world.structureAt(tx + dx, ty + dy);
+        if (!st || st.def?.kind !== 'building') continue;
+        const d = dist2(p.x, p.y, st.x + 0.5, st.y + 0.5);
+        if (d < bestD) {
+          bestD = d;
+          best = st;
+        }
+      }
+    }
+    return best;
+  }
+
+  /** Fristaden's buildings (the forge and the fire) at their own levels. */
+  townBuildingLevel(id) {
+    return TOWN_LEVELS[id] ?? 0;
+  }
+
+  isOwnStructure(st) {
+    return Boolean(st.clanId) && st.clanId === this.me?.clan?.id;
+  }
+
+  /** A clan building's level (yours from the clan, others' from the server). */
+  structureLevel(st) {
+    const id = buildingOfStruct(st.id);
+    if (!id) return 0;
+    if (this.isOwnStructure(st)) return this.clan?.base?.levels?.[id] ?? st.lv ?? 1;
+    return st.lv || 1;
+  }
+
+  upgradeBuilding(id) {
+    this.#ask({ t: 'base', op: 'upgrade', id });
+  }
+
+  collectWell() {
+    this.#ask({ t: 'base', op: 'well' });
   }
 
   // Single-player hooks the shared UI may call.

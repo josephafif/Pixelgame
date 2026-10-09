@@ -79,10 +79,11 @@ export function open(game) {
   const legend = h('div.map-legend.small',
     h('span', h('i.lg.you'), 'You'), h('span', h('i.lg.camp'), 'Camp'), h('span', h('i.lg.boss'), 'Boss'),
     h('span', h('i.lg.market'), 'Market'), h('span', h('i.lg.shrine'), 'Shrine'), h('span', h('i.lg.chest'), 'Chest'),
-    h('span', h('i.lg.pin'), 'Your pins'), h('span', h('i.lg.sea'), 'Sea'));
+    h('span', h('i.lg.pin'), 'Your pins'), h('span', h('i.lg.sea'), 'Sea'),
+    game.mapMarkers ? h('span', h('i.lg.mate'), 'Klan') : null);
 
   const markers = () => {
-    const out = [{ kind: 'camp', x: 0.5, y: 0.5, label: 'Camp' }];
+    const out = [{ kind: 'camp', x: 0.5, y: 0.5, label: game.campLabel ?? 'Camp' }];
     // Great altars are always on the map (faded until found); lesser ones once explored.
     for (const a of world.greatAltars()) {
       const boss = data.byId.bosses.get(a.bossId);
@@ -95,7 +96,7 @@ export function open(game) {
       out.push({ kind: 'boss', x: a.x, y: a.y, color: boss.color, done: game.altarSpent(a), small: true, label: `${boss.name} (altar)` });
     }
     for (const [id, st] of Object.entries(save.markets)) {
-      if (!st.seen && !st.visited) continue;
+      if (id === 'town' || (!st.seen && !st.visited)) continue;
       const m = world.marketById(id);
       if (m) out.push({ kind: 'market', x: m.x + 0.5, y: m.y + 0.5, color: m.color, label: m.name });
     }
@@ -110,6 +111,8 @@ export function open(game) {
     }
     if (save.base.recall) out.push({ kind: 'portal', x: save.base.recall.x, y: save.base.recall.y, label: 'Waystone return point' });
     save.world.pins.forEach((pin, i) => out.push({ kind: 'pin', x: pin.x, y: pin.y, index: i, label: pin.label || 'Pin' }));
+    // Multiplayer: your clan's base and your clanmates.
+    out.push(...(game.mapMarkers?.() ?? []));
     return out;
   };
 
@@ -247,6 +250,25 @@ export function open(game) {
           g.arc(x, y, r, 0, Math.PI * 2);
           g.stroke();
           break;
+        case 'base':
+          g.fillStyle = '#7ae07a';
+          g.fillRect(x - 1, y - r - 2, 2, r * 2 + 2);
+          g.strokeRect(x - 1, y - r - 2, 2, r * 2 + 2);
+          g.beginPath();
+          g.moveTo(x + 1, y - r - 2);
+          g.lineTo(x + r + 2, y - r / 2 - 1);
+          g.lineTo(x + 1, y);
+          g.closePath();
+          g.fill();
+          g.stroke();
+          break;
+        case 'mate':
+          g.fillStyle = mk.dead ? '#8d8a9e' : '#7ae07a';
+          g.beginPath();
+          g.arc(x, y, Math.max(3, r - 2), 0, Math.PI * 2);
+          g.fill();
+          g.stroke();
+          break;
         case 'pin':
           g.fillStyle = '#e8364a';
           g.beginPath();
@@ -262,7 +284,7 @@ export function open(game) {
         default:
           break;
       }
-      if (zoom >= 4 && mk.kind !== 'chest' && mk.kind !== 'shrine') {
+      if ((zoom >= 4 || mk.kind === 'mate') && mk.kind !== 'chest' && mk.kind !== 'shrine') {
         g.font = '12px "Pixelify Sans", monospace';
         g.textAlign = 'center';
         g.lineWidth = 3;
@@ -402,7 +424,8 @@ export function open(game) {
       h('button.icon-btn', { 'aria-label': 'Zoom out', onclick: () => setZoom(zoom / 1.4) }, '−'),
       h('button.icon-btn', { 'aria-label': 'Zoom in', onclick: () => setZoom(zoom * 1.4) }, '+'),
       h('button', { onclick: () => { cx = p.x; cy = p.y; schedule(); } }, icon('portal', 20), 'Me'),
-      h('button', { onclick: () => { cx = 0.5; cy = 0.5; schedule(); } }, icon('home', 20), 'Camp'),
+      h('button', { onclick: () => { cx = 0.5; cy = 0.5; schedule(); } }, icon('home', 20), game.campLabel ?? 'Camp'),
+      game.mapHome?.() ? h('button', { onclick: () => { const b = game.mapHome(); if (b) { cx = b.x; cy = b.y; schedule(); } } }, icon('flag', 20), 'Bas') : null,
       h('button', { onclick: fitAll, title: 'Zoom out to everything you have explored' }, icon('map', 20), 'All'),
       pinBtn,
       status),
@@ -410,12 +433,15 @@ export function open(game) {
     legend);
 
   const off = game.on('explored', schedule);
+  // Clanmates move: redraw now and then while the map is open.
+  const tick = game.mapMarkers ? setInterval(schedule, 1000) : 0;
   const onResize = () => schedule();
   addEventListener('resize', onResize);
   openModal({
     title: 'Map', icon: 'map', body, className: 'wide map-panel',
     onDispose: () => {
       off();
+      clearInterval(tick);
       removeEventListener('resize', onResize);
       cancelAnimationFrame(raf);
     },

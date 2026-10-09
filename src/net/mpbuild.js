@@ -1,6 +1,9 @@
 // Building in multiplayer: the same structures as the single-player camp,
-// plus the clan banner (which claims the land around it). The camp's
-// building-level requirements are replaced by character levels.
+// plus the clan banner (which claims the land around it) and the camp's
+// buildings (forge, vault … see mpbase.js). The camp's building-level
+// requirements are replaced by character levels.
+
+import { baseStructDefs } from './mpbase.js';
 
 const MP_OVERRIDES = {
   banner: {
@@ -30,7 +33,7 @@ export function mpStructureDefs(data) {
   });
   // The banner first: it is what you build before anything else.
   list.sort((a, b) => (a.id === 'banner' ? -1 : b.id === 'banner' ? 1 : 0));
-  return list;
+  return [...list, ...baseStructDefs(data)];
 }
 
 /** Game data with multiplayer structure definitions (client and server share it). */

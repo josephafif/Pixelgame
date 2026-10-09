@@ -66,7 +66,7 @@ export class BuildBar {
       },
       h('span.art', art, lock ? h('span.lock', icon('lock', 16)) : null),
       touch ? null : h('span.name', def.name),
-      touch ? null : h('span.bcost', costChips(def.cost, g.save.resources)),
+      touch ? null : h('span.bcost', costChips(g.structureCost?.(def) ?? def.cost, g.buildWallet?.(def) ?? g.save.resources)),
       touch ? null : h('span.num', String(i + 1)));
     });
     const removing = g.build.tool === 'remove';
@@ -96,7 +96,7 @@ export class BuildBar {
           h('div.build-sel',
             removing || !sel
               ? [icon('remove', 16), h('b', 'Remove'), h('span.small.muted', 'half the materials back')]
-              : [h('b', sel.name), h('span.bcost', costChips(sel.cost, g.save.resources))]),
+              : [h('b', sel.name), h('span.bcost', costChips(g.structureCost?.(sel) ?? sel.cost, g.buildWallet?.(sel) ?? g.save.resources))]),
           done)
         : h('div.build-foot', h('span.status'), done));
     if (touch) el.append(h('div.status'));
@@ -116,17 +116,19 @@ export class BuildBar {
       status.textContent = g.build.reason && g.build.ghost ? g.build.reason : hint;
       status.classList.toggle('bad', Boolean(g.build.reason));
     }
+    const costOf = (def) => g.structureCost?.(def) ?? def.cost;
+    const walletOf = (def) => g.buildWallet?.(def) ?? g.save.resources;
     const sel = structureDef(g.data, g.build.selected);
     for (const chip of this.el.querySelectorAll('.build-sel .cost')) {
-      chip.classList.toggle('short', (g.save.resources[chip.dataset.kind] ?? 0) < (sel?.cost[chip.dataset.kind] ?? 0));
+      chip.classList.toggle('short', sel ? (walletOf(sel)[chip.dataset.kind] ?? 0) < (costOf(sel)[chip.dataset.kind] ?? 0) : false);
     }
     for (const btn of this.el.querySelectorAll('.bitem[data-id]')) {
       const def = structureDefs(g.data).find((d) => d.id === btn.dataset.id);
-      const ok = canAfford(g.save.resources, def.cost);
+      const ok = canAfford(walletOf(def), costOf(def));
       btn.classList.toggle('poor', !ok);
       for (const chip of btn.querySelectorAll('.cost')) {
         const kind = chip.dataset.kind;
-        chip.classList.toggle('short', (g.save.resources[kind] ?? 0) < (def.cost[kind] ?? 0));
+        chip.classList.toggle('short', (walletOf(def)[kind] ?? 0) < (costOf(def)[kind] ?? 0));
       }
     }
   }

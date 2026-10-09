@@ -359,11 +359,14 @@ servrar loggar man in med namn och lösenord.
   rättas mjukt om servern säger något annat. Andra spelare och monster ritas cirka 100 ms bakåt
   i tiden och interpoleras mellan ögonblicksbilder. Träffar räknas mot det du såg
   (lagkompensation, högst 200 ms).
-- **Fristaden** i mitten är säker: smedjan (vapen och hackor), förrådet och härden.
-  **Vildmarken** är PvP. Nya spelare är skyddade i två timmar eller tills de besegrat en boss.
-- **Klaner:** grunda en klan och bjud in vänner (B), res ett **klanbanér** i vildmarken. Marken
-  runt banéret blir er, och där bygger ni murar, grindar, torn och fällor tillsammans.
-  Klanvalvet vid banéret delas.
+- **Fristaden** i mitten är säker: en enkel smedja (upp till sällsynta vapen) och handlare på
+  torget. **Vildmarken** är PvP. Nya spelare är skyddade i två timmar eller tills de besegrat en
+  boss.
+- **Klaner och baser:** grunda en klan och bjud in vänner (B), res ett **klanbanér** i
+  vildmarken. Marken runt banéret blir er. Där bygger ni alla byggnader från singleplayerlägret
+  (smedja, förråd, bibliotek, träningsplats, brunn, vägsten, djurhus och härd) och uppgraderar
+  dem ur klanvalvet, plus murar, grindar, torn och fällor. Klanmedlemmar syns på kartan och som
+  små pilar vid skärmkanten.
 - **Raider:** en bas kan bara skadas när någon i klanen är online, 15 minuter efter att den
   sista loggat ut, eller under serverns raidfönster (lördag 18–21 som standard). Hälften av
   valvet kan aldrig tas.

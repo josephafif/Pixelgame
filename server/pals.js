@@ -1,9 +1,9 @@
 // Pals in multiplayer: the same companions as single player
 // (src/game/pals.js). Eggs drop from bosses and elite monsters, hatch in
-// Fristaden's Pal Den and grow with essence and materials; the pal that
-// walks with you fights, gathers or just tags along, run by the server so
-// everyone sees it. A pal's growth is capped by your level, as the Den's
-// upgrades cap it in single player (the town's Den is everyone's).
+// your clan's Pal Den (a building in your base) and grow with essence and
+// materials; the pal that walks with you fights, gathers or just tags along,
+// run by the server so everyone sees it. A pal's growth is capped by the
+// Den's level, as in single player.
 //
 // The pals live in the character (ch.extra.pals), in single player's shape,
 // so the same rules (src/game/pals.js) decide prices and limits.
@@ -17,6 +17,7 @@ import { damageEnemy } from './combat.js';
 import { applyStatus } from './enemies.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
+import * as base from './base.js';
 
 const TELEPORT_DIST = 14;
 const HELP_RADIUS = 7;
@@ -26,7 +27,7 @@ const HATCH_CHECK_TICKS = 30;
 
 /** The character's pals in single player's save shape (for the shared rules). */
 export function palSave(gs, p) {
-  return mpPalSave(gs.data, p.ch);
+  return mpPalSave(gs.data, p.ch, base.levelsFor(gs, p));
 }
 
 // --- Requests -------------------------------------------------------------------------
@@ -89,7 +90,7 @@ export function collectEgg(gs, p, it) {
   addEgg(gs.data, save, it.species);
   gs.toast(p, save.base.buildings.den
     ? 'Ett Pal-ägg! Värm det i Pal Den (Pals-panelen, H) så kläcks det.'
-    : 'Ett Pal-ägg! Fristadens Pal Den tar emot dig från nivå 6: då kan du kläcka det.', 'legendary');
+    : 'Ett Pal-ägg! Bygg ett djurhus i er klans bas (Bygg-menyn) för att kläcka det.', 'legendary');
   gs.event(p.x, p.y, { k: 'pick', id: p.id, kind: 'egg' }, 12);
   players.markMe(p);
   players.persist(gs, p);

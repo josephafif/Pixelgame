@@ -20,6 +20,8 @@ const ALTAR_CLEAR = 5;
 const MAX_CHUNKS = 160;
 // Markets: at most one per big cell of the world, and only in some cells.
 export const MARKET_CELL = 112;
+// (Fristaden's traders in multiplayer; the same number as TOWN_CELL in markets.js.)
+const TOWN_MARKET_CELL = 1 << 20;
 const MARKET_CHANCE = 0.1; // ~1 market per 10 cells (plus the guaranteed first one)
 const MARKET_NAMES = [
   'Copperwind Bazaar', 'Lanternrest Market', 'Saltroad Post', 'Gilded Gate Exchange', 'Mossy Mile Post',
@@ -56,7 +58,7 @@ const BLOCKER_BY_NAME = {
 };
 /** Blocker tile id → name used by game data (gathering.harvest). */
 export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).map(([k, v]) => [v, k]));
-const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
+export const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
 /** Water a boat can float on (lakes, coastal sea, open sea). */
 export const SAILABLE = new Set([T.WATER, T.SEA, T.DEEP]);
 /**
@@ -113,6 +115,10 @@ export class World {
     // predict collisions without knowing the secret seed).
     this.sharedTerrain = opts.secretSeed !== undefined || this.hideObjects;
     this.maxChunks = opts.maxChunks ?? MAX_CHUNKS;
+    // Multiplayer: only these camp buildings stand in the town (null = all of them).
+    this.townBuildings = opts.townBuildings ?? null;
+    // Multiplayer: Fristaden's traders (src/game/markets.js), found by id and cell only.
+    this.town = opts.townMarket ?? null;
     // Multiplayer: which gates let the moving player through (null = all).
     this.gateFilter = null;
     this.chunks = new Map();
@@ -192,6 +198,7 @@ export class World {
 
   /** The market in a world cell, or null (deterministic per seed). */
   marketForCell(mx, my) {
+    if (this.town && mx === TOWN_MARKET_CELL && my === TOWN_MARKET_CELL) return this.town;
     const key = `${mx},${my}`;
     if (this.marketCache.has(key)) return this.marketCache.get(key);
     let m = null;
@@ -287,6 +294,7 @@ export class World {
 
   marketById(id) {
     if (id === 'm:first') return this.firstMarket;
+    if (id === 'town') return this.town;
     const [mx, my] = id.slice(2).split(',').map(Number);
     return Number.isFinite(mx) && Number.isFinite(my) ? this.marketForCell(mx, my) : null;
   }
@@ -483,6 +491,7 @@ export class World {
     const r = hashInts(this.objSeed, cx, cy, 0xb0b) / 4294967296;
     const far = cx * cx + cy * cy > 1 && !this.hideObjects;
     for (const b of this.data.base?.buildings ?? []) {
+      if (this.townBuildings && !this.townBuildings.includes(b.id)) continue;
       if (Math.floor(b.x / CHUNK) === cx && Math.floor(b.y / CHUNK) === cy) {
         chunk.objects.push({ type: 'building', key: `b:${b.id}`, buildingId: b.id, x: b.x, y: b.y });
       }

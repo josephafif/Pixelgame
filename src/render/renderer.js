@@ -246,6 +246,7 @@ export class Renderer {
     this.#drawParticles(game);
     this.#drawTexts(game);
     this.#drawCompass(game, W, H);
+    this.#drawMates(game, W, H);
     if (p.hurtFlash > 0) {
       v.fillStyle = `rgba(255,40,40,${p.hurtFlash})`;
       v.fillRect(0, 0, W, H);
@@ -574,6 +575,16 @@ export class Renderer {
 
   #drawStructure(game, st) {
     const v = this.v;
+    if (st.def.kind === 'building') {
+      // A clan building (multiplayer): drawn like the camp's, at its level.
+      const level = game.structureLevel?.(st) ?? 1;
+      const bx = this.#sx(st.x + 0.5);
+      const by = this.#sy(st.y + 0.5);
+      this.#shadow(bx, by + 1, 12);
+      v.drawImage(buildingSprite(st.def.building, level), bx - (BUILDING_W >> 1), by - BUILDING_H + 3);
+      this.#buildingAmbience(game, { buildingId: st.def.building, x: st.x + 0.5, y: st.y + 0.5, own: game.isOwnStructure?.(st) }, level, bx, by);
+      return;
+    }
     const x = this.#sx(st.x);
     const y = this.#sy(st.y + 1) - STRUCT_H;
     const t = game.time;
@@ -704,8 +715,12 @@ export class Renderer {
       const def = structureDef(game.data, b.selected);
       if (def) {
         v.globalAlpha = 0.55 + 0.15 * Math.sin(game.time * 6);
-        const img = structureSprite(def.id, 0, def.id === 'spikes' ? 1 : 0);
-        v.drawImage(img, x, isFlat(def.id) ? y : y + 16 - STRUCT_H);
+        if (def.kind === 'building') {
+          v.drawImage(buildingSprite(def.building, 1), x + 8 - (BUILDING_W >> 1), y + 8 - BUILDING_H + 3);
+        } else {
+          const img = structureSprite(def.id, 0, def.id === 'spikes' ? 1 : 0);
+          v.drawImage(img, x, isFlat(def.id) ? y : y + 16 - STRUCT_H);
+        }
         v.globalAlpha = 1;
       }
     }
@@ -776,7 +791,8 @@ export class Renderer {
         this.#drawCuriosity(game, o, x, y);
         break;
       case 'building': {
-        const level = buildingLevel(game.data, game.save, o.buildingId);
+        // (Multiplayer: Fristaden's own buildings, not your clan's.)
+        const level = game.townBuildingLevel?.(o.buildingId) ?? buildingLevel(game.data, game.save, o.buildingId);
         const s = buildingSprite(o.buildingId, level);
         this.#shadow(x, y + 1, 12);
         if (level === 0) v.globalAlpha = 0.85;
@@ -845,7 +861,7 @@ export class Renderer {
         break;
       case 'well': {
         this.#glow(x, y - 10, '#7ae0ff', 10 + level * 2);
-        if (wellPending(game.data, game.save) > 0) {
+        if (o.own !== false && wellPending(game.data, game.save) > 0) {
           const gem = pickupSprite('essence', '#7ae0ff');
           const bob = Math.round(Math.sin(game.time * 4) * 2);
           v.drawImage(gem, x - 2, y - BUILDING_H - 4 + bob);
@@ -1711,6 +1727,53 @@ export class Renderer {
   #drawTexts(game) {
     for (const t of game.fx.texts) {
       drawPixelText(this.v, t.text, t.x * T - this.cx, t.y * T - this.cy - 8, t.color);
+    }
+  }
+
+  /**
+   * Multiplayer: a small green arrow at the screen edge for every clanmate
+   * out of sight (like the boss arrow, only smaller), with their name.
+   */
+  #drawMates(game, W, H) {
+    const mates = game.mates;
+    if (!mates?.length) return;
+    const v = this.v;
+    const p = game.player;
+    const m = 10;
+    for (const mate of mates) {
+      const sx = this.#sx(mate.x);
+      const sy = this.#sy(mate.y);
+      if (sx > 0 && sy > 0 && sx < W && sy < H) continue; // on screen: you see them
+      const dx = mate.x - p.x;
+      const dy = mate.y - p.y;
+      if (!dx && !dy) continue;
+      const k = Math.min((W / 2 - m) / Math.max(1e-6, Math.abs(dx)), (H / 2 - m) / Math.max(1e-6, Math.abs(dy)));
+      const x = Math.round(W / 2 + dx * k);
+      const y = Math.round(H / 2 + dy * k);
+      const angle = Math.atan2(dy, dx);
+      v.save();
+      v.translate(x, y);
+      v.rotate(angle);
+      v.fillStyle = '#161622';
+      v.beginPath();
+      v.moveTo(5, 0);
+      v.lineTo(-4, -4);
+      v.lineTo(-4, 4);
+      v.fill();
+      v.fillStyle = mate.dead ? '#8d8a9e' : '#7ae07a';
+      v.beginPath();
+      v.moveTo(3.5, 0);
+      v.lineTo(-3, -2.5);
+      v.lineTo(-3, 2.5);
+      v.fill();
+      v.restore();
+      // The name sits on the inner side of the arrow.
+      // (The pixel font has no å, ä, ö: Följaren → Foljaren.)
+      const plain = mate.n.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const name = plain.length > 8 ? `${plain.slice(0, 7)}.` : plain;
+      const tx = Math.max(m + 14, Math.min(W - m - 14, x - Math.cos(angle) * 12));
+      const ty = Math.max(m, Math.min(H - m - 5, y - Math.sin(angle) * 9 - 2));
+      drawPixelText(v, name, tx, ty, mate.dead ? '#8d8a9e' : '#b8f0b8');
     }
   }
 

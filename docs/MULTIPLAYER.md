@@ -296,22 +296,38 @@ Säkerheten kommer från att servern bestämmer.
   - **Ledare**: allt, inklusive att upplösa klanen och utse en ny ledare.
   - **Officer**: bjuda in och kicka, bygga och riva, öppna klanvalvet.
   - **Medlem**: bygga, använda byggnader och lägga in saker i valvet.
-- Klanmedlemmar syns på kartan och i kompassen, har en egen klanchatt och kan
-  inte skada varandra.
+- Klanmedlemmar syns på kartan (gröna prickar) och som små gröna pilar vid
+  skärmkanten när de är utom synhåll. De har en egen klanchatt och kan inte
+  skada varandra.
 
 ### Baser
 
-- **Fristaden** vid spawn ersätter singleplayerns läger. Den är säker, utan PvP,
-  och har en marknad och en enkel forge. Där kan man inte bygga.
+- **Fristaden** vid spawn ersätter singleplayerns läger. Den är säker, utan PvP.
+  Där finns en enkel smedja (nivå 1: vanliga till sällsynta vapen, ingen
+  katalysator) och tre handlare på torget, utan murar och torn. Ingen kan skadas
+  där. Där kan man inte bygga.
 - **Klanbanér**: en klan bygger ett banér ute i vildmarken. Banéret gör anspråk
   på en cirkel med radien 16 rutor (en claim).
   - Inom en claim kan bara klanen bygga, öppna grindar och använda förråd.
   - En claim måste ligga minst 40 rutor från Fristaden och från andra claims.
   - Varje klan kan ha en claim. En spelare som spelar ensam är en klan med en
     medlem.
-- **Byggnaderna är gemensamma.** Forge, Pal Den, Vault, bibliotek och de andra
-  byggs och uppgraderas med klanens resurser i klanvalvet. Den egna
-  ryggsäcken och de egna vapnen är fortfarande personliga.
+- **Byggnaderna är gemensamma.** Alla åtta byggnader från singleplayerlägret
+  (härd, smedja, förråd, bibliotek, träningsplats, essensbrunn, vägsten och
+  djurhus) byggs en gång per klan med Bygg-menyn, var som helst på klanens mark.
+  - Nivåerna, kostnaderna och bonusarna är desamma som i singleplayer. Bonusarna
+    gäller alla i klanen, var de än är: hälsa, anfall och försvar, en större
+    väska och ett större förråd, billigare forskning, pals som växer längre
+    och smidning med bättre katalysatorer.
+  - Uppgraderingar betalas ur klanvalvet först, och resten tas från det du bär
+    (`server/base.js`).
+  - Byggnaderna kan inte förstöras och kostar inget underhåll. Rivs en byggnad
+    finns nivån kvar, och den kan byggas upp gratis någon annanstans i basen.
+  - Förrådet för vapen står i basen. Vägstenen tar dig hem till basen (nivå 2:
+    och tillbaka igen). Djurhuset kläcker ägg.
+  - Den egna väskan och de egna vapnen är fortfarande personliga.
+- **Klanvalvet** nås överallt på klanens mark. I panelen (B, fliken Valv)
+  lägger du i 10, 100 eller allt med ett tryck.
 - **Underhåll:** banéret drar lite trä, sten och essence varje vecka. Om ingen
   betalar förfaller basen långsamt, så att övergivna baser inte blir kvar för
   alltid.

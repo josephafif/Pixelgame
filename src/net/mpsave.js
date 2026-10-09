@@ -2,60 +2,46 @@
 // the same forge/inventory rules (and UI) work in both modes. The server
 // builds it to validate requests; the client builds the same thing to show
 // the same options and prices.
+//
+// `levels` are the camp building levels that count for the character right
+// now: their clan's base (src/net/mpbase.js), with Fristaden's forge level
+// when they stand at the town forge.
 
-/** Building levels in Fristaden (the town everyone shares). */
-export const FRISTAD_LEVELS = { hearth: 3, forge: 5, vault: 3, library: 2, training: 2, well: 1, den: 1, waystone: 2 };
+import { baseBonuses } from '../game/base.js';
 
 export const MP_RESOURCE_KEYS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shards'];
-
-/**
- * Fristaden's Pal Den as your character can use it: one level for every Den
- * upgrade your level has reached (the last two also need a boss beaten),
- * just as you would build it up in single player. Each level lets pals grow
- * two levels.
- */
-export function mpDenLevel(data, ch) {
-  const den = data.base?.buildings?.find((b) => b.id === 'den');
-  if (!den) return 0;
-  const bossBeaten = Object.keys(ch.extra?.bosses ?? {}).length > 0;
-  let level = 0;
-  for (const l of den.levels) {
-    if ((l.playerLevel ?? 0) > (ch.level ?? 1) || (l.boss && !bossBeaten)) break;
-    level++;
-  }
-  return level;
-}
 
 export function emptyPals() {
   return { eggs: [], owned: [], active: null, mode: 'fight', nextId: 1 };
 }
 
 /** A character's pals in single player's save shape (the shared pal rules work on it). */
-export function mpPalSave(data, ch) {
+export function mpPalSave(data, ch, levels = {}) {
   ch.extra ??= {};
   ch.extra.pals ??= emptyPals();
-  return { pals: ch.extra.pals, resources: ch.resources, base: { buildings: { ...FRISTAD_LEVELS, den: mpDenLevel(data, ch) } } };
+  return { pals: ch.extra.pals, resources: ch.resources, base: { buildings: { ...levels, den: levels.den ?? 0 } } };
 }
 
-/** Bag and storage sizes in multiplayer. */
-export function mpInventorySizes(data) {
-  return { bagSize: data.base.baseBag, storageSize: data.base.baseStorage };
+/** Bag and storage sizes in multiplayer: they grow with your clan's Vault, as in single player. */
+export function mpInventorySizes(data, levels = {}) {
+  const b = baseBonuses(data, { base: { buildings: levels } });
+  return { bagSize: data.base.baseBag + b.bag, storageSize: data.base.baseStorage + b.storage };
 }
 
 /**
  * ch: { level, xp, resources, pickaxe, extra: { codex, bosses, crafts } },
  * inv: { bag, storage, equipped, secondary, activeSlot, favorites }.
  */
-export function mpVirtualSave(data, worldSeed, ch, inv) {
+export function mpVirtualSave(data, worldSeed, ch, inv, levels = {}) {
   const extra = ch.extra ?? {};
-  const sizes = mpInventorySizes(data);
+  const sizes = mpInventorySizes(data, levels);
   return {
     worldSeed,
     player: { level: ch.level, xp: ch.xp, bonusLuck: 0, kills: ch.kills ?? 0, deaths: ch.deaths ?? 0 },
     resources: ch.resources,
     components: extra.components ?? {},
     codex: { weapons: {}, modifiers: extra.codex?.modifiers ?? [], effects: [], abilities: extra.codex?.abilities ?? [] },
-    base: { buildings: { ...FRISTAD_LEVELS, den: mpDenLevel(data, ch) }, structures: [], wellAt: Date.now(), recall: null },
+    base: { buildings: { hearth: 0, ...levels }, structures: [], wellAt: Date.now(), recall: null },
     bosses: { defeated: extra.bosses ?? {} },
     counters: { craft: extra.crafts ?? 0, drop: 0 },
     tools: { pickaxe: ch.pickaxe ?? 0, boat: extra.boat ?? 0 },

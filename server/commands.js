@@ -6,8 +6,8 @@ import { validateCraft, craftCost, buildCraftRequest } from '../src/weapons/craf
 import { forgePickaxe } from '../src/game/gathering.js';
 import { buildBoat } from '../src/game/sailing.js';
 import { researchCost } from '../src/game/base.js';
-import { mpVirtualSave, mpInventorySizes, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
-import { inSafeZone, describeRaidWindow, passwordProblem } from '../src/net/rules.js';
+import { MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
+import { describeRaidWindow, passwordProblem } from '../src/net/rules.js';
 import { hashPassword } from './auth.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
@@ -15,16 +15,12 @@ import * as pals from './pals.js';
 import * as markets from './markets.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
+import * as base from './base.js';
 
-const TOWN_REACH = 6;
+const NO_FORGE = 'Gå till en smedja: i Fristaden (upp till sällsynta vapen) eller i er bas';
 
-function nearBuilding(gs, p, id) {
-  const b = gs.data.base.buildings.find((x) => x.id === id);
-  return b && (b.x - p.x) ** 2 + (b.y - p.y) ** 2 <= TOWN_REACH * TOWN_REACH;
-}
-
-function vsave(gs, p) {
-  return mpVirtualSave(gs.data, gs.worldSeed, p.ch, p.inv);
+function vsave(gs, p, forge = null) {
+  return base.saveFor(gs, p, forge);
 }
 
 function cleanText(s, max) {
@@ -88,6 +84,8 @@ export function handle(gs, p, msg) {
     }
     case 'market':
       return markets.request(gs, p, msg);
+    case 'base':
+      return base.request(gs, p, msg);
     case 'recall':
       return players.recall(gs, p, msg.op === 'back' ? 'back' : 'go');
     case 'move':
@@ -112,8 +110,9 @@ export function handle(gs, p, msg) {
     case 'craft':
       return craft(gs, p, msg.choice ?? {});
     case 'pickaxe': {
-      if (!nearBuilding(gs, p, 'forge')) return 'Gå till smedjan i Fristaden';
-      const save = vsave(gs, p);
+      const forge = base.forgeAt(gs, p);
+      if (!forge) return NO_FORGE;
+      const save = vsave(gs, p, forge);
       try {
         const def = forgePickaxe(gs.data, save, Number(msg.tier));
         p.ch.pickaxe = def.tier;
@@ -129,8 +128,9 @@ export function handle(gs, p, msg) {
       }
     }
     case 'boat': {
-      if (!nearBuilding(gs, p, 'forge')) return 'Gå till smedjan i Fristaden';
-      const save = vsave(gs, p);
+      const forge = base.forgeAt(gs, p);
+      if (!forge) return NO_FORGE;
+      const save = vsave(gs, p, forge);
       try {
         const def = buildBoat(gs.data, save, Number(msg.tier));
         p.ch.extra.boat = def.tier;
@@ -195,12 +195,12 @@ function equip(gs, p, id, slot) {
 }
 
 function moveItem(gs, p, id, to) {
-  if (!inSafeZone(gs.rules, p.x, p.y)) return 'Förrådet kommer du åt i Fristaden';
+  if (!base.ownNear(gs, p, 'vault')) return 'Förrådet står i er bas: gå dit (bygg ett förråd med Bygg-menyn)';
   const item = findItem(p, id);
   if (!item) return 'Det vapnet har du inte';
   if (item.place === to) return null;
   if (to === 'storage' && (p.inv.equipped === id || p.inv.secondary === id)) return 'Ta bort vapnet från din utrustning först';
-  const sizes = mpInventorySizes(gs.data);
+  const sizes = base.sizesFor(gs, p);
   if (to === 'bag' && p.inv.bag.length >= sizes.bagSize) return 'Väskan är full';
   if (to === 'storage' && p.inv.storage.length >= sizes.storageSize) return 'Förrådet är fullt';
   try {
@@ -218,7 +218,8 @@ function moveItem(gs, p, id, to) {
 // --- Forge -------------------------------------------------------------------------------
 
 function craft(gs, p, raw) {
-  if (!inSafeZone(gs.rules, p.x, p.y) || !nearBuilding(gs, p, 'forge')) return 'Gå till smedjan i Fristaden';
+  const forge = base.forgeAt(gs, p);
+  if (!forge) return NO_FORGE;
   const choice = {
     archetype: String(raw.archetype ?? ''),
     material: String(raw.material ?? ''),
@@ -227,10 +228,10 @@ function craft(gs, p, raw) {
     ability: raw.ability ? String(raw.ability) : null,
     catalyst: raw.catalyst ? String(raw.catalyst) : 'none',
   };
-  const save = vsave(gs, p);
+  const save = vsave(gs, p, forge);
   const errors = validateCraft(gs.data, save, choice);
-  if (errors.length) return errors[0];
-  const sizes = mpInventorySizes(gs.data);
+  if (errors.length) return forge.town && /^Forge level/.test(errors[0]) ? 'Fristadens smedja smider bara upp till sällsynta vapen: bygg en smedja i er bas för bättre katalysatorer' : errors[0];
+  const sizes = base.sizesFor(gs, p);
   if (p.inv.bag.length >= sizes.bagSize) return 'Väskan är full: gör plats för det nya vapnet';
   const cost = craftCost(gs.data, choice, save);
   const request = buildCraftRequest(gs.data, save, choice, Math.floor(p.stats.luck));

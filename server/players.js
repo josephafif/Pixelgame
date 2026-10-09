@@ -7,7 +7,7 @@ import { computePlayerStats, xpToNext } from '../src/game/stats.js';
 import { compileWeapon } from '../src/game/combat.js';
 import { currentPickaxe, findHarvestTarget } from '../src/game/gathering.js';
 import { inSafeZone, isNewbie } from '../src/net/rules.js';
-import { mpInventorySizes, MP_RESOURCE_KEYS, FRISTAD_LEVELS, mpVirtualSave } from '../src/net/mpsave.js';
+import { MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
 import { currentBoat, boatMode, findLaunch, findLanding } from '../src/game/sailing.js';
 import * as combat from './combat.js';
 import * as loot from './loot.js';
@@ -15,6 +15,7 @@ import * as building from './building.js';
 import * as abilities from './abilities.js';
 import * as discoveries from './discoveries.js';
 import * as markets from './markets.js';
+import * as base from './base.js';
 
 // Inputs waiting to be simulated; beyond this the oldest are dropped.
 const MAX_QUEUE = 12;
@@ -133,15 +134,16 @@ export function createPlayer(gs, account, ch, items) {
 
 // --- Stats / loadout ---------------------------------------------------------------
 
-// Everyone shares Fristaden, so its buildings' bonuses apply to every player.
-function statSave(p) {
-  return { player: { level: p.ch.level, bonusLuck: 0, bonusHp: p.ch.extra?.bonusHp ?? 0 }, base: { buildings: FRISTAD_LEVELS } };
+// Your clan's buildings (the Hearth's health, the Training Grounds' attack
+// and defense) count for you wherever you are, as the camp does in single player.
+function statSave(gs, p) {
+  return { player: { level: p.ch.level, bonusLuck: 0, bonusHp: p.ch.extra?.bonusHp ?? 0 }, base: { buildings: base.levelsFor(gs, p) } };
 }
 
 export function recomputeStats(gs, p) {
   const before = p.maxHp;
   const dna = p.weapon?.dna ?? null;
-  p.stats = computePlayerStats(gs.data, statSave(p), dna, p.buffs);
+  p.stats = computePlayerStats(gs.data, statSave(gs, p), dna, p.buffs);
   p.maxHp = p.stats.maxHp;
   if (before && before !== p.maxHp && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp * (p.maxHp / before));
   const chilled = p.statuses.chill?.until > gs.time;
@@ -218,7 +220,7 @@ export function mePayload(gs, p) {
 }
 
 export function inventoryPayload(gs, p) {
-  return { t: 'inv', ...p.inv, ...mpInventorySizes(gs.data) };
+  return { t: 'inv', ...p.inv, ...base.sizesFor(gs, p) };
 }
 
 /** What other players see about this one (name, clan, weapon in hand). */
@@ -439,6 +441,9 @@ export function interact(gs, p, now) {
     gs.send(p, { t: 'ui', panel: 'clan' });
     return true;
   }
+  // Your clan's buildings (forge, vault, well …).
+  const bst = base.buildingNear(gs, p);
+  if (bst && (!best || (bst.x + 0.5 - p.x) ** 2 + (bst.y + 0.5 - p.y) ** 2 < bestD)) return base.use(gs, p, bst);
   if (!best) return tryLaunch(gs, p);
   if (discoveries.isPoi(best.type)) return discoveries.interact(gs, p, best, now);
   switch (best.type) {
@@ -489,7 +494,7 @@ export function moveParams(gs, p) {
 
 /** What the single-player sailing rules need to look at. */
 function sailingView(gs, p) {
-  return { world: gs.world, player: p, data: gs.data, save: mpVirtualSave(gs.data, gs.worldSeed, p.ch, p.inv) };
+  return { world: gs.world, player: p, data: gs.data, save: base.saveFor(gs, p) };
 }
 
 function tryLaunch(gs, p) {
@@ -592,19 +597,22 @@ function teleport(gs, p, x, y, { sailing = false } = {}) {
 }
 
 /**
- * Fristaden's Waystone, from anywhere: home to your banner (or the town),
- * then back again through it to where you left. Not in the middle of a
- * fight with another player.
+ * Your clan's Waystone, from anywhere: home to it, then (level 2) back
+ * again to where you left. Not in the middle of a fight with another player.
  */
 export function recall(gs, p, op, now = Date.now()) {
   if (p.dead) return 'Du är död';
   if (p.combatUntil > now) return 'Du kan inte resa mitt i en strid mot andra spelare';
   const ex = p.ch.extra;
+  const stone = p.clanId ? base.placed(gs, p.clanId).get('waystone') : null;
+  if (!stone) return 'Bygg en vägsten i er bas för att kunna resa hem';
+  const level = base.levelsFor(gs, p).waystone ?? 1;
+  const home = { x: stone.x + 0.5, y: stone.y + 1.6 };
   if (op === 'back') {
     const back = ex.recallFrom;
     if (!back) return 'Ingen väg tillbaka just nu';
-    const home = homeSpot(gs, p);
-    if (!inSafeZone(gs.rules, p.x, p.y) && Math.hypot(home.x - p.x, home.y - p.y) > 20) return 'Gå hem först (Fristaden eller ert banér)';
+    if (level < 2) return 'Vägstenen behöver nivå 2 för resan tillbaka';
+    if (Math.hypot(home.x - p.x, home.y - p.y) > 20) return 'Gå tillbaka till vägstenen först';
     ex.recallFrom = null;
     teleport(gs, p, back.x, back.y, { sailing: back.sailing });
     gs.toast(p, 'Genom vägstenen, tillbaka dit du var.');
@@ -612,12 +620,11 @@ export function recall(gs, p, op, now = Date.now()) {
   }
   const left = (ex.recallAt ?? 0) - now;
   if (left > 0) return `Vägstenen laddas om: ${Math.ceil(left / 1000)} s kvar`;
-  const home = homeSpot(gs, p);
   if (Math.hypot(home.x - p.x, home.y - p.y) < 20) return 'Du är redan hemma';
-  ex.recallFrom = { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, sailing: Boolean(p.sailing) };
+  ex.recallFrom = level >= 2 ? { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, sailing: Boolean(p.sailing) } : null;
   ex.recallAt = now + (gs.data.base.recallCooldown ?? 60) * 1000;
   teleport(gs, p, home.x, home.y);
-  gs.toast(p, 'Vägstenen för dig hem. Res tillbaka från menyn när du vill.', 'component');
+  gs.toast(p, level >= 2 ? 'Vägstenen för dig hem. Res tillbaka från menyn när du vill.' : 'Vägstenen för dig hem.', 'component');
   persist(gs, p);
   return null;
 }

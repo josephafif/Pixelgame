@@ -59,6 +59,9 @@ export class MpMarkets {
     if (this.checkT <= 0 && g.world) {
       this.checkT = 0.5;
       for (const m of g.world.marketsNear(p.x, p.y, ACTIVATE)) if (!this.active.has(m.id)) this.#activate(m);
+      // Fristaden's traders stand on the town square.
+      const town = g.world.town;
+      if (town && !this.active.has(town.id) && p.x * p.x + p.y * p.y < ACTIVATE * ACTIVATE) this.#activate(town);
       for (const [id, entry] of this.active) {
         if (Math.hypot(entry.def.x - p.x, entry.def.y - p.y) > DEACTIVATE) this.#deactivate(id);
       }
@@ -98,7 +101,7 @@ export class MpMarkets {
     this.active.set(m.id, { def: m, structures, layout });
     this.structures = [...this.active.values()].flatMap((e) => e.structures);
     // First time here: it goes on your map (the server says hello too).
-    g.emit('map');
+    if (!m.town) g.emit('map');
   }
 
   #deactivate(id) {

@@ -53,7 +53,7 @@ test('a database from before passwords is upgraded in place', async () => {
     db.createAccount({ id: 'guest:0123456789abcdef01234567', name: 'Gamla' });
     db.close();
     const raw = new DatabaseSync(file);
-    raw.exec('ALTER TABLE accounts DROP COLUMN pass_hash; PRAGMA user_version = 1;');
+    raw.exec('ALTER TABLE accounts DROP COLUMN pass_hash; ALTER TABLE clans DROP COLUMN base; PRAGMA user_version = 1;');
     raw.close();
     db = new Db(file);
     const acc = db.accountByName('gamla');
@@ -61,6 +61,13 @@ test('a database from before passwords is upgraded in place', async () => {
     assert.equal(acc.pass_hash, null);
     db.setPassword(acc.id, 'scrypt$1$1$1$x$y');
     assert.equal(db.account(acc.id).pass_hash, 'scrypt$1$1$1$x$y');
+    // Clans got their base (the camp's buildings) along the way.
+    const id = db.createClan({ name: 'Gamlingarna', tag: 'GAM', leaderId: acc.id });
+    const clan = db.loadClans().find((c) => c.id === id);
+    assert.deepEqual(clan.base, {});
+    clan.base = { buildings: { forge: 2 } };
+    db.saveClan(clan);
+    assert.equal(db.loadClans().find((c) => c.id === id).base.buildings.forge, 2);
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

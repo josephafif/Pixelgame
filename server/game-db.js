@@ -102,6 +102,8 @@ const SCHEMA = [
    CREATE INDEX ledger_account ON ledger(account_id, at);`,
   // v2: log in with your name and a password (guest servers, `npm run share`).
   'ALTER TABLE accounts ADD COLUMN pass_hash TEXT;',
+  // v3: clan bases have the camp's buildings ({ buildings: { forge: 2, … }, wellAt }).
+  "ALTER TABLE clans ADD COLUMN base TEXT NOT NULL DEFAULT '{}';",
 ];
 
 const json = (s, fallback) => {
@@ -278,6 +280,7 @@ export class GameDb {
       createdAt: c.created_at,
       vault: json(c.vault, {}),
       upkeep: json(c.upkeep, {}),
+      base: json(c.base, {}),
       unpaid: Boolean(c.unpaid),
       lastOnlineAt: c.last_online_at,
       members: new Map(),
@@ -316,8 +319,8 @@ export class GameDb {
   }
 
   saveClan(c) {
-    this.run('UPDATE clans SET vault = ?, upkeep = ?, unpaid = ?, last_online_at = ? WHERE id = ?',
-      JSON.stringify(c.vault), JSON.stringify(c.upkeep), c.unpaid ? 1 : 0, c.lastOnlineAt ?? 0, c.id);
+    this.run('UPDATE clans SET vault = ?, upkeep = ?, base = ?, unpaid = ?, last_online_at = ? WHERE id = ?',
+      JSON.stringify(c.vault), JSON.stringify(c.upkeep), JSON.stringify(c.base ?? {}), c.unpaid ? 1 : 0, c.lastOnlineAt ?? 0, c.id);
   }
 
   addMember(clanId, accountId, role) {

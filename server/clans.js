@@ -3,8 +3,10 @@
 
 import { canDo, clanNameProblem, clanTagProblem, ROLES, describeRaidWindow } from '../src/net/rules.js';
 import { MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
+import { BASE_BUILDINGS } from '../src/net/mpbase.js';
 import * as players from './players.js';
 import * as building from './building.js';
+import * as base from './base.js';
 
 export function clanPayload(gs, clan) {
   const banner = building.bannerOf(gs, clan.id);
@@ -31,7 +33,22 @@ export function clanPayload(gs, clan) {
     structures,
     upkeepPerWeek: upkeep,
     max: gs.rules.clanMax,
+    base: basePayload(gs, clan),
   };
+}
+
+/** The clan's camp buildings: levels, where they stand, and what the well holds. */
+function basePayload(gs, clan) {
+  const b = base.clanBase(clan);
+  const placed = base.placed(gs, clan.id);
+  const out = { levels: {}, placed: {}, well: 0 };
+  for (const id of BASE_BUILDINGS) {
+    if (b.buildings[id]) out.levels[id] = b.buildings[id];
+    const st = placed.get(id);
+    if (st) out.placed[id] = [st.x, st.y];
+  }
+  if (placed.has('well')) out.well = base.wellNow(gs, clan) + (b.wellStore ?? 0);
+  return out;
 }
 
 export function sendClan(gs, clan) {
@@ -55,8 +72,15 @@ function setMembership(gs, accountId, clanId) {
   if (p) {
     p.clanId = clanId ?? null;
     p.infoRev++;
+    // The clan's buildings (health, attack, bag size …) come and go with membership.
+    players.recomputeStats(gs, p);
+    if (p.conn) gs.send(p, { t: 'invsize', ...base.sizesFor(gs, p) });
     players.markMe(p);
-    if (!clanId) gs.send(p, { t: 'clan', id: null });
+    if (!clanId) {
+      gs.send(p, { t: 'clan', id: null });
+      gs.send(p, { t: 'mates', list: [] });
+      p.matesSent = 0;
+    }
   }
 }
 
@@ -81,7 +105,7 @@ export function handle(gs, p, msg) {
       if (gs.db.clanNameTaken(name, tag)) return 'Namnet eller taggen är upptagen';
       const id = gs.db.createClan({ name, tag, leaderId: p.accountId });
       const c = {
-        id, name, tag, createdAt: Date.now(), vault: {}, upkeep: {}, unpaid: false, lastOnlineAt: Date.now(),
+        id, name, tag, createdAt: Date.now(), vault: {}, upkeep: {}, base: {}, unpaid: false, lastOnlineAt: Date.now(),
         members: new Map([[p.accountId, { accountId: p.accountId, name: p.name, role: 'leader', joinedAt: Date.now() }]]),
         invites: new Set(),
       };
@@ -195,7 +219,9 @@ export function handle(gs, p, msg) {
     case 'withdraw': {
       if (!clan) return 'Du är inte med i någon klan';
       if (op === 'withdraw' && !canDo(me.role, 'withdraw')) return 'Bara ledare och officerare kan ta ur valvet';
-      if (!building.ownBannerNear(gs, p, 4)) return 'Stå vid klanbanéret för att använda valvet';
+      // Anywhere on your own land (or by the banner).
+      const claim = building.claimFor(gs, Math.floor(p.x), Math.floor(p.y));
+      if (!building.ownBannerNear(gs, p, 4) && claim?.clanId !== clan.id) return 'Gå till er klans mark för att använda valvet';
       const want = {};
       for (const k of MP_RESOURCE_KEYS) {
         const n = Math.floor(Number(msg.res?.[k] ?? 0));
@@ -242,8 +268,9 @@ function disband(gs, clan) {
   // The base stays standing, unowned, and crumbles over time.
   for (const st of gs.structures.values()) {
     if (st.clanId === clan.id) {
+      base.detached(gs, st, clan.id);
       st.clanId = null;
-      gs.broadcastTile(st.x, st.y, { t: 'wd', k: 'st+', st: building.structurePayload(st) });
+      gs.broadcastTile(st.x, st.y, { t: 'wd', k: 'st+', st: building.structurePayload(st, gs) });
     }
   }
   for (const id of ids) {
@@ -266,4 +293,29 @@ export function memberLeft(gs, accountId) {
 export function memberJoined(gs, accountId) {
   const clan = gs.clanOf(accountId);
   if (clan) sendClan(gs, clan);
+}
+
+/**
+ * Once a second: where your clanmates are (online, anywhere in the world),
+ * for the map and the small arrows at the screen edge. An empty list goes
+ * out once when the last one leaves, so the arrows disappear.
+ */
+export function sendMates(gs) {
+  for (const clan of gs.clans.values()) {
+    const online = [];
+    for (const id of clan.members.keys()) {
+      const m = gs.byAccount.get(id);
+      if (m?.conn && !m.asleep) online.push(m);
+    }
+    for (const p of online) {
+      const list = [];
+      for (const m of online) {
+        if (m === p) continue;
+        list.push({ id: m.id, n: m.name, x: Math.round(m.x * 10) / 10, y: Math.round(m.y * 10) / 10, dead: m.dead ? 1 : 0 });
+      }
+      if (!list.length && !p.matesSent) continue;
+      p.matesSent = list.length;
+      gs.send(p, { t: 'mates', list });
+    }
+  }
 }

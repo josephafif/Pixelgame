@@ -19,6 +19,36 @@ test.afterAll(async () => {
   await srv?.stop();
 });
 
+/** A clan with a base for player p: a banner and the camp buildings asked for ({ den: 2 }). */
+async function giveBase(p, levels) {
+  const gs = srv.gs;
+  const clans = await import('../../server/clans.js');
+  const building = await import('../../server/building.js');
+  const base = await import('../../server/base.js');
+  const { clearArea } = await import('../mp/helpers.js');
+  if (!p.clanId) clans.handle(gs, p, { op: 'create', name: `Bas${p.name}`.slice(0, 20), tag: p.name.slice(0, 3).toUpperCase() });
+  const at = clearArea(gs, 110 + Math.random() * 200, (Math.random() - 0.5) * 200);
+  const back = { x: p.x, y: p.y };
+  Object.assign(p, { x: at.x + 0.5, y: at.y + 2.5 });
+  const keep = { ...p.ch.resources };
+  const level = p.ch.level;
+  p.ch.level = 30;
+  Object.assign(p.ch.resources, { wood: 99999, stone: 99999, scrap: 99999, essence: 99999 });
+  if (building.place(gs, p, 'banner', at.x, at.y)) throw new Error('no banner');
+  const spots = [[-4, -3], [0, -4], [4, -3], [-4, 1], [4, 1], [-3, 4], [1, 4], [4, 4]];
+  Object.keys(levels).forEach((id, i) => {
+    const problem = building.place(gs, p, `b_${id}`, at.x + spots[i][0], at.y + spots[i][1]);
+    if (problem) throw new Error(`${id}: ${problem}`);
+  });
+  const clan = gs.clans.get(p.clanId);
+  Object.assign(clan.base.buildings, levels);
+  base.changed(gs, clan);
+  Object.assign(p.ch.resources, keep);
+  p.ch.level = level;
+  Object.assign(p, back);
+  return at;
+}
+
 async function join(browser, name, password = 'hemligt') {
   const ctx = await browser.newContext({ serviceWorkers: 'block' });
   const page = await ctx.newPage();
@@ -68,6 +98,7 @@ test('two players see each other, chat and form a clan', async ({ browser }) => 
   await a.page.locator('.mp-clan button.btn-primary').click();
   await expect(a.page.locator('.mp-clan-head')).toContainText('[ULV] Ulvarna');
   await expect(a.page.locator('.mp-clan-head')).toContainText('Ledare');
+  await a.page.locator('.mp-clan .tab', { hasText: 'Medlemmar' }).click();
   await a.page.locator('.mp-clan input[placeholder="Spelarens namn"]').fill('Bertil');
   await a.page.locator('.mp-clan button', { hasText: 'Bjud in' }).click();
   await b.page.keyboard.press('KeyB');
@@ -138,6 +169,34 @@ test('a legendary power in multiplayer: the button, its cooldown and its effects
   await a.ctx.close();
 });
 
+test('your clan base: the camp buildings, the base panel, upgrades and the vault in one tap', async ({ browser }) => {
+  const a = await join(browser, 'Byggaren');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Byggaren');
+  // Fristaden has only the forge (and the fire) now, and traders on the square.
+  await a.page.waitForFunction(() => window.__pixelgame.game.markets.npcs.length >= 3);
+  p.ch.level = 12;
+  const at = await giveBase(p, { forge: 1, training: 1 });
+  const players = await import('../../server/players.js');
+  Object.assign(p, { x: at.x + 0.5, y: at.y + 2.5 });
+  srv.gs.send(p, { t: 'teleport', x: p.x, y: p.y });
+  p.ch.resources = { essence: 3000, scrap: 3000, wood: 3000, stone: 3000, gold: 10, shards: 0 };
+  players.markMe(p);
+  await a.page.waitForFunction(() => window.__pixelgame.game.clan?.base?.placed?.forge);
+  await a.page.keyboard.press('KeyB');
+  await expect(a.page.locator('.mp-clan .bcard')).toHaveCount(8);
+  const forge = a.page.locator('.mp-clan .bcard[data-building="forge"]');
+  await expect(forge).toContainText('Nivå 1');
+  await forge.locator('button', { hasText: 'Uppgradera' }).click();
+  await expect(forge).toContainText('Nivå 2');
+  // The vault: everything in with one tap.
+  await a.page.locator('.mp-clan .tab', { hasText: 'Valv' }).click();
+  await a.page.locator('.mp-vault-tab button', { hasText: 'Lägg i allt' }).click();
+  await expect.poll(() => p.ch.resources.wood).toBe(0);
+  await expect(a.page.locator('.vault-row').first()).toContainText('Valv');
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
 test('pals in multiplayer: your pal walks with you, shows in the HUD, and the pals panel works', async ({ browser }) => {
   const a = await join(browser, 'Djurvan');
   const p = [...srv.gs.players.values()].find((x) => x.name === 'Djurvan');
@@ -160,7 +219,8 @@ test('pals in multiplayer: your pal walks with you, shows in the HUD, and the pa
   // Switch it to gathering, through the server.
   await a.page.locator('.pals-panel [data-mode="gather"]').click();
   await expect.poll(() => p.ch.extra.pals.mode).toBe('gather');
-  // Warm the egg in the Den.
+  // Warm the egg in your base's Pal Den.
+  await giveBase(p, { den: 2 });
   p.ch.resources.essence = 500;
   players.markMe(p);
   await a.page.waitForTimeout(200);

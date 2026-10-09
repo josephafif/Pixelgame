@@ -51,15 +51,19 @@ test('points of interest: an old campsite heals and gives a stash, once per play
   }
 });
 
-test('the Waystone: home from the wild, back again, then it recharges', async () => {
+test('the Waystone: home to your base from the wild, back again, then it recharges', async () => {
   const t = await testServer({ worldSeed: 42 });
   try {
     const a = await t.bot('Resenären');
-    const p = t.place(a, 140.5, 20.5);
-    const from = { x: p.x, y: p.y };
+    // No Waystone of your own: no way home (Fristaden has only a forge now).
     let res = await a.request({ t: 'recall', op: 'go' });
+    assert.match(res.error, /vägsten/);
+    const { spots } = await t.clanBase(a, { waystone: 2 });
+    const p = t.place(a, spots.waystone.x + 140.5, spots.waystone.y + 30.5);
+    const from = { x: p.x, y: p.y };
+    res = await a.request({ t: 'recall', op: 'go' });
     assert.equal(res.ok, true, res.error);
-    assert.ok(Math.hypot(p.x, p.y) < 30, 'home in Fristaden');
+    assert.ok(Math.hypot(p.x - spots.waystone.x, p.y - spots.waystone.y) < 4, 'home at the Waystone');
     assert.ok(a.json.some((m) => m.t === 'teleport'));
     res = await a.request({ t: 'recall', op: 'go' });
     assert.equal(res.ok, false, 'already home (and recharging)');

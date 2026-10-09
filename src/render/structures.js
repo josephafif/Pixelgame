@@ -4,6 +4,7 @@
 // up with their neighbours (the mask says which sides are connected).
 
 import { createCanvas, ctx2d } from './canvas.js';
+import { buildingSprite } from './buildings.js';
 
 const O = '#161622';
 export const STRUCT_W = 16;
@@ -315,6 +316,8 @@ export function drawTurretHead(g, x, y, angle, recoil) {
 
 /** Static icon (build menu): the sprite with its moving parts drawn in. */
 export function structureIcon(id) {
+  // Multiplayer clan buildings ('b_forge' …): the camp building itself.
+  if (id.startsWith('b_')) return buildingSprite(id.slice(2), 1);
   const key = `icon:${id}`;
   let c = cache.get(key);
   if (c) return c;

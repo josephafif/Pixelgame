@@ -1045,6 +1045,7 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 .lg.chest { background: #e0b040; }
 .lg.pin { background: #e8364a; border-radius: 50%; }
 .lg.sea { background: #2f8fc4; }
+.lg.mate { background: #7ae07a; border-radius: 50%; }
 @media (max-width: 640px) {
   .map-panel { height: 100%; }
   .map-status { flex-basis: 100%; margin: 0; }
@@ -1151,6 +1152,36 @@ body.mp .key-hints { display: none !important; }
 .mp-members .dot { width: 8px; height: 8px; background: #4a4266; display: inline-block; }
 .mp-members .dot.on { background: var(--good); }
 .mp-member-actions { display: inline-flex; gap: 4px; }
+/* The clan panel: base, vault, members. */
+.mp-clan-head .chip { font-size: 13px; padding: 0 6px; }
+.chip.ok { color: var(--good); }
+.chip.warn { color: var(--ember); }
+.mp-wallet { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mp-wallet .cost { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; }
+.mp-base-grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.mp-base-grid .bcard { gap: 4px; padding: 6px 8px; }
+.mp-base-grid .bcard-art canvas { width: 48px; height: 54px; }
+.mp-base-grid .bcard h3 { font-size: 17px; }
+.mp-base-grid .bcard .row button { min-height: 34px; }
+.mp-base-grid .bcard .bcost { display: inline-flex; flex-wrap: wrap; gap: 3px; flex-basis: 100%; }
+.mp-base-empty { align-items: flex-start; }
+.mp-vault-tab .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vault-rows { display: flex; flex-direction: column; gap: 4px; }
+.vault-row {
+  display: grid; grid-template-columns: minmax(110px, 1.3fr) 64px 64px minmax(0, 2.6fr); align-items: center; gap: 8px;
+  padding: 4px 6px; background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line);
+}
+.vault-res { display: inline-flex; align-items: center; gap: 6px; }
+.vault-num { display: flex; flex-direction: column; line-height: 1.05; }
+.vault-num small { font-size: 11px; color: var(--muted); }
+.vault-btns { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.vault-btns button.small { min-width: 44px; }
+@media (max-width: 640px) {
+  .vault-row { grid-template-columns: 1fr 52px 52px; }
+  .vault-btns { grid-column: 1 / -1; justify-content: stretch; }
+  .vault-btns button.small { flex: 1; min-height: 36px; }
+  .mp-base-grid { grid-template-columns: 1fr; }
+}
 button.small { min-height: 30px; padding: 0 8px; font-size: 13px; }
 .mp-players ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 .mp-name, .mp-fail, .mp-connecting { display: flex; flex-direction: column; gap: 10px; }

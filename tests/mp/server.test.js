@@ -184,6 +184,13 @@ test('clans: create, invite, join; clan mates can not hurt each other', async ()
     // Members can't kick, the leader can't leave a clan with members.
     assert.equal((await b.request({ t: 'clan', op: 'kick', name: 'Hunter' })).ok, false);
     assert.equal((await a.request({ t: 'clan', op: 'leave' })).ok, false);
+    // Clanmates see each other wherever they are (the map and the edge arrows).
+    t.place(b, 300.5, -200.5);
+    const mates = await a.waitFor((m) => m.t === 'mates' && m.list.some((x) => x.n === 'Prey' && Math.abs(x.x - 300.5) < 1));
+    assert.equal(mates.list.length, 1, 'only the others');
+    // Leaving the clan clears them.
+    assert.equal((await b.request({ t: 'clan', op: 'leave' })).ok, true);
+    await b.waitFor((m) => m.t === 'mates' && m.list.length === 0);
   } finally {
     await t.close();
   }

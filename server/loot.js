@@ -8,10 +8,11 @@ import { generateWeapon } from '../src/weapons/generator.js';
 import { dropRarity, WEAPON_DROP_CHANCE } from '../src/game/economy.js';
 import { harvestInfo, rollDrops } from '../src/game/gathering.js';
 import { salvageValue } from '../src/game/loot.js';
-import { learnFromWeapon, mpInventorySizes, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
+import { learnFromWeapon, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
 import { inSafeZone } from '../src/net/rules.js';
 import * as players from './players.js';
 import * as pals from './pals.js';
+import * as base from './base.js';
 
 const MAGNET = 2.6;
 const COLLECT = 0.6;
@@ -411,7 +412,7 @@ function collect(gs, p, it) {
 
 /** Puts a weapon in the player's bag (written to the database first). */
 export function giveWeapon(gs, p, dna, source) {
-  const sizes = mpInventorySizes(gs.data);
+  const sizes = base.sizesFor(gs, p);
   if (p.inv.bag.length >= sizes.bagSize) {
     if ((p.bagFullWarnAt ?? 0) < Date.now() - 4000) {
       p.bagFullWarnAt = Date.now();
@@ -439,7 +440,7 @@ export function giveWeapon(gs, p, dna, source) {
 }
 
 function openBag(gs, p, bag) {
-  const sizes = mpInventorySizes(gs.data);
+  const sizes = base.sizesFor(gs, p);
   const room = sizes.bagSize - p.inv.bag.length;
   const items = bag.items.slice(0, Math.max(0, room));
   try {

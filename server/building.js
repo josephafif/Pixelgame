@@ -8,9 +8,12 @@ import { structureDef, refundFor } from '../src/game/construction.js';
 import { canAfford, pay, shortfalls } from '../src/game/base.js';
 import { inSafeZone, bannerProblem, claimAt, canDo } from '../src/net/rules.js';
 import { mpStructureLock } from '../src/net/mpbuild.js';
+import { buildingOfStruct, BUILDING_SV } from '../src/net/mpbase.js';
 import * as combat from './combat.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
+import * as base from './base.js';
+import * as clans from './clans.js';
 
 const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });
 const MAX_CLAN_STRUCTURES = 400;
@@ -30,6 +33,7 @@ function attach(gs, st) {
   if (layer.has(tileKey(st.x, st.y))) return false;
   layer.set(tileKey(st.x, st.y), st);
   gs.structures.set(st.sid, st);
+  base.attached(gs, st);
   return true;
 }
 
@@ -39,8 +43,11 @@ export function loadStructures(gs) {
   }
 }
 
-export function structurePayload(st) {
-  return { sid: st.sid, id: st.id, x: st.x, y: st.y, hp: Math.ceil(st.hp), clanId: st.clanId ?? 0 };
+export function structurePayload(st, gs = null) {
+  const out = { sid: st.sid, id: st.id, x: st.x, y: st.y, hp: Math.ceil(st.hp), clanId: st.clanId ?? 0 };
+  // A clan building shows its level (its look grows with it).
+  if (gs && st.def?.kind === 'building') out.lv = base.structureLevel(gs, st);
+  return out;
 }
 
 export function bannerOf(gs, clanId) {
@@ -63,6 +70,7 @@ export function claimFor(gs, tx, ty) {
 /** May player `p` damage structure `st` right now? */
 export function canDamage(gs, p, st, now = Date.now()) {
   if (!p || st.dead || st.marketId) return false; // markets' walls stand
+  if (st.def?.kind === 'building') return false; // a clan's buildings can't be broken (raids are about walls and the vault)
   if (st.clanId && st.clanId === p.clanId) return false;
   if (inSafeZone(gs.rules, st.x + 0.5, st.y + 0.5)) return false;
   if (!st.clanId) return true; // abandoned
@@ -79,7 +87,7 @@ export function turretMayHit(gs, st, p, now = Date.now()) {
 }
 
 export function damageStructure(gs, st, amount, attacker) {
-  if (!st || st.dead || amount <= 0 || st.marketId) return;
+  if (!st || st.dead || amount <= 0 || st.marketId || st.def?.kind === 'building') return;
   st.hp -= amount;
   st.rt.flash = 0.12;
   st.rt.lastHit = gs.time;
@@ -123,6 +131,7 @@ export function destroyStructure(gs, st, attacker) {
   const layer = st.def.kind === 'floor' ? gs.world.floors : gs.world.structures;
   if (layer.get(tileKey(st.x, st.y)) === st) layer.delete(tileKey(st.x, st.y));
   gs.structures.delete(st.sid);
+  base.detached(gs, st);
   gs.db.deleteStructure(st.sid);
   gs.broadcastTile(st.x, st.y, { t: 'wd', k: 'st-', sid: st.sid, x: st.x, y: st.y, broken: Boolean(attacker !== undefined) });
   if (st.id === 'banner' && st.clanId) bannerLost(gs, st, attacker);
@@ -196,22 +205,51 @@ export function place(gs, p, defId, tx, ty) {
   let count = 0;
   for (const st of gs.structures.values()) if (st.clanId === clan.id) count++;
   if (count >= MAX_CLAN_STRUCTURES) return 'Er bas kan inte rymma fler byggen';
-  if (!canAfford(p.ch.resources, def.cost)) return shortfalls(p.ch.resources, def.cost)[0];
-  pay(p.ch.resources, def.cost);
+  const bid = buildingOfStruct(def.id);
+  let paid = null;
+  if (bid) {
+    // A camp building: one of each per clan, a little room around it, paid
+    // from the vault (and your pockets). Built before? Then moving it is free.
+    if (base.placed(gs, clan.id).has(bid)) return `Er klan har redan ${BUILDING_SV[bid].toLowerCase()} (riv den först för att flytta den)`;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (gs.world.structureAt(tx + dx, ty + dy)?.def?.kind === 'building') return 'För nära en annan byggnad';
+      }
+    }
+    const built = (base.clanBase(clan).buildings[bid] ?? 0) > 0;
+    const cost = built ? {} : def.cost;
+    const short = base.shortfall(clan, p, cost);
+    if (short) return short;
+    paid = base.pay(clan, p, cost);
+    base.clanBase(clan).buildings[bid] = Math.max(1, base.clanBase(clan).buildings[bid] ?? 0);
+  } else {
+    if (!canAfford(p.ch.resources, def.cost)) return shortfalls(p.ch.resources, def.cost)[0];
+    pay(p.ch.resources, def.cost);
+  }
   const st = { clanId: clan.id, id: def.id, x: tx, y: ty, layer: layerOf(def), hp: def.hp, builtBy: p.accountId };
   try {
     gs.db.tx(() => {
       st.sid = gs.db.insertStructure(st);
       players.persist(gs, p);
+      if (bid) gs.db.saveClan(clan);
     });
   } catch (err) {
-    for (const [k, v] of Object.entries(def.cost)) p.ch.resources[k] = (p.ch.resources[k] ?? 0) + v;
+    if (paid) base.refund(clan, p, paid);
+    else for (const [k, v] of Object.entries(def.cost)) p.ch.resources[k] = (p.ch.resources[k] ?? 0) + v;
     gs.log.error('[build] failed', err);
     return 'Kunde inte bygga';
   }
   attach(gs, st);
   players.markMe(p);
-  gs.broadcastTile(tx, ty, { t: 'wd', k: 'st+', st: structurePayload(st) });
+  gs.broadcastTile(tx, ty, { t: 'wd', k: 'st+', st: structurePayload(st, gs) });
+  if (bid) {
+    if (bid === 'well') base.clanBase(clan).wellAt ??= Date.now();
+    base.changed(gs, clan);
+    for (const id of clan.members.keys()) {
+      const m = gs.byAccount.get(id);
+      if (m?.conn) gs.toast(m, `${p.name} byggde ${BUILDING_SV[bid].toLowerCase()} i er bas!`, 'level');
+    }
+  }
   if (def.id === 'banner') {
     gs.broadcast({ t: 'claims', claims: gs.claims() });
     for (const id of clan.members.keys()) {
@@ -233,6 +271,15 @@ export function remove(gs, p, tx, ty) {
   if (!canDo(role, 'unbuild') && st.builtBy !== p.accountId) return 'Bara officerare kan riva andras byggen';
   if (st.id === 'banner' && !canDo(role, 'banner')) return 'Bara ledare och officerare kan riva banéret';
   if (st.rt.lastHit > gs.time - 10) return 'Inte medan basen anfalls';
+  const bid = buildingOfStruct(st.id);
+  if (bid) {
+    // A camp building comes down for free and keeps its level: build it again anywhere in the base.
+    if (!canDo(role, 'unbuild')) return 'Bara ledare och officerare kan riva byggnader';
+    destroyStructure(gs, st, undefined);
+    base.changed(gs, clan);
+    gs.toast(p, `${BUILDING_SV[bid]} är riven. Nivån finns kvar: bygg den igen var ni vill i basen (gratis).`, 'info');
+    return null;
+  }
   const refund = refundFor(gs.data, st.def);
   for (const [k, v] of Object.entries(refund)) p.ch.resources[k] = (p.ch.resources[k] ?? 0) + v;
   destroyStructure(gs, st, undefined);
@@ -348,7 +395,10 @@ export function persistDamage(gs) {
 export function upkeep(gs) {
   const per = gs.rules.upkeepPerStructure ?? {};
   const counts = new Map();
-  for (const st of gs.structures.values()) counts.set(st.clanId ?? 0, (counts.get(st.clanId ?? 0) ?? 0) + 1);
+  for (const st of gs.structures.values()) {
+    if (st.def.kind === 'building') continue; // the camp's buildings cost no upkeep
+    counts.set(st.clanId ?? 0, (counts.get(st.clanId ?? 0) ?? 0) + 1);
+  }
   for (const clan of gs.clans.values()) {
     const n = counts.get(clan.id) ?? 0;
     if (!n) continue;
@@ -376,7 +426,7 @@ export function upkeep(gs) {
   }
   for (const st of [...gs.structures.values()]) {
     const clan = st.clanId ? gs.clans.get(st.clanId) : null;
-    const decay = !clan ? 0.05 : clan.unpaid ? 0.02 : !bannerOf(gs, clan.id) ? 0.02 : 0;
+    const decay = !clan ? 0.05 : st.def.kind === 'building' ? 0 : clan.unpaid ? 0.02 : !bannerOf(gs, clan.id) ? 0.02 : 0;
     if (!decay) continue;
     st.hp -= st.def.hp * decay;
     st.dirtyHp = true;
