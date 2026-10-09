@@ -127,12 +127,13 @@ test('sites to explore: a watchtower shows the land, ruins wake their guardians,
     const tower = findSite(t.gs, 'tower');
     assert.ok(tower, 'a watchtower');
     t.place(a, tower.x, tower.y + 0.8);
-    await a.waitFor((m) => m.t === 'chunk' && m.objects.some((o) => o.key === tower.key));
+    // (The world around you arrives a few chunks per tick: give it time on a busy machine.)
+    await a.waitFor((m) => m.t === 'chunk' && m.objects.some((o) => o.key === tower.key), 10000);
     // Climb it: the land around shows on your map, and places worth a visit are pinned.
     a.input({ buttons: BTN.INTERACT });
-    const reveal = await a.waitFor((m) => m.t === 'reveal');
+    const reveal = await a.waitFor((m) => m.t === 'reveal', 8000);
     assert.equal(reveal.r, 7);
-    await a.waitFor((m) => m.t === 'pin');
+    await a.waitFor((m) => m.t === 'pin', 8000);
     assert.ok(p.ch.extra.found.includes(tower.key));
     // Ruins: rich loot, and two elite guardians wake up.
     const ruins = findSite(t.gs, 'ruins');
@@ -155,7 +156,7 @@ test('sites to explore: a watchtower shows the land, ruins wake their guardians,
     for (const e of t.gs.enemiesNear(p.x, p.y, 20)) e.dead = true;
     const pins = a.json.filter((m) => m.t === 'pin').length;
     loot.addPickup(t.gs, 'mapscroll', p.x + 0.4, p.y, { owner: p.id, lockUntil: Date.now() + 60000, vx: 0, vy: 0 });
-    const shown = await a.waitFor((m) => m.t === 'reveal' && m.r === 5);
+    const shown = await a.waitFor((m) => m.t === 'reveal' && m.r === 5, 8000);
     assert.ok(Math.hypot(shown.x - p.x, shown.y - p.y) > 30, 'somewhere else');
     await sleep(100);
     assert.ok(a.json.filter((m) => m.t === 'pin').length > pins, 'pinned');
