@@ -628,6 +628,55 @@ export function update(gs, dt) {
     }
   }
   separate(gs);
+  keepOffPlayers(gs);
+}
+
+/**
+ * Monsters never stand inside a player: whatever walks into you (or you
+ * into it) ends up at arm's length and slides around you.
+ */
+function keepOffPlayers(gs) {
+  for (const p of gs.players.values()) {
+    if (p.dead) continue;
+    for (const e of gs.enemiesNear(p.x, p.y, p.r + 3)) {
+      if (e.dead || e.submerged) continue;
+      const rr = e.r + p.r;
+      let dx = e.x - p.x;
+      let dy = e.y - p.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= rr * rr) continue;
+      let d = Math.sqrt(d2);
+      const push = rr - d;
+      if (d < 0.001) {
+        // Exactly on top: step out on its own side.
+        const a = e.id * 2.39996;
+        dx = Math.cos(a);
+        dy = Math.sin(a);
+        d = 1;
+      }
+      shove(gs, e, (dx / d) * push, (dy / d) * push);
+    }
+  }
+}
+
+/** Moves a monster by (px, py), sliding along walls rather than into them. */
+function shove(gs, e, px, py) {
+  if (e.boss) {
+    e.x += px;
+    e.y += py;
+    return;
+  }
+  const r = Math.min(e.r, 0.45);
+  const mode = moveMode(e);
+  const w = gs.world;
+  if (w.isFree(e.x + px, e.y + py, r, mode)) {
+    e.x += px;
+    e.y += py;
+  } else if (w.isFree(e.x + px, e.y, r, mode)) {
+    e.x += px;
+  } else if (w.isFree(e.x, e.y + py, r, mode)) {
+    e.y += py;
+  }
 }
 
 /** Light separation so crowds don't merge into one sprite. */
@@ -664,6 +713,10 @@ function nudge(gs, e, px, py) {
 /** Keeps a lively but fair number of monsters around everyone out in the wild. */
 export function spawn(gs) {
   if (gs.enemies.size >= gs.config.maxEnemies) return;
+  // Never inside a clan's base (its claim, plus a margin for the group).
+  const claims = gs.claims();
+  const baseR2 = (gs.rules.claimRadius + 4) ** 2;
+  const inBase = (x, y) => claims.some((c) => (x - c.x) ** 2 + (y - c.y) ** 2 <= baseR2);
   for (const p of gs.players.values()) {
     if (p.dead || p.asleep || inSafeZone(gs.rules, p.x, p.y)) continue;
     const wl = gs.world.worldLevel(p.x, p.y);
@@ -680,8 +733,8 @@ export function spawn(gs) {
       const x = p.x + Math.cos(a) * d;
       const y = p.y + Math.sin(a) * d;
       if (inSafeZone(gs.rules, x, y) || (x * x + y * y) < (gs.rules.safeRadius + 6) ** 2) continue;
-      if (!gs.world.isFree(x, y, 0.45, 'enemy')) continue;
-      // Never right next to another player (or inside a base's walls).
+      if (!gs.world.isFree(x, y, 0.45, 'enemy') || inBase(x, y)) continue;
+      // Never right next to another player.
       if (gs.nearestPlayer(x, y, 10)) continue;
       const biome = gs.world.biomeAt(Math.floor(x), Math.floor(y));
       const candidates = biome.enemies.map((id) => gs.data.byId.enemies.get(id)).filter((c) => c && !c.sea);

@@ -12,6 +12,7 @@ import * as clans from './clans.js';
 const MAX_TEXT = 8 * 1024;
 const MAX_BINARY = 256;
 const AUTH_TIMEOUT_MS = 10000;
+const NAME_TIMEOUT_MS = 10 * 60 * 1000; // picking a name and a password takes a while
 
 /** Token bucket: `rate` per second, bursts up to `burst`. */
 class Bucket {
@@ -156,9 +157,9 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
   let stage = 'auth';
   let identity = null;
   let busy = false;
-  const timer = setTimeout(() => {
+  let timer = setTimeout(() => {
     if (stage !== 'play') conn.kick('Inloggningen tog för lång tid');
-  }, AUTH_TIMEOUT_MS);
+  }, config.authTimeoutMs ?? AUTH_TIMEOUT_MS);
 
   const enter = (account) => {
     let online = 0;
@@ -226,6 +227,10 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
     }
     if (!account) {
       stage = 'create';
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (stage !== 'play') conn.kick('Det tog för lång tid att välja namn');
+      }, NAME_TIMEOUT_MS);
       conn.sendJson({ t: 'need-name', suggestion: identity.name ? identity.name.replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 16) : '' });
       return undefined;
     }
@@ -273,6 +278,11 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
       if (!conn.text.take()) return conn.strike(gs, 'rate limit');
       const msg = JSON.parse(data.toString('utf8'));
       if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return conn.strike(gs, 'bad message');
+      if (stage === 'create' && msg.t === 'ping') {
+        // Keeps the connection alive while a new player picks a name.
+        conn.sendJson({ t: 'pong', c: msg.c, s: Date.now(), tick: gs.tick });
+        return undefined;
+      }
       if (stage === 'auth' || stage === 'create') {
         if (busy) return undefined;
         busy = true;

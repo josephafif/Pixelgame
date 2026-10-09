@@ -135,10 +135,13 @@ export function makeEnemy(data, v, time) {
 
 export function updateEnemy(o, v, x, y, dt, time) {
   const f = (n) => field(ET.ENEMY, v, n);
+  // Velocity from the server's positions (o.x/o.y may be nudged for drawing).
   if (dt > 0) {
-    o.vx = o.vx * 0.6 + ((x - o.x) / dt) * 0.4;
-    o.vy = o.vy * 0.6 + ((y - o.y) / dt) * 0.4;
+    o.vx = o.vx * 0.6 + ((x - (o.sx ?? x)) / dt) * 0.4;
+    o.vy = o.vy * 0.6 + ((y - (o.sy ?? y)) / dt) * 0.4;
   }
+  o.sx = x;
+  o.sy = y;
   o.x = x;
   o.y = y;
   const hp = f('hp');

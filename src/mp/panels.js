@@ -172,7 +172,7 @@ export class MpPanels {
     const body = h('div.mp-name',
       h('p', g.account?.password
         ? 'Byt lösenordet du loggar in med.'
-        : 'Du spelar som gäst. Välj ett lösenord, så kan du logga in med ditt namn från en ny länk eller en annan enhet.'),
+        : 'Din karaktär har inget lösenord än. Välj ett, så kan du logga in med ditt namn från en ny länk eller en annan enhet.'),
       h('p.small.muted', `Ditt namn: ${g.myName ?? ''}`),
       h('label.field', h('span', 'Nytt lösenord (minst 4 tecken)'), input),
       h('button.btn-primary', { onclick: save }, 'Spara'));

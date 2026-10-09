@@ -3,9 +3,11 @@
 // works best in an installed app), Google and Discord. Sessions are kept in
 // localStorage and refreshed before they expire.
 //
-// Servers that allow guests hand out their own guest token; it is kept per
-// server so a guest keeps their character. A guest with a password can get
-// their token back from any address or device (POST /login).
+// Servers can also hand out their own login (a "guest" token in the code;
+// players just see a character with a name and a password). It is kept per
+// server with the character's name, so the game remembers who you are there
+// and you don't have to log in again. With the name and password you get it
+// back from any address or device (POST /login).
 
 const SESSION_KEY = 'pg-mp-session';
 const GUEST_PREFIX = 'pg-mp-guest:';
@@ -166,14 +168,33 @@ export class MpAuth {
     }
   }
 
-  // --- Guests ---------------------------------------------------------------------
+  // --- Characters with the server's own login ------------------------------------------
 
-  guestToken(serverUrl) {
-    return read(GUEST_PREFIX + serverUrl);
+  /** The character this browser plays on a server: { token, name, password } or null. */
+  character(serverKey) {
+    const v = read(GUEST_PREFIX + serverKey);
+    if (typeof v === 'string') return { token: v, name: null, password: false }; // saved by an older version
+    return v?.token ? v : null;
   }
 
-  setGuestToken(serverUrl, token) {
-    write(GUEST_PREFIX + serverUrl, token);
+  guestToken(serverKey) {
+    return this.character(serverKey)?.token ?? null;
+  }
+
+  setGuestToken(serverKey, token, info = {}) {
+    const old = this.character(serverKey);
+    const same = old?.token === token;
+    write(GUEST_PREFIX + serverKey, { token, name: info.name ?? (same ? old.name : null), password: info.password ?? (same ? old.password : false) });
+  }
+
+  /** After joining: remember who we are on this server. */
+  rememberCharacter(serverKey, name, password) {
+    const c = this.character(serverKey);
+    if (c) write(GUEST_PREFIX + serverKey, { ...c, name, password: Boolean(password) });
+  }
+
+  forgetCharacter(serverKey) {
+    write(GUEST_PREFIX + serverKey, null);
   }
 }
 

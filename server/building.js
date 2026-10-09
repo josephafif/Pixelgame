@@ -256,6 +256,7 @@ function runTurret(gs, st, dt, now) {
   let best = null;
   let bestD = spec.range * spec.range;
   for (const e of gs.enemiesNear(cx, cy, spec.range)) {
+    if (e.dead || e.submerged) continue;
     const d = (e.x - cx) ** 2 + (e.y - cy) ** 2;
     if (d < bestD) {
       bestD = d;
@@ -284,7 +285,7 @@ function runTurret(gs, st, dt, now) {
   const angle = Math.atan2(best.y + (best.vy ?? 0) * lead - cy, best.x + (best.vx ?? 0) * lead - cx);
   combat.spawnProjectile(gs, {
     x: cx, y: cy, angle, speed: spec.speed, damage: turretDamage(gs, st), range: spec.range + 1,
-    size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, turret: st.sid, element: spec.element ?? 'physical',
+    size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, turret: st.sid, clanId: st.clanId, element: spec.element ?? 'physical',
     color: spec.color, status: spec.status ?? null, kind: 'shot', source: 'turret',
   });
   gs.event(cx, cy, { k: 'turret', sid: st.sid, aim: angle }, 30);

@@ -423,6 +423,7 @@ export function spawnProjectile(gs, o) {
     owner: o.owner ?? 0,
     enemy: o.enemy ?? 0,
     turret: o.turret ?? 0,
+    clanId: o.clanId ?? null, // a turret's clan: its shots fly over the clan's own walls
     kind: o.kind ?? 'shot',
     pierce: o.pierce ?? 0,
     blast: o.blast ?? 1.5,
@@ -447,6 +448,16 @@ function rebase(gs, pr) {
   pr.t0 = gs.tick;
   pr.x0 = pr.x;
   pr.y0 = pr.y;
+}
+
+/**
+ * Shots from a clan's players and turrets fly over the clan's own walls and
+ * turrets (as in single player); everyone else's shots hit them.
+ */
+function ownStructure(gs, pr, st) {
+  if (!st.clanId) return false;
+  const clanId = pr.turret ? pr.clanId : pr.owner ? gs.players.get(pr.owner)?.clanId : null;
+  return clanId === st.clanId;
 }
 
 function shotBlocked(gs, x, y) {
@@ -502,7 +513,7 @@ export function updateProjectiles(gs, dt, now) {
       }
       if (pr.kind !== 'boomerang') {
         const block = shotBlocked(gs, pr.x, pr.y);
-        if (block) {
+        if (block && !(block.st && ownStructure(gs, pr, block.st))) {
           if (block.st && pr.owner) {
             const shooter = gs.players.get(pr.owner);
             if (shooter && building.canDamage(gs, shooter, block.st, now)) {

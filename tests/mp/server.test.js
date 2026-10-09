@@ -41,6 +41,34 @@ test('join as a guest: name, starter sword, world seed', async () => {
   }
 });
 
+test('a new player may take their time picking a name (the login timeout only covers the login)', async () => {
+  const t = await testServer({ authTimeoutMs: 300 });
+  try {
+    const slow = await t.bot('Funderaren', { nameDelay: 1000, password: 'hemligt1' });
+    assert.equal(slow.welcome.name, 'Funderaren');
+    assert.ok(!slow.kicked, slow.kicked);
+    // A connection that never logs in is still closed.
+    const { Bot } = await import('./bot.js');
+    const idle = new Bot(t.url, { token: 'guest' });
+    idle.connect = function connectSilently() {
+      return new Promise((resolve) => {
+        import('ws').then(({ default: WebSocket }) => {
+          const ws = new WebSocket(t.url);
+          ws.on('message', (data) => {
+            const msg = JSON.parse(data.toString());
+            if (msg.t === 'kick') idle.kicked = msg.reason;
+          });
+          ws.on('close', () => resolve());
+        });
+      });
+    };
+    await idle.connect();
+    assert.match(idle.kicked ?? '', /för lång tid/);
+  } finally {
+    await t.close();
+  }
+});
+
 test('movement is server-side: flooding inputs gives no speed', async () => {
   const t = await testServer();
   try {
@@ -227,6 +255,59 @@ test('bases: banners claim land, only the clan builds there, raids follow the ru
   }
 });
 
+/** A free tile (no block, no structure) near (x, y), not in `taken`. */
+function freeTile(gs, x, y, taken = []) {
+  for (let d = 1; d < 8; d++) {
+    for (let dy = -d; dy <= d; dy++) {
+      for (let dx = -d; dx <= d; dx++) {
+        const tx = Math.floor(x) + dx;
+        const ty = Math.floor(y) + dy;
+        if (gs.world.blockAt(tx, ty) || gs.world.structureAt(tx, ty)) continue;
+        if (taken.some(([a, b]) => a === tx && b === ty)) continue;
+        if ((tx + 0.5 - x) ** 2 + (ty + 0.5 - y) ** 2 < 1) continue; // not where the builder stands
+        return [tx, ty];
+      }
+    }
+  }
+  return null;
+}
+
+test('turrets shoot monsters, over the clan walls next to them', async () => {
+  const t = await testServer();
+  try {
+    const a = await t.bot('Tornbyggare');
+    const p = t.player(a);
+    p.ch.level = 40;
+    p.ch.resources = { wood: 500, stone: 500, scrap: 500, essence: 500 };
+    await a.request({ t: 'clan', op: 'create', name: 'Tornen', tag: 'TRN' });
+    let x = 100;
+    while (!t.gs.world.isFree(x, 0.5, 1.2)) x += 1;
+    t.place(a, x, 0.5);
+    const banner = freeTile(t.gs, p.x, p.y);
+    let res = await a.request({ t: 'build', id: 'banner', x: banner[0], y: banner[1] });
+    assert.equal(res.ok, true, res.error);
+    const turret = freeTile(t.gs, p.x, p.y, [banner]);
+    res = await a.request({ t: 'build', id: 'arrow_turret', x: turret[0], y: turret[1] });
+    assert.equal(res.ok, true, res.error);
+    const st = t.gs.world.structureAt(turret[0], turret[1]);
+    // A wall right next to the turret, between it and the monster.
+    const [wx, wy] = [turret[0] + 1, turret[1]];
+    if (!t.gs.world.blockAt(wx, wy) && !t.gs.world.structureAt(wx, wy)) {
+      res = await a.request({ t: 'build', id: 'wood_wall', x: wx, y: wy });
+      assert.equal(res.ok, true, res.error);
+    }
+    const { spawnEnemy } = await import('../../server/enemies.js');
+    const spot = t.gs.world.findFreeSpot(turret[0] + 4.5, turret[1] + 0.5, 0.4);
+    const e = spawnEnemy(t.gs, 'slime', spot.x, spot.y, { level: 1 });
+    e.hp = e.maxHp = 5000;
+    await sleep(3000);
+    assert.ok(e.hp < 5000, `the turret hit the monster (hp ${e.hp})`);
+    assert.ok(st && !st.dead, 'the turret still stands');
+  } finally {
+    await t.close();
+  }
+});
+
 test('death in the wild drops a bag; the killer can pick it up; nothing is duplicated', async () => {
   const t = await testServer();
   try {
@@ -322,6 +403,29 @@ test('monsters spawn in the wild, never in town', async () => {
     await sleep(1500);
     near = [...t.gs.enemiesNear(t.player(a).x, t.player(a).y, 30)].length;
     assert.ok(near > 0, 'monsters in the wild');
+  } finally {
+    await t.close();
+  }
+});
+
+test('monsters stop at arm\'s length: they never stand inside a player', async () => {
+  const t = await testServer();
+  try {
+    const a = await t.bot('Vaggen');
+    const pa = t.player(a);
+    let x = 120;
+    while (!t.gs.world.isFree(x, 0.5, 2.5)) x += 1;
+    t.place(a, x, 0.5);
+    pa.protectUntil = Date.now() + 60000;
+    const { spawnEnemy } = await import('../../server/enemies.js');
+    const foes = [spawnEnemy(t.gs, 'slime', pa.x + 0.05, pa.y, { level: 1 }), spawnEnemy(t.gs, 'slime', pa.x - 2, pa.y + 0.3, { level: 1 })];
+    for (const e of foes) e.hp = e.maxHp = 5000;
+    await sleep(1500);
+    for (const e of foes) {
+      const d = Math.hypot(e.x - pa.x, e.y - pa.y);
+      assert.ok(d >= e.r + pa.r - 0.02, `monster ${e.id} at ${d.toFixed(2)} (contact ${(e.r + pa.r).toFixed(2)})`);
+      assert.ok(d < e.r + pa.r + 1.2, 'but close enough to bite');
+    }
   } finally {
     await t.close();
   }

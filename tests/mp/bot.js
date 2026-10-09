@@ -5,12 +5,13 @@ import WebSocket from 'ws';
 import { encodeInput, decodeSnapshot, PROTOCOL_VERSION } from '../../src/net/protocol.js';
 
 export class Bot {
-  constructor(url, { token = 'guest', name = null, password = undefined, headers = undefined } = {}) {
+  constructor(url, { token = 'guest', name = null, password = undefined, headers = undefined, nameDelay = 0 } = {}) {
     this.url = url;
     this.token = token;
     this.name = name;
     this.password = password;
     this.headers = headers;
+    this.nameDelay = nameDelay; // a person takes a while to pick a name (pinging, like the browser)
     this.known = new Map();
     this.json = [];
     this.snapshots = 0;
@@ -39,7 +40,17 @@ export class Bot {
         const msg = JSON.parse(data.toString());
         this.json.push(msg);
         if (msg.t === 'guest') this.token = msg.token;
-        if (msg.t === 'need-name' && !msg.error) ws.send(JSON.stringify({ t: 'create', name: this.name ?? `Bot${Math.floor(Math.random() * 1e6)}`, password: this.password }));
+        if (msg.t === 'need-name' && !msg.error) {
+          const create = () => {
+            clearInterval(this.namePing);
+            if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'create', name: this.name ?? `Bot${Math.floor(Math.random() * 1e6)}`, password: this.password }));
+          };
+          if (!this.nameDelay) create();
+          else {
+            this.namePing = setInterval(() => ws.send(JSON.stringify({ t: 'ping', c: 0 })), 200);
+            setTimeout(create, this.nameDelay);
+          }
+        }
         if (msg.t === 'welcome') {
           this.welcome = msg;
           resolve(this);

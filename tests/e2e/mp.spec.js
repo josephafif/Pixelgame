@@ -27,7 +27,7 @@ async function join(browser, name, password = 'hemligt') {
   await page.click('#title-multiplayer');
   const server = page.locator('.mp-server');
   await expect(server).toContainText('Pixelgame-servern');
-  await server.locator('button', { hasText: 'Spela som gäst' }).click();
+  await server.locator('button', { hasText: 'Ny karaktär' }).click();
   await expect(page.locator('.mp-name input[type="text"]')).toBeVisible();
   await page.fill('.mp-name input[type="text"]', name);
   await page.fill('.mp-name input[type="password"]', password);
@@ -111,7 +111,7 @@ test('on a new link or device: log in with name and password and get your charac
   await expect(page.locator('#title-multiplayer')).toHaveClass(/btn-primary/);
   await page.click('#title-multiplayer');
   const server = page.locator('.mp-server');
-  await server.locator('button', { hasText: 'Logga in med namn' }).click();
+  await server.locator('button', { hasText: /^Logga in$/ }).click();
   await page.fill('.mp-login input[type="text"]', 'doris');
   await page.fill('.mp-login input[type="password"]', 'felord');
   await page.locator('.mp-login button').click();
@@ -128,6 +128,23 @@ test('on a new link or device: log in with name and password and get your charac
   await page.fill('.mp-name input[type="password"]', 'nyttlosen');
   await page.locator('.mp-name button').click();
   await expect(page.locator('.toast').last()).toContainText('Lösenordet är sparat');
+  // The game remembers who you are: next time it is one click.
+  await page.goto(`${base}/?debug=1`);
+  await page.click('#title-multiplayer');
+  await expect(page.locator('.mp-server button', { hasText: 'Spela som Doris' })).toBeVisible();
+  // If that saved login stops working (a new world on the same address), you log in right there.
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('pg-mp-guest:')) localStorage.setItem(key, JSON.stringify({ token: 'guest.e30.AAAA', name: 'Doris', password: true }));
+    }
+  });
+  await page.locator('.mp-server button', { hasText: 'Spela som Doris' }).click();
+  await expect(page.locator('.mp-name')).toContainText('Logga in på');
+  await expect(page.locator('.mp-name input[type="text"]')).toHaveValue('Doris');
+  await page.fill('.mp-name input[type="password"]', 'nyttlosen');
+  await page.locator('.mp-name button', { hasText: 'Logga in' }).click();
+  await page.waitForFunction(() => window.__pixelgame?.game?.connected);
+  expect(await page.evaluate(() => window.__pixelgame.game.myName)).toBe('Doris');
   expect(errors.filter((e) => !/401/.test(e))).toEqual([]);
   await ctx.close();
 });
@@ -162,10 +179,10 @@ test('on the game\'s website: the official server, a friend\'s server by its cod
     await page.fill('.mp-join input', 'AAAAAA');
     await page.locator('.mp-join button').click();
     await expect(page.locator('.mp-friends .warn')).toContainText('Ingen server har koden AAAAAA');
-    // Join the friend's server by its code, as a guest with a password.
+    // Join the friend's server by its code, as a new character with a password.
     await page.fill('.mp-join input', 'K7QX2M');
     await page.locator('.mp-join button').click();
-    await page.locator('.mp-friends .mp-server button', { hasText: 'Spela som gäst' }).click();
+    await page.locator('.mp-friends .mp-server button', { hasText: 'Ny karaktär' }).click();
     await expect(page.locator('.mp-name input[type="text"]')).toBeVisible();
     await expect(page.locator('.mp-name')).toContainText('Använd inte ett lösenord');
     await page.fill('.mp-name input[type="text"]', 'Vännen');
@@ -175,11 +192,11 @@ test('on the game\'s website: the official server, a friend\'s server by its cod
     expect(await page.evaluate(() => window.__pixelgame.game.serverInfo.name)).toBe('Annas server');
     // The login is kept by the code (the friend's address changes every time they start).
     expect(await page.evaluate(() => Boolean(localStorage.getItem('pg-mp-guest:code:K7QX2M')))).toBe(true);
-    // Back in the lobby: the code is remembered, and you continue as yourself.
+    // Back in the lobby: the code is remembered, and you play on as yourself with one click.
     await page.goto(`${baseURL}/?debug=1`);
     await page.click('#title-multiplayer');
     await page.locator('.mp-recent button', { hasText: 'K7QX2M' }).click();
-    await expect(page.locator('.mp-friends .mp-server button', { hasText: 'Fortsätt som gäst' })).toBeVisible();
+    await expect(page.locator('.mp-friends .mp-server button', { hasText: 'Spela som Vännen' })).toBeVisible();
     expect(errors).toEqual([]);
     await ctx.close();
   } finally {

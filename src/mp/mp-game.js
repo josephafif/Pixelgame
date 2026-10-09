@@ -303,7 +303,7 @@ export class MpGame {
         this.connected = false;
         this.emit('disconnect', info);
       },
-      onNeedName: (msg) => onNeedName?.(msg, (name, password) => this.conn.sendJson({ t: 'create', name, password })),
+      onNeedName: (msg) => onNeedName?.(msg, (name, password) => this.conn.sendCreate(name, password)),
     });
     const welcome = await this.conn.connect(token);
     this.#onWelcome(welcome);
@@ -1056,6 +1056,7 @@ export class MpGame {
             ent.obj.y = s.y;
           }
           updateEnemy(ent.obj, s.v, s.x, s.y, dt, this.time);
+          this.#keepOffMe(ent.obj);
           enemies.push(ent.obj);
           if (ent.obj.boss && (!boss || dist2(boss.x, boss.y, this.player.x, this.player.y) > dist2(ent.obj.x, ent.obj.y, this.player.x, this.player.y))) boss = ent.obj;
           break;
@@ -1138,6 +1139,24 @@ export class MpGame {
       this.emit('boss', boss ? { active: true, name: boss.bossDef.name } : { active: false });
     }
     if (this.target && !enemies.includes(this.target) && !others.includes(this.target)) this.target = null;
+  }
+
+  /**
+   * Monsters are drawn a little in the past and you a little ahead, so one
+   * the server keeps at arm's length could look like it stands in you: it
+   * is drawn at the edge instead (as the server has it).
+   */
+  #keepOffMe(e) {
+    const p = this.player;
+    if (p.dead || e.submerged) return;
+    const rr = e.r + p.r;
+    const dx = e.x - p.x;
+    const dy = e.y - p.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 >= rr * rr || d2 < 1e-6) return;
+    const d = Math.sqrt(d2);
+    e.x = p.x + (dx / d) * rr;
+    e.y = p.y + (dy / d) * rr;
   }
 
   #remoteAttack(o) {

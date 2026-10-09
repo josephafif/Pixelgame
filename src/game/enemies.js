@@ -1276,6 +1276,38 @@ export function updateEnemies(game, dt) {
       }
     }
   }
+  // Enemies never stand inside you: whatever walks into you (or you into
+  // it) ends up at arm's length and slides around you.
+  if (!p.dead) {
+    for (const e of list) {
+      if (e.dead || e.submerged) continue;
+      const rr = e.r + p.r;
+      let dx = e.x - p.x;
+      let dy = e.y - p.y;
+      const d2v = dx * dx + dy * dy;
+      if (d2v >= rr * rr) continue;
+      let d = Math.sqrt(d2v);
+      const push = rr - d;
+      if (d < 0.001) {
+        const a = Math.random() * Math.PI * 2;
+        dx = Math.cos(a);
+        dy = Math.sin(a);
+        d = 1;
+      }
+      const px = (dx / d) * push;
+      const py = (dy / d) * push;
+      const r = Math.min(e.r, 0.45);
+      const mode = moveMode(e);
+      if (e.boss || game.world.isFree(e.x + px, e.y + py, r, mode)) {
+        e.x += px;
+        e.y += py;
+      } else if (game.world.isFree(e.x + px, e.y, r, mode)) {
+        e.x += px;
+      } else if (game.world.isFree(e.x, e.y + py, r, mode)) {
+        e.y += py;
+      }
+    }
+  }
   // Remove dead and far-away enemies.
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];

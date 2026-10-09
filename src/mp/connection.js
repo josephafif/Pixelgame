@@ -28,12 +28,20 @@ export class Connection {
       const ws = new WebSocket(this.url);
       ws.binaryType = 'arraybuffer';
       this.ws = ws;
-      const timeout = setTimeout(() => {
-        if (!welcomed) {
-          ws.close();
-          reject(new Error('Servern svarar inte'));
-        }
-      }, 15000);
+      // The server must answer within 15 s, except while a new player picks
+      // a name (that takes as long as it takes; pings keep the line open).
+      let timeout = null;
+      const arm = () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          if (!welcomed) {
+            ws.close();
+            reject(new Error('Servern svarar inte'));
+          }
+        }, 15000);
+      };
+      this.rearm = arm;
+      arm();
       ws.onopen = () => {
         this.open = true;
         this.sendJson({ t: 'auth', v: PROTOCOL_VERSION, token });
@@ -54,10 +62,13 @@ export class Connection {
         if (msg.t === 'welcome') {
           welcomed = true;
           clearTimeout(timeout);
+          this.rearm = null;
           this.#startPing();
           resolve(msg);
         }
         if (msg.t === 'need-name') {
+          clearTimeout(timeout);
+          if (!this.pingTimer) this.#startPing();
           this.h.onNeedName?.(msg);
           return;
         }
@@ -94,9 +105,16 @@ export class Connection {
   }
 
   #startPing() {
+    clearInterval(this.pingTimer);
     const ping = () => this.sendJson({ t: 'ping', c: performance.now() });
     ping();
     this.pingTimer = setInterval(ping, 2000);
+  }
+
+  /** A new player's name (and password): the server answers with a welcome or asks again. */
+  sendCreate(name, password) {
+    this.rearm?.();
+    return this.sendJson({ t: 'create', name, password });
   }
 
   sendJson(msg) {

@@ -132,7 +132,7 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
     const emailInput = h('input', { type: 'email', placeholder: 'din@epost.se', autocomplete: 'email', value: state.email ?? '' });
     const codeInput = h('input', { type: 'text', inputmode: 'numeric', placeholder: '123456', maxlength: 10, autocomplete: 'one-time-code' });
     return h('div.mp-account',
-      h('p.small.muted', 'Logga in med ett konto, så kan du spela med samma karaktär från alla dina enheter. Eller spela med namn och lösenord.'),
+      h('p.small.muted', 'Logga in med Google eller Discord, eller skapa en karaktär med namn och lösenord nedan. Spelet kommer ihåg din inloggning.'),
       h('div.mp-oauth',
         p.google ? h('button', { onclick: () => { location.href = auth.oauthUrl('google', redirectUrl()); } }, 'Logga in med Google') : null,
         p.discord ? h('button', { onclick: () => { location.href = auth.oauthUrl('discord', redirectUrl()); } }, 'Logga in med Discord') : null),
@@ -190,6 +190,7 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
     const accountOk = ready && s.official && info.supabase && auth.configured;
     const loggedIn = Boolean(auth.session);
     const key = serverKey(s);
+    const mine = auth.character(key);
     return h('div.mp-server',
       h('div.mp-server-head',
         h('b', info?.name ?? s.name),
@@ -200,8 +201,10 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
       offline ? h('p.small.muted', 'Be den som kör servern att starta den (npm run share). Koden är densamma nästa gång.') : null,
       h('div.row',
         accountOk && loggedIn ? h('button.btn-primary', { onclick: () => join(s, 'account') }, icon('players', 20), 'Spela') : null,
-        ready && info.guests ? h(`button${accountOk && loggedIn ? '' : '.btn-primary'}`, { onclick: () => join(s, 'guest') },
-          auth.guestToken(key) ? 'Fortsätt som gäst' : 'Spela som gäst') : null,
+        // The game remembers your character on each server: one click and you're in.
+        ready && info.guests && mine?.name ? h(`button${accountOk && loggedIn ? '' : '.btn-primary'}`, { onclick: () => join(s, 'guest') },
+          icon('players', 20), `Spela som ${mine.name}`) : null,
+        ready && info.guests && !mine?.name ? h(`button${accountOk && loggedIn ? '' : '.btn-primary'}`, { onclick: () => join(s, 'guest') }, 'Ny karaktär') : null,
         ready && info.logins ? h('button', {
           'aria-expanded': String(state.login?.url === s.url),
           onclick: () => {
@@ -209,13 +212,13 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
             rerender();
             document.querySelector('.mp-login input')?.focus();
           },
-        }, 'Logga in med namn') : null,
+        }, mine?.name ? 'Annan karaktär' : 'Logga in') : null,
         s.custom ? h('button.btn-danger', { onclick: () => { removeServer(s.url); refresh(); } }, 'Ta bort') : null),
-      ready && info.logins && state.login?.url === s.url ? loginForm(s) : null);
+      ready && info.logins && state.login?.url === s.url ? loginForm(s, mine) : null);
   }
 
   /** Name + password: your character from another link or device. */
-  function loginForm(s) {
+  function loginForm(s, mine) {
     const form = state.login;
     const name = h('input', { type: 'text', maxlength: 16, autocomplete: 'username', value: form.name, oninput: (e) => { form.name = e.target.value; } });
     const password = h('input', { type: 'password', maxlength: 64, autocomplete: 'current-password', value: form.password, oninput: (e) => { form.password = e.target.value; } });
@@ -229,7 +232,7 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
       state.busy = true;
       try {
         const res = await loginWithPassword(s.url, form.name.trim(), form.password);
-        auth.setGuestToken(serverKey(s), res.token);
+        auth.setGuestToken(serverKey(s), res.token, { name: res.name, password: true });
         join(s, 'guest');
         return;
       } catch (err) {
@@ -245,13 +248,20 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
         if (e.key === 'Enter') submit();
       });
     }
+    const fresh = () => {
+      if (mine?.name && !mine.password
+        && !window.confirm(`${mine.name} har inget lösenord. Om du skapar en ny karaktär kan du inte komma tillbaka till ${mine.name}. Fortsätta?`)) return;
+      auth.forgetCharacter(serverKey(s));
+      join(s, 'guest');
+    };
     return h('div.mp-login',
-      h('p.small.muted', 'Har du spelat här förut, från en annan enhet? Logga in med namnet och lösenordet du valde.'),
+      h('p.small.muted', 'Logga in med namnet och lösenordet du valde när du skapade din karaktär. Det fungerar från vilken enhet som helst.'),
       form.error ? h('p.warn', form.error) : null,
       h('div.mp-login-fields',
         h('label.field', h('span', 'Namn'), name),
         h('label.field', h('span', 'Lösenord'), password),
-        h('button.btn-primary', { disabled: state.busy, onclick: submit }, 'Logga in')));
+        h('button.btn-primary', { disabled: state.busy, onclick: submit }, 'Logga in')),
+      mine?.name ? h('p.small', h('button.small', { onclick: fresh }, 'Skapa en ny karaktär i stället')) : null);
   }
 
   function friendsSection() {
@@ -360,9 +370,9 @@ export function handleAuthRedirect(app) {
 }
 
 /**
- * A new character's name. Guests also pick a password: guest identities
- * live in the browser, per address, so the password is how you get your
- * character back on a new link or another device.
+ * A new character's name. Without a Google/Discord account you also pick a
+ * password: the login the server hands out lives in this browser, so the
+ * name and password are how you get your character back anywhere else.
  */
 function namePrompt(msg, send, { guest = false, last = {}, hosted = false } = {}) {
   const input = h('input', { type: 'text', maxlength: 16, value: last.name ?? msg.suggestion ?? '', autocomplete: 'username', autofocus: true });
@@ -386,15 +396,15 @@ function namePrompt(msg, send, { guest = false, last = {}, hosted = false } = {}
     });
   }
   openModal({
-    title: 'Välj ditt namn',
+    title: 'Skapa din karaktär',
     locked: true,
     className: 'tutorial-panel',
     body: h('div.mp-name',
-      h('p', 'Så här ser andra spelare dig. Du kan inte byta senare.'),
+      h('p', 'Så här ser andra spelare dig. Du kan inte byta namn senare.'),
       error,
       h('label.field', h('span', 'Namn (3–16 tecken)'), input),
       password ? h('label.field', h('span', 'Lösenord (minst 4 tecken)'), password) : null,
-      password ? h('p.small.muted', 'Med namnet och lösenordet kommer du tillbaka till din karaktär från en ny länk eller en annan enhet.') : null,
+      password ? h('p.small.muted', 'Spelet kommer ihåg dig på den här enheten. På en annan enhet loggar du in med namnet och lösenordet.') : null,
       password && hosted ? h('p.small.warn', 'Servern körs av en spelare. Använd inte ett lösenord som du har någon annanstans.') : null,
       h('button.btn-primary', { onclick: submit }, 'Börja spela')),
   });
@@ -424,6 +434,59 @@ function failModal(title, text, { retry = true } = {}) {
         retry ? h('button.btn-primary', { onclick: () => location.reload() }, 'Anslut igen') : null,
         h('button', { onclick: goMenu }, 'Till huvudmenyn'))),
   });
+}
+
+/** Name + password, when the login this browser remembered stopped working. */
+function reloginModal(server, key, lastName) {
+  const auth = makeAuth();
+  const name = h('input', { type: 'text', maxlength: 16, autocomplete: 'username', value: lastName });
+  const password = h('input', { type: 'password', maxlength: 64, autocomplete: 'current-password' });
+  const error = h('p.warn', { hidden: true });
+  let busy = false;
+  const submit = async () => {
+    if (busy) return;
+    if (name.value.trim().length < 3 || passwordProblem(password.value)) {
+      error.textContent = 'Skriv ditt namn och ditt lösenord';
+      error.hidden = false;
+      return;
+    }
+    busy = true;
+    try {
+      const res = await loginWithPassword(server.url, name.value.trim(), password.value);
+      auth.setGuestToken(key, res.token, { name: res.name, password: true });
+      location.reload();
+    } catch (err) {
+      error.textContent = err.message;
+      error.hidden = false;
+      password.value = '';
+    }
+    busy = false;
+  };
+  for (const el of [name, password]) {
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submit();
+    });
+  }
+  openModal({
+    title: 'Logga in',
+    locked: true,
+    className: 'tutorial-panel',
+    body: h('div.mp-name',
+      h('p', `Logga in på ${server.name} med din karaktärs namn och lösenord.`),
+      error,
+      h('label.field', h('span', 'Namn'), name),
+      h('label.field', h('span', 'Lösenord'), password),
+      h('div.row',
+        h('button.btn-primary', { onclick: submit }, 'Logga in'),
+        h('button', {
+          onclick: () => {
+            auth.forgetCharacter(key);
+            location.reload();
+          },
+        }, 'Ny karaktär'),
+        h('button', { onclick: goMenu }, 'Till huvudmenyn'))),
+  });
+  (lastName ? password : name).focus();
 }
 
 /** ?mp=play: connect and start playing. */
@@ -457,7 +520,7 @@ export async function startMultiplayer(app) {
   const last = {};
   try {
     await game.connect(join.server, token, {
-      onGuestToken: (t) => auth.setGuestToken(key, t),
+      onGuestToken: (t) => auth.setGuestToken(key, t, { name: null, password: false }),
       onNeedName: (msg, send) => namePrompt(msg, (name, password) => {
         last.name = name;
         last.password = password;
@@ -466,9 +529,16 @@ export async function startMultiplayer(app) {
       }, { guest: join.mode === 'guest', last, hosted: !join.server.official }),
     });
   } catch (err) {
+    // The saved login no longer works here (the server's world was reset,
+    // or it is another server on the same address): log in again.
+    if (join.mode === 'guest' && token !== 'guest' && /^Inloggningen misslyckades/.test(err.message)) {
+      reloginModal(join.server, key, auth.character(key)?.name ?? '');
+      return;
+    }
     failModal('Kunde inte ansluta', err.message);
     return;
   }
+  if (join.mode === 'guest') auth.rememberCharacter(key, game.myName, game.account?.password);
   closeModal(true);
   $('#hud')?.removeAttribute('hidden');
   document.body.classList.add('mp');
