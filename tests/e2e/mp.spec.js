@@ -125,6 +125,15 @@ test('the inventory and forge open in multiplayer, and nobody can build in town'
   await a.page.waitForTimeout(500);
   await a.page.keyboard.press('KeyC');
   await expect(a.page.locator('.forge-panel')).toBeVisible();
+  // Boats are built at the forge in multiplayer too (a raft in town; ships need your base's forge).
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Cecilia');
+  Object.assign(p.ch.resources, { wood: 500, stone: 500, scrap: 500, essence: 500 });
+  (await import('../../server/players.js')).markMe(p);
+  await a.page.locator('.forge-panel .tab', { hasText: 'Tools' }).click();
+  const raft = a.page.locator('.forge-panel .tool-card', { hasText: 'Raft' });
+  await expect(raft).toBeVisible();
+  await raft.locator('button', { hasText: 'Build' }).click();
+  await expect.poll(() => p.ch.extra.boat ?? 0).toBe(1);
   expect(a.errors).toEqual([]);
   await a.ctx.close();
 });

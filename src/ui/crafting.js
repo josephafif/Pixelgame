@@ -370,7 +370,7 @@ export function open(game, app, arg = {}) {
                 },
               }, icon('anvil', 20), 'Forge'))));
       })),
-      game.mp ? null : boats());
+      boats());
   }
 
   function tabs() {
