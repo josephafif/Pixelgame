@@ -498,6 +498,7 @@ export class Renderer {
     for (const e of game.enemies) if (!e.dead) list.push({ y: e.y, kind: 'enemy', o: e });
     for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
     if (game.pal && !game.pal.hidden) list.push({ y: game.pal.y, kind: 'pal', o: game.pal });
+    for (const o of game.otherPals ?? []) list.push({ y: o.y, kind: 'pal', o }); // multiplayer
     for (const o of game.others ?? []) if (!o.dead) list.push({ y: o.y, kind: 'remote', o });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
     list.sort((a, b) => a.y - b.y);

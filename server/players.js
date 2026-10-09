@@ -197,6 +197,7 @@ export function mePayload(gs, p) {
     bosses: p.ch.extra.bosses,
     codex: p.ch.extra.codex,
     crafts: p.ch.extra.crafts ?? 0,
+    pals: p.ch.extra.pals ?? null,
     stats: p.stats,
     kills: p.ch.kills,
     deaths: p.ch.deaths,
@@ -316,6 +317,7 @@ export function update(gs, p, now) {
 function applyFrame(gs, p, f, now) {
   p.lastSeq = f.seq;
   p.lastView = Math.min(f.view, gs.tick);
+  p.lastTarget = f.target; // your pal helps with whatever you fight
   if (f.cmd) command(gs, p, f.cmd);
   // Movement: the same code the client predicts with.
   gs.world.gateFilter = (st) => Boolean(st.clanId) && st.clanId === p.clanId;

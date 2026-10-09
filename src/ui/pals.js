@@ -41,6 +41,18 @@ function pct(f) {
   return p < 1 ? `${p.toFixed(1)}%` : `${Math.round(p)}%`;
 }
 
+// In multiplayer the Den is Fristaden's, and your level decides how far pals grow.
+const MP_TEXT = [
+  [/^Build a Pal Den first$/, 'The Pal Den in Fristaden takes you in from level 6'],
+  [/^Upgrade the Pal Den to raise pals past level (\d+)$/, 'Reach a higher level (or beat a boss) to raise pals past level $1'],
+];
+
+function mpText(game, text) {
+  if (!game.mp) return text;
+  for (const [re, to] of MP_TEXT) if (re.test(text)) return text.replace(re, to);
+  return text;
+}
+
 export function open(game, app) {
   const { data, save } = game;
 
@@ -55,7 +67,7 @@ export function open(game, app) {
     const maxed = pal.level >= data.pals.maxLevel;
     const next = maxed ? null : palStats(data, pal.species, pal.level + 1);
     const blockers = palUpgradeBlockers(data, save, pal);
-    const hard = blockers.filter((b) => !/^Needs \d+ more /.test(b));
+    const hard = blockers.filter((b) => !/^Needs \d+ more /.test(b)).map((b) => mpText(game, b));
     const live = game.pal?.id === pal.id ? game.pal : null;
     return h('article.bcard.pal-card.active', { 'data-pal': pal.id },
       h('div.bcard-top',
@@ -63,7 +75,7 @@ export function open(game, app) {
         h('div',
           h('h3', pal.name),
           h('div.small', { style: { color: sp?.color } }, sp?.role ?? ''),
-          h('div.small.muted', `Level ${pal.level} / ${data.pals.maxLevel}${cap < data.pals.maxLevel ? ` (Den allows ${cap})` : ''}`),
+          h('div.small.muted', `Level ${pal.level} / ${data.pals.maxLevel}${cap < data.pals.maxLevel ? ` (${game.mp ? 'your level allows' : 'Den allows'} ${cap})` : ''}`),
           live?.state === 'down' ? h('div.small.warn', `Knocked out — back in ${Math.max(0, Math.ceil(live.downUntil - game.time))}s`) : null)),
       h('p.desc', sp?.desc ?? ''),
       h('div.pal-stats',
@@ -91,7 +103,7 @@ export function open(game, app) {
           'data-action': 'upgrade',
           onclick: () => game.upgradePal(pal.id),
         }, icon('up', 20), 'Upgrade'),
-        h('button', { onclick: () => game.setActivePal(null) }, 'Leave at camp')));
+        h('button', { onclick: () => game.setActivePal(null) }, game.mp ? 'Let it rest' : 'Leave at camp')));
   }
 
   function restingCard(pal) {
@@ -102,14 +114,14 @@ export function open(game, app) {
         h('div',
           h('h3', pal.name),
           h('div.small', { style: { color: sp?.color } }, `${sp?.role ?? ''} · level ${pal.level}`),
-          h('div.small.muted', 'Resting at camp'))),
+          h('div.small.muted', game.mp ? 'Resting' : 'Resting at camp'))),
       h('div.row', h('button.btn-primary', { onclick: () => game.setActivePal(pal.id) }, icon('pal', 20), 'Take along')));
   }
 
   function eggCard(egg) {
     const left = egg.hatchAt ? Math.max(0, Math.ceil((egg.hatchAt - Date.now()) / 1000)) : null;
     const blockers = hatchBlockers(data, save, egg);
-    const hard = blockers.filter((b) => !/^Needs \d+ more /.test(b));
+    const hard = blockers.filter((b) => !/^Needs \d+ more /.test(b)).map((b) => mpText(game, b));
     return h('article.bcard.pal-card.egg-card', { 'data-egg': egg.id },
       h('div.bcard-top',
         eggArt(data, egg),
@@ -143,7 +155,8 @@ export function open(game, app) {
     return h('div.pals',
       h('p.small.muted', 'Pals follow you around and fight at your side or gather wood and stone. '
         + 'They hatch from rare Pal Eggs, and grow stronger with essence and materials.'),
-      den < 1 ? h('div.notice',
+      den < 1 && game.mp ? h('div.notice', icon('lock', 16), ' The Pal Den in Fristaden takes you in from level 6: then you can hatch eggs and raise pals.') : null,
+      den < 1 && !game.mp ? h('div.notice',
         icon('lock', 16), ' Build a Pal Den at your camp to hatch eggs and raise pals.',
         h('button', { onclick: () => app.panels.show('base', { focus: 'den' }) }, icon('home', 20), 'Camp')) : null,
       active ? activeCard(active) : null,

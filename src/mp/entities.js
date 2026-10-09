@@ -4,7 +4,7 @@
 // packets arrive unevenly).
 
 import {
-  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS,
+  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   byteToAngle, intToColor,
 } from '../net/protocol.js';
 import { TICK_RATE } from '../net/movement.js';
@@ -247,6 +247,23 @@ export function readArea(v, rt, x = field(ET.AREA, v, 'x') / Q, y = field(ET.ARE
     owner: f('owner') ?? 0,
     x2: (f('x2') ?? 0) / Q,
     y2: (f('y2') ?? 0) / Q,
+  };
+}
+
+/** A pal (species by its index in the game data). */
+export function readPal(v, data) {
+  const f = (n) => field(ET.PAL, v, n);
+  return {
+    owner: f('owner'),
+    species: data.pals.species[f('species')]?.id ?? data.pals.species[0].id,
+    level: f('level'),
+    hp: f('hp'),
+    maxHp: f('maxHp'),
+    state: PAL_STATES[f('state')] ?? 'follow',
+    anim: f('anim'),
+    work: f('work'),
+    down: f('down'),
+    facing: f('facing') ? -1 : 1,
   };
 }
 

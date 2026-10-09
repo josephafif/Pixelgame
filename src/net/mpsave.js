@@ -8,6 +8,35 @@ export const FRISTAD_LEVELS = { hearth: 3, forge: 5, vault: 3, library: 2, train
 
 export const MP_RESOURCE_KEYS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shards'];
 
+/**
+ * Fristaden's Pal Den as your character can use it: one level for every Den
+ * upgrade your level has reached (the last two also need a boss beaten),
+ * just as you would build it up in single player. Each level lets pals grow
+ * two levels.
+ */
+export function mpDenLevel(data, ch) {
+  const den = data.base?.buildings?.find((b) => b.id === 'den');
+  if (!den) return 0;
+  const bossBeaten = Object.keys(ch.extra?.bosses ?? {}).length > 0;
+  let level = 0;
+  for (const l of den.levels) {
+    if ((l.playerLevel ?? 0) > (ch.level ?? 1) || (l.boss && !bossBeaten)) break;
+    level++;
+  }
+  return level;
+}
+
+export function emptyPals() {
+  return { eggs: [], owned: [], active: null, mode: 'fight', nextId: 1 };
+}
+
+/** A character's pals in single player's save shape (the shared pal rules work on it). */
+export function mpPalSave(data, ch) {
+  ch.extra ??= {};
+  ch.extra.pals ??= emptyPals();
+  return { pals: ch.extra.pals, resources: ch.resources, base: { buildings: { ...FRISTAD_LEVELS, den: mpDenLevel(data, ch) } } };
+}
+
 /** Bag and storage sizes in multiplayer. */
 export function mpInventorySizes(data) {
   return { bagSize: data.base.baseBag, storageSize: data.base.baseStorage };
@@ -26,7 +55,7 @@ export function mpVirtualSave(data, worldSeed, ch, inv) {
     resources: ch.resources,
     components: {},
     codex: { weapons: {}, modifiers: extra.codex?.modifiers ?? [], effects: [], abilities: extra.codex?.abilities ?? [] },
-    base: { buildings: { ...FRISTAD_LEVELS }, structures: [], wellAt: Date.now(), recall: null },
+    base: { buildings: { ...FRISTAD_LEVELS, den: mpDenLevel(data, ch) }, structures: [], wellAt: Date.now(), recall: null },
     bosses: { defeated: extra.bosses ?? {} },
     counters: { craft: extra.crafts ?? 0, drop: 0 },
     tools: { pickaxe: ch.pickaxe ?? 0, boat: 0 },
@@ -44,7 +73,7 @@ export function mpVirtualSave(data, worldSeed, ch, inv) {
     flags: {},
     world: { explored: [], pins: [], chests: [], shrines: [], altars: [], found: [], harvested: {} },
     markets: {},
-    pals: { eggs: [], owned: [], active: null, mode: 'follow', nextId: 1 },
+    pals: extra.pals ?? emptyPals(),
   };
 }
 

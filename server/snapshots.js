@@ -5,7 +5,7 @@
 import { CHUNK } from '../src/game/world.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import {
-  ET, PF, EF, PRF, PKF, SF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS,
+  ET, PF, EF, PRF, PKF, SF, AF, ALF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   encodeSnapshot, changed, quantize, angleToByte, colorToInt,
 } from '../src/net/protocol.js';
 import { inSafeZone, claimAt } from '../src/net/rules.js';
@@ -69,6 +69,13 @@ function areaValues(gs, a) {
     extra, a.owner ?? 0, quantize(a.x2 ?? a.x), quantize(a.y2 ?? a.y)];
 }
 
+function palValues(gs, pal) {
+  const species = Math.max(0, gs.data.pals.species.findIndex((s) => s.id === pal.species));
+  const down = pal.state === 'down' ? Math.max(0, Math.ceil(pal.downUntil - gs.time)) : 0;
+  return [quantize(pal.x), quantize(pal.y), pal.facing >= 0 ? 0 : 1, pal.owner, species, pal.level, Math.ceil(Math.max(0, pal.hp)), pal.stats.maxHp,
+    Math.max(0, PAL_STATES.indexOf(pal.state)), pal.anim, pal.work, down];
+}
+
 function allyValues(a) {
   return [quantize(a.x), quantize(a.y), angleToByte(a.facing), a.owner, a.anim, a.moving ? ALF.MOVING : 0];
 }
@@ -116,6 +123,10 @@ export function sendSnapshots(gs, now) {
   for (const it of gs.pickups.values()) all.push({ id: it.id, type: ET.PICKUP, x: it.x, y: it.y, values: pickupValues(it), ref: it });
   for (const a of gs.areas.values()) all.push({ id: a.id, type: ET.AREA, x: a.x, y: a.y, values: areaValues(gs, a), ref: a });
   for (const a of gs.allies.values()) all.push({ id: a.id, type: ET.ALLY, x: a.x, y: a.y, values: allyValues(a), ref: a });
+  for (const p of gs.players.values()) {
+    const pal = p.palEnt;
+    if (pal) all.push({ id: pal.eid, type: ET.PAL, x: pal.x, y: pal.y, values: palValues(gs, pal), ref: pal });
+  }
   // Bucketed by position: each player looks only at the cells around them.
   const grid = (gs.snapGrid ??= new SpatialGrid(16));
   grid.rebuild(all);

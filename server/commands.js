@@ -9,6 +9,7 @@ import { inSafeZone, describeRaidWindow, passwordProblem } from '../src/net/rule
 import { hashPassword } from './auth.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
+import * as pals from './pals.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
 
@@ -66,6 +67,8 @@ export function handle(gs, p, msg) {
       return building.remove(gs, p, Number(msg.x), Number(msg.y));
     case 'equip':
       return equip(gs, p, String(msg.id ?? ''), msg.slot === 'secondary' ? 'secondary' : 'main');
+    case 'pal':
+      return pals.request(gs, p, msg);
     case 'move':
       return moveItem(gs, p, String(msg.id ?? ''), msg.to === 'storage' ? 'storage' : 'bag');
     case 'salvage': {

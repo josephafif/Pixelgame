@@ -14,6 +14,7 @@ const loaders = {
   crafting: () => import('../ui/crafting.js'),
   map: () => import('../ui/map.js'),
   settings: () => import('../ui/settings.js'),
+  pals: () => import('../ui/pals.js'),
 };
 
 const DOCK = {
@@ -83,12 +84,8 @@ export class MpPanels {
       this.game.toggleBuildMode(false);
       return;
     }
-    const alias = { base: 'clan', research: 'players', pals: null }[name];
+    const alias = { base: 'clan', research: 'players' }[name];
     const target = alias === undefined ? name : alias;
-    if (target === null) {
-      this.game.toast('Pals finns inte i multiplayer än.', 'warn');
-      return;
-    }
     if (isModalOpen() && this.open === target && !Object.keys(arg).length) {
       closeModal();
       return;

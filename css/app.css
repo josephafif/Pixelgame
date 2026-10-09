@@ -1102,6 +1102,8 @@ body:not([data-input="keyboard"]) .keys { display: none; }
   position: absolute; left: calc(10px + var(--safe-l)); top: calc(150px + var(--safe-t));
   min-width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center;
 }
+/* With a pal walking along, its chip takes that spot: the chat button moves down. */
+body.mp:has(.hud-pal:not([hidden])) .mp-chat-btn { top: calc(176px + var(--safe-t)); }
 .mp-chat-bar {
   position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(10px + var(--safe-b));
   width: min(96vw, 620px); display: flex; gap: 6px; align-items: center; padding: 6px;
@@ -1155,6 +1157,6 @@ button.small { min-height: 30px; padding: 0 8px; font-size: 13px; }
 @media (max-width: 640px), (max-height: 520px) {
   .mp-zone { font-size: 11px; top: calc(4px + var(--safe-t)); border-width: 4px; border-image-width: 4px; }
   .mp-chat-log { font-size: 11px; width: 60vw; bottom: calc(42% + var(--safe-b)); }
-  .mp-chat-btn { top: calc(78px + var(--safe-t)); left: calc(6px + var(--safe-l)); }
+  .mp-chat-btn, body.mp:has(.hud-pal:not([hidden])) .mp-chat-btn { top: calc(78px + var(--safe-t)); left: calc(6px + var(--safe-l)); }
   .mp-debug { font-size: 9px; white-space: normal; width: 96vw; text-align: center; }
 }

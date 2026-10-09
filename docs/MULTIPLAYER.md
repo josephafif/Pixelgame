@@ -32,7 +32,7 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 | Del | Var i koden |
 |---|---|
 | Delad kärna: protokoll, rörelse, regler | `src/net/` (`protocol.js`, `movement.js`, `rules.js`, `mpbuild.js`, `mpsave.js`) |
-| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
+| Server: 30 Hz, auktoritativ, SQLite, inloggning | `server/` (`game-server.js`, `players.js`, `combat.js`, `abilities.js`, `pals.js`, `enemies.js`, `loot.js`, `building.js`, `clans.js`, `snapshots.js`, `grid.js`, `net.js`, `auth.js`, `db.js`) |
 | Klient: lobby, förutsägelse, interpolering, panelerna | `src/mp/` (`mp-game.js`, `entities.js`, `connection.js`, `lobby.js`, `auth.js`, `panels.js`, `hud-extra.js`) |
 | Drift | `cloud/` och `wrangler.jsonc` (Cloudflare), `supabase/` (serverlistan), `scripts/share.mjs` (`npm run share`), `server/Dockerfile`, `docker-compose.yml`, `deploy/` |
 | Tester | `tests/mp/` (protokoll, rörelse, regler, inloggning, databas och botar mot en riktig server), `tests/e2e/mp.spec.js` (två webbläsare), `scripts/loadtest.mjs` |
@@ -57,10 +57,21 @@ PvP-strid på egen hand. Nedkylningen sparas med karaktären, så den nollställ
 inte om man loggar ut eller byter vapen. Fenix räddar dig en gång medan den är
 redo, precis som i singleplayer.
 
+### Pals
+
+Pals finns i multiplayer (`server/pals.js`). Ägg droppar från bossar (alltid
+första gången du besegrar en boss) och från elitmonster. Du kläcker dem i
+Fristadens Pal Den och gör dem starkare med essens och material. Eftersom
+Fristaden delas av alla bestämmer din nivå hur långt pals kan växa, på samma
+sätt som Den-uppgraderingarna gör i singleplayer: Den tar emot dig från nivå
+6, och de två sista stegen kräver också en besegrad boss. Palen som går med dig
+körs av servern, så alla ser den. Den slåss, samlar trä och sten åt dig eller
+följer bara med, och slås den ut vaknar den efter en stund. Pals sparas med
+karaktären.
+
 ### Inte med i multiplayer än
 
 Följande finns i singleplayer men inte i multiplayer än:
-- pals;
 - båtar, havsdjur och marknader;
 - forskning (smedjan har samma val för alla);
 - WebTransport (allt går via WebSocket).

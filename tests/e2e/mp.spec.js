@@ -133,6 +133,38 @@ test('a legendary power in multiplayer: the button, its cooldown and its effects
   await a.ctx.close();
 });
 
+test('pals in multiplayer: your pal walks with you, shows in the HUD, and the pals panel works', async ({ browser }) => {
+  const a = await join(browser, 'Djurvan');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Djurvan');
+  p.ch.level = 8;
+  p.ch.extra.pals = {
+    eggs: [{ id: 'egg2', species: 'emberpup', hatchAt: null }],
+    owned: [{ id: 'pal1', species: 'glimmerfox', name: 'Glimmerfox', level: 2 }],
+    active: 'pal1', mode: 'fight', nextId: 3,
+  };
+  const pals = await import('../../server/pals.js');
+  const players = await import('../../server/players.js');
+  pals.sync(srv.gs, p);
+  players.markMe(p);
+  await a.page.waitForFunction(() => window.__pixelgame.game.pal?.species === 'glimmerfox');
+  await expect(a.page.locator('#hud-pal')).toBeVisible();
+  await a.page.keyboard.press('KeyH');
+  await expect(a.page.locator('.pals-panel')).toBeVisible();
+  await expect(a.page.locator('.pals-panel .pal-card.active')).toContainText('Glimmerfox');
+  await expect(a.page.locator('.pals-panel .egg-card')).toBeVisible();
+  // Switch it to gathering, through the server.
+  await a.page.locator('.pals-panel [data-mode="gather"]').click();
+  await expect.poll(() => p.ch.extra.pals.mode).toBe('gather');
+  // Warm the egg in the Den.
+  p.ch.resources.essence = 500;
+  players.markMe(p);
+  await a.page.waitForTimeout(200);
+  await a.page.locator('.pals-panel [data-action="hatch"]').click();
+  await expect.poll(() => Boolean(p.ch.extra.pals.eggs[0]?.hatchAt)).toBe(true);
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
 test('on a new link or device: log in with name and password and get your character back', async ({ browser }) => {
   const a = await join(browser, 'Doris', 'ostkaka');
   const level = await a.page.evaluate(() => window.__pixelgame.game.me?.level);

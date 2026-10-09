@@ -25,8 +25,10 @@ import { mpVirtualSave } from '../net/mpsave.js';
 import { inSafeZone, claimAt, canDo, bannerProblem, pvpBlock } from '../net/rules.js';
 import { Connection } from './connection.js';
 import {
-  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly,
+  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal,
 } from './entities.js';
+import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
+import { emptyPals, mpDenLevel } from '../net/mpsave.js';
 import { abilityProgress, abilityReadyIn } from '../game/abilities.js';
 
 const DEG = Math.PI / 180;
@@ -80,6 +82,7 @@ export class MpGame {
     this.allies = [];
     this.others = [];
     this.pal = null;
+    this.otherPals = []; // other players' pals
     this.boss = null;
     this.shake = 0;
     this.hitstop = 0;
@@ -233,10 +236,13 @@ export class MpGame {
     s.codex.modifiers = me.codex?.modifiers ?? [];
     s.codex.abilities = me.codex?.abilities ?? [];
     s.counters.craft = me.crafts ?? 0;
+    s.pals = me.pals ?? emptyPals();
+    s.base.buildings.den = mpDenLevel(this.data, { level: me.level, extra: { bosses: me.bosses ?? {} } });
     if (me.stats) this.pstats = me.stats;
     this.xpNext = me.xpNext;
     this.emit('inventory');
     this.emit('tools');
+    this.emit('pals');
     this.emit('me', me);
   }
 
@@ -462,6 +468,10 @@ export class MpGame {
           if (ev.id === this.myId || ev.by === this.myId) this.#playEvent(ev);
           else this.eventQueue.push(ev);
         }
+        break;
+      case 'pal-born':
+        this.audio.play('levelup');
+        this.emit('pals');
         break;
       case 'abcd':
         // Ability cooldowns: all of them when you join, one when you cast.
@@ -1059,6 +1069,8 @@ export class MpGame {
     const pickups = [];
     const areas = [];
     const allies = [];
+    const otherPals = [];
+    let myPal = null;
     let boss = null;
     const myClan = this.me?.clan?.id ?? null;
     for (const ent of this.store.ents.values()) {
@@ -1153,6 +1165,47 @@ export class MpGame {
           if (a.t >= 0 && a.t <= a.dur) areas.push(a);
           break;
         }
+        case ET.PAL: {
+          const info = readPal(s.v, this.data);
+          let o = ent.obj;
+          if (!o || o.species !== info.species) {
+            o = {
+              eid: ent.id, species: info.species, x: s.x, y: s.y, vx: 0, vy: 0, r: 0.3, facing: info.facing, phase: Math.random() * 10,
+              attackT: -9, workT: -9, flash: 0, anim: info.anim, work: info.work, hp: info.hp, stats: null, state: info.state,
+            };
+            ent.obj = o;
+          }
+          if (dt > 0) {
+            o.vx = (s.x - o.x) / dt;
+            o.vy = (s.y - o.y) / dt;
+          }
+          o.x = s.x;
+          o.y = s.y;
+          o.facing = info.facing;
+          if (info.hp < o.hp) o.flash = 0.12;
+          o.flash = Math.max(0, o.flash - dt);
+          o.hp = info.hp;
+          o.level = info.level;
+          o.state = info.state;
+          o.downUntil = this.time + info.down;
+          o.stats = { ...palStats(this.data, info.species, info.level), maxHp: info.maxHp };
+          if (info.anim !== o.anim) {
+            o.anim = info.anim;
+            o.attackT = this.time;
+            this.fx.emit(palSpecies(this.data, info.species)?.element === 'fire' ? 'ember' : 'hit', o.x + o.facing * 0.6, o.y, 4, 0.3, 2);
+          }
+          if (info.work !== o.work) {
+            o.work = info.work;
+            o.workT = this.time;
+          }
+          if (info.owner === this.myId) {
+            o.id = this.save.pals.active;
+            myPal = o;
+          } else {
+            otherPals.push(o);
+          }
+          break;
+        }
         case ET.ALLY: {
           const info = readAlly(s.v);
           let o = ent.obj;
@@ -1185,6 +1238,8 @@ export class MpGame {
     this.pickups = pickups;
     this.areas = areas;
     this.allies = allies;
+    this.pal = myPal;
+    this.otherPals = otherPals;
     if (boss !== this.boss) {
       this.boss = boss;
       this.emit('boss', boss ? { active: true, name: boss.bossDef.name } : { active: false });
@@ -1324,7 +1379,17 @@ export class MpGame {
         this.fx.emit(ev.wood ? 'leaf' : 'stone', ev.x, ev.y - 0.3, 14, 0.9, 2.5);
         this.audio.play('fell');
         break;
+      case 'palhurt': {
+        const o = this.store.ents.get(ev.id)?.obj;
+        if (o) this.fx.number(o.x, o.y - 0.8, ev.n, { color: '#ffb0b0' });
+        break;
+      }
       case 'pick':
+        if (ev.kind === 'egg' && ev.id === this.myId) {
+          this.audio.play('discover', { rarity: 3 });
+          this.flash('#9cf07a', 0.3);
+          break;
+        }
         if (ev.id === this.myId) this.audio.play(SOUND_KINDS[ev.kind] ?? 'pickup', { throttle: 60 });
         break;
       case 'turret': {
@@ -1637,6 +1702,44 @@ export class MpGame {
   equip(id, slot = 'main') {
     this.#ask({ t: 'equip', id, slot });
     return true;
+  }
+
+  // --- Pals (the server keeps them with your character) -----------------------------------------
+
+  hatchEgg(id) {
+    this.#ask({ t: 'pal', op: 'hatch', id });
+    return true;
+  }
+
+  async upgradePal(id) {
+    const res = await this.#ask({ t: 'pal', op: 'upgrade', id });
+    if (res.ok) this.audio.play('levelup');
+    return res.ok;
+  }
+
+  setActivePal(id) {
+    this.#ask({ t: 'pal', op: 'active', id });
+  }
+
+  setPalMode(mode) {
+    if (!PAL_MODES.includes(mode)) return;
+    this.save.pals.mode = mode;
+    this.emit('pals');
+    this.#ask({ t: 'pal', op: 'mode', mode });
+  }
+
+  /** Eggs hatch on the server (the pals panel calls this every second). */
+  checkHatch() {}
+
+  #palHud() {
+    const pal = this.pal;
+    if (!pal) return null;
+    const owned = findPal(this.save, pal.id);
+    return {
+      name: owned?.name ?? '', species: pal.species, level: pal.level, mode: this.save.pals.mode,
+      hp: Math.ceil(pal.hp), maxHp: pal.stats.maxHp, down: pal.state === 'down',
+      downLeft: pal.state === 'down' ? Math.max(0, Math.ceil(pal.downUntil - this.time)) : 0,
+    };
   }
 
   moveWeapon(id, to) {
@@ -2054,7 +2157,7 @@ export class MpGame {
       fps: Math.round(1000 / this.frameMs),
       craftingUnlocked: true,
       campAlert: false,
-      pal: null,
+      pal: this.#palHud(),
       compass: this.compass,
       zone: this.zoneInfo(),
       ping: Math.round(this.conn?.rtt ?? 0),
@@ -2077,10 +2180,6 @@ export class MpGame {
   }
 
   // Single-player hooks the shared UI may call.
-  checkHatch() {}
-
-  setPalMode() {}
-
   recallReadyIn() {
     return 0;
   }

@@ -11,6 +11,7 @@ import { salvageValue } from '../src/game/loot.js';
 import { learnFromWeapon, mpInventorySizes, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
 import { inSafeZone } from '../src/net/rules.js';
 import * as players from './players.js';
+import * as pals from './pals.js';
 
 const MAGNET = 2.6;
 const COLLECT = 0.6;
@@ -110,6 +111,7 @@ export function onEnemyKilled(gs, e, killer) {
   for (let i = 0; i < orbs; i++) addPickup(gs, 'essence', e.x, e.y, { value, owner: owner?.id ?? 0, lockUntil: owner ? now + LOCK_MS : 0 });
   if (Math.random() < (e.elite ? 1 : 0.35)) addPickup(gs, 'scrap', e.x, e.y, { value: 1 + Math.floor(e.level / 6), owner: owner?.id ?? 0, lockUntil: owner ? now + LOCK_MS : 0 });
   if (Math.random() < 0.05) addPickup(gs, 'heart', e.x, e.y, {});
+  if (e.elite && owner) pals.dropEgg(gs, owner, 'elite', e.x, e.y);
   const source = e.elite ? 'elite' : 'drop';
   if (Math.random() < WEAPON_DROP_CHANCE[source] * (1 + luck * 0.01)) {
     const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, roll: source });
@@ -131,6 +133,8 @@ function bossDefeated(gs, b, now) {
     if (!p || dmg / total < gs.rules.bossShare) continue;
     winners.push(p);
     p.ch.firstBoss = true;
+    // A Pal Egg: always the first time you beat this boss, sometimes after that.
+    pals.dropEgg(gs, p, p.ch.extra.bosses[def.id] ? 'boss' : 'bossFirst', b.x + (Math.random() - 0.5) * 2, b.y + (Math.random() - 0.5) * 2);
     p.ch.extra.bosses[def.id] = (p.ch.extra.bosses[def.id] ?? 0) + 1;
     // Personal loot: everyone who fought gets their own reward.
     const dna = generate(gs, {
@@ -164,12 +168,18 @@ export function openChest(gs, p, o, now) {
 
 // --- Gathering ---------------------------------------------------------------------------
 
-export function fellBlock(gs, p, target, tool) {
+/** A tree or rock falls. `direct`: straight into p's pockets (what a pal chopped). */
+export function fellBlock(gs, p, target, tool, { direct = false } = {}) {
   const id = gs.removeBlock(target.tx, target.ty);
   if (!id) return;
   const drops = rollDrops(target.info, tool.yield ?? 1);
   const now = Date.now();
   for (const [kind, n] of Object.entries(drops)) {
+    if (direct) {
+      p.ch.resources[kind] = (p.ch.resources[kind] ?? 0) + n;
+      players.markMe(p);
+      continue;
+    }
     for (let i = 0; i < n; i++) {
       addPickup(gs, kind === 'shards' ? 'shard' : kind, target.x, target.y, { value: 1, owner: p.id, lockUntil: now + LOCK_MS });
     }
@@ -287,6 +297,9 @@ function collect(gs, p, it) {
       return giveWeapon(gs, p, it.dna, 'pickup');
     case 'bag':
       return openBag(gs, p, it);
+    case 'egg':
+      pals.collectEgg(gs, p, it);
+      return true;
     default:
       return true;
   }

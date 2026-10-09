@@ -13,6 +13,7 @@ import * as loot from './loot.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
 import * as abilities from './abilities.js';
+import * as pals from './pals.js';
 import { sendSnapshots } from './snapshots.js';
 import { SpatialGrid, PAD } from './grid.js';
 
@@ -203,6 +204,7 @@ export class GameServer {
     if (this.tick % 15 === 0) enemies.spawn(this, now);
     this.reindexEnemies();
     abilities.updateAllies(this, TICK_DT);
+    pals.update(this, TICK_DT);
     prof.mark('enemies');
     combat.updateProjectiles(this, TICK_DT, now);
     combat.updateAreas(this, TICK_DT, now);
@@ -271,6 +273,7 @@ export class GameServer {
     p.infoRev++;
     this.db.touchAccount(account.id, account.email);
     clans.memberJoined(this, account.id);
+    pals.sync(this, p);
     return p;
   }
 

@@ -12,11 +12,11 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
-export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6 };
+export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, PAL: 7 };
 
 /**
  * Fields per entity type, all integers on the wire. Position-like fields
@@ -30,6 +30,8 @@ export const FIELDS = {
   [ET.AREA]: ['x', 'y', 'r', 'kind', 'color', 't0', 'dur', 'extra', 'owner', 'x2', 'y2'],
   // Clones from the Mirror ability: who they copy, and their blows.
   [ET.ALLY]: ['x', 'y', 'facing', 'owner', 'anim', 'flags'],
+  // Pals: species is its index in the game data; anim/work count its bites and chops.
+  [ET.PAL]: ['x', 'y', 'facing', 'owner', 'species', 'level', 'hp', 'maxHp', 'state', 'anim', 'work', 'down'],
 };
 const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
@@ -44,7 +46,9 @@ export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FO
 /** Enemy animation states. */
 export const ESTATE = ['move', 'windup', 'charge', 'fade', 'cast', 'idle'];
 /** Pickup kinds. */
-export const PICKUP_KINDS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shard', 'heart', 'weapon', 'bag'];
+export const PICKUP_KINDS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shard', 'heart', 'weapon', 'bag', 'egg'];
+/** Pal states on the wire. */
+export const PAL_STATES = ['follow', 'fight', 'gather', 'down'];
 /** Projectile sprites. */
 export const PROJ_SPRITES = ['orb', 'arrow', 'bolt', 'knife', 'blade', 'leafblade', 'shard', 'bullet', 'boomerang', 'chakram', 'wave', 'ball', 'spit', 'rock', 'fireball'];
 /** Area kinds. */
