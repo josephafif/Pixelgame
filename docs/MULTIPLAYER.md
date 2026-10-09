@@ -69,10 +69,20 @@ körs av servern, så alla ser den. Den slåss, samlar trä och sten åt dig ell
 följer bara med, och slås den ut vaknar den efter en stund. Pals sparas med
 karaktären.
 
+### Båtar och havet
+
+Båtarna byggs i smedjan precis som i singleplayer: flotte, slup och galeon. Vid
+stranden sjösätter du båten med Använd, och vid land går du i land. Båtens fart
+och vatten förutsägs på klienten med samma regler som servern använder (läget
+och farten kommer med varje snapshot), så seglingen känns lika direkt som att
+gå. Hajar och sjöormar dyker upp runt den som seglar och anfaller bara folk i
+båtar. Sjöormar kan ge ett Pal-ägg. Galeonens skrov tar en del av skadan, och
+andra spelare ser din båt.
+
 ### Inte med i multiplayer än
 
 Följande finns i singleplayer men inte i multiplayer än:
-- båtar, havsdjur och marknader;
+- marknader;
 - forskning (smedjan har samma val för alla);
 - WebTransport (allt går via WebSocket).
 

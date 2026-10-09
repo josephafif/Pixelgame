@@ -58,7 +58,7 @@ export function mpVirtualSave(data, worldSeed, ch, inv) {
     base: { buildings: { ...FRISTAD_LEVELS, den: mpDenLevel(data, ch) }, structures: [], wellAt: Date.now(), recall: null },
     bosses: { defeated: extra.bosses ?? {} },
     counters: { craft: extra.crafts ?? 0, drop: 0 },
-    tools: { pickaxe: ch.pickaxe ?? 0, boat: 0 },
+    tools: { pickaxe: ch.pickaxe ?? 0, boat: extra.boat ?? 0 },
     inventory: {
       bag: inv?.bag ?? [],
       storage: inv?.storage ?? [],

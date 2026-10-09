@@ -12,7 +12,7 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
@@ -23,7 +23,7 @@ export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, P
  * ('q') are tiles × 64 and sent as deltas; the rest are sent as values.
  */
 export const FIELDS = {
-  [ET.PLAYER]: ['x', 'y', 'facing', 'hp', 'maxHp', 'flags', 'anim', 'slot', 'tool'],
+  [ET.PLAYER]: ['x', 'y', 'facing', 'hp', 'maxHp', 'flags', 'anim', 'slot', 'tool', 'boat'],
   [ET.ENEMY]: ['x', 'y', 'facing', 'hp', 'maxHp', 'state', 'def', 'level', 'flags', 'element', 'anim'],
   [ET.PROJ]: ['x', 'y', 'vx', 'vy', 't0', 'sprite', 'color', 'size', 'owner', 'flags'],
   [ET.PICKUP]: ['x', 'y', 'kind', 'color', 'rarity', 'ref', 'flags'],
@@ -42,7 +42,7 @@ export const EF = { ELITE: 1, BOSS: 2, SUBMERGED: 4, STUNNED: 8, FROZEN: 16, ALE
 export const PRF = { ENEMY: 1, LOB: 2, MINE: 4 };
 export const PKF = { LOCKED: 1, MINE: 2 };
 /** Your own state flags (snapshot self block). */
-export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FOREIGN_CLAIM: 32, ASLEEP: 64, BLINK: 128 };
+export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FOREIGN_CLAIM: 32, ASLEEP: 64, BLINK: 128, SAILING: 256 };
 /** Enemy animation states. */
 export const ESTATE = ['move', 'windup', 'charge', 'fade', 'cast', 'idle'];
 /** Pickup kinds. */
@@ -116,7 +116,7 @@ export function encodeSnapshot({ tick, ack, self, removed, entities }) {
   // Your own state goes at full precision: the client replays its inputs
   // from exactly here, and any rounding would show up as tiny corrections.
   w.f64(self.x).f64(self.y).f64(self.kx).f64(self.ky).f64(self.speed).f64(self.sprint);
-  w.uv(self.hp).uv(self.maxHp).u8(self.flags);
+  w.uv(self.hp).uv(self.maxHp).uv(self.flags);
   w.uv(removed.length);
   for (const id of removed) w.uv(id);
   // Entities with no changes are skipped by the caller.
@@ -159,7 +159,7 @@ export function decodeSnapshot(buf, known) {
   const ack = r.uv();
   const self = {
     x: r.f64(), y: r.f64(), kx: r.f64(), ky: r.f64(), speed: r.f64(), sprint: r.f64(),
-    hp: r.uv(), maxHp: r.uv(), flags: r.u8(),
+    hp: r.uv(), maxHp: r.uv(), flags: r.uv(),
   };
   const removed = [];
   for (let n = r.uv(); n > 0; n--) removed.push(r.uv());

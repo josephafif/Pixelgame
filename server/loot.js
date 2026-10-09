@@ -57,7 +57,8 @@ export function addPickup(gs, kind, x, y, extra = {}) {
       }
     }
   }
-  if (!gs.world.isFree(x, y, 0.3)) ({ x, y } = gs.world.findFreeSpot(x, y, 0.3, 'player', { x, y }));
+  // On land it must lie where you can walk; out at sea it floats where it fell.
+  if (!gs.world.isFree(x, y, 0.3) && !gs.world.isFree(x, y, 0.3, 'boat')) ({ x, y } = gs.world.findFreeSpot(x, y, 0.3, 'player', { x, y }));
   const a = Math.random() * Math.PI * 2;
   const it = {
     id: gs.newId(),
@@ -111,7 +112,7 @@ export function onEnemyKilled(gs, e, killer) {
   for (let i = 0; i < orbs; i++) addPickup(gs, 'essence', e.x, e.y, { value, owner: owner?.id ?? 0, lockUntil: owner ? now + LOCK_MS : 0 });
   if (Math.random() < (e.elite ? 1 : 0.35)) addPickup(gs, 'scrap', e.x, e.y, { value: 1 + Math.floor(e.level / 6), owner: owner?.id ?? 0, lockUntil: owner ? now + LOCK_MS : 0 });
   if (Math.random() < 0.05) addPickup(gs, 'heart', e.x, e.y, {});
-  if (e.elite && owner) pals.dropEgg(gs, owner, 'elite', e.x, e.y);
+  if (owner && (e.elite || e.kind === 'serpent')) pals.dropEgg(gs, owner, e.kind === 'serpent' ? 'serpent' : 'elite', e.x, e.y);
   const source = e.elite ? 'elite' : 'drop';
   if (Math.random() < WEAPON_DROP_CHANCE[source] * (1 + luck * 0.01)) {
     const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, roll: source });

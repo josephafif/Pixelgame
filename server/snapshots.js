@@ -29,7 +29,8 @@ function playerValues(gs, p, now) {
   if (p.inv.activeSlot === 'none') flags |= PF.EMPTY;
   if (now - p.lastHurtAt < 160) flags |= PF.HURT;
   if (p.ascend?.until > gs.time) flags |= PF.ASCEND;
-  return [quantize(p.x), quantize(p.y), angleToByte(p.facing), Math.ceil(Math.max(0, p.hp)), p.maxHp, flags, p.anim, SLOTS.indexOf(p.inv.activeSlot), p.ch.pickaxe];
+  const boat = p.sailing ? p.ch.extra.boat ?? 0 : 0;
+  return [quantize(p.x), quantize(p.y), angleToByte(p.facing), Math.ceil(Math.max(0, p.hp)), p.maxHp, flags, p.anim, SLOTS.indexOf(p.inv.activeSlot), p.ch.pickaxe, boat];
 }
 
 function enemyValues(gs, e) {
@@ -87,6 +88,7 @@ function selfFlags(gs, p, now, claims) {
   if (p.protectUntil > now) f |= SF.PROTECTED;
   if (p.newbie) f |= SF.NEWBIE;
   if (gs.tick - p.blinkTick <= 1) f |= SF.BLINK;
+  if (p.sailing) f |= SF.SAILING;
   const c = claimAt(gs.rules, claims, Math.floor(p.x), Math.floor(p.y));
   if (c && c.clanId === p.clanId) f |= SF.OWN_CLAIM;
   else if (c) f |= SF.FOREIGN_CLAIM;
@@ -125,7 +127,7 @@ export function sendSnapshots(gs, now) {
   for (const a of gs.allies.values()) all.push({ id: a.id, type: ET.ALLY, x: a.x, y: a.y, values: allyValues(a), ref: a });
   for (const p of gs.players.values()) {
     const pal = p.palEnt;
-    if (pal) all.push({ id: pal.eid, type: ET.PAL, x: pal.x, y: pal.y, values: palValues(gs, pal), ref: pal });
+    if (pal && !pal.hidden) all.push({ id: pal.eid, type: ET.PAL, x: pal.x, y: pal.y, values: palValues(gs, pal), ref: pal });
   }
   // Bucketed by position: each player looks only at the cells around them.
   const grid = (gs.snapGrid ??= new SpatialGrid(16));
@@ -205,11 +207,12 @@ function sendTo(gs, p, now, grid, nearby, collect, claims, r2) {
       }
     }
     for (const id of p.view.pinfo.keys()) if (!gs.players.has(id)) p.view.pinfo.delete(id);
+    const mv = players.moveParams(gs, p);
     const buf = encodeSnapshot({
       tick: gs.tick,
       ack: p.lastSeq,
       self: {
-        x: p.x, y: p.y, kx: p.kx, ky: p.ky, speed: p.speed, sprint: gs.data.player.sprintMultiplier,
+        x: p.x, y: p.y, kx: p.kx, ky: p.ky, speed: mv.speed, sprint: mv.sprint,
         hp: Math.ceil(Math.max(0, p.hp)), maxHp: p.maxHp, flags: selfFlags(gs, p, now, claims),
       },
       removed,

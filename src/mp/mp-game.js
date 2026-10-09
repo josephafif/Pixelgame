@@ -28,6 +28,7 @@ import {
   EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal,
 } from './entities.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
+import { currentBoat, boatMode, boatDefs, findLaunch, findLanding } from '../game/sailing.js';
 import { emptyPals, mpDenLevel } from '../net/mpsave.js';
 import { abilityProgress, abilityReadyIn } from '../game/abilities.js';
 
@@ -232,6 +233,7 @@ export class MpGame {
     s.player.playTime = me.playSeconds;
     Object.assign(s.resources, me.resources);
     s.tools.pickaxe = me.pickaxe;
+    s.tools.boat = me.boat ?? 0;
     s.bosses.defeated = me.bosses ?? {};
     s.codex.modifiers = me.codex?.modifiers ?? [];
     s.codex.abilities = me.codex?.abilities ?? [];
@@ -676,7 +678,9 @@ export class MpGame {
   #reconcile(snap) {
     const s = snap.self;
     const wasDead = this.player.dead;
+    const wasSailing = this.sailing;
     this.selfFlags = s.flags;
+    if (this.sailing !== wasSailing) this.#sailingChanged();
     this.speed = s.speed;
     this.sprintMult = s.sprint;
     const p = this.player;
@@ -699,7 +703,7 @@ export class MpGame {
     const pred = { x: s.x, y: s.y, kx: s.kx, ky: s.ky };
     if (!p.dead) {
       this.#withGates(() => {
-        for (const f of this.pending) stepMove(this.world, pred, f, this.speed, this.sprintMult);
+        for (const f of this.pending) stepMove(this.world, pred, f, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode);
       });
     }
     const dx = before.x - pred.x;
@@ -818,9 +822,13 @@ export class MpGame {
     this.pending.push(frame);
     if (this.pending.length > 120) this.pending.shift();
     this.prev = { x: this.pred.x, y: this.pred.y };
-    this.#withGates(() => stepMove(this.world, this.pred, frame, this.speed, this.sprintMult));
+    this.#withGates(() => stepMove(this.world, this.pred, frame, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode));
     p.moving = mx !== 0 || my !== 0;
     p.sprinting = p.moving && (buttons & BTN.SPRINT) !== 0;
+    // Foam in the wake.
+    if (this.sailing && p.moving && Math.random() < 0.6) {
+      this.fx.emit('glint', p.x - Math.cos(p.facing) * 0.8, p.y + 0.25, 1, 0.3, 0.6, ['#e8f8ff', '#9ad8f4']);
+    }
     if (!p.attackAnim) p.facing = aim;
     if ((buttons & BTN.ATTACK) && !this.suppressAttack) this.#predictAttack(aim);
   }
@@ -1112,6 +1120,7 @@ export class MpGame {
           o.clanId = pi?.clanId ?? null;
           o.weapon = info.slot === 'main' || info.slot === 'secondary' ? pi?.compiled ?? null : null;
           o.pickaxeDef = pickaxeDefs(this.data).find((d) => d.tier === info.pickaxe) ?? null;
+          o.boatDef = info.boat ? boatDefs(this.data).find((b) => b.tier === info.boat) ?? null : null;
           o.friendly = Boolean(myClan && o.clanId === myClan);
           o.cloak = o.friendly ? '#3fa86a' : '#c8364a';
           o.nameColor = o.friendly ? '#8ef0a0' : o.protected ? '#c8c8d8' : '#ffb0a0';
@@ -1457,6 +1466,14 @@ export class MpGame {
       case 'smite':
         this.fx.add({ type: 'pillar', x: ev.x, y: ev.y, r: 0.6, color: '#fff3b0', dur: 0.3 });
         break;
+      case 'splash':
+        // Boarding, a shark's lunge, a serpent diving or bursting up.
+        this.fx.emit('splash', ev.x, ev.y, ev.big ? 22 : 8, ev.big ? 1 : 0.5, ev.big ? 3.5 : 2);
+        if (ev.big) {
+          this.fx.add({ type: 'ring', x: ev.x, y: ev.y, r0: 0.3, r1: 1.8, color: '#e8f8ff', dur: 0.35 });
+          if (dist2(ev.x, ev.y, this.player.x, this.player.y) < 16 * 16) this.audio.play('boom', { throttle: 120 });
+        }
+        break;
       case 'ab':
         this.#abilityFx(ev);
         break;
@@ -1533,6 +1550,8 @@ export class MpGame {
   #findInteractable() {
     const p = this.player;
     if (this.build.active || p.dead) return null;
+    // Out on the water: Use takes you ashore.
+    if (this.sailing) return findLanding(this);
     let best = null;
     let bestD = INTERACT_RADIUS * INTERACT_RADIUS;
     for (const o of this.world.objectsNear(p.x, p.y, 1)) {
@@ -1550,7 +1569,8 @@ export class MpGame {
       return { type: 'banner', key: `banner:${banner.sid}`, x: banner.x + 0.5, y: banner.y + 0.5 };
     }
     if (!best && this.toolActive) return findHarvestTarget({ player: p, world: this.world, data: this.data });
-    return best;
+    // At the water's edge: launch your boat (or learn why you can't).
+    return best ?? findLaunch(this);
   }
 
   interactLabel(o) {
@@ -1561,6 +1581,9 @@ export class MpGame {
       case 'altar': return this.altarSpent(o) ? 'Ett tyst altare' : `Väck ${this.data.byId.bosses.get(o.bossId)?.name ?? 'bossen'}`;
       case 'building': return BUILDING_LABELS[o.buildingId] ?? 'Använd';
       case 'banner': return 'Klanbanéret (klan och valv)';
+      case 'launch': return `Segla ut (${o.boat.name})`;
+      case 'land': return 'Gå i land';
+      case 'shore': return null;
       default: return null;
     }
   }
@@ -1628,16 +1651,30 @@ export class MpGame {
     return this.activeSlot === 'none';
   }
 
+  /** Setting sail or going ashore (the server moved you). */
+  #sailingChanged() {
+    const p = this.player;
+    if (this.sailing && this.build.active) this.toggleBuildMode(false);
+    this.fx.emit('glint', p.x, p.y, 14, 0.6, 2, ['#e8f8ff', '#9ad8f4']);
+    this.audio.play('swish');
+    this.target = null;
+    this.interactTarget = null;
+    this.interactT = 0;
+    this.emit('interact', { label: null });
+    this.emit('sailing', { on: this.sailing });
+  }
+
+  /** Out on the water in your boat (the server says so in every snapshot). */
   get sailing() {
-    return false;
+    return Boolean(this.selfFlags & SF.SAILING);
   }
 
   get boat() {
-    return null;
+    return currentBoat(this.data, this.save);
   }
 
   get moveMode() {
-    return 'player';
+    return this.sailing ? boatMode(this.boat) : 'player';
   }
 
   get heldWeapon() {
@@ -1803,9 +1840,10 @@ export class MpGame {
     return res.ok ? pickaxeDefs(this.data).find((p) => p.tier === tier) : null;
   }
 
-  buildBoat() {
-    this.toast('Båtar finns inte i multiplayer än.', 'warn');
-    return null;
+  async buildBoat(tier) {
+    const res = await this.#ask({ t: 'boat', tier });
+    if (res.ok) this.audio.play('levelup');
+    return res.ok ? boatDefs(this.data).find((b) => b.tier === tier) : null;
   }
 
   // --- Discovery (crafted weapons: the case-opening roll, then choose) ----------------------------------

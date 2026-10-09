@@ -1234,7 +1234,7 @@ export class Renderer {
     let img = (right ? sprites.right : sprites.left)[isClone ? 0 : frame];
     if (!isClone && c.hurtFlash > 0) img = sprites.flash;
     const bob = c.moving ? (Math.floor(c.walkT) % 2) : 0;
-    const sailing = !remote && game.sailing;
+    const sailing = remote ? Boolean(c.boatDef) : game.sailing;
     const toolActive = remote ? c.slot === 'tool' : game.toolActive;
     const handsEmpty = remote ? c.slot === 'none' : game.handsEmpty;
     if (isClone || !sailing) this.#shadow(x + lx, y + 1 + ly, 5);
@@ -1276,7 +1276,7 @@ export class Renderer {
   /** You in your boat: mast and sails behind, hull in front of your legs. */
   #drawSailor(game, c, x, y, img, right, pose) {
     const v = this.v;
-    const boat = game.boat;
+    const boat = c.remote ? c.boatDef : game.boat;
     if (!boat) return;
     const art = boatSprite(boat.id, boat.color);
     const side = right ? art.right : art.left;

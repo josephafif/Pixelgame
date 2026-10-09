@@ -117,6 +117,8 @@ export function hurtPlayer(gs, p, amount, { element = 'physical', fromX, fromY, 
     dmg *= p.stats.damageTaken;
   }
   if (attacker) dmg *= gs.rules.pvpDamage;
+  // At sea a sturdy hull takes part of the blow.
+  if (p.sailing && !dot) dmg *= 1 - (players.boatOf(gs, p)?.armor ?? 0);
   dmg = Math.max(1, Math.round(dmg));
   p.hp -= dmg;
   p.lastHurtAt = now;

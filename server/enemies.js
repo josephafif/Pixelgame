@@ -22,7 +22,7 @@ function scaleFor(level) {
 export function spawnEnemy(gs, defId, x, y, { level = 1, elite = false, biome = null } = {}) {
   const data = gs.data;
   const def = data.byId.enemies.get(defId);
-  if (!def || def.sea) return null;
+  if (!def) return null;
   let el = 'physical';
   if (biome) {
     const nonPhysical = biome.elements.filter((e) => e !== 'physical');
@@ -73,6 +73,9 @@ export function spawnEnemy(gs, defId, x, y, { level = 1, elite = false, biome = 
     dead: false,
     lonely: 0,
     spin: Math.random() < 0.5 ? 1 : -1,
+    phase: Math.random() * 10,
+    phaseT: 5 + Math.random() * 3, // a serpent's next dive
+    submerged: false,
   };
   gs.enemies.set(e.id, e);
   return e;
@@ -308,19 +311,20 @@ function goToward(gs, e, tx, ty, speed) {
 function pickTarget(gs, e) {
   const sight = e.def.sight ?? 7;
   let t = e.target ? gs.players.get(e.target) : null;
-  if (t && (t.dead || inSafeZone(gs.rules, t.x, t.y))) t = null;
+  const sea = Boolean(e.def.sea);
+  if (t && (t.dead || inSafeZone(gs.rules, t.x, t.y) || (sea && !t.sailing))) t = null;
   if (t) {
     const d2 = (t.x - e.x) ** 2 + (t.y - e.y) ** 2;
     const leash = sight * LEASH;
     if (d2 > leash * leash && e.alertUntil < gs.time) t = null;
   }
-  if (!t) t = gs.nearestPlayer(e.x, e.y, sight, (p) => !inSafeZone(gs.rules, p.x, p.y));
+  if (!t) t = gs.nearestPlayer(e.x, e.y, sight, (p) => !inSafeZone(gs.rules, p.x, p.y) && (!sea || p.sailing));
   e.target = t?.id ?? 0;
   return t;
 }
 
 function contact(gs, e, p, mult = 1) {
-  if (!p || p.dead || e.atkCd > 0) return;
+  if (!p || p.dead || e.atkCd > 0 || e.submerged || (e.def.sea && !p.sailing)) return;
   const rr = e.r + p.r + 0.12;
   if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 > rr * rr) return;
   e.atkCd = 1;
@@ -372,6 +376,12 @@ function behave(gs, e, dt) {
   const speed = e.speed * (e.slowMult ?? 1);
   e.stateT += dt;
   switch (e.def.behavior) {
+    case 'shark':
+      shark(gs, e, p, dx, dy, d, speed, dt);
+      break;
+    case 'serpent':
+      serpent(gs, e, p, dx, dy, d, speed, dt);
+      break;
     case 'charger': {
       if (e.state === 'windup') {
         e.vx = e.vy = 0;
@@ -493,6 +503,122 @@ function behave(gs, e, dt) {
       e.state = 'move';
       break;
   }
+}
+
+// --- Sea creatures (as in single player) ---------------------------------------------------------
+
+/** Sharks circle the boat, then dart in for a bite and swing away again. */
+function shark(gs, e, p, dx, dy, d, speed, dt) {
+  const nx = dx / (d || 1);
+  const ny = dy / (d || 1);
+  e.circleT = (e.circleT ?? 1.2 + Math.random()) - dt;
+  let vx;
+  let vy;
+  if (e.state === 'lunge') {
+    vx = e.chargeX * speed * 2.4;
+    vy = e.chargeY * speed * 2.4;
+    if (e.stateT > 0.5) {
+      e.state = 'move';
+      e.stateT = 0;
+      e.circleT = 1.6 + Math.random() * 1.6;
+    }
+    contact(gs, e, p, 1.5);
+  } else {
+    const orbit = 2.8;
+    const pull = Math.max(-1, Math.min(1, (d - orbit) * 0.7));
+    vx = (nx * pull - ny * e.spin) * speed;
+    vy = (ny * pull + nx * e.spin) * speed;
+    if (e.circleT <= 0 && d < 5.5 && p.sailing) {
+      e.state = 'lunge';
+      e.stateT = 0;
+      e.chargeX = nx;
+      e.chargeY = ny;
+      e.anim = (e.anim + 1) & 255;
+      gs.event(e.x, e.y, { k: 'fx', fx: 'splash', x: e.x, y: e.y }, 24);
+    }
+    contact(gs, e, p);
+  }
+  const sp = Math.sqrt(vx * vx + vy * vy);
+  if (sp > 0.01) {
+    const s = steer(gs, e, vx / sp, vy / sp);
+    e.vx = s.x * sp;
+    e.vy = s.y * sp;
+  } else {
+    e.vx = e.vy = 0;
+  }
+  if (Math.abs(e.vx) > 0.05) e.facing = e.vx > 0 ? 1 : -1;
+}
+
+/**
+ * Sea serpents weave around you at range spitting water, then dive (nothing
+ * can hit them under water) and burst up somewhere near you.
+ */
+function serpent(gs, e, p, dx, dy, d, speed, dt) {
+  const nx = dx / (d || 1);
+  const ny = dy / (d || 1);
+  e.phaseT -= dt;
+  e.facing = dx >= 0 ? 1 : -1;
+  if (e.state === 'dive') {
+    const tx = e.surfaceX - e.x;
+    const ty = e.surfaceY - e.y;
+    const dd = Math.sqrt(tx * tx + ty * ty);
+    if (e.stateT > 1.6) {
+      e.state = 'erupt';
+      e.stateT = 0;
+      const sx = e.surfaceX;
+      const sy = e.surfaceY;
+      // The water bulges where it comes up: get out of the way.
+      combat.spawnArea(gs, {
+        kind: 'telegraph', x: sx, y: sy, r: 1.5, dur: 0.75, color: '#9ad8f4', damage: e.dmg * 1.4, element: 'physical', enemy: e.id,
+        after: () => {
+          if (e.dead) return;
+          e.submerged = false;
+          e.state = 'move';
+          e.stateT = 0;
+          e.phaseT = 5 + Math.random() * 2.5;
+          gs.event(sx, sy, { k: 'fx', fx: 'splash', x: sx, y: sy, big: true }, 30);
+        },
+      });
+    }
+    if (dd > 0.3) {
+      e.vx = (tx / dd) * speed * 1.8;
+      e.vy = (ty / dd) * speed * 1.8;
+    } else {
+      e.vx = e.vy = 0;
+    }
+    return;
+  }
+  if (e.state === 'erupt') {
+    e.vx = e.vy = 0;
+    return;
+  }
+  // Keep about five tiles away, weaving from side to side.
+  const want = 5;
+  const dir = d > want + 1 ? 1 : d < want - 1 ? -0.6 : 0;
+  const weave = Math.sin(gs.time * 2.6 + e.phase) * 0.9;
+  if (e.atkCd <= 0 && d < (e.def.range ?? 8) + 1) {
+    e.atkCd = 2.4;
+    shoot(gs, e, p, { speed: e.def.projSpeed ?? 7, sprite: 'orb', count: 3, spread: 0.44, mult: 0.7 });
+    gs.event(e.x, e.y, { k: 'fx', fx: 'splash', x: e.x, y: e.y }, 24);
+  }
+  if (e.phaseT <= 0) {
+    // Dive, and come up again a few tiles from you (in deep water).
+    const a = Math.random() * Math.PI * 2;
+    const r = 2.5 + Math.random() * 1.5;
+    const spot = gs.world.findFreeSpot(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, 0.5, 'deepswim', null);
+    if (spot) {
+      e.state = 'dive';
+      e.stateT = 0;
+      e.submerged = true;
+      e.surfaceX = spot.x;
+      e.surfaceY = spot.y;
+      gs.event(e.x, e.y, { k: 'fx', fx: 'splash', x: e.x, y: e.y, big: true }, 30);
+    } else {
+      e.phaseT = 2;
+    }
+  }
+  e.vx = (nx * dir - ny * weave) * speed;
+  e.vy = (ny * dir + nx * weave) * speed;
 }
 
 // --- Bosses ------------------------------------------------------------------------------------
@@ -768,6 +894,40 @@ function nudge(gs, e, px, py) {
   }
 }
 
+/** Out at sea: sharks everywhere, now and then a serpent in the deep (as in single player). */
+function spawnAtSea(gs, p) {
+  const wl = gs.world.worldLevel(p.x, p.y);
+  let sea = 0;
+  let serpents = 0;
+  for (const e of gs.enemiesNear(p.x, p.y, 22)) {
+    if (e.dead || !e.def.sea) continue;
+    sea++;
+    if (e.kind === 'serpent') serpents++;
+  }
+  if (sea >= Math.round(Math.min(6, 2 + Math.floor(wl / 2)))) return;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = 11 + Math.random() * 5;
+    const x = p.x + Math.cos(a) * d;
+    const y = p.y + Math.sin(a) * d;
+    if (!gs.world.isFree(x, y, 0.5, 'swim')) continue;
+    const deep = gs.world.isFree(x, y, 0.6, 'deepswim');
+    const level = Math.max(wl, p.ch.level - 1);
+    if (deep && serpents === 0 && wl >= 3 && Math.random() < 0.22) {
+      spawnEnemy(gs, 'serpent', x, y, { level });
+      for (const o of gs.playersNear(p.x, p.y, 20)) if (o.sailing) gs.toast(o, 'Något enormt rör sig under vågorna…', 'boss');
+      return;
+    }
+    const group = Math.random() < 0.3 ? 2 : 1;
+    for (let g = 0; g < group; g++) {
+      const gx = x + (Math.random() - 0.5) * 2;
+      const gy = y + (Math.random() - 0.5) * 2;
+      if (gs.world.isFree(gx, gy, 0.45, 'swim')) spawnEnemy(gs, 'shark', gx, gy, { level });
+    }
+    return;
+  }
+}
+
 /** Keeps a lively but fair number of monsters around everyone out in the wild. */
 export function spawn(gs) {
   if (gs.enemies.size >= gs.config.maxEnemies) return;
@@ -777,6 +937,10 @@ export function spawn(gs) {
   const inBase = (x, y) => claims.some((c) => (x - c.x) ** 2 + (y - c.y) ** 2 <= baseR2);
   for (const p of gs.players.values()) {
     if (p.dead || p.asleep || inSafeZone(gs.rules, p.x, p.y)) continue;
+    if (p.sailing) {
+      spawnAtSea(gs, p);
+      continue;
+    }
     const wl = gs.world.worldLevel(p.x, p.y);
     let alive = 0;
     let others = 0;

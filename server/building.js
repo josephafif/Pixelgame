@@ -164,6 +164,7 @@ export function place(gs, p, defId, tx, ty) {
   if (!def) return 'Okänd byggnad';
   if (!Number.isInteger(tx) || !Number.isInteger(ty) || Math.abs(tx) > 1e6 || Math.abs(ty) > 1e6) return 'Ogiltig plats';
   if (p.dead) return 'Du är död';
+  if (p.sailing) return 'Gå i land för att bygga';
   const clan = p.clanId ? gs.clans.get(p.clanId) : null;
   if (!clan) return 'Gå med i eller skapa en klan för att bygga (även ensam)';
   const role = clan.members.get(p.accountId)?.role ?? 'member';

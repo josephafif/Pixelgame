@@ -7,7 +7,8 @@ import { computePlayerStats, xpToNext } from '../src/game/stats.js';
 import { compileWeapon } from '../src/game/combat.js';
 import { currentPickaxe, findHarvestTarget } from '../src/game/gathering.js';
 import { inSafeZone, isNewbie } from '../src/net/rules.js';
-import { mpInventorySizes, MP_RESOURCE_KEYS, FRISTAD_LEVELS } from '../src/net/mpsave.js';
+import { mpInventorySizes, MP_RESOURCE_KEYS, FRISTAD_LEVELS, mpVirtualSave } from '../src/net/mpsave.js';
+import { currentBoat, boatMode, findLaunch, findLanding } from '../src/game/sailing.js';
 import * as combat from './combat.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
@@ -118,9 +119,11 @@ export function createPlayer(gs, account, ch, items) {
   applySlot(gs, p, inv.activeSlot, { quiet: true });
   if (!p.hp || p.hp <= 0) p.hp = p.maxHp;
   p.hp = Math.min(p.hp, p.maxHp);
+  // Saved at sea: keep sailing if the boat still floats there.
+  p.sailing = Boolean(ch.extra.sailing && boatOf(gs, p) && gs.world.isFree(p.x, p.y, p.r, boatMode(boatOf(gs, p))));
   // Safe placement (the world may have changed while they were away).
   gs.world.gateFilter = (st) => st.clanId && st.clanId === p.clanId;
-  if (!gs.world.isFree(p.x, p.y, p.r)) Object.assign(p, gs.world.findFreeSpot(p.x, p.y, p.r, 'player', TOWN_SPAWN));
+  if (!p.sailing && !gs.world.isFree(p.x, p.y, p.r)) Object.assign(p, gs.world.findFreeSpot(p.x, p.y, p.r, 'player', TOWN_SPAWN));
   gs.world.gateFilter = null;
   p.newbie = isNewbie(gs.rules, ch);
   return p;
@@ -188,6 +191,7 @@ export function mePayload(gs, p) {
     xpNext: xpToNext(gs.data, p.ch.level),
     resources: p.ch.resources,
     pickaxe: p.ch.pickaxe,
+    boat: p.ch.extra.boat ?? 0,
     playSeconds: Math.floor(p.ch.playSeconds),
     newbie: p.newbie,
     pvpOptIn: p.ch.pvpOptIn,
@@ -321,7 +325,8 @@ function applyFrame(gs, p, f, now) {
   if (f.cmd) command(gs, p, f.cmd);
   // Movement: the same code the client predicts with.
   gs.world.gateFilter = (st) => Boolean(st.clanId) && st.clanId === p.clanId;
-  stepMove(gs.world, p, f, p.speed, gs.data.player.sprintMultiplier, p.r);
+  const mv = moveParams(gs, p);
+  stepMove(gs.world, p, f, mv.speed, mv.sprint, p.r, mv.mode);
   gs.world.gateFilter = null;
   p.moving = f.mx !== 0 || f.my !== 0;
   p.sprinting = p.moving && (f.buttons & BTN.SPRINT) !== 0;
@@ -391,6 +396,12 @@ function tickStatuses(gs, p, dt) {
 /** Uses whatever is next to the player. Returns true if something was used. */
 export function interact(gs, p, now) {
   if (p.dead) return false;
+  // Out on the water, Use takes you ashore (when there is land next to you).
+  if (p.sailing) {
+    const spot = findLanding(sailingView(gs, p));
+    if (spot) setSailing(gs, p, false, spot);
+    return true;
+  }
   let best = null;
   let bestD = INTERACT_RADIUS * INTERACT_RADIUS;
   for (const o of gs.world.objectsNear(p.x, p.y, 1)) {
@@ -409,7 +420,7 @@ export function interact(gs, p, now) {
     gs.send(p, { t: 'ui', panel: 'clan' });
     return true;
   }
-  if (!best) return false;
+  if (!best) return tryLaunch(gs, p);
   switch (best.type) {
     case 'chest':
       loot.openChest(gs, p, best, now);
@@ -435,6 +446,57 @@ export function interact(gs, p, now) {
     default:
       return false;
   }
+}
+
+// --- Sailing ---------------------------------------------------------------------------------
+
+/** The boat this character owns (its best), or null. */
+export function boatOf(gs, p) {
+  return currentBoat(gs.data, { tools: { boat: p.ch.extra.boat ?? 0 } });
+}
+
+/**
+ * How you move right now: walking, or sailing your boat (its own speed, a
+ * small sprint boost, and water to float on). The client predicts with the
+ * same numbers (they come with every snapshot).
+ */
+export function moveParams(gs, p) {
+  const boat = p.sailing ? boatOf(gs, p) : null;
+  if (!boat) return { speed: p.speed, sprint: gs.data.player.sprintMultiplier, mode: 'player' };
+  const chilled = p.statuses.chill?.until > gs.time;
+  return { speed: boat.speed * (chilled ? 0.65 : 1), sprint: 1.2, mode: boatMode(boat) };
+}
+
+/** What the single-player sailing rules need to look at. */
+function sailingView(gs, p) {
+  return { world: gs.world, player: p, data: gs.data, save: mpVirtualSave(gs.data, gs.worldSeed, p.ch, p.inv) };
+}
+
+function tryLaunch(gs, p) {
+  const spot = findLaunch(sailingView(gs, p));
+  if (!spot) return false;
+  if (spot.type === 'shore') {
+    gs.toast(p, spot.reason === 'Build a boat at the Forge (Tools) to sail'
+      ? 'Bygg en båt i smedjan (Verktyg) för att segla.'
+      : `${boatOf(gs, p)?.name ?? 'Båten'} klarar inte det öppna havet.`, 'warn');
+    return true;
+  }
+  setSailing(gs, p, true, spot);
+  return true;
+}
+
+export function setSailing(gs, p, on, spot) {
+  gs.event(p.x, p.y, { k: 'fx', fx: 'splash', x: p.x, y: p.y }, 24);
+  p.x = spot.x;
+  p.y = spot.y;
+  p.kx = p.ky = 0;
+  p.sailing = on;
+  p.infoRev++;
+  if (on && !p.ch.extra.sailed) {
+    p.ch.extra.sailed = true;
+    gs.toast(p, `Ombord på ${boatOf(gs, p)?.name ?? 'båten'}! Styr som när du går, och tryck Använd vid land för att gå i land.`, 'component');
+  }
+  markMe(p);
 }
 
 // --- Pickaxe ---------------------------------------------------------------------------------
@@ -493,6 +555,7 @@ export function respawn(gs, p, now) {
   p.y = free.y;
   p.kx = p.ky = 0;
   p.dead = false;
+  p.sailing = false;
   p.statuses = {};
   recomputeStats(gs, p);
   p.hp = p.maxHp;
@@ -510,6 +573,7 @@ export function persist(gs, p) {
   ch.y = Math.round(p.y * 100) / 100;
   ch.hp = p.dead ? p.maxHp : Math.max(1, Math.round(p.hp));
   ch.loadout = { equipped: p.inv.equipped, secondary: p.inv.secondary, activeSlot: p.inv.activeSlot, favorites: p.inv.favorites };
+  ch.extra.sailing = Boolean(p.sailing);
   gs.db.saveCharacter(ch);
   p.lastSave = Date.now();
 }

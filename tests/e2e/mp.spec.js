@@ -10,7 +10,8 @@ let base;
 
 test.beforeAll(async () => {
   const quiet = { info() {}, debug() {}, warn() {}, error: (...a) => console.error(...a) };
-  srv = await startServer({ port: 0, host: '127.0.0.1', dbPath: ':memory:', allowGuests: true, serveStatic: true, devAdmins: true, log: quiet });
+  // A fixed world (one with open sea within reach, for the sailing test).
+  srv = await startServer({ port: 0, host: '127.0.0.1', dbPath: ':memory:', allowGuests: true, serveStatic: true, devAdmins: true, worldSeed: 42, log: quiet });
   base = `http://127.0.0.1:${srv.port}`;
 });
 
@@ -161,6 +162,53 @@ test('pals in multiplayer: your pal walks with you, shows in the HUD, and the pa
   await a.page.waitForTimeout(200);
   await a.page.locator('.pals-panel [data-action="hatch"]').click();
   await expect.poll(() => Boolean(p.ch.extra.pals.eggs[0]?.hatchAt)).toBe(true);
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
+test('sailing in multiplayer: set sail at the shore and sail smoothly (predicted like walking)', async ({ browser }) => {
+  const a = await join(browser, 'Kaptenen');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Kaptenen');
+  p.ch.extra.boat = 2;
+  p.protectUntil = Date.now() + 10 * 60 * 1000;
+  const players = await import('../../server/players.js');
+  players.markMe(p);
+  // A shore with open sea to the east.
+  const { T, SAILABLE } = await import('../../src/game/world.js');
+  const w = srv.gs.world;
+  let shore = null;
+  for (let r = 40; r < 400 && !shore; r += 2) {
+    for (let k = 0; k < 64 && !shore; k++) {
+      const x = Math.floor(Math.cos((k / 64) * Math.PI * 2) * r);
+      const y = Math.floor(Math.sin((k / 64) * Math.PI * 2) * r);
+      if (w.blockAt(x, y) || !w.isFree(x + 0.5, y + 0.5, 0.32)) continue;
+      if (w.blockAt(x + 1, y) !== T.SEA || !SAILABLE.has(w.blockAt(x + 3, y)) || !w.isFree(x + 1.5, y + 0.5, 0.32, 'boat')) continue;
+      shore = { x: x + 0.5, y: y + 0.5 };
+    }
+  }
+  expect(shore).not.toBeNull();
+  await a.page.evaluate(([x, y]) => window.__pixelgame.game.chat(`/tp ${x} ${y}`), [shore.x, shore.y]);
+  await a.page.waitForTimeout(700);
+  // Face the sea, then Use.
+  await a.page.keyboard.down('KeyD');
+  await a.page.waitForTimeout(250);
+  await a.page.keyboard.up('KeyD');
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.interactTarget?.type)).toBe('launch');
+  await a.page.keyboard.press('KeyE');
+  await a.page.waitForFunction(() => window.__pixelgame.game.sailing);
+  const before = await a.page.evaluate(() => window.__pixelgame.game.netStats.bigCorrections);
+  await a.page.keyboard.down('KeyD');
+  await a.page.waitForTimeout(1200);
+  await a.page.keyboard.up('KeyD');
+  await a.page.waitForTimeout(300);
+  const after = await a.page.evaluate(() => {
+    const g = window.__pixelgame.game;
+    return { big: g.netStats.bigCorrections, x: g.player.x, y: g.player.y, err: g.netStats.lastError };
+  });
+  expect(after.big).toBe(before);
+  expect(after.x).toBeGreaterThan(shore.x + 2);
+  expect(Math.abs(after.x - p.x)).toBeLessThan(0.3);
+  expect(p.sailing).toBe(true);
   expect(a.errors).toEqual([]);
   await a.ctx.close();
 });

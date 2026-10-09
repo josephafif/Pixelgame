@@ -129,6 +129,8 @@ export function makeEnemy(data, v, time) {
     anim: f('anim'),
     dead: false,
     status: {},
+    trail: def.id === 'serpent' ? [] : null, // a serpent's body follows where its head has been
+    trailT: 0,
     seenAt: time,
   };
 }
@@ -144,6 +146,14 @@ export function updateEnemy(o, v, x, y, dt, time) {
   o.sy = y;
   o.x = x;
   o.y = y;
+  if (o.trail) {
+    o.trailT -= dt;
+    if (o.trailT <= 0) {
+      o.trailT = 0.05;
+      o.trail.unshift({ x, y });
+      if (o.trail.length > 30) o.trail.pop();
+    }
+  }
   const hp = f('hp');
   if (hp < o.hp) {
     o.flash = 0.08;
@@ -184,6 +194,7 @@ export function readPlayer(v) {
     protected: Boolean(flags & PF.PROTECTED),
     hurt: Boolean(flags & PF.HURT),
     ascending: Boolean(flags & PF.ASCEND),
+    boat: f('boat') ?? 0, // the boat tier while sailing (0 on land)
     anim: f('anim'),
     slot: SLOTS[f('slot')] ?? 'main',
     pickaxe: f('tool'),

@@ -4,6 +4,7 @@
 
 import { validateCraft, craftCost, buildCraftRequest } from '../src/weapons/crafting.js';
 import { forgePickaxe } from '../src/game/gathering.js';
+import { buildBoat } from '../src/game/sailing.js';
 import { mpVirtualSave, mpInventorySizes, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
 import { inSafeZone, describeRaidWindow, passwordProblem } from '../src/net/rules.js';
 import { hashPassword } from './auth.js';
@@ -102,6 +103,21 @@ export function handle(gs, p, msg) {
         p.infoRev++;
         gs.send(p, { t: 'loadout', equipped: p.inv.equipped, secondary: p.inv.secondary, activeSlot: p.inv.activeSlot, favorites: p.inv.favorites });
         gs.toast(p, `${def.name} smidd! Gå fram till ett träd eller en sten och hacka (3).`, 'level');
+        return null;
+      } catch (err) {
+        return err.message;
+      }
+    }
+    case 'boat': {
+      if (!nearBuilding(gs, p, 'forge')) return 'Gå till smedjan i Fristaden';
+      const save = vsave(gs, p);
+      try {
+        const def = buildBoat(gs.data, save, Number(msg.tier));
+        p.ch.extra.boat = def.tier;
+        players.persist(gs, p);
+        gs.db.log(p.accountId, 'boat', null, { tier: def.tier });
+        players.markMe(p);
+        gs.toast(p, `${def.name} byggd! Gå ner till vattnet och tryck Använd för att segla ut.`, 'level');
         return null;
       } catch (err) {
         return err.message;

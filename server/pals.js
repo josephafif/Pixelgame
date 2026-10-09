@@ -382,6 +382,18 @@ export function update(gs, dt) {
       p.palEnt = null;
       continue;
     }
+    // Out at sea your pal rides along in the boat.
+    const pal = p.palEnt;
+    if (p.sailing) {
+      pal.hidden = true;
+      pal.x = p.x;
+      pal.y = p.y;
+      continue;
+    }
+    if (pal.hidden) {
+      pal.hidden = false;
+      place(gs, p, pal);
+    }
     step(gs, p, dt);
   }
 }
