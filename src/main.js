@@ -135,7 +135,7 @@ class App {
       surface: $('#surface'),
       joystick: $('#joystick'),
       knob: $('#knob'),
-      buttons: { attack: $('#btn-attack'), sprint: $('#btn-sprint'), ability: $('#btn-ability') },
+      buttons: { attack: $('#btn-attack'), sprint: $('#btn-sprint'), ability: $('#btn-ability'), dash: $('#btn-dash') },
       settings: () => this.game?.save.settings ?? save.settings,
     });
     this.input.onModeChange = (mode) => this.#applyInputMode(mode);

@@ -33,6 +33,8 @@ export class Hud {
       toasts: $('#toasts'),
       ability: $('#btn-ability'),
       abilityCd: $('#btn-ability .cd'),
+      dash: $('#btn-dash'),
+      dashCd: $('#btn-dash .cd'),
       attack: $('#btn-attack'),
       sprint: $('#btn-sprint'),
       fps: $('#fps'),
@@ -218,6 +220,16 @@ export class Hud {
       e.ability.style.setProperty('--cd', `${Math.round(frac * 360)}deg`);
       e.ability.classList.toggle('ready', s.ability.ready);
       e.abilityCd.textContent = s.ability.ready ? '' : Math.ceil(s.ability.left);
+    }
+    // Gale Step: shown once you have learnt it.
+    if (e.dash) {
+      e.dash.toggleAttribute('hidden', !s.dash);
+      if (s.dash) {
+        const ready = s.dash.left <= 0;
+        e.dash.style.setProperty('--cd', `${Math.round((ready ? 0 : s.dash.left / s.dash.total) * 360)}deg`);
+        e.dash.classList.toggle('ready', ready);
+        e.dashCd.textContent = ready ? '' : Math.ceil(s.dash.left);
+      }
     }
     if (s.boss) {
       e.bossName.textContent = `${s.boss.name}${s.boss.phase === 2 ? ' — ENRAGED' : ''}`;

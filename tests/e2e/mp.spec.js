@@ -192,7 +192,7 @@ test('your clan base: the camp buildings, the base panel, upgrades and the vault
   players.markMe(p);
   await a.page.waitForFunction(() => window.__pixelgame.game.clan?.base?.placed?.forge);
   await a.page.keyboard.press('KeyB');
-  await expect(a.page.locator('.mp-clan .bcard')).toHaveCount(9); // (with the Workers' Lodge)
+  await expect(a.page.locator('.mp-clan .bcard')).toHaveCount(10); // (with the Workers' Lodge and the Healing Garden)
   const forge = a.page.locator('.mp-clan .bcard[data-building="forge"]');
   await expect(forge).toContainText('Nivå 1');
   await forge.locator('button', { hasText: 'Uppgradera' }).click();

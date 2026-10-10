@@ -10,7 +10,7 @@ import { horseSprite } from '../render/horses.js';
 import { describeHorse, MAX_HORSES } from '../game/horses.js';
 import {
   buildingDefs, buildingLevel, maxLevel, nextLevelInfo, upgradeBlockers, describeBonus, campRank,
-  wellPending, baseBonuses,
+  wellPending, baseBonuses, TONIC,
 } from '../game/base.js';
 import { structureDef, upgradeDef, upgradeCost, structureLock } from '../game/construction.js';
 
@@ -53,6 +53,22 @@ export function open(game, app, { focus = null } = {}) {
             rerender();
           },
         }, icon('essence', 20), n > 0 ? `Collect ${n}` : 'Filling…')];
+      }
+      case 'garden': {
+        // Lumen Tonic: healing over time and a ward against the bogs, brewed from Lumen Spores.
+        const left = Math.max(0, Math.ceil((game.tonicUntil ?? 0) - game.time));
+        const have = Math.floor(save.resources.spores ?? 0);
+        return [h('button', {
+          disabled: have < TONIC.cost.spores,
+          title: `Heals ${TONIC.regenPct}% Health a second and wards against the fen's bogs for ${TONIC.seconds / 60} minutes`,
+          onclick: () => {
+            const problem = game.brewTonic();
+            if (problem) game.toast(problem, 'warn');
+            rerender();
+          },
+        }, icon('spores', 20), left > 0
+          ? `Tonic: ${Math.ceil(left / 60)} min left`
+          : `Brew Lumen Tonic (${TONIC.cost.spores} spores, you have ${have})`)];
       }
       case 'waystone': {
         const far = !game.atCamp();

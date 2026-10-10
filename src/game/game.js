@@ -35,7 +35,8 @@ import { Construction, buildRadius, structureDef, structureDefs, structureLock, 
 import { Markets } from './markets.js';
 import { Workforce } from './workforce.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
-import { slideMove, groundEffect, tryLeap, LEAP_TIME } from '../net/movement.js';
+import { slideMove, groundEffect, tryLeap, dash, quantizeAxis, LEAP_TIME, DASH_TIME } from '../net/movement.js';
+import { hasSkill, beaconOf, dashCooldown, GALE_STEP } from './skills.js';
 import { Stable } from './riding.js';
 import { BREED_BY_ID } from './horses.js';
 import { POI, isPoi, poiFound, interactPoi, readOldMap, chunksAround } from './discoveries.js';
@@ -350,6 +351,47 @@ export class Game {
     this.emit('base');
     this.requestSave();
     return null;
+  }
+
+  /** Gale Step's cooldown: { left, total } (seconds), or null before you have learnt it. */
+  get dashState() {
+    if (!hasSkill(this.data, this.save.components, GALE_STEP.id)) return null;
+    const total = dashCooldown(beaconOf(this.data, this.save));
+    return { left: Math.max(0, (this.dashReadyAt ?? 0) - this.time), total };
+  }
+
+  /** Gale Step (V): a quick dash that slips past attacks (as in multiplayer). */
+  galeStep(sample) {
+    const p = this.player;
+    if (p.dead || this.sailing || this.build.active || this.paused) return false;
+    const st = this.dashState;
+    if (!st) {
+      if (!(this.dashHintAt > this.time)) {
+        this.dashHintAt = this.time + 8;
+        this.toast('Gale Step is taught by a Gale Feather (Skyreach): research it to dash with V.', 'info');
+      }
+      return false;
+    }
+    if (st.left > 0) return false;
+    const moving = Math.abs(sample.moveX) + Math.abs(sample.moveY) > 0.01;
+    const frame = moving
+      ? { mx: quantizeAxis(sample.moveX), my: quantizeAxis(sample.moveY) }
+      : { mx: quantizeAxis(Math.cos(p.facing)), my: quantizeAxis(Math.sin(p.facing)) };
+    if (!dash(this.world, p, frame, p.r, this.moveMode)) return false;
+    this.dashReadyAt = this.time + st.total;
+    p.invuln = Math.max(p.invuln ?? 0, DASH_TIME);
+    this.dashTrail(p.dash.x0, p.dash.y0, p.x, p.y);
+    p.dash = null;
+    this.audio.play('dash');
+    return true;
+  }
+
+  /** Wisps of wind along a Gale Step. */
+  dashTrail(x0, y0, x1, y1) {
+    for (let i = 0; i <= 6; i++) {
+      const t = i / 6;
+      this.fx.emit('glint', x0 + (x1 - x0) * t, y0 + (y1 - y0) * t - 0.3, 2, 0.35, 0.8, ['#ffffff', '#d8ecff', '#9ad8f4']);
+    }
   }
 
   applyPlayerStatus(id) {
@@ -2003,6 +2045,8 @@ export class Game {
         else if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample));
       } else if (c === 'ability') {
         if (!this.toolActive && !this.handsEmpty) castAbility(this, this.#aim(sample));
+      } else if (c === 'dash') {
+        this.galeStep(sample);
       } else if (c === 'slot1' || c === 'slot2' || c === 'slot3') {
         if (!this.build.active) this.switchSlot({ slot1: 'main', slot2: 'secondary', slot3: 'tool' }[c]);
       } else if (c === 'slotNext' || c === 'slotPrev') {
@@ -2092,6 +2136,7 @@ export class Game {
       nearCamp: Math.hypot(this.player.x - 0.5, this.player.y - 0.5) <= this.buildRadius() + 6,
       ability: abilityProgress(this),
       abilityName: this.weapon?.ability?.name ?? null,
+      dash: this.dashState,
       sprinting: this.player.sprinting,
       boss: this.boss ? { name: this.boss.bossDef.name, hp: this.boss.hp, maxHp: this.boss.maxHp, phase: this.boss.phase } : null,
       dead: this.player.dead,

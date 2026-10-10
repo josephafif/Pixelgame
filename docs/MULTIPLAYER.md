@@ -358,11 +358,22 @@ Säkerheten kommer från att servern bestämmer.
   - Den egna väskan och de egna vapnen är fortfarande personliga.
 - **Klanvalvet** nås överallt på klanens mark. I panelen (B, fliken Valv)
   lägger du i 10, 100 eller allt med ett tryck.
-- **Fjärrländerna** (Prism Barrens, senare Mireglass Fen och Skyreach) finns i serverns värld från
-  världsversion 2 (`meta.worldGen`). En äldre värld uppgraderas när servern startar, men chunkarna
-  runt varje klanbas sparas i `meta.legacyChunks` och behåller sin gamla mark. Listan skickas till
-  klienterna i `welcome`, så alla ser samma värld. Speglar, studsande skott, Mirror Knight och
-  Prism Relay fungerar som i singleplayer, och servern bestämmer allt.
+- **Fjärrländerna** (Prism Barrens från världsversion 2, Mireglass Fen och Skyreach från version 3)
+  finns i serverns värld (`meta.worldGen`). En äldre värld uppgraderas när servern startar, men
+  chunkarna runt varje klanbas sparas i `meta.legacyChunks` och behåller sin gamla mark. Listan
+  skickas till klienterna i `welcome`, så alla ser samma värld. Speglar, studsande skott, Mirror
+  Knight och Prism Relay fungerar som i singleplayer, och servern bestämmer allt.
+- **Gyttja, vind och hästhopp** räknas i den delade rörelsekoden (`src/net/movement.js`:
+  `groundEffect`, `tryLeap`), så klientens förutsägelse och servern hamnar på samma ruta. Ett
+  hopp syns för andra via flaggan `PF.LEAP`.
+- **Gale Step** skickas som knappen `BTN.DASH` i den bildruta du trycker. Servern kontrollerar att
+  du har lärt dig den (forskad Gale Feather eller Roc Plume) och att nedkylningen är klar, och kör
+  samma `dash` som klienten. Du är oträffbar en kort stund (`PF.DASH`). Klanens **Wind Beacon**
+  gör alla medlemmar snabbare och kortar nedkylningen; `me.dashCd` berättar hur lång den är.
+- **Läketrädgården** är en klanbyggnad (ritningen från Mireglass Fen). Den läker medlemmarna
+  utanför strid, skyddar mot gyttjan från nivå 2, och `{ t: 'base', op: 'tonic' }` brygger en
+  Lumen Tonic av dina egna Lumen Spores.
+- Protokollversion 13 (nya rutor, `PF.DASH`, `BTN.DASH`): äldre klienter ombeds ladda om.
 - **Underhåll:** dras ur klanvalvet en gång i timmen: 5 trä och 5 sten per
   bygge och vecka, 10 skrot och 10 essens per byggnadsnivå och vecka, och varje
   arbetares lön (126 skrot och 84 essens i veckan). Allt går att ändra per server

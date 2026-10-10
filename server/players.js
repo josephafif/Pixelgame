@@ -1,7 +1,8 @@
 // Players on the server: joining, inputs (with the anti-speedhack budget),
 // movement, actions, death and respawn, persistence.
 
-import { stepMove, PLAYER_RADIUS, TICK_DT, TICK_RATE, LEAP_TIME } from '../src/net/movement.js';
+import { stepMove, dash, PLAYER_RADIUS, TICK_DT, TICK_RATE, LEAP_TIME, DASH_TIME } from '../src/net/movement.js';
+import { hasSkill, dashCooldown, GALE_STEP } from '../src/game/skills.js';
 import { BTN, CMD, byteToAngle } from '../src/net/protocol.js';
 import { computePlayerStats, xpToNext } from '../src/game/stats.js';
 import { compileWeapon } from '../src/game/combat.js';
@@ -140,7 +141,10 @@ export function createPlayer(gs, account, ch, items) {
 // Your clan's buildings (the Hearth's health, the Training Grounds' attack
 // and defense) count for you wherever you are, as the camp does in single player.
 function statSave(gs, p) {
-  return { player: { level: p.ch.level, bonusLuck: 0, bonusHp: p.ch.extra?.bonusHp ?? 0 }, base: { buildings: base.levelsFor(gs, p) } };
+  return {
+    player: { level: p.ch.level, bonusLuck: 0, bonusHp: p.ch.extra?.bonusHp ?? 0 },
+    base: { buildings: base.levelsFor(gs, p), beacon: building.beaconFor(gs, p.clanId) },
+  };
 }
 
 export function recomputeStats(gs, p) {
@@ -220,6 +224,8 @@ export function mePayload(gs, p) {
     recallFrom: p.ch.extra.recallFrom ?? null,
     horses: horses.payload(p),
     stats: p.stats,
+    dashCd: dashCooldownOf(gs, p),
+    tonicLeft: Math.max(0, (p.tonicUntil ?? 0) - gs.time),
     kills: p.ch.kills,
     deaths: p.ch.deaths,
     pvpKills: p.ch.pvpKills,
@@ -355,6 +361,7 @@ function applyFrame(gs, p, f, now) {
   // Movement: the same code the client predicts with.
   gs.world.gateFilter = (st) => Boolean(st.clanId) && st.clanId === p.clanId;
   const mv = moveParams(gs, p);
+  if (f.buttons & BTN.DASH) galeStep(gs, p, f, mv, now);
   stepMove(gs.world, p, f, mv.speed, mv.sprint, p.r, mv.mode);
   gs.world.gateFilter = null;
   if (p.leap) {
@@ -375,6 +382,29 @@ function applyFrame(gs, p, f, now) {
     else if (heldWeapon(p)) combat.tryAttack(gs, p, aim, f.target, now);
   }
   if (f.buttons & BTN.ABILITY && p.inv.activeSlot !== 'tool') abilities.cast(gs, p, aim, f.target, now);
+}
+
+// A little slack: the client's clock and the server's tick never agree to the millisecond.
+const DASH_SLACK = 0.15;
+
+/** The cooldown of your Gale Step (the clan's Wind Beacon shortens it). */
+export function dashCooldownOf(gs, p) {
+  return dashCooldown(building.beaconFor(gs, p.clanId));
+}
+
+/**
+ * Gale Step (V): a quick dash that slips past attacks. The client predicts
+ * it with the same code (movement.js: dash), on the frame it pressed it.
+ */
+function galeStep(gs, p, f, mv, now) {
+  if (p.dead || p.sailing || mv.mode === 'boat' || p.asleep) return;
+  if ((p.dashReadyAt ?? 0) - DASH_SLACK > gs.time) return;
+  if (!hasSkill(gs.data, p.ch.extra.components, GALE_STEP.id)) return;
+  if (!dash(gs.world, p, f, p.r, mv.mode)) return;
+  p.dash = null;
+  p.dashReadyAt = gs.time + dashCooldownOf(gs, p);
+  p.dashUntil = gs.time + DASH_TIME;
+  p.invulnUntil = Math.max(p.invulnUntil ?? 0, now + DASH_TIME * 1000);
 }
 
 function command(gs, p, cmd) {

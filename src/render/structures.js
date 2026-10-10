@@ -252,6 +252,30 @@ function prismRelay(g) {
   rect(g, 7, 4, 1, 1, '#ffffff');
 }
 
+/** Wind Beacon: a stone pillar with a cage of aether crystal and streamers in the wind. */
+function windBeacon(g) {
+  // Plinth.
+  rect(g, 2, 19, 12, 5, O);
+  rect(g, 3, 20, 10, 3, '#8a8a96');
+  rect(g, 3, 20, 10, 1, '#b0b0bc');
+  // Pillar.
+  rect(g, 5, 8, 6, 12, O);
+  rect(g, 6, 9, 4, 11, '#c8ccd8');
+  rect(g, 6, 9, 1, 11, '#eef2fa');
+  rect(g, 9, 9, 1, 11, '#9aa0b4');
+  // The aether crystal in its cage.
+  rect(g, 4, 1, 8, 8, O);
+  rect(g, 5, 2, 6, 6, '#bfe8ff');
+  rect(g, 6, 3, 4, 4, '#ffffff');
+  rect(g, 7, 4, 2, 2, '#9ad8f4');
+  rect(g, 4, 4, 8, 1, '#e0b040');
+  rect(g, 7, 1, 2, 8, '#e0b040');
+  // Streamers.
+  rect(g, 11, 10, 4, 1, '#7ae8ff');
+  rect(g, 12, 12, 3, 1, '#ffffff');
+  rect(g, 1, 11, 4, 1, '#d8ecff');
+}
+
 function banner(g) {
   rect(g, 2, 1, 2, 22, '#8a5a33');
   rect(g, 2, 1, 1, 22, '#b07a48');
@@ -460,6 +484,7 @@ export function structureSprite(id, mask = 0, state = 0, tint = null) {
     case 'flame_turret': turretBase(g, true); break;
     case 'torch': torch(g); break;
     case 'prism_relay': prismRelay(g); break;
+    case 'wind_beacon': windBeacon(g); break;
     case 'banner': banner(g); break;
     case 'wood_floor': woodFloor(g); break;
     case 'stone_floor': stoneFloor(g); break;

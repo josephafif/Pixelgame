@@ -1294,3 +1294,85 @@ test('Prism Barrens: the far land is there, Prismite shows up, the Warden lays l
   await expect.poll(() => game(page, () => window.__pixelgame.game.areas.filter((a) => a.laser).length), { timeout: 15000 }).toBeGreaterThan(2);
   expect(errors).toEqual([]);
 });
+
+/** Puts the player on free ground near the middle of a far region; returns its biome. */
+async function goToRegion(page, id) {
+  return game(page, (rid) => {
+    const g = window.__pixelgame.game;
+    const r = g.world.farRegions.find((x) => x.id === rid);
+    for (let d = 0; d < 30; d++) {
+      for (let a = 0; a < 16; a++) {
+        const x = Math.round(r.x + Math.cos((a / 16) * 6.283) * d);
+        const y = Math.round(r.y + Math.sin((a / 16) * 6.283) * d);
+        if (g.world.isFree(x + 0.5, y + 0.5, 0.4) && g.world.biomeAt(x, y).id === rid) {
+          g.player.x = x + 0.5;
+          g.player.y = y + 0.5;
+          g.player.invuln = 9999;
+          g.enemies.length = 0;
+          return { biome: g.world.biomeAt(x, y).id, ground: g.world.groundAt(x, y) };
+        }
+      }
+    }
+    return null;
+  }, id);
+}
+
+test('Mireglass Fen and Skyreach: the bog sickens you, the bosses fight, and Gale Step dashes once learnt', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  // The fen: moss, swamp water and bog; standing in the bog poisons you.
+  expect((await goToRegion(page, 'fen')).biome).toBe('fen');
+  const bog = await game(page, () => {
+    const g = window.__pixelgame.game;
+    for (let d = 0; d < 40; d++) {
+      for (let a = 0; a < 24; a++) {
+        const x = Math.round(g.player.x + Math.cos((a / 24) * 6.283) * d);
+        const y = Math.round(g.player.y + Math.sin((a / 24) * 6.283) * d);
+        if (g.world.groundAt(x, y) === 19 && g.world.isFree(x + 0.5, y + 0.5, 0.4)) {
+          g.player.x = x + 0.5;
+          g.player.y = y + 0.5;
+          return true;
+        }
+      }
+    }
+    return false;
+  });
+  expect(bog).toBe(true);
+  await expect.poll(() => game(page, () => Boolean(window.__pixelgame.game.player.statuses.poison)), { timeout: 8000 }).toBe(true);
+  await page.screenshot({ path: 'test-results/fen.png' });
+  // The Mireheart wakes and fights without a hitch.
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { spawnBoss } = await import('/src/game/enemies.js');
+    g.godMode = true;
+    spawnBoss(g, 'mireheart', g.player.x + 4, g.player.y - 2);
+  });
+  await page.waitForTimeout(2500);
+  // Skyreach: islands in the clouds.
+  await game(page, () => { window.__pixelgame.game.enemies.length = 0; });
+  expect((await goToRegion(page, 'skyreach')).biome).toBe('skyreach');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: 'test-results/skyreach.png' });
+  // Gale Step: nothing before the feather; once learnt, V dashes and the button cools down.
+  await expect(page.locator('#btn-dash')).toBeHidden();
+  const before = await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.components.gale_feather = { researched: true };
+    g.player.facing = 0;
+    return { x: g.player.x, y: g.player.y };
+  });
+  await page.keyboard.press('KeyV');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.dashState?.left ?? 0)).toBeGreaterThan(0);
+  const after = await game(page, () => ({ x: window.__pixelgame.game.player.x, y: window.__pixelgame.game.player.y }));
+  expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeGreaterThan(0.5);
+  await expect(page.locator('#btn-dash')).toHaveAttribute('aria-label', 'Gale Step');
+  await expect(page.locator('#btn-dash')).not.toHaveAttribute('hidden', '');
+  // The Aether Roc dives and sends walls of wind.
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { spawnBoss } = await import('/src/game/enemies.js');
+    spawnBoss(g, 'aether_roc', g.player.x + 4, g.player.y - 2);
+  });
+  await page.waitForTimeout(3000);
+  expect(errors).toEqual([]);
+});

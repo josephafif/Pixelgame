@@ -270,6 +270,7 @@ export class Construction {
     this.list.push(st);
     this.#attach(st);
     const g = this.game;
+    if (def.beacon) g.recomputeStats?.(); // a Wind Beacon makes you quicker
     g.fx.emit(def.kind === 'floor' ? 'dust' : 'wood', tx + 0.5, ty + 0.6, 6, 0.6, 1.5);
     g.audio.play('build', { throttle: 60 });
     g.emit('structures');
@@ -354,6 +355,7 @@ export class Construction {
     if (layer.get(tileKey(st.x, st.y)) === st) layer.delete(tileKey(st.x, st.y));
     this.damaged.delete(st);
     st.dead = true;
+    if (st.def.beacon && g.pstats) g.recomputeStats?.();
     // A floor on water was all that held up what stood on it.
     if (st.def.kind === 'floor' && onWater(g.world, st.x, st.y)) {
       const top = g.world.structureAt(st.x, st.y);

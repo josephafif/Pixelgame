@@ -3,6 +3,7 @@
 // sprinting is free and can be held forever.
 
 import { baseBonuses } from './base.js';
+import { beaconOf } from './skills.js';
 
 export function xpToNext(data, level) {
   const { base, growth } = data.player.xp;
@@ -27,7 +28,8 @@ export function computePlayerStats(data, save, dna, buffs = []) {
   for (const [el, v] of Object.entries(save.player.resist ?? {})) resist[el] = (resist[el] ?? 0) + v;
   return {
     maxHp: Math.round((p.health + p.perLevel.health * L) * (1 + camp.maxHpPct / 100)) + (save.player.bonusHp ?? 0) + buffTotal('maxHp'),
-    moveSpeed: p.moveSpeed * (1 + ((bonus.moveSpeedPct ?? 0) + buffTotal('moveSpeedPct')) / 100),
+    // (The Wind Beacon in your camp makes you quicker everywhere.)
+    moveSpeed: p.moveSpeed * (1 + ((bonus.moveSpeedPct ?? 0) + buffTotal('moveSpeedPct') + beaconOf(data, save).moveSpeedPct) / 100),
     attackPower: Math.round(p.attackPower + p.perLevel.attackPower * L + camp.attackPower + buffTotal('attackPower')),
     defense: Math.max(0, Math.round((p.defense + p.perLevel.defense * L + camp.defense + (bonus.defense ?? 0)) * (1 + (bonus.defensePct ?? 0) / 100))),
     critChance: Math.min(90, p.critChance + (dna?.stats.critChance ?? 0)),

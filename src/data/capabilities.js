@@ -24,6 +24,9 @@ export const HOOK_ACTIONS = new Set([
   'buff', 'shatter',
 ]);
 
+/** Skills a component can teach (src/game/skills.js). */
+export const SKILLS = new Set(['gale_step']);
+
 export const ABILITY_ACTIONS = new Set([
   'meteor', 'blink', 'blackhole', 'clone', 'quake', 'phoenix', 'storm', 'frostnova', 'bladering', 'timewarp',
   'prismsplit',

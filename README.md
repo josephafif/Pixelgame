@@ -40,6 +40,7 @@ npm run server       # spelservern i produktion (inställningar i server/.env, s
 | Attack / Use | Svärdknappen (blir en hand nära kistor, byggnader m.m.) | Klick, Space, J (E/F = Use) | A / RT |
 | Sprint (ingen stamina) | Stövelknappen (växla eller håll, valbart) | Shift | LB / L3 |
 | Ability | Stjärnknappen (syns bara när vapnet har en) | Q, K eller högerklick | X |
+| Gale Step (rusning, när du lärt dig den) | Fjäderknappen ovanför stöveln | V eller L | LT |
 | Byt plats: huvudvapen / sekundärt / hacka | Hotbaren ovanför knapparna | 1 / 2 / 3 eller mushjulet | RB |
 | Lägg undan (tomma händer) | Tryck på platsen du redan håller | Samma siffra igen | – |
 | Segla ut / gå i land | Handknappen vid vattnet / nära land | E | A |
@@ -257,9 +258,40 @@ Planen och designen finns i [`docs/EXPANSION.md`](docs/EXPANSION.md).
 - **Prism Relay** (ritningen *Blueprint: Prism Relay*, forskas fram i biblioteket) är en tornmodul.
   Ställ den intill ett torn, så slår tornet 25 % hårdare och skjuter tre skott.
 
+**Mireglass Fen** (ute nu) är ett lysande träsk med mörk mossa, torv och turkost vatten.
+
+- **Gyttjan** saktar ner dig (en häst mindre) och gör dig sjuk efter en stund. Läketrädgården
+  på nivå 2, eller en Lumen Tonic, skyddar dig.
+- **Mendbloom** och **Puffcap** spricker när något slår dem: Mendbloom blir ett läkande sken,
+  Puffcap ett giftmoln som skadar alla i det (monster mest, så lura in dem). De växer upp igen.
+  **Lumencaps** (vilken hacka som helst) ger **Lumen Spores**.
+- Fiender: **Bogling** (hoppar fram), **Glowmoth** (fladdrar och dyker) och
+  elitfienden **Mire Troll**, som stormar fram och läker i gyttjan: lura upp den på fast mark.
+- Bossen **The Mireheart** får träsket att slåss: puffcaps spricker runt dig, läkande blommor
+  slår upp intill, och rötter och sporer fyller arenan.
+- **Blueprint: Healing Garden** ger lägret **Läketrädgården**: du läker långsamt utanför strid
+  (mer för varje nivå), från nivå 2 gör gyttjan dig inte sjuk, och där brygger du **Lumen Tonic**
+  (6 Lumen Spores: läker och skyddar mot gyttjan i tre minuter).
+
+**Skyreach** (ute nu) är svävande öar i ett hav av moln.
+
+- Molnen går inte att gå på. Plankbroar och **vindströmmar** binder ihop öarna; en ström bär
+  dig åt sitt håll.
+- **Hästen hoppar** över smala glipor mellan öarna (upp till drygt tre och en halv ruta): rid
+  rakt mot kanten där en ö syns på andra sidan. Murar och vatten går inte att hoppa över.
+- **Aether Crystals** (Mythril) ger **Aetherglass**.
+- Fiender: **Gale Sprite** (dyker), **Cloud Ray** (glider och skjuter) och elitfienden
+  **Storm Griffin**.
+- Bossen **The Aether Roc** stiger ur räckhåll och dyker ned där du står (spring från skuggan),
+  och vindväggar sveper över ön och kastar dig bakåt.
+- **Gale Feather** (och bosskärnan Roc Plume) lär dig **Gale Step**: tryck V för en snabb
+  rusning på drygt tre rutor, åt det håll du går eller siktar. Under rusningen kan inget träffa
+  dig. Laddas om på 4 sekunder.
+- **Wind Beacon** (ritningen *Blueprint: Wind Beacon*) byggs i lägret: du rör dig 8 % snabbare
+  överallt och Gale Step laddas 40 % fortare. I multiplayer gäller klanens fyr alla medlemmar.
+
 Gamla världar får fjärrländerna, men allt du redan har utforskat ser ut precis som förut. I
-multiplayer behåller marken runt varje klanbas sitt gamla utseende. Mireglass Fen och Skyreach
-kommer härnäst.
+multiplayer behåller marken runt varje klanbas sitt gamla utseende.
 
 ## Hästar
 
@@ -348,10 +380,12 @@ När bossen är död tystnar altaret, och för att slåss igen måste du hitta e
 | **Tide Leviathan** | Sunken Isles | Vattenväggar sveper över ön (hitta luckan), gejsrar under fötterna och virvlar som drar in dig |
 
 Fjärrländerna har egna bossar som bara dyker upp vid de mindre altarna i sitt land:
-**The Prism Warden** i Prism Barrens (laserfält, spegelbilder, ringar och spiraler).
+**The Prism Warden** i Prism Barrens (laserfält, spegelbilder, ringar och spiraler), **The
+Mireheart** i Mireglass Fen (giftmoln, rötter, läkande blommor) och **The Aether Roc** i Skyreach
+(störtdyk och vindväggar).
 
 De nya bossarna har egna boss-kärnor till Forge (Bone Crown, Heartwood, Wyrm Fang, Tide Pearl,
-Prism Heart).
+Prism Heart, Mire Heart, Roc Plume).
 Bossar släpper alltid ett vapen, minst sällsynt (rare), med 30 % chans till episkt och 3 % till
 legendariskt.
 
@@ -532,6 +566,8 @@ blinkande "!" innan den rusar). Grafiken finns i `src/render/creatures.js` och b
 | Voidreach | **Void Eye** (svävar och skjuter), **Shade** (bleknar bort och dyker upp bakom dig), Wisp, Bat |
 | Sunken Isles | **Reef Crab** (går i sidled och nyper), Slime, Bat |
 | Prism Barrens | **Shardling** (flock, spricker i skärvor), **Refractor** (prisma som skjuter), **Mirror Knight** (elit, kastar tillbaka skott) |
+| Mireglass Fen | **Bogling** (hoppar fram), **Glowmoth** (dyker), **Mire Troll** (elit, stormar fram, läker i gyttjan) |
+| Skyreach | **Gale Sprite** (dyker), **Cloud Ray** (skjuter), **Storm Griffin** (elit, stormar fram) |
 
 Elementvarianter färgas i elementets färg men behåller en ton av sin egen, så de går att känna
 igen. Hur många som dyker upp tillsammans styrs av `group` (vargar kommer 2–4 åt gången, golems
@@ -593,6 +629,7 @@ Use, eller öppna lägerpanelen (B / hus-knappen). Varje byggnad har nivåer med
 | Pal Den | Kläck pal-ägg. Varje nivå låter dina pals växa två nivåer till |
 | Waystone | Teleportera hem till lägret. Nivå 2: gå tillbaka dit du var |
 | Workers' Lodge | Anställ arbetare (se nedan). Varje nivå ger plats för en till och lär dem bryta hårdare sten |
+| Healing Garden | Kräver ritningen från Mireglass Fen. Läker dig utanför strid, skyddar mot gyttjan från nivå 2, brygger Lumen Tonic |
 
 Hearth, Forge, Vault, Library, Training Grounds och Essence Well går upp till **nivå 7** (nivå 6
 och 7 kräver en besegrad boss och mycket material). På nivå 7 vajar gyllene vimplar över

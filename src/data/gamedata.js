@@ -3,7 +3,7 @@
 
 import {
   SUPPORTED_SCHEMA, ATTACK_PATTERNS, SPRITE_TEMPLATES, HOOK_TRIGGERS, HOOK_ACTIONS,
-  ABILITY_ACTIONS, WEAPON_STATS, PLAYER_STATS,
+  ABILITY_ACTIONS, WEAPON_STATS, PLAYER_STATS, SKILLS,
 } from './capabilities.js';
 
 export const GAMEDATA_URL = 'data/v1/gamedata.json';
@@ -101,6 +101,16 @@ export function validateReferences(data) {
     for (const id of u.effects ?? []) need('effects', id, `component ${c.id}`);
     for (const id of u.abilities ?? []) need('abilities', id, `component ${c.id}`);
     for (const id of u.modifiers ?? []) need('modifiers', id, `component ${c.id}`);
+    // Camp structures and buildings, and skills (src/game/skills.js).
+    for (const id of u.structures ?? []) {
+      if (!data.building?.structures?.some((st) => st.id === id)) problems.push(`component ${c.id} references unknown structure "${id}"`);
+    }
+    for (const id of u.buildings ?? []) {
+      if (!data.base?.buildings?.some((b) => b.id === id)) problems.push(`component ${c.id} references unknown building "${id}"`);
+    }
+    for (const id of u.skills ?? []) {
+      if (!SKILLS.has(id)) problems.push(`component ${c.id} references unknown skill "${id}"`);
+    }
   }
   for (const b of data.biomes) {
     for (const id of b.enemies) need('enemies', id, `biome ${b.id}`);

@@ -275,6 +275,7 @@ function disband(gs, clan) {
   const ids = [...clan.members.keys()];
   gs.db.deleteClan(clan.id);
   gs.clans.delete(clan.id);
+  gs.beacons?.delete(clan.id);
   // The base stays standing, unowned, and crumbles over time.
   for (const st of gs.structures.values()) {
     if (st.clanId === clan.id) {

@@ -9,7 +9,7 @@ på väg.
 |---|---|---|
 | 1 | Teknisk genomgång, datamodeller (det här dokumentet) | klar |
 | 2 | Ny grafik och Prism Barrens | klar |
-| 3 | Mireglass Fen och Skyreach (hästhopp mellan öar) | pågår |
+| 3 | Mireglass Fen och Skyreach (hästhopp mellan öar) | klar |
 | 4 | Sällsyntare ritningar, de bästa bara från svåra bossar | planerad |
 | 5 | Soldater, trupper, strategikartan och territorier | planerad |
 | 6 | NPC-fraktioner med baser och strategisk AI | planerad |

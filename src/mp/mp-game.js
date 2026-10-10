@@ -19,7 +19,8 @@ import { attackDuration, impactDelay, MELEE_PATTERNS } from '../render/weapon-an
 import {
   ET, SF, CMD, BTN, encodeInput, decodeSnapshot, angleToByte,
 } from '../net/protocol.js';
-import { stepMove, quantizeAxis, TICK_RATE, TICK_DT, TICK_MS, PLAYER_RADIUS, LEAP_TIME } from '../net/movement.js';
+import { stepMove, dash, quantizeAxis, TICK_RATE, TICK_DT, TICK_MS, PLAYER_RADIUS, LEAP_TIME } from '../net/movement.js';
+import { hasSkill, GALE_STEP } from '../game/skills.js';
 import { mpGameData, mpStructureLock } from '../net/mpbuild.js';
 import { mpVirtualSave } from '../net/mpsave.js';
 import { inSafeZone, claimAt, canDo, bannerProblem, pvpBlock } from '../net/rules.js';
@@ -256,6 +257,7 @@ export class MpGame {
     s.horses = me.horses ?? { owned: [], riding: null };
     s.world.found = me.found ?? [];
     s.components = me.components ?? {};
+    this.tonicUntil = this.time + (me.tonicLeft ?? 0);
     s.markets = me.markets ?? {};
     if (me.stats) this.pstats = me.stats;
     this.xpNext = me.xpNext;
@@ -770,9 +772,13 @@ export class MpGame {
     const pred = { x: s.x, y: s.y, kx: s.kx, ky: s.ky };
     if (!p.dead) {
       this.#withGates(() => {
-        for (const f of this.pending) stepMove(this.world, pred, f, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode);
+        for (const f of this.pending) {
+          if (f.buttons & BTN.DASH) dash(this.world, pred, f, PLAYER_RADIUS, this.moveMode);
+          stepMove(this.world, pred, f, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode);
+        }
       });
-      pred.leap = null; // (replayed leaps were already shown)
+      pred.leap = null; // (replayed leaps and dashes were already shown)
+      pred.dash = null;
     }
     const dx = before.x - pred.x;
     const dy = before.y - pred.y;
@@ -862,6 +868,18 @@ export class MpGame {
           const ab = this.weapon.ability ?? this.weapon.dna.ability;
           this.abilityReadyAt.set(this.weapon.dna.id, this.time + ab.cooldown);
         }
+      } else if (c === 'dash') {
+        // Gale Step: the server decides too (the same cooldown, the same dash).
+        const st = this.dashState;
+        if (!st) {
+          if (!(this.dashHintAt > this.time)) {
+            this.dashHintAt = this.time + 8;
+            this.toast('Gale Step lärs av en Vindfjäder (Skyreach): forska fram den för att rusa med V.', 'info');
+          }
+        } else if (st.left === 0 && !p.dead && !this.sailing && !this.build.active) {
+          buttons |= BTN.DASH;
+          this.dashReadyAt = this.time + st.total;
+        }
       } else if (c === 'slot1' || c === 'slot2' || c === 'slot3') {
         if (!this.build.active) cmd = { slot1: CMD.SLOT_MAIN, slot2: CMD.SLOT_SECONDARY, slot3: CMD.SLOT_TOOL }[c];
       } else if (c === 'slotNext' || c === 'slotPrev') {
@@ -896,7 +914,20 @@ export class MpGame {
     this.pending.push(frame);
     if (this.pending.length > 120) this.pending.shift();
     this.prev = { x: this.pred.x, y: this.pred.y };
-    this.#withGates(() => stepMove(this.world, this.pred, frame, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode));
+    this.#withGates(() => {
+      if (frame.buttons & BTN.DASH) dash(this.world, this.pred, frame, PLAYER_RADIUS, this.moveMode);
+      stepMove(this.world, this.pred, frame, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode);
+    });
+    if (this.pred.dash) {
+      // Gale Step: wisps of wind along the way, and a moment out of reach.
+      const d = this.pred.dash;
+      for (let i = 0; i <= 6; i++) {
+        const t = i / 6;
+        this.fx.emit('glint', d.x0 + (this.pred.x - d.x0) * t, d.y0 + (this.pred.y - d.y0) * t - 0.3, 2, 0.35, 0.8, ['#ffffff', '#d8ecff', '#9ad8f4']);
+      }
+      this.pred.dash = null;
+      this.audio.play('dash');
+    }
     if (this.pred.leap) {
       // Your horse leapt a gap in the clouds: drawn along its arc.
       this.player.leap = { x0: this.pred.leap.x0, y0: this.pred.leap.y0, t: 0 };
@@ -1210,6 +1241,8 @@ export class MpGame {
           Object.assign(o, info, { anim: o.anim });
           if (info.hurt) o.hurtFlash = 0.12;
           o.hurtFlash = Math.max(0, o.hurtFlash - dt);
+          // Another player's Gale Step: wisps of wind where they rush past.
+          if (info.dashing && Math.random() < 0.8) this.fx.emit('glint', o.x, o.y - 0.3, 2, 0.4, 0.8, ['#ffffff', '#d8ecff', '#9ad8f4']);
           if (o.moving) o.walkT += dt * (o.sprinting ? 14 : 9);
           o.name = pi?.name ?? '…';
           o.tag = pi?.tag ?? null;
@@ -2549,6 +2582,13 @@ export class MpGame {
     return { kind: 'wild', label: 'Vildmark: PvP', protectedNow, newbie };
   }
 
+  /** Gale Step's cooldown: { left, total } (seconds), or null before you have learnt it. */
+  get dashState() {
+    if (!hasSkill(this.data, this.save.components, GALE_STEP.id)) return null;
+    const total = this.me?.dashCd ?? GALE_STEP.cooldown;
+    return { left: Math.max(0, (this.dashReadyAt ?? 0) - this.time), total };
+  }
+
   hudState() {
     const p = this.player;
     const s = this.save;
@@ -2569,6 +2609,7 @@ export class MpGame {
       nearCamp: Boolean(this.me?.clan) && !(this.selfFlags & SF.SAFE),
       ability: this.toolActive || this.handsEmpty ? null : abilityProgress(this),
       abilityName: this.weapon?.ability?.name ?? null,
+      dash: this.dashState,
       sprinting: p.sprinting,
       boss: this.boss ? { name: this.boss.bossDef.name, hp: this.boss.hp, maxHp: this.boss.maxHp, phase: this.boss.hp < this.boss.maxHp * 0.5 ? 2 : 1 } : null,
       dead: p.dead,
@@ -2678,6 +2719,12 @@ export class MpGame {
 
   collectWell() {
     this.#ask({ t: 'base', op: 'well' });
+  }
+
+  /** A Lumen Tonic from the clan's Healing Garden (the server pays and decides). */
+  brewTonic() {
+    this.#ask({ t: 'base', op: 'tonic' });
+    return null;
   }
 
   // Single-player hooks the shared UI may call.

@@ -519,6 +519,16 @@ body[data-input="keyboard"] .key-hints { display: block; }
 @keyframes ready-pulse { 50% { filter: brightness(1.35); } }
 .btn .cd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; font-weight: 700; text-shadow: 0 2px 0 var(--ink); }
 .btn.ability:not(.ready) .glyph { opacity: 0.35; }
+/* Gale Step (V): above Sprint, cools down like an ability. */
+.btn.dash {
+  right: calc(var(--btn) * 1.18); bottom: calc(var(--btn) * 0.86);
+  width: calc(var(--btn) * 0.6); height: calc(var(--btn) * 0.6);
+  --cd: 0deg;
+  background: conic-gradient(rgba(8, 6, 14, 0.72) var(--cd), transparent 0), linear-gradient(#5a8ab8, #23405e);
+}
+.btn.dash.ready { background: linear-gradient(#8ad8ff, #2f6e9e); }
+.btn.dash:not(.ready) .glyph { opacity: 0.35; }
+.btn.dash .cd { font-size: 14px; }
 
 /* Loadout hotbar: main (1), secondary (2), pickaxe (3). */
 .hotbar {

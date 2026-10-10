@@ -6,7 +6,7 @@ import { h, pixelCanvas } from '../ui/dom.js';
 import { icon, costChips } from '../ui/icons.js';
 import { closeModal, askConfirm } from '../ui/modal.js';
 import { buildingSprite } from '../render/buildings.js';
-import { buildingDef, maxLevel, COST_KEYS } from '../game/base.js';
+import { buildingDef, maxLevel, COST_KEYS, TONIC } from '../game/base.js';
 import { BASE_BUILDINGS, BUILDING_SV, baseStructId } from '../net/mpbase.js';
 import { ROLE_SV, canDo } from '../net/rules.js';
 import { workerLook, ROLE_NAMES_SV, WORKER_ROLES } from '../game/workers.js';
@@ -49,6 +49,9 @@ export function bonusSv(data, id, level) {
       const tier = Math.max(1, Math.min(4, level - 1));
       return `Plats för ${cap} arbetare · ${['', 'träd och sten', '+ kristaller', '+ obsidian', '+ järnmalm'][tier]}`;
     }
+    case 'garden':
+      return [`Läk ${((p.regenPct ?? 0) * n).toFixed(1)} % hälsa i sekunden utanför strid`, level >= 2 ? 'gyttjan gör er inte sjuka' : null, 'brygg lumentonikum']
+        .filter(Boolean).join(' · ');
     default: return '';
   }
 }
@@ -211,6 +214,13 @@ function useButtons(game, panels, id, b) {
     case 'well': {
       const n = Math.floor(b.well ?? 0);
       return [btn('essence', n > 0 ? `Hämta ${n}` : 'Fylls…', () => game.collectWell(), n <= 0)];
+    }
+    case 'garden': {
+      // Lumen Tonic, paid with your own Lumen Spores.
+      const left = Math.max(0, Math.ceil((game.tonicUntil ?? 0) - game.time));
+      const have = Math.floor(game.save.resources.spores ?? 0);
+      return [btn('spores', left > 0 ? `Tonikum: ${Math.ceil(left / 60)} min kvar` : `Brygg lumentonikum (${TONIC.cost.spores} sporer, du har ${have})`,
+        () => game.brewTonic(), have < TONIC.cost.spores)];
     }
     case 'waystone': {
       const left = Math.ceil(game.recallReadyIn());

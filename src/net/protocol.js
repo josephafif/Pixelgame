@@ -12,7 +12,7 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 12;
+export const PROTOCOL_VERSION = 13;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
@@ -44,7 +44,7 @@ const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
 
 /** Bit flags. */
-export const PF = { MOVING: 1, SPRINT: 2, DEAD: 4, ASLEEP: 8, PROTECTED: 16, TOOL: 32, EMPTY: 64, HURT: 128, ASCEND: 256, LEAP: 512 };
+export const PF = { MOVING: 1, SPRINT: 2, DEAD: 4, ASLEEP: 8, PROTECTED: 16, TOOL: 32, EMPTY: 64, HURT: 128, ASCEND: 256, LEAP: 512, DASH: 1024 };
 export const EF = { ELITE: 1, BOSS: 2, SUBMERGED: 4, STUNNED: 8, FROZEN: 16, ALERT: 32, CLONE: 64 };
 export const PRF = { ENEMY: 1, LOB: 2, MINE: 4 };
 export const PKF = { LOCKED: 1, MINE: 2 };
@@ -78,7 +78,7 @@ export const SLOTS = ['main', 'secondary', 'tool', 'none'];
 /** One-shot commands carried by an input frame. */
 export const CMD = { NONE: 0, SLOT_MAIN: 1, SLOT_SECONDARY: 2, SLOT_TOOL: 3, SLOT_NONE: 4, SLOT_NEXT: 5, SLOT_PREV: 6 };
 /** Input buttons. */
-export const BTN = { ATTACK: 1, SPRINT: 2, INTERACT: 4, ABILITY: 8 };
+export const BTN = { ATTACK: 1, SPRINT: 2, INTERACT: 4, ABILITY: 8, DASH: 16 };
 
 export const quantize = (v) => Math.round(v * Q);
 export const dequantize = (n) => n / Q;

@@ -351,6 +351,55 @@ const DRAW = {
     p.rect(9, 22, 1, 6, C.woodDark);
     p.rect(8, 22, 3, 1, C.stoneLight);
   },
+  garden(p, tier) {
+    // Raised beds of glowing lumencaps and mendblooms, a pool, and (later) a glasshouse.
+    const bed = (x, y, w) => {
+      p.box(x, y, w, 4, WOOD);
+      p.rect(x + 1, y + 1, w - 2, 2, '#3a2a1a');
+    };
+    const cap = (x, y) => {
+      p.rect(x, y, 1, 3, C.paper);
+      p.rect(x - 1, y - 1, 3, 1, '#9affc8');
+      p.set(x, y - 2, '#f0fff8');
+    };
+    const bloom = (x, y) => {
+      p.rect(x, y, 1, 3, '#4fb04f');
+      p.set(x - 1, y - 1, '#ff9ad8');
+      p.set(x + 1, y - 1, '#ff9ad8');
+      p.set(x, y - 2, '#ff9ad8');
+      p.set(x, y - 1, '#ffe27a');
+    };
+    if (tier >= 3) {
+      // A glasshouse behind the beds.
+      p.box(4, 6, 24, 16, [C.paper, '#bfe8ff', '#7ab8d8']);
+      for (let x = 8; x < 28; x += 5) p.rect(x, 6, 1, 16, '#e8f8ff');
+      p.roof(3, 28, 6, 5, ['#d8f4ff', '#9ad8f4']);
+      p.disc(16, 13, 3, '#9affc8');
+      p.set(16, 13, '#ffffff');
+    }
+    bed(2, GROUND - 4, 12);
+    bed(18, GROUND - 4, 12);
+    cap(5, GROUND - 8);
+    bloom(9, GROUND - 7);
+    cap(12, GROUND - 7);
+    bloom(21, GROUND - 7);
+    cap(25, GROUND - 8);
+    if (tier >= 2) {
+      // A little pool with a fountain stone between the beds.
+      p.disc(16, GROUND - 3, 2, C.water);
+      p.set(16, GROUND - 4, '#bfe8ff');
+      bed(2, GROUND - 13, 9);
+      cap(4, GROUND - 17);
+      bloom(8, GROUND - 16);
+      bed(21, GROUND - 13, 9);
+      bloom(23, GROUND - 16);
+      cap(27, GROUND - 17);
+    }
+    if (tier >= 3) {
+      p.rect(15, GROUND - 10, 2, 6, C.stoneLight);
+      p.set(15, GROUND - 11, '#bfe8ff');
+    }
+  },
   waystone(p, tier) {
     if (tier >= 2) {
       p.box(4, 8, 5, GROUND - 8, STONE);

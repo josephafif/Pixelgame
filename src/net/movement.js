@@ -60,6 +60,20 @@ export const LEAP_MIN = 1.2;
 export const LEAP_MAX = 3.6; // the widest gap a horse clears (tiles, foot to foot)
 export const LEAP_TIME = 0.45; // seconds in the air (how long it is drawn)
 
+/** True when all that keeps a horse from standing at (x, y) is the sea of clouds. */
+function onlyClouds(world, x, y, r) {
+  const x0 = Math.floor(x - r);
+  const x1 = Math.floor(x + r);
+  const y0 = Math.floor(y - r);
+  const y1 = Math.floor(y + r);
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      if (world.blockedFor(tx, ty, 'horse') && world.blockAt(tx, ty) !== T.SKY) return false;
+    }
+  }
+  return true;
+}
+
 /**
  * On horseback, running into the sea of clouds: if there is free, solid
  * ground within LEAP_MAX straight ahead, and nothing but open sky in
@@ -78,9 +92,8 @@ export function tryLeap(world, s, dx, dy, r) {
     const lx = s.x + nx * d;
     const ly = s.y + ny * d;
     if (!world.isFree(lx, ly, r, 'horse')) {
-      // Still over the clouds? Then keep looking further out; anything else ends it.
-      const b = world.blockAt(Math.floor(lx), Math.floor(ly));
-      if (b !== T.SKY) return false;
+      // Still (partly) over the clouds? Then keep looking further out; a wall or water ends it.
+      if (!onlyClouds(world, lx, ly, r)) return false;
       continue;
     }
     s.leap = { x0: s.x, y0: s.y, t: 0 };
@@ -89,6 +102,42 @@ export function tryLeap(world, s, dx, dy, r) {
     return true;
   }
   return false;
+}
+
+// --- Gale Step: a quick dash ----------------------------------------------------------------
+
+export const DASH_DIST = 3.2; // tiles
+export const DASH_TIME = 0.22; // seconds you are out of reach (and drawn as a streak)
+const DASH_STEPS = 8;
+const DIAG = 0.7071067811865476;
+// The eight ways to dash standing still (by the aim byte), exact in every engine.
+const COMPASS = [[1, 0], [DIAG, DIAG], [0, 1], [-DIAG, DIAG], [-1, 0], [-DIAG, -DIAG], [0, -1], [DIAG, -DIAG]];
+
+/**
+ * Gale Step: dashes up to DASH_DIST the way the frame walks (or, standing
+ * still, the way it aims), in small steps so walls, water and the edge of
+ * the clouds stop you as they would walking. Returns true when it moved;
+ * `s.dash` = { x0, y0 } for the drawing.
+ */
+export function dash(world, s, frame, r = PLAYER_RADIUS, mode = 'player') {
+  let { x: ux, y: uy } = inputDirection(frame.mx, frame.my);
+  const len2 = ux * ux + uy * uy;
+  if (len2 < 0.04) {
+    [ux, uy] = COMPASS[((frame.aim ?? 0) + 16 >> 5) & 7];
+  } else {
+    const len = Math.sqrt(len2);
+    ux /= len;
+    uy /= len;
+  }
+  const x0 = s.x;
+  const y0 = s.y;
+  const step = DASH_DIST / DASH_STEPS;
+  for (let i = 0; i < DASH_STEPS; i++) slideMove(world, s, ux * step, uy * step, r, mode);
+  if (s.x === x0 && s.y === y0) return false;
+  s.kx = 0;
+  s.ky = 0;
+  s.dash = { x0, y0 };
+  return true;
 }
 
 /**

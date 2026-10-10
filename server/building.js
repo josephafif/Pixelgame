@@ -10,6 +10,7 @@ import { upkeepPerDay, chargeUpkeep } from '../src/game/upkeep.js';
 import { inSafeZone, bannerProblem, claimAt, canDo } from '../src/net/rules.js';
 import { mpStructureLock } from '../src/net/mpbuild.js';
 import { relayFor } from '../src/game/construction.js';
+import { NO_BEACON } from '../src/game/skills.js';
 import { buildingOfStruct, BUILDING_SV, upkeepRates } from '../src/net/mpbase.js';
 import * as combat from './combat.js';
 import * as players from './players.js';
@@ -35,7 +36,34 @@ function attach(gs, st) {
   layer.set(tileKey(st.x, st.y), st);
   gs.structures.set(st.sid, st);
   base.attached(gs, st);
+  if (def.beacon && st.clanId) beaconsChanged(gs, st, true);
   return true;
+}
+
+// --- Wind Beacons ------------------------------------------------------------------------
+// A clan's beacon makes all its members quicker and recharges Gale Step
+// sooner, wherever they are (src/game/skills.js).
+
+function beaconsChanged(gs, st, on) {
+  gs.beacons ??= new Map();
+  let set = gs.beacons.get(st.clanId);
+  if (!set) gs.beacons.set(st.clanId, (set = new Set()));
+  if (on) set.add(st);
+  else set.delete(st);
+  for (const p of gs.players?.values() ?? []) {
+    if (p.clanId !== st.clanId) continue;
+    players.recomputeStats(gs, p);
+    players.markMe(p);
+  }
+}
+
+/** The best beacon a clan has standing: { moveSpeedPct, dashCooldownPct }. */
+export function beaconFor(gs, clanId) {
+  let best = NO_BEACON;
+  for (const st of (clanId && gs.beacons?.get(clanId)) || []) {
+    if (!st.dead && st.def.beacon.moveSpeedPct >= best.moveSpeedPct) best = st.def.beacon;
+  }
+  return best;
 }
 
 export function loadStructures(gs) {
@@ -133,6 +161,7 @@ export function destroyStructure(gs, st, attacker) {
   if (layer.get(tileKey(st.x, st.y)) === st) layer.delete(tileKey(st.x, st.y));
   gs.structures.delete(st.sid);
   base.detached(gs, st);
+  if (st.def.beacon && st.clanId) beaconsChanged(gs, st, false);
   gs.db.deleteStructure(st.sid);
   gs.broadcastTile(st.x, st.y, { t: 'wd', k: 'st-', sid: st.sid, x: st.x, y: st.y, broken: Boolean(attacker !== undefined) });
   if (st.id === 'banner' && st.clanId) bannerLost(gs, st, attacker);

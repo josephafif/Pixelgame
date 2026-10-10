@@ -8,7 +8,7 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-territories-2',
+  id: '2026-10-territories-3',
   title: { sv: 'Territorier och fraktioner', en: 'Territories and Factions' },
   teaser: {
     sv: 'Den största uppdateringen hittills är på väg: tre nya biomer, soldater, en strategikarta och fraktioner som för krig.',
@@ -24,9 +24,9 @@ export const NEWS = {
       title: { sv: 'Tre nya biomer', en: 'Three new biomes' },
       items: [
         {
-          live: false,
-          sv: '**Mireglass Fen**: ett lysande träsk med läkande svampar, giftmoln och bossen The Mireheart. Samla Lumen Spores.',
-          en: '**Mireglass Fen**: a glowing swamp with healing fungi, poison clouds and the boss The Mireheart. Gather Lumen Spores.',
+          live: true,
+          sv: '**Mireglass Fen**: ett lysande träsk långt ute. Gyttjan saktar ner dig och gör dig sjuk, Mendblooms läker och Puffcaps släpper giftmoln när något slår dem (lura in monstren!). Boglings, Glowmoths, Mire Trolls och bossen The Mireheart. Samla Lumen Spores, hitta ritningen till Läketrädgården och brygg Lumen Tonic där.',
+          en: '**Mireglass Fen**: a glowing swamp far out. Its bog slows you and makes you sick, Mendblooms heal and Puffcaps burst into poison clouds when anything hits them (lure the monsters in!). Boglings, Glowmoths, Mire Trolls and the boss The Mireheart. Gather Lumen Spores, find the Healing Garden blueprint and brew Lumen Tonic there.',
         },
         {
           live: true,
@@ -34,9 +34,9 @@ export const NEWS = {
           en: '**Prism Barrens**: a crystal desert far out (about 350–400 tiles from camp) where mirror crystals bounce shots, even monsters\' shots back at them. Shardlings, Refractors, Mirror Knights and the boss The Prism Warden with its laser fields. Mine Prismite, find the Prism Lens for the Prism Split power, and build a Prism Relay by your turrets.',
         },
         {
-          live: false,
-          sv: '**Skyreach**: svävande öar där hästen hoppar mellan öarna. Vindströmmar, luftportaler, bossen The Aether Roc och Gale Step.',
-          en: '**Skyreach**: floating islands your horse leaps between. Wind currents, sky portals, the boss The Aether Roc and Gale Step.',
+          live: true,
+          sv: '**Skyreach**: svävande öar i ett hav av moln. Gå över broarna, låt vindströmmarna bära dig, eller rid: hästen hoppar över smala glipor mellan öarna. Gale Sprites, Cloud Rays, Storm Griffins och bossen The Aether Roc. Bryt Aetherglass, lär dig **Gale Step** (V: en snabb rusning förbi attacker) och bygg en Vindfyr som gör dig snabbare.',
+          en: '**Skyreach**: floating islands in a sea of clouds. Cross the bridges, ride the wind currents, or take your horse: it leaps the narrow gaps between islands. Gale Sprites, Cloud Rays, Storm Griffins and the boss The Aether Roc. Mine Aetherglass, learn **Gale Step** (V: a quick dash past attacks) and build a Wind Beacon that makes you quicker.',
         },
       ],
     },

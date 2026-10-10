@@ -190,6 +190,23 @@ const ICONS = {
     ],
     pal: { o: O, b: '#7ae0ff', B: '#3a8ab0', y: '#ffffff' },
   },
+  gust: {
+    map: [
+      '.........oo.',
+      '.......oowwo',
+      '......owwbo.',
+      '.....owwbbo.',
+      '....owwbbo..',
+      '...owwbbo...',
+      '..owbbbo....',
+      '..owbbo.....',
+      '.oobbo......',
+      '.o.oo.......',
+      'o...........',
+      '............',
+    ],
+    pal: { o: O, w: '#ffffff', b: '#9ad8f4' },
+  },
   horse: {
     map: [
       '............',

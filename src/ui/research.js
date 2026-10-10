@@ -5,6 +5,7 @@ import { h } from './dom.js';
 import { icon, costChip } from './icons.js';
 import { openModal, replaceModalBody } from './modal.js';
 import { researchCost, baseBonuses } from '../game/base.js';
+import { GALE_STEP } from '../game/skills.js';
 
 function unlockList(game, c) {
   const u = c.unlocks ?? {};
@@ -15,6 +16,8 @@ function unlockList(game, c) {
   for (const id of u.effects ?? []) parts.push(`Effect: ${name('effects', id)}`);
   for (const id of u.abilities ?? []) parts.push(`Ability: ${name('abilities', id)}`);
   for (const id of u.structures ?? []) parts.push(`Build: ${game.data.building?.structures?.find((s) => s.id === id)?.name ?? id}`);
+  for (const id of u.buildings ?? []) parts.push(`Camp building: ${game.data.base?.buildings?.find((b) => b.id === id)?.name ?? id}`);
+  for (const id of u.skills ?? []) parts.push(`Skill: ${id === GALE_STEP.id ? `${GALE_STEP.name} (V: a quick dash past attacks)` : id}`);
   if (c.element) parts.push(`Forge element: ${game.data.byId.elements.get(c.element)?.name}`);
   return parts;
 }

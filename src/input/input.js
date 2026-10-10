@@ -14,7 +14,7 @@ const KEYMAP = {
   KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
   Space: 'attack', KeyJ: 'attack', Enter: 'attack',
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
-  KeyQ: 'ability', KeyK: 'ability',
+  KeyQ: 'ability', KeyK: 'ability', KeyV: 'dash', KeyL: 'dash',
   KeyE: 'interact', KeyF: 'interact',
   KeyI: 'inventory', KeyC: 'crafting', KeyR: 'research', KeyB: 'base', KeyG: 'build', KeyM: 'map', KeyH: 'pals',
   Escape: 'menu', KeyP: 'menu',
@@ -113,6 +113,7 @@ export class Input {
       this.keys.add(action);
       if (action.startsWith('slot')) this.#command(action);
       if (action === 'ability') this.#command('ability');
+      if (action === 'dash') this.#command('dash');
       // Attack doubles as Use: the game interacts instead when something usable is near.
       if (action === 'interact' || action === 'attack') this.#command('interact');
       if (action === 'sprint') this.#pressSprint();
@@ -172,6 +173,7 @@ export class Input {
     }, () => { this.buttonAttack = false; });
     hold(this.buttons.sprint, () => this.#pressSprint(), () => { this.sprintHeld = false; });
     hold(this.buttons.ability, () => this.#command('ability'));
+    if (this.buttons.dash) hold(this.buttons.dash, () => this.#command('dash'));
   }
 
   #pressSprint() {
@@ -310,6 +312,7 @@ export class Input {
     this.padAttack = pressed(0) || pressed(7);
     if (edge(0)) this.#command('interact');
     if (edge(2)) this.#command('ability');
+    if (edge(6)) this.#command('dash');
     if (edge(3)) this.#command('inventory');
     if (edge(9)) this.#command('menu');
     if (edge(1)) this.#command('back');
