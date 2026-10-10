@@ -839,6 +839,12 @@ export class MpGame {
         continue;
       }
       if (c === 'interact' || c === 'interact-or-attack') {
+        // At sea, attacking a monster in reach never takes you ashore (Use still does).
+        const t = this.target;
+        if (this.sailing && (sample.attack || c === 'interact-or-attack') && t && !t.dead) {
+          if (c === 'interact-or-attack') buttons |= BTN.ATTACK;
+          continue;
+        }
         buttons |= BTN.INTERACT;
         const o = this.interactTarget;
         if (o && o.type !== 'harvest') this.suppressAttack = true;

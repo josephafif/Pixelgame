@@ -577,8 +577,11 @@ de har alltid något att göra.
 - **Skadar du en arbetare** (ett slarvigt slag, en explosion) blir den arg på dig och slår
   tillbaka tills den lugnat ner sig. Dör den är den borta.
 - När du är borta räknas en del av det de hade hämtat in (upp till 12 timmar).
+- De **hittar vägen**: står stugan innanför murar går de ut och in genom porten (i multiplayer
+  bara genom den egna klanens portar). Finns ingen väg till ett träd låter de det vara en stund.
 
-Logik: `src/game/workers.js` (delad med servern), `src/game/workforce.js`; panelen
+Logik: `src/game/workers.js` (delad med servern), vägen i `src/game/pathfind.js` (A* över
+rutorna), `src/game/workforce.js`; panelen
 `src/ui/workers.js`; grafiken `src/render/workers-art.js`.
 
 ### Valvet och underhållet
@@ -782,7 +785,7 @@ src/
                               marknader (markets.js), ekonomi och vapenvärde (economy.js),
                               segling (sailing.js), småfynd (discoveries.js), pals (pals.js),
                               hästar (horses.js, riding.js), byar (villages.js), arbetare
-                              (workers.js, workforce.js), underhåll (upkeep.js)
+                              (workers.js, workforce.js, pathfind.js), underhåll (upkeep.js)
   render/                     renderer, pixelsprites, animerade monster och pals (creatures.js),
                               tiles, vapensprites, byggnader, konstruktioner, båtar, hästar, animationer
   input/, audio/, storage/, pwa/, ui/

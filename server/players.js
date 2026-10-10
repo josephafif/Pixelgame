@@ -408,9 +408,12 @@ function tickStatuses(gs, p, dt) {
 export function interact(gs, p, now) {
   if (p.dead) return false;
   // Out on the water, Use takes you ashore (when there is land next to you).
+  // With no land in reach, nothing happens: the attack button (which also
+  // means Use) still attacks the sea creatures around the boat.
   if (p.sailing) {
     const spot = findLanding(sailingView(gs, p));
-    if (spot) setSailing(gs, p, false, spot);
+    if (!spot) return false;
+    setSailing(gs, p, false, spot);
     return true;
   }
   let best = null;

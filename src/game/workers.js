@@ -10,6 +10,7 @@
 
 import { hashInts } from '../core/rng.js';
 import { harvestInfo } from './gathering.js';
+import { findRoute } from './pathfind.js';
 
 export const WORKER_ROLES = ['wood', 'stone'];
 export const ROLE_NAMES = { wood: 'Lumberjack', stone: 'Miner' };
@@ -27,6 +28,11 @@ const REACH = 0.85; // how close to a tree's centre a worker stands to chop it
 const STRIKE_REACH = 0.95;
 const STRIKE_EVERY = 1.0;
 const LEASH = 22; // an angry worker gives up chasing beyond this
+const DIRECT = 12; // closer than this with nothing in between, a worker just walks straight there
+const REPLAN_MOVED = 1.5; // someone being chased got this far from where the way was planned to
+const REPLAN_EVERY = 0.6; // (at most this often)
+const WAYPOINT = 0.35; // close enough to a point on the way: on to the next
+const AVOID_FOR = 90; // seconds a tree with no way to it is left alone
 
 /** A worker's name and colours: the same everywhere, from who owns it and its number. */
 export function workerLook(owner, id) {
@@ -90,6 +96,9 @@ export function createWorker(rec, home, stats) {
     hp: stats.hp, maxHp: stats.hp, state: 'rest', t: 0, restFor: 1 + Math.random() * 3,
     job: null, carry: {}, fells: 0, dmg: 0, swingT: 0, anim: 0, moving: false, walkT: 0,
     hurtFlash: 0, angry: null, calmAt: 0, strikeT: 0, stuckT: 0, lastD: Infinity, detour: 0, detourT: 0, dead: false, idle: false,
+    // The way being walked (points over the tiles), where it leads, and the
+    // trees and rocks there turned out to be no way to (key → until clock).
+    route: null, goalX: NaN, goalY: NaN, planT: 0, noRoute: false, clock: 0, avoid: new Map(),
   };
 }
 
@@ -117,6 +126,7 @@ function scan(ctx, w, cx, cy, radius, stats) {
       if ((mx - home.x) ** 2 + (my - home.y) ** 2 > range2) continue;
       if (clear && (mx - clear.x) ** 2 + (my - clear.y) ** 2 < clear2) continue;
       if (taken.has(`${tx},${ty}`)) continue;
+      if (w.avoid?.size && (w.avoid.get(`${tx},${ty}`) ?? -1) > w.clock) continue;
       if (world.marketAt?.(mx, my, 1)) continue; // never in a market or a village
       const d = (mx - w.x) ** 2 + (my - w.y) ** 2;
       if (d < bestD) {
@@ -157,34 +167,87 @@ export function findWorkTarget(ctx, w, stats) {
   return null;
 }
 
+/** Is the straight line between two points open for a worker of radius r? */
+function lineFree(world, r, ax, ay, bx, by) {
+  const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 0.3);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    if (!world.isFree(ax + (bx - ax) * t, ay + (by - ay) * t, r, 'pal')) return false;
+  }
+  return true;
+}
+
 /**
- * Walks towards (tx, ty), sliding along walls and stepping sideways when
- * stuck. Returns true on arrival.
+ * Plans the way to (tx, ty) over the tiles: round walls and out through the
+ * gate. Straight there when nothing is in between. Sets w.noRoute when there
+ * is no way at all.
+ */
+function plan(ctx, w, tx, ty) {
+  const world = ctx.world;
+  w.goalX = tx;
+  w.goalY = ty;
+  w.planT = REPLAN_EVERY;
+  w.lastD = Infinity;
+  if ((tx - w.x) ** 2 + (ty - w.y) ** 2 < DIRECT * DIRECT && lineFree(world, w.r, w.x, w.y, tx, ty)) {
+    w.route = null;
+    w.noRoute = false;
+    return;
+  }
+  w.route = findRoute(w.x, w.y, tx, ty, (x, y) => world.blockedFor(x, y, 'pal'), {
+    clear: (ax, ay, bx, by) => lineFree(world, w.r, ax, ay, bx, by),
+  });
+  w.noRoute = !w.route;
+}
+
+/**
+ * Walks towards (tx, ty) along the planned way, sliding along walls and
+ * stepping sideways when stuck (and planning again). Returns true on arrival.
  */
 function walk(ctx, w, tx, ty, speed, dt, arrive = 0.2) {
-  const dx = tx - w.x;
-  const dy = ty - w.y;
-  const d = Math.hypot(dx, dy);
+  const d = Math.hypot(tx - w.x, ty - w.y);
   if (d <= arrive) {
     w.moving = false;
     w.stuckT = 0;
     w.lastD = Infinity;
+    w.route = null;
+    w.goalX = NaN;
     return true;
   }
-  let mx = dx / d;
-  let my = dy / d;
+  w.planT -= dt;
+  const moved = (tx - w.goalX) ** 2 + (ty - w.goalY) ** 2;
+  // A new goal (or the one being chased got away): find the way there.
+  if (!(moved < REPLAN_MOVED * REPLAN_MOVED) || (moved > 0.0001 && w.planT <= 0)) plan(ctx, w, tx, ty);
+  // The next point on the way (the goal itself on the last stretch).
+  let px = tx;
+  let py = ty;
+  const route = w.route;
+  if (route) {
+    while (route.length > 1 && (route[0].x - w.x) ** 2 + (route[0].y - w.y) ** 2 < WAYPOINT * WAYPOINT) {
+      route.shift();
+      w.lastD = Infinity;
+    }
+    if (route.length > 1) {
+      px = route[0].x;
+      py = route[0].y;
+    }
+  }
+  const dx = px - w.x;
+  const dy = py - w.y;
+  const dp = Math.hypot(dx, dy) || 1;
+  let mx = dx / dp;
+  let my = dy / dp;
   if (w.detourT > 0) {
     // Step around whatever is in the way.
     w.detourT -= dt;
-    const px = -my * w.detour;
-    const py = mx * w.detour;
-    mx = mx * 0.3 + px;
-    my = my * 0.3 + py;
+    const sx = -my * w.detour;
+    const sy = mx * w.detour;
+    mx = mx * 0.3 + sx;
+    my = my * 0.3 + sy;
     const n = Math.hypot(mx, my) || 1;
     mx /= n;
     my /= n;
   }
-  const step = Math.min(d, speed * dt);
+  const step = Math.min(dp, speed * dt);
   const world = ctx.world;
   const nx = w.x + mx * step;
   const ny = w.y + my * step;
@@ -198,18 +261,28 @@ function walk(ctx, w, tx, ty, speed, dt, arrive = 0.2) {
   w.moving = true;
   w.walkT += dt * 8;
   w.facing = Math.atan2(my, mx);
-  const now = Math.hypot(tx - w.x, ty - w.y);
+  const now = Math.hypot(px - w.x, py - w.y);
   if (now > w.lastD - speed * dt * 0.25) {
     w.stuckT += dt;
     if (w.stuckT > 0.5 && w.detourT <= 0) {
       w.detour = w.detour === 1 ? -1 : 1;
       w.detourT = 0.9;
+      // Something new in the way (a wall just built?): plan again soon.
+      w.planT = Math.min(w.planT, 0.3);
+      if (w.stuckT > 1.5) w.goalX = NaN;
     }
   } else {
     w.stuckT = Math.max(0, w.stuckT - dt * 0.5);
   }
   w.lastD = now;
   return false;
+}
+
+function avoid(w, job) {
+  if (w.avoid.size > 40) {
+    for (const [k, until] of w.avoid) if (until <= w.clock) w.avoid.delete(k);
+  }
+  w.avoid.set(key(job), w.clock + AVOID_FOR);
 }
 
 function release(ctx, w) {
@@ -223,6 +296,9 @@ function setState(w, state) {
   w.stuckT = 0;
   w.lastD = Infinity;
   w.detourT = 0;
+  w.route = null;
+  w.noRoute = false;
+  w.goalX = NaN;
 }
 
 function goHome(ctx, w) {
@@ -236,6 +312,7 @@ export function stepWorker(w, ctx, dt) {
   if (w.dead) return;
   const stats = ctx.stats;
   w.t += dt;
+  w.clock += dt;
   if (w.angry) {
     angry(w, ctx, dt, stats);
     return;
@@ -274,8 +351,9 @@ export function stepWorker(w, ctx, dt) {
         setState(w, 'work');
         w.dmg = 0;
         w.swingT = stats.swing;
-      } else if (w.stuckT > 5 || w.t > 60) {
-        // Can't get there: try something else.
+      } else if (w.noRoute || w.stuckT > 5 || w.t > 60) {
+        // Can't get there: leave that one be for a while and try something else.
+        avoid(w, job);
         release(ctx, w);
         setState(w, 'rest');
         w.restFor = 0.5;
@@ -313,10 +391,13 @@ export function stepWorker(w, ctx, dt) {
         setState(w, 'rest');
         // A breather at the lodge (and a bite to eat) before the next trip.
         w.restFor = (stats.rest ?? 12) * (0.75 + (ctx.rng ?? Math.random)() * 0.5);
-      } else if (w.stuckT > 6 || w.t > 90) {
-        // Lost: they find their own way back (and turn up at the lodge).
+      } else if (w.noRoute || w.stuckT > 6 || w.t > 90) {
+        // Lost (or walled out): they find their own way back (and turn up at the lodge).
         w.x = home.x;
         w.y = home.y;
+        w.route = null;
+        w.noRoute = false;
+        w.goalX = NaN;
         ctx.teleported?.(w);
       }
       return;

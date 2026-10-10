@@ -1773,6 +1773,12 @@ export class Game {
   }
 
   /** Where the weapon points: the locked target if any, else where we walk. */
+  /** An attack press out on the water with a monster in reach: fight, don't land. */
+  #fightingAtSea(command, sample) {
+    const t = this.target;
+    return this.sailing && (sample.attack || command === 'interact-or-attack') && Boolean(t) && !t.dead;
+  }
+
   #aim(sample) {
     const p = this.player;
     const h = this.interactTarget;
@@ -1894,6 +1900,11 @@ export class Game {
         continue;
       }
       if (c === 'interact' || c === 'interact-or-attack') {
+        // At sea, attacking a monster in reach never takes you ashore (Use still does).
+        if (this.#fightingAtSea(c, sample)) {
+          if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample));
+          continue;
+        }
         if (this.interact()) this.suppressAttack = true;
         else if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample));
       } else if (c === 'ability') {

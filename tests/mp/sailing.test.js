@@ -101,3 +101,53 @@ test('sailing: build a boat at the forge, set sail, meet the sharks, go ashore',
     await t.close();
   }
 });
+
+test('sailing: the attack button (which also means Use) hits sea creatures out on the water', async () => {
+  const { spawnEnemy } = await import('../../server/enemies.js');
+  const { findLanding } = await import('../../src/game/sailing.js');
+  const t = await testServer({ worldSeed: 42 });
+  try {
+    const bot = await t.bot('Hajjägaren');
+    const p = t.player(bot);
+    p.protectUntil = Date.now() + 10 * 60 * 1000;
+    p.ch.extra.boat = 2;
+    const shore = findShore(t.gs);
+    t.place(bot, shore.land.x, shore.land.y);
+    const aim = angleToByte(Math.atan2(shore.dir.y, shore.dir.x));
+    await walk(bot, 3, { aim });
+    for (let i = 0; i < 3 && !p.sailing; i++) {
+      bot.input({ buttons: BTN.INTERACT, aim });
+      await sleep(300);
+      if (!p.sailing) await walk(bot, 2, { aim });
+    }
+    assert.equal(p.sailing, true, 'sailing');
+    // Out where no land is in reach (Use has nowhere to take you ashore).
+    const w = t.gs.world;
+    let open = null;
+    for (let d = 3; d < 60 && !open; d++) {
+      const x = p.x + shore.dir.x * d;
+      const y = p.y + shore.dir.y * d;
+      let sea = true;
+      for (let dy = -3; dy <= 3 && sea; dy++) for (let dx = -3; dx <= 3 && sea; dx++) sea = SAILABLE.has(w.blockAt(Math.floor(x) + dx, Math.floor(y) + dy));
+      if (sea) open = { x: Math.floor(x) + 0.5, y: Math.floor(y) + 0.5 };
+    }
+    assert.ok(open, 'open water');
+    Object.assign(p, open);
+    p.queue.length = 0;
+    await walk(bot, 2, { aim }); // (Use let go of)
+    assert.equal(findLanding({ world: w, player: p }), null);
+    const shark = spawnEnemy(t.gs, 'shark', p.x + 1.6, p.y, { level: 1 });
+    const hp = shark.hp;
+    // A press: Use and attack together on the first frame, then attack held.
+    for (let i = 0; i < 20; i++) {
+      const at = angleToByte(Math.atan2(shark.y - p.y, shark.x - p.x));
+      bot.input({ buttons: BTN.ATTACK | (i === 0 ? BTN.INTERACT : 0), aim: at, target: shark.id });
+      await sleep(33);
+    }
+    await sleep(200);
+    assert.ok(shark.dead || shark.hp < hp, `the shark was hit (${shark.hp}/${hp})`);
+    assert.equal(p.sailing, true, 'still in the boat');
+  } finally {
+    await t.close();
+  }
+});

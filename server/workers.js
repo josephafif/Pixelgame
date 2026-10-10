@@ -131,7 +131,10 @@ export function update(gs, dt) {
     }
     let ctx = ctxs.get(clan.id);
     if (!ctx) ctxs.set(clan.id, (ctx = ctxFor(gs, clan, st)));
+    // Workers go through their own clan's gates (and a market's), nobody else's.
+    gs.world.gateFilter = (s) => Boolean(s.clanId) && s.clanId === clan.id;
     stepWorker(w, ctx, dt);
+    gs.world.gateFilter = null;
     if (w.dead) died(gs, clan, w, null);
   }
   // The clan panel's vault numbers follow the deliveries (at most every few seconds).

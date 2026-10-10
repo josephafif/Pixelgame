@@ -9,6 +9,7 @@ import {
 } from '../../src/game/workers.js';
 import { upkeepPerDay, suppliesLast, chargeUpkeep, formatHours, HOUR_MS } from '../../src/game/upkeep.js';
 import { harvestInfo } from '../../src/game/gathering.js';
+import { findRoute } from '../../src/game/pathfind.js';
 import { buildRadius } from '../../src/game/construction.js';
 import { loadData } from './helpers.js';
 
@@ -229,4 +230,98 @@ test('workers stand still while not working, and can be stepped without a game',
   assert.equal(w.idle, true);
   assert.equal(hurtWorker(w, ctx, w.hp + 1, 'x'), true);
   assert.equal(w.dead, true);
+});
+
+/**
+ * A tiny world from a map ('#' wall, 'G' gate, 'T' tree, anything else open
+ * ground; the map's top-left tile is at (ox, oy), outside it open ground).
+ */
+function mapWorld(rows, ox, oy) {
+  const grid = rows.map((r) => [...r]);
+  const at = (tx, ty) => grid[ty - oy]?.[tx - ox] ?? '.';
+  const world = {
+    blockAt: (tx, ty) => (at(tx, ty) === 'T' ? T.TREE : 0),
+    blockedFor: (tx, ty, mode) => at(tx, ty) === '#' || (at(tx, ty) === 'G' && mode === 'enemy'),
+    isFree(x, y, r, mode) {
+      for (let ty = Math.floor(y - r); ty <= Math.floor(y + r); ty++) {
+        for (let tx = Math.floor(x - r); tx <= Math.floor(x + r); tx++) if (world.blockedFor(tx, ty, mode)) return false;
+      }
+      return true;
+    },
+    removeBlock(tx, ty) {
+      grid[ty - oy][tx - ox] = '.';
+    },
+    marketAt: () => null,
+  };
+  return world;
+}
+
+test('pathfinding: the way out of a walled yard goes through its gate', () => {
+  const world = mapWorld([
+    '#######',
+    '#.....#',
+    '#.....#',
+    '#.....#',
+    '###G###',
+  ], 0, 0);
+  const route = findRoute(3.5, 1.5, 3.5, -3.5, (x, y) => world.blockedFor(x, y, 'pal'), {
+    clear: (ax, ay, bx, by) => {
+      for (let i = 1, n = Math.ceil(Math.hypot(bx - ax, by - ay) / 0.3); i <= n; i++) {
+        if (!world.isFree(ax + ((bx - ax) * i) / n, ay + ((by - ay) * i) / n, 0.3, 'pal')) return false;
+      }
+      return true;
+    },
+  });
+  assert.ok(route, 'found a way');
+  assert.deepEqual(route.at(-1), { x: 3.5, y: -3.5 });
+  // Through the gate (3, 4), then round the yard.
+  assert.ok(route.some((pt) => Math.floor(pt.x) === 3 && Math.floor(pt.y) >= 4), JSON.stringify(route));
+  // Walled in for good: no way.
+  const shut = mapWorld(['#####', '#...#', '#####'], 0, 0);
+  assert.equal(findRoute(2.5, 1.5, 2.5, -3.5, (x, y) => shut.blockedFor(x, y, 'pal')), null);
+});
+
+test('workers inside walls go out through the gate, fell trees and come back the same way', () => {
+  const world = mapWorld([
+    '..........T..........',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....#########.......',
+    '.....#.......#.......',
+    '.....#.......#.......',
+    '.....#.......#.......',
+    '.....#.......#.......',
+    '.....#.......#.......',
+    '.....####G####.......',
+  ], -10, -14);
+  // (The tree stands at (0, -14), the lodge's yard spans (-4..2, -9..-5) with its gate at (-1, -4).)
+  const stats = { ...workerStats(data, 1), range: 30 };
+  const home = { x: -1.5, y: -7 };
+  const w = createWorker({ id: 1, role: 'wood' }, home, stats);
+  let delivered = null;
+  let felled = 0;
+  const ctx = {
+    world, data, time: 0, stats, home, clear: null, working: true, taken: new Set(), rng: () => 0.5,
+    fell: (_, job) => {
+      felled++;
+      world.removeBlock(job.tx, job.ty);
+      return { wood: 3 };
+    },
+    deliver: (_, carry) => {
+      delivered = { ...carry };
+    },
+    target: () => null,
+    strike() {},
+  };
+  let throughGate = false;
+  for (let i = 0; i < 30 * 120 && !delivered; i++) {
+    stepWorker(w, ctx, 1 / 30);
+    assert.ok(world.isFree(w.x, w.y, w.r * 0.9, 'pal'), `never inside a wall (${w.x.toFixed(2)}, ${w.y.toFixed(2)}, ${w.state})`);
+    if (Math.floor(w.x) === -1 && Math.floor(w.y) === -4) throughGate = true;
+  }
+  assert.equal(felled, 1, 'felled the tree outside');
+  assert.ok(throughGate, 'went through the gate');
+  assert.deepEqual(delivered, { wood: 3 }, 'and brought the wood home');
+  assert.ok(Math.hypot(w.x - home.x, w.y - home.y) < 0.5, 'back at the lodge');
 });
