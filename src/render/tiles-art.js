@@ -9,7 +9,7 @@ import { T, CHUNK } from '../game/world.js';
 export const TILE_PX = 16;
 const VARIANTS = 4;
 
-const GROUND_STYLE = {
+export const GROUND_STYLE = {
   [T.GRASS]: { base: '#4f9a44', dots: ['#5fb050', '#3f7f38'], blades: '#6cc15c' },
   [T.FLOWERS]: { base: '#4f9a44', dots: ['#5fb050', '#3f7f38'], flowers: ['#ffd84a', '#ff7ab0', '#ffffff', '#8ab8ff'] },
   [T.MOSS]: { base: '#3c7437', dots: ['#58944a', '#2f5e2c'], blades: '#4f8a44' },

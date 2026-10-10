@@ -71,9 +71,9 @@ export const NEWS = {
       title: { sv: 'Grafik och belöningar', en: 'Looks and rewards' },
       items: [
         {
-          live: false,
-          sv: '**Ny grafik**: mjukare ljus, skuggor och rikare mark och skog i hela världen. Kollisioner och regler är desamma.',
-          en: '**New look**: softer light, shadows and richer ground and forests across the world. Collisions and rules stay the same.',
+          live: true,
+          sv: '**Ny grafik**: mjukare ljus, skuggor, täta trädkronor, strandkanter och rikare mark i hela världen. Kollisioner och regler är desamma (Inställningar → Graphics → Classic ger den gamla stilen).',
+          en: '**New look**: softer light, shadows, dense tree crowns, shorelines and richer ground across the world. Collisions and rules stay the same (Settings → Graphics → Classic brings back the old look).',
         },
         {
           live: false,

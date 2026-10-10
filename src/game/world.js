@@ -763,6 +763,13 @@ export class World {
     return chunk.block[(ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK)];
   }
 
+  groundAt(tx, ty) {
+    const cx = Math.floor(tx / CHUNK);
+    const cy = Math.floor(ty / CHUNK);
+    const chunk = this.getChunk(cx, cy);
+    return chunk.ground[(ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK)];
+  }
+
   isSolid(tx, ty) {
     return this.blockAt(tx, ty) !== 0;
   }
@@ -856,6 +863,18 @@ export class World {
     if (cut) chunk.cut.set(i, cut);
     else chunk.cut.delete(i);
     chunk.canvas = null; // re-render
+    // Crowns, shadows and shade reach across chunk edges (the rich style): the neighbours too.
+    const lx = tx - cx * CHUNK;
+    const ly = ty - cy * CHUNK;
+    if (lx === 0 || ly === 0 || lx === CHUNK - 1 || ly === CHUNK - 1) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const n = this.chunks.get(`${cx + dx},${cy + dy}`);
+          if (n) n.canvas = null;
+        }
+      }
+    }
   }
 
   /** Removes a tree/rock and remembers it. Returns the removed tile id. */

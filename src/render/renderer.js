@@ -7,6 +7,7 @@
 
 import { createCanvas, ctx2d } from './canvas.js';
 import { renderChunk, TILE_PX } from './tiles-art.js';
+import { renderChunkRich, vignetteFor } from './terrain-rich.js';
 import { boatSprite } from './boats.js';
 import { horseSprite, HORSE_W, HORSE_H } from './horses.js';
 import { CHUNK } from '../game/world.js';
@@ -46,6 +47,7 @@ const TARGET_SHORT_SIDE = 230; // game pixels on the shorter screen side
 // little more on phones held upright, where the screen is narrow.
 const VIEW_TARGETS = { close: 190, normal: TARGET_SHORT_SIDE, wide: 300 };
 const NEW_CHUNKS_PER_FRAME = 4;
+const CHUNK_MS = 6; // time for new chunks per frame (at least one is drawn)
 
 /**
  * HD scale: the whole number nearest `fit` (screen pixels per art pixel)
@@ -112,6 +114,9 @@ export class Renderer {
     this.hd = true;
     this.R = 1;
     this.viewSize = 'auto';
+    // 'rich' (light, shade, fuller trees) or 'classic' (the original look).
+    this.terrain = 'rich';
+    this.terrainChanged = false;
     this.pan = { x: 0, y: 0 };
     this.camX = 0;
     this.camY = 0;
@@ -132,6 +137,14 @@ export class Renderer {
     if (this.hd === on) return;
     this.hd = on;
     this.resize();
+  }
+
+  /** The terrain style: 'rich' or 'classic' (every chunk is drawn again). */
+  setTerrainStyle(style) {
+    const next = style === 'classic' ? 'classic' : 'rich';
+    if (next === this.terrain) return;
+    this.terrain = next;
+    this.terrainChanged = true;
   }
 
   setViewSize(size) {
@@ -247,6 +260,7 @@ export class Renderer {
     this.#drawProjectiles(game);
     this.#drawShapes(game);
     this.#drawParticles(game);
+    if (this.terrain === 'rich') this.v.drawImage(vignetteFor(W, H), 0, 0);
     this.#drawTexts(game);
     this.#drawCompass(game, W, H);
     this.#drawMates(game, W, H);
@@ -301,11 +315,20 @@ export class Renderer {
     const r0 = Math.floor(cy / size);
     const r1 = Math.floor((cy + H) / size);
     let rendered = 0;
+    const world = game.world;
+    if (this.terrainChanged) {
+      this.terrainChanged = false;
+      for (const chunk of world.chunks.values()) chunk.canvas = null;
+    }
+    const rich = this.terrain === 'rich';
+    // New chunks are drawn within a few milliseconds a frame (the rest next
+    // frame), so riding fast into new land never stutters on a phone.
+    const until = performance.now() + CHUNK_MS;
     for (let row = r0; row <= r1; row++) {
       for (let col = c0; col <= c1; col++) {
-        const chunk = game.world.getChunk(col, row);
-        if (!chunk.canvas && rendered < NEW_CHUNKS_PER_FRAME) {
-          chunk.canvas = renderChunk(chunk, game.world.growthOf(chunk));
+        const chunk = world.getChunk(col, row);
+        if (!chunk.canvas && rendered < NEW_CHUNKS_PER_FRAME && (rendered === 0 || performance.now() < until)) {
+          chunk.canvas = rich ? renderChunkRich(chunk, world.growthOf(chunk), world) : renderChunk(chunk, world.growthOf(chunk));
           rendered += 1;
         }
         if (chunk.canvas) this.v.drawImage(chunk.canvas, col * size - cx, row * size - cy);

@@ -8,7 +8,7 @@ på väg.
 | Fas | Innehåll | Status |
 |---|---|---|
 | 1 | Teknisk genomgång, datamodeller (det här dokumentet) | klar |
-| 2 | Ny grafik och Prism Barrens | pågår |
+| 2 | Ny grafik (klar) och Prism Barrens | pågår |
 | 3 | Mireglass Fen och Skyreach (hästhopp mellan öar) | planerad |
 | 4 | Sällsyntare ritningar, de bästa bara från svåra bossar | planerad |
 | 5 | Soldater, trupper, strategikartan och territorier | planerad |

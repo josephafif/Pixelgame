@@ -205,6 +205,7 @@ export class MpGame {
     this.setQuality(s.quality === 'low' ? 'low' : 'high');
     this.renderer.setViewSize?.(s.viewSize ?? 'auto');
     this.renderer.setHd?.(s.pixels !== 'classic');
+    this.renderer.setTerrainStyle?.(s.graphics ?? 'rich');
   }
 
   updateSettings(patch) {

@@ -250,6 +250,7 @@ export class Game {
     this.setQuality(level);
     this.renderer.setViewSize?.(s.viewSize ?? 'auto');
     this.renderer.setHd?.(s.pixels !== 'classic');
+    this.renderer.setTerrainStyle?.(s.graphics ?? 'rich');
   }
 
   updateSettings(patch) {

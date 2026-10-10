@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   autoFullscreen: true, // phones/tablets: go full screen when you press Play
   viewSize: 'auto', // 'auto' | 'close' | 'normal' | 'wide' (how much of the world you see)
   pixels: 'hd', // 'hd' (2× detail, smooth movement) | 'classic' (the 1× pixel grid)
+  graphics: 'rich', // 'rich' (light, shade, fuller trees) | 'classic' (the original look)
 });
 
 export class NewerSaveError extends Error {

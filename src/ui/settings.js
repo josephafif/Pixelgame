@@ -45,6 +45,7 @@ export function open(game, app) {
         choice('Quality', 'quality', [['auto', 'Auto (adapts to your device)'], ['high', 'High'], ['low', 'Low (battery saver)']]),
         choice('View', 'viewSize', [['auto', 'Auto (wider on phones held upright)'], ['close', 'Close'], ['normal', 'Normal'], ['wide', 'Wide (see more)']]),
         choice('Pixels', 'pixels', [['hd', 'HD (finer detail, smoother movement)'], ['classic', 'Classic (big chunky pixels)']]),
+        choice('Graphics', 'graphics', [['rich', 'Rich (light, shade and lush forests)'], ['classic', 'Classic (the original look)']]),
         toggle('Screen shake', 'screenShake'),
         toggle('Damage numbers', 'damageNumbers'),
         toggle('Show FPS', 'showFps'),
