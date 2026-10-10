@@ -44,6 +44,8 @@ export function open(game, app, { focus = null } = {}) {
         return [h('button', { onclick: () => app.panels.show('research') }, icon('book', 20), 'Research')];
       case 'den':
         return [h('button', { onclick: () => app.panels.show('pals') }, icon('pal', 20), 'Pals')];
+      case 'training':
+        return [h('button', { onclick: () => app.panels.show('strategy') }, icon('flag', 20), 'Train soldiers · strategy map')];
       case 'well': {
         const n = wellPending(data, save);
         return [h('button', {

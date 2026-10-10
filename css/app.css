@@ -1369,3 +1369,24 @@ button.small { min-height: 30px; padding: 0 8px; font-size: 13px; }
   .ws-main { grid-template-columns: 1fr; }
   .ws-left { position: static; }
 }
+
+/* The strategy map (N): territories, squads and orders. */
+.strategy-top { display: grid; grid-template-columns: minmax(0, 448px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.strategy-mapbox { display: flex; flex-direction: column; gap: 6px; }
+.strategy-map { width: 100%; max-width: 448px; aspect-ratio: 1; image-rendering: pixelated; border: 2px solid var(--ink, #161622); border-radius: 6px; cursor: pointer; touch-action: manipulation; }
+.strategy-nav { flex-wrap: wrap; gap: 4px; }
+.strategy-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.strategy-cell { padding: 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); }
+.strategy-cell .row { flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.squad-card { padding: 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); border: 2px solid transparent; display: flex; flex-direction: column; gap: 4px; }
+.squad-card.selected { border-color: #ffd24a; }
+.squad-card .row { flex-wrap: wrap; gap: 4px; align-items: center; }
+.squad-dot { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #161622; font-weight: 700; font-size: 11px; border: 2px solid #161622; }
+button.link { background: none; border: none; padding: 0; min-height: 0; color: inherit; cursor: pointer; text-align: left; }
+.soldier-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.soldier-row .worker-info { display: flex; flex-direction: column; min-width: 140px; }
+.row.wrap { flex-wrap: wrap; gap: 4px; }
+@media (max-width: 720px) {
+  .strategy-top { grid-template-columns: 1fr; }
+  .strategy-map { max-width: none; }
+}

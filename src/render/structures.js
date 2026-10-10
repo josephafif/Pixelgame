@@ -138,6 +138,21 @@ function aegisWall(g, mask) {
   if (!up) for (const mx of [1, 10]) rect(g, mx, 2, 5, 1, '#ffd24a');
 }
 
+/** An outpost's flag: a tall pole on a stone foot, the cloth in its holder's colour. */
+function outpostFlag(g, tint = '#b8b8c8') {
+  rect(g, 4, 20, 8, 4, O);
+  rect(g, 5, 21, 6, 2, '#8a8a96');
+  rect(g, 5, 21, 6, 1, '#b0b0bc');
+  rect(g, 7, 1, 2, 20, O);
+  rect(g, 7, 2, 1, 19, '#8a5a33');
+  rect(g, 8, 2, 1, 19, '#6b4a2a');
+  rect(g, 6, 0, 4, 2, '#ffd24a');
+  rect(g, 9, 3, 7, 7, O);
+  rect(g, 9, 4, 6, 5, tint);
+  rect(g, 9, 4, 6, 1, 'rgba(255, 255, 255, 0.35)');
+  rect(g, 13, 8, 2, 1, O);
+}
+
 /** Sunfire Obelisk: a tall stone needle with a captured sun at its tip. */
 function sunfireObelisk(g) {
   rect(g, 2, 19, 12, 5, O);
@@ -512,6 +527,8 @@ export function structureSprite(id, mask = 0, state = 0, tint = null) {
     case 'wood_wall': woodWall(g, mask); break;
     case 'stone_wall': stoneWall(g, mask); break;
     case 'iron_wall': ironWall(g, mask); break;
+    case 'palisade': woodWall(g, mask); break;
+    case 'outpost_flag': outpostFlag(g, tint ?? undefined); break;
     case 'aegis_wall': aegisWall(g, mask); break;
     case 'sunfire_obelisk': sunfireObelisk(g); break;
     case 'gate': gate(g, mask, state); break;

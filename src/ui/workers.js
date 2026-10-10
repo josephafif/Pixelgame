@@ -7,6 +7,7 @@ import { icon, costChips } from './icons.js';
 import { openModal, replaceModalBody, askConfirm } from './modal.js';
 import { buildingLevel } from '../game/base.js';
 import { workerStats, ROLE_NAMES, WORKER_ROLES } from '../game/workers.js';
+import { isSoldier } from '../game/army.js';
 import { formatHours, roundUp } from '../game/upkeep.js';
 import { workerPortrait } from '../render/workers-art.js';
 
@@ -58,14 +59,18 @@ export function open(game, app) {
     const problem = wf.hireProblem();
     const wage = roundUp(data.base.workers.wagePerDay ?? {});
     const hire = (role) => game.hireWorker(role);
+    // Soldiers and recruits are on the strategy map; these are the ones who work.
+    const workers = wf.list.filter((w) => !isSoldier(data, w.role) && !save.base.workers.find((r) => r.id === w.id)?.trainingTo);
     return h('div.workers',
       h('p.small.muted', `Lodge level ${level}: room for ${cap} workers. They work on ${TIER_TEXT[stats.tier]}, up to ${stats.range} tiles from camp, and come back with what they gathered.`),
       h('div.row.worker-wage', h('span.small', 'Wage per worker and day:'), costChips(wage), h('span.small.muted', '(paid from the Vault)')),
       save.base.unpaid ? h('p.warn.small', icon('skull', 16), ' The upkeep isn’t paid, so your workers have stopped. Put supplies in the Vault.') : null,
-      h('div.worker-list', wf.list.length ? wf.list.map(workerRow) : h('p.muted', 'No workers yet.')),
-      save.base.workers.length < cap
+      h('div.worker-list', workers.length ? workers.map(workerRow) : h('p.muted', 'No workers yet.')),
+      wf.soldierCount() ? h('p.small', `${wf.soldierCount()} of your people are soldiers (or training to be).`) : null,
+      h('button', { onclick: () => app.panels.show('strategy') }, icon('flag', 20), 'Army and strategy map (N)'),
+      wf.workerCount() < cap
         ? h('section.worker-hire',
-          h('h3', `Hire a worker (${save.base.workers.length} / ${cap})`),
+          h('h3', `Hire a worker (${wf.workerCount()} / ${cap})`),
           h('div.row', costChips(cost, save.resources)),
           problem ? h('p.small.req', problem) : null,
           h('div.row',

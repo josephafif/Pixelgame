@@ -34,6 +34,9 @@ import {
 import { Construction, buildRadius, structureDef, structureDefs, structureLock, upgradeDef, upgradeCost } from './construction.js';
 import { Markets } from './markets.js';
 import { Workforce } from './workforce.js';
+import { Campaign } from './campaign.js';
+import { roleDef, isSoldier, squadOf, barracksCap } from './army.js';
+import { territoryConfig, territoryAt } from './territory.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
 import { slideMove, groundEffect, tryLeap, dash, quantizeAxis, LEAP_TIME, DASH_TIME } from '../net/movement.js';
 import { hasSkill, beaconOf, dashCooldown, GALE_STEP } from './skills.js';
@@ -110,6 +113,8 @@ export class Game {
     this.markets = new Markets(this);
     // Workers from the Workers' Lodge, the Vault's supplies and the camp's upkeep.
     this.workforce = new Workforce(this);
+    // Soldiers, squads and territories (campaign.js).
+    this.campaign = new Campaign(this);
     this.stable = new Stable(this);
     // Build mode (camp construction) and gathering state.
     this.build = {
@@ -1398,8 +1403,8 @@ export class Game {
   }
 
   damageStructure(st, amount) {
-    // Market walls and turrets are built to last.
-    if (st.owner === 'market') {
+    // Market walls and turrets (and outposts' palisades) are built to last.
+    if (st.owner === 'market' || st.owner === 'outpost') {
       st.rt.flash = 0.1;
       return;
     }
@@ -1410,7 +1415,9 @@ export class Game {
   structuresForDraw() {
     const mine = this.save.base.structures;
     const markets = this.markets.structures;
-    return markets.length ? mine.concat(markets) : mine;
+    const outposts = this.campaign.structures;
+    if (!markets.length && !outposts.length) return mine;
+    return mine.concat(markets, outposts);
   }
 
   /** Your attacks can hurt people at markets (see Markets.hitNpcs) and your own workers. */
@@ -1441,6 +1448,61 @@ export class Game {
   /** Your hired workers (drawn by the renderer). */
   get workers() {
     return this.workforce.list;
+  }
+
+  // --- The army and the territories (campaign.js; the strategy map, ui/strategy.js) ----------
+
+  /** What the strategy map shows: the squares around (tx, ty), squads, soldiers and recruits. */
+  strategyView(tx, ty, radius) {
+    const c = this.campaign;
+    const data = this.data;
+    const roster = this.save.base.workers;
+    const list = this.workforce.list;
+    const look = (id) => list.find((w) => w.id === id);
+    const roleName = (id) => roleDef(data, id)?.name ?? (id === 'wood' ? 'Lumberjack' : 'Miner');
+    const soldiers = roster.filter((r) => isSoldier(data, r.role) || r.trainingTo).map((r) => {
+      const w = look(r.id);
+      return {
+        id: r.id, name: w?.name ?? '?', role: r.trainingTo ?? r.role, roleName: roleName(r.trainingTo ?? r.role), rank: r.rank ?? 0, gear: r.gear ?? 1,
+        hp: w?.hp ?? 0, maxHp: isSoldier(data, r.role) ? w?.maxHp ?? 0 : 0, squad: squadOf(c.army, r.id)?.id ?? 0,
+        training: Boolean(r.trainingTo), trainLeft: r.trainingTo ? Math.max(0, Math.ceil((r.trainUntil - Date.now()) / 1000)) : 0,
+      };
+    });
+    const recruits = roster.filter((r) => !isSoldier(data, r.role) && !r.trainingTo).map((r) => ({ id: r.id, name: look(r.id)?.name ?? '?', role: r.role, roleName: roleName(r.role) }));
+    return {
+      lang: 'en', size: territoryConfig(data).size, here: territoryAt(data, this.player.x, this.player.y), player: { x: this.player.x, y: this.player.y },
+      territories: radius >= 0 ? c.territoriesAround(tx, ty, radius) : [],
+      squads: c.squadsView(), soldiers, recruits, roles: data.army?.roles ?? [],
+      barracks: { used: this.workforce.soldierCount(), cap: barracksCap(data, c.levels().training) },
+      canCreateSquad: c.army.squads.length < (data.army?.squads?.max ?? 4),
+      gear: (s) => c.gearInfo(s.id),
+      trainProblem: (id, role) => c.trainProblem(id, role),
+    };
+  }
+
+  /** The strategy map's actions; returns a problem to show, or null. */
+  armyAction(op, a = {}) {
+    const c = this.campaign;
+    try {
+      switch (op) {
+        case 'squad-create': c.createSquad(a.name || `Squad ${c.army.nextSquad}`); break;
+        case 'squad-disband': c.disbandSquad(a.squad); break;
+        case 'assign': c.assign(a.soldier, a.squad); break;
+        case 'order': return c.order(a.squad, a.kind, { key: a.key, x: a.x, y: a.y });
+        case 'stance': c.setStance(a.squad, a.stance); break;
+        case 'train': {
+          const rec = c.train(a.id, a.role);
+          this.toast(`${this.workforce.list.find((w) => w.id === rec.id)?.name ?? 'The recruit'} starts training at the Training Grounds.`, 'level');
+          break;
+        }
+        case 'gear': c.buyGear(a.id); this.audio.play('build'); break;
+        case 'muster': c.muster(a.id, a.role ?? 'wood'); break;
+        default: return 'Unknown order';
+      }
+      return null;
+    } catch (err) {
+      return err.message;
+    }
   }
 
   // --- Workers and the Vault's supplies -----------------------------------------------------
@@ -1486,6 +1548,10 @@ export class Game {
 
   /** A turret's projectile reached an enemy. */
   turretHit(proj, e) {
+    if (proj.soldier) {
+      this.campaign.arrowHit(proj, e);
+      return;
+    }
     dealDamage(this, e, proj.damage, { element: proj.element, structure: proj.structure, canCrit: false });
     if (proj.status && !e.dead) applyStatus(this, e, proj.status, proj.damage);
   }
@@ -2095,6 +2161,7 @@ export class Game {
     this.construction.update(dt);
     this.markets.update(dt);
     this.workforce.update(dt);
+    this.campaign.update(dt);
     this.stable.update(dt);
     this.#ambience(dt);
     this.exploreT -= dt;

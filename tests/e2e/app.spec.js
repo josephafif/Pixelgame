@@ -1381,3 +1381,71 @@ test('Mireglass Fen and Skyreach: the bog sickens you, the bosses fight, and Gal
   await page.waitForTimeout(3000);
   expect(errors).toEqual([]);
 });
+
+test('army: train soldiers, form a squad on the strategy map, and take an outpost together', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  // A camp with a lodge and Training Grounds, and workers to train.
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    Object.assign(g.save.base.buildings, { lodge: 3, training: 3, forge: 3, vault: 1 });
+    Object.assign(g.save.resources, { scrap: 99999, essence: 99999, wood: 9999, stone: 9999 });
+    g.workforce.sync();
+    for (let i = 0; i < 4; i++) g.hireWorker('wood');
+  });
+  await page.keyboard.press('KeyN');
+  const panel = page.locator('.strategy-panel');
+  await expect(panel).toBeVisible();
+  // Train three of them from the recruits list.
+  for (let i = 0; i < 3; i++) await panel.locator('[data-recruit] button', { hasText: 'Train: Infantry' }).first().click();
+  await expect(panel.locator('[data-soldier]')).toHaveCount(3);
+  await game(page, () => {
+    for (const r of window.__pixelgame.game.save.base.workers) if (r.trainingTo) r.trainUntil = Date.now() - 1;
+  });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(1500);
+  await page.keyboard.press('KeyN');
+  await expect(panel).toBeVisible();
+  await panel.locator('button', { hasText: 'New squad' }).click();
+  for (let i = 0; i < 3; i++) await panel.locator('[data-soldier] select').nth(i).selectOption({ label: 'Squad 1' });
+  await expect(panel.locator('.squad-card')).toContainText('3 soldiers');
+  await panel.locator('.squad-card button', { hasText: 'Follow me' }).click();
+  await expect(panel.locator('.squad-card')).toContainText('Following you');
+  await page.keyboard.press('Escape');
+  // Off to the nearest outpost, the squad with you; they fight its guards.
+  const site = await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { outpostFor } = await import('/src/game/territory.js');
+    let s = null;
+    for (const [tx, ty] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      s = outpostFor(g.world, g.data, tx, ty);
+      if (s) break;
+    }
+    for (const r of g.save.base.workers) Object.assign(r, { gear: 5, rank: 5 });
+    g.godMode = true;
+    const spot = g.world.findFreeSpot(s.x, s.y + 9, 0.4);
+    g.player.x = spot.x;
+    g.player.y = spot.y;
+    for (const w of g.workforce.list) {
+      w.x = spot.x + (Math.random() - 0.5) * 2;
+      w.y = spot.y + 1;
+      w.route = null;
+      w.goalX = NaN;
+    }
+    return { key: s.key, x: s.x, y: s.y };
+  });
+  await expect.poll(() => game(page, (k) => window.__pixelgame.game.enemies.filter((e) => e.outpost === k && !e.dead).length, site.key), { timeout: 10000 }).toBeGreaterThan(0);
+  await expect.poll(() => game(page, (k) => window.__pixelgame.game.enemies.filter((e) => e.outpost === k && !e.dead).length, site.key), { timeout: 60000 }).toBe(0);
+  // Stand at the flag together until it is yours.
+  await game(page, (s) => {
+    const g = window.__pixelgame.game;
+    g.player.x = s.x + 1;
+    g.player.y = s.y + 1;
+  }, site);
+  await expect.poll(() => game(page, (k) => window.__pixelgame.game.campaign.isOwned(k), site.key), { timeout: 40000 }).toBe(true);
+  await page.screenshot({ path: 'test-results/outpost.png' });
+  await page.keyboard.press('KeyN');
+  await expect(panel).toBeVisible();
+  await page.screenshot({ path: 'test-results/strategy.png' });
+  expect(errors).toEqual([]);
+});

@@ -202,8 +202,9 @@ function plan(ctx, w, tx, ty) {
 /**
  * Walks towards (tx, ty) along the planned way, sliding along walls and
  * stepping sideways when stuck (and planning again). Returns true on arrival.
+ * (Soldiers walk the same way: army.js.)
  */
-function walk(ctx, w, tx, ty, speed, dt, arrive = 0.2) {
+export function walk(ctx, w, tx, ty, speed, dt, arrive = 0.2) {
   const d = Math.hypot(tx - w.x, ty - w.y);
   if (d <= arrive) {
     w.moving = false;

@@ -26,7 +26,8 @@ import { currentPickaxe } from '../game/gathering.js';
 import { palSpecies } from '../game/pals.js';
 import { palSprites } from './creatures.js';
 import { drawPixelText } from './font.js';
-import { workerSprites, axeSprite, carrySprite } from './workers-art.js';
+import { workerSprites, axeSprite, carrySprite, soldierSprites, soldierWeapon, shieldSprite } from './workers-art.js';
+import { isSoldier } from '../game/army.js';
 import { installHd, uninstallHd, hdFrame } from './hd.js';
 
 const T = TILE_PX;
@@ -661,7 +662,7 @@ export class Renderer {
     const t = game.time;
     const id = st.id;
     const state = st.def.kind === 'gate' && st.rt.open > 0.5 ? 1 : 0;
-    const img = structureSprite(id, this.#mask(game, st), state, id === 'stall' ? st.color : null);
+    const img = structureSprite(id, this.#mask(game, st), state, id === 'stall' || id === 'outpost_flag' ? st.color : null);
     v.drawImage(img, x, y);
     if (st.rt.flash > 0 && st.def.kind !== 'turret') this.#flashRect(x, y + 2, 16, STRUCT_H - 2);
     if (id === 'arrow_turret') {
@@ -714,7 +715,9 @@ export class Renderer {
   /** Hired workers: a cap, an axe or a pickaxe (swung while they work), a bundle on the way home. */
   #drawWorker(game, w, x, y) {
     const v = this.v;
-    const sprites = workerSprites(w);
+    // Soldiers wear a helmet and carry their weapon (a guard its shield too).
+    const soldier = isSoldier(game.data, w.role);
+    const sprites = soldier ? soldierSprites(w, w.role) : workerSprites(w);
     const right = Math.cos(w.facing) >= 0;
     const frame = w.moving ? 1 + (Math.floor(w.walkT) % 2) : 0;
     let img = (right ? sprites.right : sprites.left)[frame];
@@ -745,8 +748,9 @@ export class Renderer {
     v.save();
     v.translate(Math.round(hx + Math.cos(angle) * 3), Math.round(hy + Math.sin(angle) * 3));
     v.rotate(angle + Math.PI / 2);
-    v.drawImage(w.role === 'wood' ? axeSprite() : pickaxeSprite('#a4abb6'), -6, -13);
+    v.drawImage(soldier ? soldierWeapon(w.role) : w.role === 'wood' ? axeSprite() : pickaxeSprite('#a4abb6'), -6, -13);
     v.restore();
+    if (soldier && w.role === 'guard') v.drawImage(shieldSprite(), right ? x - 7 : x + 1, y - 9 - bob);
     const p = game.player;
     const near = (p.x - w.x) ** 2 + (p.y - w.y) ** 2 < 20;
     if (w.angry) {
@@ -755,7 +759,7 @@ export class Renderer {
       // On strike (no wages) or nothing to do: a little 'z'.
       if (Math.floor(game.time * 2 + w.id) % 4 < 2) drawPixelText(v, 'Z', x + 4, y - 20, '#c8c8d8');
     }
-    if (near || w.angry) drawPixelText(v, w.name.toUpperCase(), x, y - 29, w.angry ? '#ff8a8a' : '#e8d8b0');
+    if (near || w.angry) drawPixelText(v, w.name.toUpperCase(), x, y - 29, w.angry ? '#ff8a8a' : soldier ? '#cfe0ff' : '#e8d8b0');
     if (w.hp < w.maxHp) this.#healthBar(x, y - 16, 12, w.hp / w.maxHp, w.angry ? '#ff5050' : '#6cd66c');
   }
 

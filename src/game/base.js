@@ -182,7 +182,7 @@ export function describeBonus(data, id, level) {
     case 'library':
       return `-${p.researchDiscountPct * n}% research cost`;
     case 'training':
-      return `+${p.attackPower * n} Attack Power · +${p.defense * n} Defense`;
+      return `+${p.attackPower * n} Attack Power · +${p.defense * n} Defense · trains soldiers (room for ${level * (data.army?.barracksPerTraining ?? 2)})`;
     case 'well':
       return `${p.essencePerHour * n} essence per hour`;
     case 'waystone':

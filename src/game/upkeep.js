@@ -25,9 +25,11 @@ export function upkeepPerDay(counts, rates) {
   const structures = add({}, rates.perStructure, counts.structures ?? 0);
   const buildings = add({}, rates.perBuildingLevel, counts.buildingLevels ?? 0);
   const workers = add({}, rates.perWorker, counts.workers ?? 0);
+  // Soldiers draw their own pay (more than a worker's).
+  const soldiers = add({}, rates.perSoldier ?? rates.perWorker, counts.soldiers ?? 0);
   const total = {};
-  for (const part of [structures, buildings, workers]) add(total, part, 1);
-  return { structures, buildings, workers, total };
+  for (const part of [structures, buildings, workers, soldiers]) add(total, part, 1);
+  return { structures, buildings, workers, soldiers, total };
 }
 
 /** Hours the supplies in `vault` keep the base running (Infinity when nothing is due). */

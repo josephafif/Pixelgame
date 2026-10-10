@@ -12,7 +12,7 @@ const SAFE_RADIUS = 16;
 // base buildings stand.
 const CAMP_RADIUS = 8.75; // (room on the plaza for the Workers' Lodge too)
 const CAMP_CLEAR = 12;
-const LANDMARK_RADIUS = 22;
+export const LANDMARK_RADIUS = 22;
 // Lesser altars: one more boss to find in about half of the big world cells.
 // Every altar can be beaten once; after that you look for a new one.
 export const ALTAR_CELL = 200;

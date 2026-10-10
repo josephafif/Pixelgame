@@ -1234,6 +1234,37 @@
       { "id": "glimmerfox", "name": "Glimmerfox", "role": "All-rounder", "color": "#7ad8ff", "weight": 2, "gather": 1.1, "damage": 1.05, "hp": 0.9, "element": "lightning", "attack": "zap", "range": 4.5, "mode": "fight", "desc": "Zaps enemies with lightning from afar and happily helps with the chores." }
     ]
   },
+  "army": {
+    "barracksPerTraining": 2,
+    "wagePerDay": { "scrap": 30, "essence": 20 },
+    "roles": [
+      { "id": "guard", "name": "Guard", "sv": "Vakt", "training": 1, "cost": { "scrap": 90, "essence": 60 }, "seconds": 40, "hp": 170, "damage": 9, "every": 1.0, "reach": 1.0, "speed": 2.0, "sight": 8, "desc": "Sturdy and steady: holds a post and keeps the camp safe." },
+      { "id": "infantry", "name": "Infantry", "sv": "Infanterist", "training": 2, "cost": { "scrap": 150, "essence": 100, "stone": 20 }, "seconds": 55, "hp": 140, "damage": 15, "every": 0.9, "reach": 1.0, "speed": 2.1, "sight": 9, "desc": "The backbone of a squad: hits hard up close." },
+      { "id": "archer", "name": "Archer", "sv": "Bågskytt", "training": 3, "cost": { "scrap": 170, "essence": 120, "wood": 40 }, "seconds": 65, "hp": 95, "damage": 11, "every": 1.2, "reach": 6.5, "ranged": true, "speed": 2.0, "sight": 10, "desc": "Shoots from a distance. Keep them behind the front." },
+      { "id": "rider", "name": "Rider", "sv": "Ryttare", "training": 4, "cost": { "scrap": 260, "essence": 170 }, "seconds": 80, "hp": 150, "damage": 13, "every": 0.9, "reach": 1.1, "speed": 3.6, "sight": 12, "desc": "Fast on horseback: scouts far and gets there first." },
+      { "id": "engineer", "name": "Engineer", "sv": "Ingenjör", "training": 2, "cost": { "scrap": 120, "essence": 70, "wood": 30 }, "seconds": 50, "hp": 105, "damage": 7, "every": 1.1, "reach": 1.0, "speed": 2.0, "sight": 8, "repair": 14, "desc": "Mends walls, gates and turrets near its post, and fights when it must." }
+    ],
+    "gear": [
+      { "level": 1, "pct": 0 },
+      { "level": 2, "pct": 15, "cost": { "scrap": 70, "essence": 40 } },
+      { "level": 3, "pct": 32, "cost": { "scrap": 160, "essence": 90, "stone": 30 } },
+      { "level": 4, "pct": 52, "cost": { "scrap": 320, "essence": 190, "stone": 60 }, "forge": 3 },
+      { "level": 5, "pct": 75, "cost": { "scrap": 620, "essence": 380, "prismite": 6 }, "forge": 5 }
+    ],
+    "xpPerRank": 40,
+    "maxRank": 5,
+    "rankPct": 8,
+    "squads": { "max": 4, "size": 8 },
+    "territory": {
+      "size": 96,
+      "captureSeconds": 20,
+      "captureRadius": 4.5,
+      "incomePerTier": { "scrap": 5, "essence": 3, "wood": 4, "stone": 4 },
+      "frontierPenaltyPct": 6,
+      "raidEveryMinutes": 20,
+      "maxOwned": 16
+    }
+  },
   "blueprintLoot": {
     "sources": {
       "chest": { "chance": 0.05, "tiers": { "common": 80, "rare": 20 } },

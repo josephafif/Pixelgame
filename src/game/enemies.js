@@ -261,6 +261,50 @@ function wander(game, e, dt) {
   return { x: s.x * speed, y: s.y * speed };
 }
 
+/** The soldier this monster fights, if any (campaign.js). */
+function soldierFoe(game, e, dt) {
+  const b = e.brawl;
+  if (b && !b.dead && !b.ghost && (b.x - e.x) ** 2 + (b.y - e.y) ** 2 < 14 * 14) return b;
+  e.brawl = null;
+  if (!(e.outpost || e.raid) || !game.campaign) return null;
+  e.brawlScanT = (e.brawlScanT ?? 0) - dt;
+  if (e.brawlScanT > 0) return null;
+  e.brawlScanT = 0.5;
+  const sight = e.def.sight ?? 7;
+  let best = null;
+  let bestD = sight * sight;
+  for (const s of game.campaign.soldiers()) {
+    if (s.dead || s.ghost) continue;
+    const dd = (s.x - e.x) ** 2 + (s.y - e.y) ** 2;
+    if (dd < bestD) {
+      bestD = dd;
+      best = s;
+    }
+  }
+  e.brawl = best;
+  return best;
+}
+
+/** Up close with a soldier: blows; otherwise towards it. */
+function brawl(game, e, foe, speed) {
+  const dx = foe.x - e.x;
+  const dy = foe.y - e.y;
+  const d = Math.hypot(dx, dy) || 1;
+  if (Math.abs(dx) > 0.05) e.facing = dx > 0 ? 1 : -1;
+  if (d < e.r + (foe.r ?? 0.3) + 0.45) {
+    e.vx = e.vy = 0;
+    if (e.atkCd <= 0) {
+      e.atkCd = 1.1;
+      e.squash = 0.6;
+      game.campaign?.hurt(foe, e.dmg, e);
+    }
+    return;
+  }
+  const s = steer(game, e, dx / d, dy / d);
+  e.vx = s.x * speed;
+  e.vy = s.y * speed;
+}
+
 /** Hits a structure that stands in the way (walls, gates, turrets). */
 function attackStructure(game, e, st) {
   if (!st || e.atkCd > 0) return;
@@ -288,6 +332,13 @@ function updateBehaviour(game, e, dt) {
   e.stateT += dt;
   e.atkCd -= dt;
   perceive(game, e, d);
+  // Your soldiers are foes too: the one fighting it, or (for an outpost's
+  // guards and raiders) any soldier that comes close. Whoever is nearer.
+  const foe = e.state === 'charge' ? null : soldierFoe(game, e, dt);
+  if (foe && (!e.alert || p.dead || (foe.x - e.x) ** 2 + (foe.y - e.y) ** 2 < d * d)) {
+    brawl(game, e, foe, speed);
+    return;
+  }
   if (!e.alert && e.state !== 'charge') {
     // Lost you mid-attack: calm down (a fading shade comes back).
     if (e.state === 'windup' || e.state === 'fade') {
