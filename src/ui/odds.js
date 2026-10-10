@@ -4,6 +4,7 @@
 import { h } from './dom.js';
 import { openModal } from './modal.js';
 import { rarityOdds, WEAPON_DROP_CHANCE } from '../game/economy.js';
+import { sourceOdds, TIERS } from '../game/blueprints.js';
 
 function pct(f) {
   if (f <= 0) return '–';
@@ -57,6 +58,32 @@ export function open(game) {
       + 'Level and luck tilt the odds a little towards rarer weapons.'),
     h('div.odds-scroll', h('table.odds-table', h('thead', head), h('tbody', body))),
     h('p.small.muted', 'Epic and legendary weapons come from their own small roll; everything else is common to rare. '
-      + 'Bosses always drop a weapon. Forge odds are before any boss-core bonus.'));
+      + 'Bosses always drop a weapon. Forge odds are before any boss-core bonus.'),
+    blueprintOdds(data));
   openModal({ title: 'Loot odds', icon: 'star', body: content, className: 'wide odds-panel' });
+}
+
+const BP_SOURCES = [
+  ['enemy', 'Monster'], ['elite', 'Elite monster'], ['chest', 'Chest'], ['ruin', 'Ruin or buried treasure'],
+  ['boss', 'Boss (lesser altar)'], ['hardBoss', 'Hard boss (great altar, far lands)'],
+];
+const TIER_COLOR = { common: 'uncommon', rare: 'rare', epic: 'epic', legendary: 'legendary' };
+
+/** Blueprints: the chance of one per source, and how likely each tier is (the blueprint table). */
+function blueprintOdds(data) {
+  if (!data.blueprintLoot) return null;
+  const color = (t) => data.byId.rarities.get(TIER_COLOR[t])?.color ?? null;
+  const name = (t) => t[0].toUpperCase() + t.slice(1);
+  return h('div',
+    h('h3', 'Blueprints'),
+    h('div.odds-scroll', h('table.odds-table',
+      h('thead', h('tr', h('th', 'Source'), h('th.num', 'Blueprint'), TIERS.map((t) => h('th.num', { style: { color: color(t) } }, name(t))))),
+      h('tbody', BP_SOURCES.map(([id, label]) => {
+        const o = sourceOdds(data, id);
+        if (!o) return null;
+        return h('tr', h('th', label), h('td.num', pct(o.chance)),
+          TIERS.map((t) => h('td.num', { style: { color: o.tiers[t] > 0 ? color(t) : null } }, o.tiers[t] > 0 ? `${Math.round(o.tiers[t])}%` : '–')));
+      })))),
+    h('p.small.muted', 'Legendary blueprints only come from the hardest bosses. The first win over each boss gives a set blueprint, '
+      + 'blueprints you have not found yet come first, and a duplicate turns into essence and scrap. Merchants never sell epic or legendary ones.'));
 }

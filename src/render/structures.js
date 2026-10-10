@@ -118,6 +118,41 @@ function ironWall(g, mask) {
   }
 }
 
+/** Aegis Wall: a reinforced wall bound in gold, with a faint blue ward over the stone. */
+function aegisWall(g, mask) {
+  ironWall(g, mask);
+  const up = mask & UP;
+  const down = mask & DOWN;
+  const bottom = down ? 24 : 21;
+  const body = up ? 0 : 9;
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(120, 200, 255, 0.16)';
+  g.fillRect(0, body, 16, bottom - body);
+  g.globalCompositeOperation = 'source-over';
+  for (const y of up ? [3, 11, 19] : [11, 19]) {
+    if (y >= bottom) continue;
+    rect(g, 0, y, 16, 1, '#ffd24a');
+    rect(g, 7, y - 1, 2, 3, '#ffd24a');
+    rect(g, 7, y, 2, 1, '#bfe8ff');
+  }
+  if (!up) for (const mx of [1, 10]) rect(g, mx, 2, 5, 1, '#ffd24a');
+}
+
+/** Sunfire Obelisk: a tall stone needle with a captured sun at its tip. */
+function sunfireObelisk(g) {
+  rect(g, 2, 19, 12, 5, O);
+  rect(g, 3, 20, 10, 3, '#8a8a96');
+  rect(g, 3, 20, 10, 1, '#b0b0bc');
+  rect(g, 4, 6, 8, 14, O);
+  rect(g, 5, 7, 6, 13, '#d8d0b8');
+  rect(g, 5, 7, 1, 13, '#f4ecd8');
+  rect(g, 10, 7, 1, 13, '#a89878');
+  for (const y of [10, 14, 17]) rect(g, 6, y, 4, 1, '#ffd24a');
+  rect(g, 5, 1, 6, 6, O);
+  rect(g, 6, 2, 4, 4, '#ffb040');
+  rect(g, 7, 2, 2, 3, '#fff2b0');
+}
+
 function gate(g, mask, open) {
   // Posts.
   for (const x of [0, 13]) {
@@ -477,6 +512,8 @@ export function structureSprite(id, mask = 0, state = 0, tint = null) {
     case 'wood_wall': woodWall(g, mask); break;
     case 'stone_wall': stoneWall(g, mask); break;
     case 'iron_wall': ironWall(g, mask); break;
+    case 'aegis_wall': aegisWall(g, mask); break;
+    case 'sunfire_obelisk': sunfireObelisk(g); break;
     case 'gate': gate(g, mask, state); break;
     case 'iron_gate': ironGate(g, mask, state); break;
     case 'arrow_turret': turretBase(g, false); break;

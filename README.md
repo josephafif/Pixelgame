@@ -94,9 +94,30 @@ Progressionen är medvetet långsammare än i första versionen:
   chans. Du får också en när du skrotar ett legendariskt vapen, och ibland säljer en
   marknad en för 4 000 guld.
 - **Byggnader** kostar också trä och sten från nivå 2, så du behöver samla material.
+- **Ritningar** (vapentyper och byggen) är sällsynta, och en enda tabell bestämmer dem i både
+  singleplayer och multiplayer (`blueprintLoot` i datat, `src/game/blueprints.js`):
 
-All balans ligger i `gamedata.json` (`crafting`, `catalysts`, `base`, `building`, `gathering`)
-och i `src/game/loot.js`.
+  | Källa | Chans för en ritning | Vanlig | Sällsynt | Episk | Legendarisk |
+  | --- | --- | --- | --- | --- | --- |
+  | Vanligt monster | 0,15 % | 90 % | 10 % | – | – |
+  | Elitmonster | 1,5 % | 60 % | 35 % | 5 % | – |
+  | Kista | 5 % | 80 % | 20 % | – | – |
+  | Ruin eller nedgrävd skatt | 18 % | 55 % | 40 % | 5 % | – |
+  | Boss vid ett mindre altare | 30 % | 15 % | 55 % | 30 % | – |
+  | Svår boss (stort altare, fjärrländerna) | 55 % | – | 30 % | 50 % | 20 % |
+
+  Lägrets ritningar hör till sitt land (Prism Relay i Prism Barrens, Healing Garden i Mireglass
+  Fen, Wind Beacon i Skyreach); vapenritningar finns överallt. Ritningar du inte har hittat
+  kommer först. **Första segern över varje boss** ger en bestämd ritning (Bone King ger
+  armborstet, The Prism Warden Prism Relay och så vidare). En **dubblett** blir essens och skrot
+  efter nivå (20/15 för en vanlig, upp till 220/150 för en legendarisk). Handlare säljer aldrig
+  episka eller legendariska ritningar. Loot odds visar tabellen.
+- **Legendariska ritningar** finns bara hos de svåraste bossarna: **Aegis Wall** (den starkaste
+  muren, 2 400 hälsa; en Reinforced Wall kan byggas om till den) och **Sunfire Obelisk** (ett torn
+  med lång räckvidd som sätter eld på allt det träffar).
+
+All balans ligger i `gamedata.json` (`crafting`, `catalysts`, `base`, `building`, `gathering`,
+`blueprintLoot`) och i `src/game/loot.js`.
 
 ## Rarity syns direkt
 

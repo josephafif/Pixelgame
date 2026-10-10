@@ -37,6 +37,7 @@ import { Workforce } from './workforce.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
 import { slideMove, groundEffect, tryLeap, dash, quantizeAxis, LEAP_TIME, DASH_TIME } from '../net/movement.js';
 import { hasSkill, beaconOf, dashCooldown, GALE_STEP } from './skills.js';
+import { isBlueprint, blueprintTier, duplicateValue } from './blueprints.js';
 import { Stable } from './riding.js';
 import { BREED_BY_ID } from './horses.js';
 import { POI, isPoi, poiFound, interactPoi, readOldMap, chunksAround } from './discoveries.js';
@@ -782,9 +783,25 @@ export class Game {
     const entry = this.save.components[id] ?? { found: 0, researched: false };
     this.save.components[id] = entry;
     entry.found += 1;
+    // A blueprint you already have turns into essence and scrap, by its tier.
+    if (entry.found > 1 && isBlueprint(def)) {
+      const v = duplicateValue(this.data, def);
+      this.save.resources.essence += v.essence;
+      this.save.resources.scrap += v.scrap;
+      this.toast(`${def.name} (duplicate) → +${v.essence} essence, +${v.scrap} scrap`);
+      this.emit('components');
+      this.requestSave();
+      return;
+    }
     if (entry.found > 1 && entry.researched) {
       this.save.resources.essence += 10;
       this.toast(`${def.name} (duplicate) → +10 essence`);
+      return;
+    }
+    if (isBlueprint(def) && blueprintTier(def) === 'legendary') {
+      this.toast(`A legendary blueprint: ${def.name}! Research it at the Library.`, 'legendary');
+      this.emit('components');
+      this.saveNow();
       return;
     }
     if (def.research === 0 && !entry.researched) {

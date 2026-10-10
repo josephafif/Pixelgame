@@ -588,12 +588,17 @@ test('loot odds: the menu shows the chance of every rarity', async ({ page }) =>
   await startGame(page);
   await page.keyboard.press('Escape');
   await page.click('.menu button:has-text("Loot odds")');
-  const table = page.locator('.odds-table');
+  const table = page.locator('.odds-table').first();
   await expect(table).toBeVisible();
   for (const r of ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary']) await expect(table.locator('thead')).toContainText(r);
   const monster = table.locator('tbody tr', { hasText: 'Monster' }).first();
   await expect(monster).toContainText('%');
   await expect(table.locator('tbody tr', { hasText: 'Golden Catalyst' })).toContainText('100%');
+  // Blueprints: one table, legendaries only from the hard bosses.
+  const bp = page.locator('.odds-table').nth(1);
+  await expect(bp).toBeVisible();
+  await expect(bp.locator('tbody tr', { hasText: 'Hard boss' }).locator('td').last()).toHaveText('20%');
+  await expect(bp.locator('tbody tr', { hasText: 'Chest' }).locator('td').last()).toHaveText('–');
   expect(errors).toEqual([]);
 });
 

@@ -5,6 +5,7 @@ import { hashInts } from '../core/rng.js';
 import { dist2, normalize } from '../core/math.js';
 import { researchedComponents } from '../weapons/crafting.js';
 import { dropRarity, seededRoll, WEAPON_DROP_CHANCE } from './economy.js';
+import { rollBlueprint, withoutBlueprints, firstKillReward, isHardBoss } from './blueprints.js';
 
 const MAGNET_RADIUS = 2.6;
 const COLLECT_RADIUS = 0.6;
@@ -168,15 +169,38 @@ export function onEnemyKilledLoot(game, e) {
     addPickup(game, 'component', e.x, e.y, { componentId: e.bossDef.drop.component, color: e.color });
     // Star Shards (for the Golden Catalyst): first kill of each boss, then 25%.
     const firstKill = !(game.save.bosses.defeated[e.bossDef.id] > 0);
+    bossBlueprints(game, e, firstKill, biome);
     if (firstKill || Math.random() < 0.25) addPickup(game, 'shard', e.x, e.y, { value: 1, color: '#ffd24a' });
     for (let i = 0; i < 6; i++) addPickup(game, 'scrap', e.x, e.y, { value: 2, color: '#b8bcc8' });
     return;
   }
   const componentChance = (e.elite ? 0.08 : 0.012) + luck * 0.0004;
   if (Math.random() < componentChance) {
-    const id = pickComponent(game, biome.components);
+    const id = pickComponent(game, withoutBlueprints(game.data, biome.components));
     if (id) addPickup(game, 'component', e.x, e.y, { componentId: id, color: componentColor(game, id) });
   }
+  // Blueprints are rare (the blueprint table in the data: blueprints.js).
+  dropBlueprint(game, rollBlueprint(game.data, e.elite ? 'elite' : 'enemy', { biome: biome.id, components: game.save.components, luck }), e.x, e.y);
+}
+
+function dropBlueprint(game, id, x, y) {
+  if (id && game.data.byId.components.has(id)) addPickup(game, 'component', x, y, { componentId: id, color: componentColor(game, id) });
+}
+
+/**
+ * A boss's blueprints: the set reward for the first win over it, and a roll
+ * of the boss table (the hard bosses' table, with legendaries, at a great
+ * altar or in the far lands).
+ */
+function bossBlueprints(game, e, firstKill, biome) {
+  const opts = { biome: biome.id, components: game.save.components, luck: game.pstats.luck };
+  const source = isHardBoss(e.bossDef, e.altarKey) ? 'hardBoss' : 'boss';
+  if (firstKill) {
+    const reward = firstKillReward(game.data, e.bossDef.id);
+    if (reward === 'roll') dropBlueprint(game, rollBlueprint(game.data, source, { ...opts, sure: true }), e.x - 1, e.y);
+    else dropBlueprint(game, reward, e.x - 1, e.y);
+  }
+  dropBlueprint(game, rollBlueprint(game.data, source, opts), e.x + 1, e.y);
 }
 
 export function componentColor(game, id) {
@@ -185,7 +209,7 @@ export function componentColor(game, id) {
   return game.data.byId.rarities.get(c?.rarity)?.color ?? '#ffffff';
 }
 
-export function openChestLoot(game, obj, { richness = 1 } = {}) {
+export function openChestLoot(game, obj, { richness = 1, source = 'chest' } = {}) {
   const level = Math.max(game.world.worldLevel(obj.x, obj.y), game.save.player.level);
   const biome = game.world.biomeAt(Math.floor(obj.x), Math.floor(obj.y));
   // Chests are mostly essence and scrap; now and then a weapon (opened like a case).
@@ -200,10 +224,12 @@ export function openChestLoot(game, obj, { richness = 1 } = {}) {
   addPickup(game, 'gold', obj.x, obj.y + 0.5, { value: Math.round((3 + ((Math.random() * 6) | 0)) * richness), color: '#ffd24a' });
   // Now and then an old map (it shows a new part of the world).
   if (Math.random() < 0.06) addPickup(game, 'mapscroll', obj.x, obj.y + 0.5, { color: '#ecdcb0' });
-  if (Math.random() < 0.35 + game.pstats.luck * 0.005) {
-    const id = pickComponent(game, [...biome.components, 'bp_scythe', 'bp_gun', 'bp_cannon', 'bp_chakram', 'bp_warfan', 'bp_crossbow']);
+  if (Math.random() < 0.3 + game.pstats.luck * 0.005) {
+    const id = pickComponent(game, withoutBlueprints(game.data, biome.components));
     if (id && game.data.byId.components.has(id)) addPickup(game, 'component', obj.x, obj.y + 0.5, { componentId: id, color: componentColor(game, id) });
   }
+  // A blueprint now and then (a ruin's or a buried treasure's table is better than a chest's).
+  dropBlueprint(game, rollBlueprint(game.data, source, { biome: biome.id, components: game.save.components, luck: game.pstats.luck }), obj.x, obj.y + 0.5);
 }
 
 export function updatePickups(game, dt) {

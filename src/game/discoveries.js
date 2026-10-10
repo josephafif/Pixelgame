@@ -244,7 +244,7 @@ export function interactPoi(game, o) {
         game.toast('Something is buried here. You need a pickaxe to dig it up.', 'warn');
         return true;
       }
-      openChestLoot(game, o, { richness: 2.5 });
+      openChestLoot(game, o, { richness: 2.5, source: 'ruin' });
       if (Math.random() < 0.1) addPickup(game, 'shard', o.x, o.y, { value: 1, color: '#ffd24a' });
       game.dropEgg?.('treasure', o.x, o.y);
       fx.emit('sparkle', o.x, o.y, 24, 0.8, 3);
@@ -267,7 +267,7 @@ export function interactPoi(game, o) {
       break;
     }
     case 'ruins': {
-      openChestLoot(game, o, { richness: 2 });
+      openChestLoot(game, o, { richness: 2, source: 'ruin' });
       if (Math.random() < 0.35) addPickup(game, 'mapscroll', o.x, o.y + 0.5, { color: '#ecdcb0' });
       if (Math.random() < 0.08) addPickup(game, 'shard', o.x, o.y + 0.5, { value: 1, color: '#ffd24a' });
       const biome = game.world.biomeAt(Math.floor(o.x), Math.floor(o.y));

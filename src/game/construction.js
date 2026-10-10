@@ -115,7 +115,7 @@ export function upgradeCost(data, from, to) {
 
 /** Stone and iron structures throw stone chips (the rest wood splinters). */
 export function stony(id) {
-  return /^(stone|iron)/.test(id);
+  return /^(stone|iron|aegis|sunfire)/.test(id);
 }
 
 const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });

@@ -8,6 +8,7 @@ import { generateWeapon } from '../src/weapons/generator.js';
 import { dropRarity, WEAPON_DROP_CHANCE } from '../src/game/economy.js';
 import { harvestInfo, rollDrops } from '../src/game/gathering.js';
 import { salvageValue } from '../src/game/loot.js';
+import { rollBlueprint, withoutBlueprints, firstKillReward, isHardBoss, isBlueprint, blueprintTier, duplicateValue } from '../src/game/blueprints.js';
 import { learnFromWeapon, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
 import { inSafeZone } from '../src/net/rules.js';
 import * as players from './players.js';
@@ -119,9 +120,11 @@ export function onEnemyKilled(gs, e, killer) {
   if (Math.random() < (e.elite ? 1 : 0.35)) addPickup(gs, 'scrap', e.x, e.y, { value: 1 + Math.floor(e.level / 6), owner: owner?.id ?? 0, lockUntil: owner ? now + LOCK_MS : 0 });
   if (Math.random() < 0.05) addPickup(gs, 'heart', e.x, e.y, {});
   // Now and then a component to research (more often from elites).
-  if (owner && Math.random() < (e.elite ? 0.08 : 0.012) + luck * 0.0004) {
+  if (owner) {
     const biome = gs.world.biomeAt(Math.floor(e.x), Math.floor(e.y));
-    dropComponent(gs, owner, pickOne(biome.components), e.x, e.y);
+    if (Math.random() < (e.elite ? 0.08 : 0.012) + luck * 0.0004) dropComponent(gs, owner, pickOne(withoutBlueprints(gs.data, biome.components)), e.x, e.y);
+    // Blueprints are rare (the blueprint table in the data: src/game/blueprints.js).
+    dropComponent(gs, owner, rollBlueprint(gs.data, e.elite ? 'elite' : 'enemy', { biome: biome.id, components: owner.ch.extra.components, luck }), e.x, e.y);
   }
   if (owner && e.elite) pals.dropEgg(gs, owner, 'elite', e.x, e.y);
   // Now and then an elite carries an old map.
@@ -167,8 +170,10 @@ function bossDefeated(gs, b, now) {
     winners.push(p);
     p.ch.firstBoss = true;
     // A Pal Egg: always the first time you beat this boss, sometimes after that.
-    pals.dropEgg(gs, p, p.ch.extra.bosses[def.id] ? 'boss' : 'bossFirst', b.x + (Math.random() - 0.5) * 2, b.y + (Math.random() - 0.5) * 2);
+    const firstKill = !p.ch.extra.bosses[def.id];
+    pals.dropEgg(gs, p, firstKill ? 'bossFirst' : 'boss', b.x + (Math.random() - 0.5) * 2, b.y + (Math.random() - 0.5) * 2);
     p.ch.extra.bosses[def.id] = (p.ch.extra.bosses[def.id] ?? 0) + 1;
+    bossBlueprints(gs, p, b, firstKill);
     // Personal loot: everyone who fought gets their own reward.
     const dna = generate(gs, {
       level: b.level, luck: Math.floor(p.stats.luck), source: 'boss', minRarity: def.drop?.minRarity ?? 'rare', theme: def.drop?.theme ?? null, roll: 'boss',
@@ -216,12 +221,10 @@ export function personalChest(gs, p, o, now, rich = 1) {
     const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', roll: 'chest', unlocked: researchedOf(p) });
     dropWeapon(gs, dna, o.x, o.y + 0.6, p);
   }
-  chestComponent(gs, p, o);
+  chestComponent(gs, p, o, rich >= 2 ? 'ruin' : 'chest');
 }
 
 // --- Components (research at the library, as in single player) ---------------------------
-
-const BLUEPRINTS = ['bp_scythe', 'bp_gun', 'bp_cannon', 'bp_chakram', 'bp_warfan', 'bp_crossbow'];
 
 function pickOne(list) {
   return list?.length ? list[(Math.random() * list.length) | 0] : null;
@@ -244,10 +247,28 @@ export function dropComponent(gs, p, id, x, y) {
   addPickup(gs, 'component', x, y, { componentId: id, color: componentColor(gs, id), owner: p.id, lockUntil: Date.now() + 60000 });
 }
 
-function chestComponent(gs, p, o) {
-  if (Math.random() >= 0.35 + (p.stats?.luck ?? 0) * 0.005) return;
+function chestComponent(gs, p, o, source = 'chest') {
   const biome = gs.world.biomeAt(Math.floor(o.x), Math.floor(o.y));
-  dropComponent(gs, p, pickOne([...biome.components, ...BLUEPRINTS]), o.x, o.y + 0.5);
+  const luck = p.stats?.luck ?? 0;
+  if (Math.random() < 0.3 + luck * 0.005) dropComponent(gs, p, pickOne(withoutBlueprints(gs.data, biome.components)), o.x, o.y + 0.5);
+  // A blueprint now and then (a ruin's or a buried treasure's table is better than a chest's).
+  dropComponent(gs, p, rollBlueprint(gs.data, source, { biome: biome.id, components: p.ch.extra.components, luck }), o.x, o.y + 0.5);
+}
+
+/**
+ * A boss's blueprints for one of its victors: the set reward for their
+ * first win over it, and a roll of the boss table (the hard bosses' table,
+ * with legendaries, at a great altar or in the far lands).
+ */
+function bossBlueprints(gs, p, b, firstKill) {
+  const biome = gs.world.biomeAt(Math.floor(b.x), Math.floor(b.y));
+  const opts = { biome: biome.id, components: p.ch.extra.components, luck: p.stats?.luck ?? 0 };
+  const source = isHardBoss(b.def, b.altarKey) ? 'hardBoss' : 'boss';
+  if (firstKill) {
+    const reward = firstKillReward(gs.data, b.def.id);
+    dropComponent(gs, p, reward === 'roll' ? rollBlueprint(gs.data, source, { ...opts, sure: true }) : reward, b.x - 1, b.y);
+  }
+  dropComponent(gs, p, rollBlueprint(gs.data, source, opts), b.x + 1, b.y);
 }
 
 /** Picking up (or buying) a component. */
@@ -258,9 +279,17 @@ export function discoverComponent(gs, p, id) {
   const entry = p.ch.extra.components[id] ?? { found: 0, researched: false };
   p.ch.extra.components[id] = entry;
   entry.found += 1;
-  if (entry.found > 1 && entry.researched) {
+  if (entry.found > 1 && isBlueprint(def)) {
+    // A blueprint you already have turns into essence and scrap, by its tier.
+    const v = duplicateValue(gs.data, def);
+    p.ch.resources.essence = (p.ch.resources.essence ?? 0) + v.essence;
+    p.ch.resources.scrap = (p.ch.resources.scrap ?? 0) + v.scrap;
+    gs.toast(p, `${def.name} (dubblett) → +${v.essence} essens, +${v.scrap} skrot`);
+  } else if (entry.found > 1 && entry.researched) {
     p.ch.resources.essence = (p.ch.resources.essence ?? 0) + 10;
     gs.toast(p, `${def.name} (dubblett) → +10 essens`);
+  } else if (entry.found === 1 && isBlueprint(def) && blueprintTier(def) === 'legendary') {
+    gs.toast(p, `En legendarisk ritning: ${def.name}! Forska på den i biblioteket.`, 'legendary');
   } else if (def.research === 0 && !entry.researched) {
     entry.researched = true;
     gs.toast(p, `Bosskärna: ${def.name}! Nya vapenmöjligheter i smedjan.`, 'legendary');

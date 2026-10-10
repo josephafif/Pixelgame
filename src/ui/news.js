@@ -8,7 +8,7 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-territories-3',
+  id: '2026-10-territories-4',
   title: { sv: 'Territorier och fraktioner', en: 'Territories and Factions' },
   teaser: {
     sv: 'Den största uppdateringen hittills är på väg: tre nya biomer, soldater, en strategikarta och fraktioner som för krig.',
@@ -76,9 +76,9 @@ export const NEWS = {
           en: '**New look**: softer light, shadows, dense tree crowns, shorelines and richer ground across the world. Collisions and rules stay the same (Settings → Graphics → Classic brings back the old look).',
         },
         {
-          live: false,
-          sv: '**Sällsyntare ritningar**: vanliga kistor ger sällan ritningar, och de allra bästa får du bara av de svåraste bossarna.',
-          en: '**Rarer blueprints**: common chests rarely give blueprints, and the very best only come from the hardest bosses.',
+          live: true,
+          sv: '**Sällsyntare ritningar**: kistor och vanliga monster ger sällan ritningar, ruiner och bossar oftare. Legendariska ritningar (**Aegis Wall** och **Sunfire Obelisk**) får du bara av de svåraste bossarna: vid de stora altarna och i fjärrländerna. Första segern över varje boss ger en bestämd ritning, och en dubblett blir essens och skrot. Oddsen står i Loot odds.',
+          en: '**Rarer blueprints**: chests and ordinary monsters rarely give blueprints, ruins and bosses more often. Legendary blueprints (the **Aegis Wall** and the **Sunfire Obelisk**) only come from the hardest bosses: at the great altars and in the far lands. The first win over each boss gives a set blueprint, and a duplicate turns into essence and scrap. The odds are in Loot odds.',
         },
       ],
     },

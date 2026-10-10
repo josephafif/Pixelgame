@@ -975,7 +975,9 @@
     { "id": "bp_healing_garden", "name": "Blueprint: Healing Garden", "type": "blueprint", "rarity": "rare", "research": 50, "desc": "A garden for your camp: you heal over time, and it brews Lumen Tonic from Lumen Spores.", "unlocks": { "buildings": ["garden"] } },
     { "id": "gale_feather", "name": "Gale Feather", "type": "ability", "rarity": "rare", "research": 50, "desc": "Teaches Gale Step: a short dash (V) that slips past attacks and through enemies.", "unlocks": { "skills": ["gale_step"] } },
     { "id": "roc_plume", "name": "Roc Plume", "type": "core", "tier": 4, "rarity": "legendary", "element": "wind", "boss": "aether_roc", "research": 0, "rarityBonus": 1, "desc": "Boss core. Gale Step and weapons of the high winds.", "craftTags": ["wind", "knockback", "speed"], "unlocks": { "skills": ["gale_step"] } },
-    { "id": "bp_wind_beacon", "name": "Blueprint: Wind Beacon", "type": "blueprint", "rarity": "epic", "research": 60, "desc": "A beacon for your camp: you move faster everywhere, and Gale Step recharges sooner.", "unlocks": { "structures": ["wind_beacon"] } }
+    { "id": "bp_wind_beacon", "name": "Blueprint: Wind Beacon", "type": "blueprint", "rarity": "epic", "research": 60, "desc": "A beacon for your camp: you move faster everywhere, and Gale Step recharges sooner.", "unlocks": { "structures": ["wind_beacon"] } },
+    { "id": "bp_aegis_wall", "name": "Blueprint: Aegis Wall", "type": "blueprint", "rarity": "legendary", "research": 120, "desc": "Only the hardest bosses guard it. The strongest wall there is: Reinforced Walls can be raised into it.", "unlocks": { "structures": ["aegis_wall"] } },
+    { "id": "bp_sunfire_obelisk", "name": "Blueprint: Sunfire Obelisk", "type": "blueprint", "rarity": "legendary", "research": 120, "desc": "Only the hardest bosses guard it. A tower of captured sunlight that sets everything in reach ablaze.", "unlocks": { "structures": ["sunfire_obelisk"] } }
   ],
   "catalysts": [
     { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
@@ -1200,12 +1202,14 @@
       { "id": "banner", "name": "Banner", "kind": "decor", "hp": 80, "cost": { "wood": 10, "scrap": 6 }, "desc": "Shows everyone whose camp this is." },
       { "id": "wood_floor", "name": "Wooden Floor", "kind": "floor", "walkable": true, "hp": 60, "cost": { "wood": 2 }, "upgradesTo": "stone_floor", "desc": "Decorative planks." },
       { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 2 }, "desc": "Decorative paving." },
-      { "id": "iron_wall", "name": "Reinforced Wall", "kind": "wall", "hp": 900, "cost": { "stone": 14, "scrap": 20 }, "requires": { "hearth": 4, "forge": 3 }, "desc": "Stone bound with iron. Holds out far longer than stone." },
+      { "id": "iron_wall", "name": "Reinforced Wall", "kind": "wall", "hp": 900, "cost": { "stone": 14, "scrap": 20 }, "requires": { "hearth": 4, "forge": 3 }, "upgradesTo": "aegis_wall", "desc": "Stone bound with iron. Holds out far longer than stone." },
       { "id": "iron_gate", "name": "Iron Gate", "kind": "gate", "hp": 560, "cost": { "wood": 10, "stone": 14, "scrap": 40 }, "requires": { "hearth": 3 }, "desc": "An iron-bound gate: you walk through, enemies batter it much longer." },
       { "id": "ballista", "name": "Ballista", "kind": "turret", "hp": 460, "cost": { "wood": 60, "stone": 50, "scrap": 180 }, "requires": { "training": 3, "forge": 2 }, "turret": { "range": 9, "interval": 1.4, "damage": 30, "speed": 18, "sprite": "arrow", "color": "#f0e0b8" }, "desc": "A heavy bolt thrower: long range and hard hits." },
       { "id": "iron_spikes", "name": "Iron Spikes", "kind": "trap", "walkable": true, "hp": 280, "cost": { "scrap": 35, "stone": 10 }, "requires": { "forge": 2 }, "trap": { "damage": 22, "interval": 0.6 }, "desc": "Sharper, sturdier spikes for the gates." },
       { "id": "prism_relay", "name": "Prism Relay", "kind": "relay", "hp": 300, "cost": { "stone": 20, "scrap": 60, "prismite": 12 }, "blueprint": "bp_prism_relay", "relay": { "range": 1.5, "damage": 0.25, "split": 2 }, "desc": "Stand it next to a turret: the turret hits 25% harder and its shots split in three." },
-      { "id": "wind_beacon", "name": "Wind Beacon", "kind": "beacon", "hp": 260, "cost": { "stone": 30, "scrap": 80, "aether": 15 }, "blueprint": "bp_wind_beacon", "beacon": { "moveSpeedPct": 8, "dashCooldownPct": 40 }, "desc": "Build it in your camp: you move 8% faster everywhere, and Gale Step recharges 40% sooner." }
+      { "id": "wind_beacon", "name": "Wind Beacon", "kind": "beacon", "hp": 260, "cost": { "stone": 30, "scrap": 80, "aether": 15 }, "blueprint": "bp_wind_beacon", "beacon": { "moveSpeedPct": 8, "dashCooldownPct": 40 }, "desc": "Build it in your camp: you move 8% faster everywhere, and Gale Step recharges 40% sooner." },
+      { "id": "aegis_wall", "name": "Aegis Wall", "kind": "wall", "hp": 2400, "cost": { "stone": 24, "scrap": 50, "essence": 30 }, "requires": { "hearth": 5 }, "blueprint": "bp_aegis_wall", "desc": "Stone and star-iron under a shimmering ward. Holds out far longer than anything else." },
+      { "id": "sunfire_obelisk", "name": "Sunfire Obelisk", "kind": "turret", "hp": 720, "cost": { "stone": 90, "scrap": 280, "essence": 220 }, "requires": { "training": 4, "forge": 4 }, "blueprint": "bp_sunfire_obelisk", "turret": { "range": 10, "interval": 0.75, "damage": 24, "speed": 15, "sprite": "orb", "element": "fire", "status": "burn", "color": "#ffd27a" }, "desc": "A tower of captured sunlight: long reach, quick fire, and every hit burns." }
     ]
   },
   "sailing": {
@@ -1230,6 +1234,27 @@
       { "id": "glimmerfox", "name": "Glimmerfox", "role": "All-rounder", "color": "#7ad8ff", "weight": 2, "gather": 1.1, "damage": 1.05, "hp": 0.9, "element": "lightning", "attack": "zap", "range": 4.5, "mode": "fight", "desc": "Zaps enemies with lightning from afar and happily helps with the chores." }
     ]
   },
+  "blueprintLoot": {
+    "sources": {
+      "chest": { "chance": 0.05, "tiers": { "common": 80, "rare": 20 } },
+      "ruin": { "chance": 0.18, "tiers": { "common": 55, "rare": 40, "epic": 5 } },
+      "enemy": { "chance": 0.0015, "tiers": { "common": 90, "rare": 10 } },
+      "elite": { "chance": 0.015, "tiers": { "common": 60, "rare": 35, "epic": 5 } },
+      "boss": { "chance": 0.3, "tiers": { "common": 15, "rare": 55, "epic": 30 } },
+      "hardBoss": { "chance": 0.55, "tiers": { "rare": 30, "epic": 50, "legendary": 20 } }
+    },
+    "duplicate": {
+      "common": { "essence": 20, "scrap": 15 },
+      "rare": { "essence": 45, "scrap": 30 },
+      "epic": { "essence": 90, "scrap": 60 },
+      "legendary": { "essence": 220, "scrap": 150 }
+    },
+    "firstKill": {
+      "bone_king": "bp_crossbow", "thornmother": "bp_chakram", "frost_warden": "bp_warfan", "storm_colossus": "bp_gun",
+      "void_herald": "bp_scythe", "sand_wyrm": "bp_cannon", "inferno_titan": "roll", "tide_leviathan": "roll",
+      "prism_warden": "bp_prism_relay", "mireheart": "bp_healing_garden", "aether_roc": "bp_wind_beacon"
+    }
+  },
   "biomes": [
     { "id": "plains", "name": "Green Plains", "ground": "grass", "alt": "flowers", "blockers": { "tree": 0.05, "rock": 0.02 }, "water": 0.1, "enemies": ["slime", "boar", "bat", "skeleton", "brute"], "elements": ["physical", "earth", "wind"], "components": ["earth_core", "wind_core", "bp_crossbow", "bp_chakram"] },
     { "id": "forest", "name": "Deepwood", "ground": "moss", "alt": "grass", "blockers": { "tree": 0.22, "rock": 0.02 }, "water": 0.12, "enemies": ["slime", "spider", "wisp", "bat"], "elements": ["poison", "earth", "physical"], "components": ["poison_core", "monster_fang", "earth_core", "bp_warfan"] },
@@ -1239,7 +1264,7 @@
     { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02, "ore": 0.012 }, "water": 0.04, "enemies": ["harpy", "golem", "bat", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
     { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06, "starstone": 0.006 }, "water": 0.0, "enemies": ["eye", "shade", "wisp", "bat"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" },
     { "id": "isles", "name": "Sunken Isles", "ground": "grass", "alt": "flowers", "blockers": { "palm": 0.08, "rock": 0.02 }, "water": 0.0, "enemies": ["crab", "slime", "bat"], "elements": ["wind", "holy", "physical"], "components": ["wind_core", "holy_core", "bp_chakram"] },
-    { "id": "prism", "name": "Prism Barrens", "far": true, "gen": 2, "ground": "prismsand", "alt": "prismglass", "blockers": { "prism": 0.05, "mirror": 0.022, "rock": 0.008 }, "water": 0.0, "enemies": ["shardling", "refractor", "mirror_knight"], "elements": ["arcane", "lightning", "holy"], "components": ["prism_lens", "crystal_heart", "holy_core"] },
+    { "id": "prism", "name": "Prism Barrens", "far": true, "gen": 2, "ground": "prismsand", "alt": "prismglass", "blockers": { "prism": 0.05, "mirror": 0.022, "rock": 0.008 }, "water": 0.0, "enemies": ["shardling", "refractor", "mirror_knight"], "elements": ["arcane", "lightning", "holy"], "components": ["prism_lens", "crystal_heart", "holy_core", "bp_prism_relay"] },
     { "id": "fen", "name": "Mireglass Fen", "far": true, "gen": 3, "ground": "fenmoss", "alt": "peat", "blockers": { "tree": 0.05, "roots": 0.04, "lumencap": 0.03, "ruin": 0.008, "mendbloom": 0.006, "puffcap": 0.012 }, "water": 0.2, "waterTile": "fenwater", "bog": 0.16, "enemies": ["bogling", "glowmoth", "mire_troll"], "elements": ["poison", "holy", "earth"], "components": ["lumen_seed", "bp_healing_garden", "poison_core", "monster_fang"] },
     { "id": "skyreach", "name": "Skyreach", "far": true, "gen": 3, "sky": true, "ground": "skygrass", "alt": "skystone", "blockers": { "rock": 0.03, "aethercrystal": 0.02, "ruin": 0.012, "tree": 0.015 }, "water": 0.0, "enemies": ["gale_sprite", "cloud_ray", "storm_griffin"], "elements": ["wind", "lightning", "holy"], "components": ["gale_feather", "bp_wind_beacon", "wind_core", "holy_core"] }
   ],

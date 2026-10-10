@@ -272,7 +272,18 @@ export class MpPanels {
     if (!g.clan && !refresh) this.clanState.tab = 'base';
     const body = clanPanelBody(g, this, this.clanState);
     if (refresh) {
+      // What you were typing (a clan name, a player to invite) survives the update.
+      const typed = new Map();
+      let focused = null;
+      for (const el of document.querySelectorAll('.mp-clan input[placeholder]')) {
+        if (el.value) typed.set(el.placeholder, el.value);
+        if (el === document.activeElement) focused = el.placeholder;
+      }
       replaceModalBody(body);
+      for (const el of body.querySelectorAll('input[placeholder]')) {
+        if (typed.has(el.placeholder) && !el.value) el.value = typed.get(el.placeholder);
+        if (el.placeholder === focused) el.focus();
+      }
       return;
     }
     g.clanRequest('info');

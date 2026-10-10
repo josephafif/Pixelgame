@@ -13,6 +13,7 @@ import { structureDef, runTurret } from './construction.js';
 import { buyPrice, sellPrice, weaponValue, EPIC_CHANCE } from './economy.js';
 import { researchedComponents } from '../weapons/crafting.js';
 import { researchCost } from './base.js';
+import { isBlueprint, blueprintTier } from './blueprints.js';
 import { villageLayout, villagerTarget } from './villages.js';
 
 const ACTIVATE = 46;
@@ -239,7 +240,9 @@ export function marketStock(data, save, m, now = Date.now()) {
     { kind: 'bundle', res: 'scrap', qty: 15, price: Math.round(60 * scale) },
     { kind: 'bundle', res: 'essence', qty: 25, price: Math.round(110 * scale) },
   );
-  const pool = data.components.filter((c) => !c.boss && c.research > 0 && !save.components[c.id]?.researched);
+  // Merchants never trade the great blueprints (epic and legendary come from bosses).
+  const pool = data.components.filter((c) => !c.boss && c.research > 0 && !save.components[c.id]?.researched
+    && !(isBlueprint(c) && ['epic', 'legendary'].includes(blueprintTier(c))));
   if (pool.length) {
     const c = pool[Math.floor(rng.next() * pool.length)];
     items.push({ kind: 'component', id: c.id, price: Math.round(150 + researchCost(data, save, c) * 1.5) });

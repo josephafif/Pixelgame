@@ -189,7 +189,7 @@ test('phone: loot odds and boats fit the screen', async ({ page }) => {
   await startGame(page, { tap: true });
   await page.tap('#btn-menu');
   await page.tap('.menu button:has-text("Loot odds")');
-  await expect(page.locator('.odds-table')).toBeVisible();
+  await expect(page.locator('.odds-table').first()).toBeVisible();
   const fit = await page.evaluate(() => ({
     panel: document.querySelector('.odds-panel').offsetWidth,
     page: document.documentElement.scrollWidth,

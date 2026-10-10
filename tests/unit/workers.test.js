@@ -173,7 +173,7 @@ test('the camp pays upkeep every hour from the vault, and unpaid workers stop', 
   assert.ok(game.workforce.list.every((w) => w.state === 'rest' || w.state === 'return'));
 });
 
-test('walls upgrade in place: wood → stone → reinforced', () => {
+test('walls upgrade in place: wood → stone → reinforced → aegis (with its blueprint)', () => {
   const save = richSave();
   Object.assign(save.base.buildings, { hearth: 4, forge: 3 });
   const game = stubGame(save);
@@ -190,6 +190,12 @@ test('walls upgrade in place: wood → stone → reinforced', () => {
   assert.equal(save.resources.stone, before - cost.stone);
   assert.ok(c.upgrade(3, 3).ok);
   assert.equal(game.world.structureAt(3, 3).id, 'iron_wall');
+  // The legendary Aegis Wall needs its blueprint (and a Hearth at level 5).
+  assert.match(c.upgrade(3, 3).reason, /Blueprint: Aegis Wall/);
+  save.components.bp_aegis_wall = { found: 1, researched: true };
+  save.base.buildings.hearth = 5;
+  assert.ok(c.upgrade(3, 3).ok);
+  assert.equal(game.world.structureAt(3, 3).id, 'aegis_wall');
   assert.match(c.upgrade(3, 3).reason, /as strong as it gets/);
   // Bulk: every wooden wall at once.
   for (let x = -2; x < 2; x++) assert.ok(c.place('wood_wall', x, 4).ok);
@@ -197,7 +203,7 @@ test('walls upgrade in place: wood → stone → reinforced', () => {
   assert.ok(save.base.structures.filter((st) => st.y === 4).every((st) => st.id === 'stone_wall'));
   // Saved as the new kind.
   const reloaded = stubGame(fillDefaults(JSON.parse(JSON.stringify(save))));
-  assert.equal(reloaded.world.structureAt(3, 3).id, 'iron_wall');
+  assert.equal(reloaded.world.structureAt(3, 3).id, 'aegis_wall');
 });
 
 test('cut trees grow back in steps, never inside the camp', () => {

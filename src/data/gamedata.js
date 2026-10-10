@@ -118,6 +118,25 @@ export function validateReferences(data) {
     for (const id of b.components) need('components', id, `biome ${b.id}`);
     if (b.boss) need('bosses', b.boss, `biome ${b.id}`);
   }
+  // The blueprint table (src/game/blueprints.js): legendary ones only from the hardest bosses.
+  const bl = data.blueprintLoot;
+  if (bl) {
+    for (const [source, row] of Object.entries(bl.sources ?? {})) {
+      if (!(row.chance >= 0 && row.chance <= 1)) problems.push(`blueprintLoot.${source} has a bad chance`);
+      for (const tier of Object.keys(row.tiers ?? {})) {
+        if (!['common', 'rare', 'epic', 'legendary'].includes(tier)) problems.push(`blueprintLoot.${source} has an unknown tier "${tier}"`);
+      }
+      if (row.tiers?.legendary && source !== 'hardBoss') problems.push(`blueprintLoot.${source} gives legendary blueprints (only hard bosses may)`);
+    }
+    for (const [boss, reward] of Object.entries(bl.firstKill ?? {})) {
+      need('bosses', boss, 'blueprintLoot.firstKill');
+      if (reward === 'roll') continue;
+      need('components', reward, `blueprintLoot.firstKill.${boss}`);
+      const c = data.components.find((x) => x.id === reward);
+      if (c && c.type !== 'blueprint') problems.push(`blueprintLoot.firstKill.${boss} is not a blueprint`);
+      if (c?.rarity === 'legendary') problems.push(`blueprintLoot.firstKill.${boss} is legendary (only the hard bosses' table gives those)`);
+    }
+  }
   for (const b of data.bosses) {
     need('biomes', b.biome, `boss ${b.id}`);
     need('components', b.drop.component, `boss ${b.id}`);

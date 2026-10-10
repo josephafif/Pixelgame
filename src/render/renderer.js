@@ -672,6 +672,10 @@ export class Renderer {
       drawFlame(v, x + 8, y + 7, t + st.x, st.rt.flash > 0 ? 3 : 2);
       this.#glow(x + 8, y + 4, '#ff7a2a', 14);
       if (Math.random() < 0.08) game.fx.emit('ember', st.x + 0.5, st.y + 0.2, 1, 0.3, 0.4);
+    } else if (id === 'sunfire_obelisk') {
+      // Its captured sun pulses, and flares when it fires.
+      this.#glow(x + 8, y + 4, '#ffd27a', 14 + Math.sin(t * 3 + st.x) * 2 + (st.rt.flash > 0 ? 6 : 0));
+      if (Math.random() < 0.05) game.fx.emit('ember', st.x + 0.5, st.y - 0.4, 1, 0.2, 0.4);
     } else if (id === 'torch') {
       drawFlame(v, x + 8, y + 7, t + st.x * 3, 1);
       this.#glow(x + 8, y + 5, '#ffb040', 22 + Math.sin(t * 9 + st.y) * 2);
