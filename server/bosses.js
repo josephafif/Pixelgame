@@ -7,7 +7,7 @@ import * as combat from './combat.js';
 import { applyPlayerStatus } from './players.js';
 import { spawnEnemy } from './enemies.js';
 import { segmentDist2 } from '../src/core/math.js';
-import { laserField, LASER_WIDTH } from '../src/game/lasers.js';
+import { laserField, LASER_WIDTH, windWave } from '../src/game/lasers.js';
 
 const FX_RADIUS = 34;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -100,6 +100,67 @@ function pattern(gs, b, p, name) {
     if (!b.dead && gs.enemies.has(b.id)) fn();
   });
   switch (name) {
+    case 'mirebloom': {
+      // Puffballs burst around one of the fighters; a healing bloom opens nearby (as in single player).
+      const t = someone(gs, b, p);
+      const n = b.phase === 2 ? 4 : 3;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = 1 + Math.random() * 2.2;
+        const tx = t.x + Math.cos(a) * d;
+        const ty = t.y + Math.sin(a) * d;
+        warn(gs, b, { x: tx, y: ty, r: 1.6, dur: 0.9 + i * 0.2, color: '#b8d84a' }, () => {
+          combat.spawnArea(gs, { kind: 'puff', x: tx, y: ty, r: 2, dur: 3.5, dps: b.dmg * 0.6, color: '#b8d84a', element: 'poison', fromBoss: true });
+          fx(gs, tx, ty, [emit('smoke', tx, ty, 14, 0.8, 2), snd('whirl', { throttle: 100 })]);
+        });
+      }
+      const away = Math.atan2(t.y - b.y, t.x - b.x) + (Math.random() - 0.5) * 1.6;
+      const mx = t.x + Math.cos(away) * 4.5;
+      const my = t.y + Math.sin(away) * 4.5;
+      combat.spawnArea(gs, { kind: 'mend', x: mx, y: my, r: 1.8, dur: 5, healPct: 5, color: '#9affc8' });
+      fx(gs, mx, my, [emit('sparkle', mx, my, 16, 0.8, 2)]);
+      return b.phase === 2 ? 3.4 : 3;
+    }
+    case 'skydive': {
+      b.submerged = true;
+      b.state = 'windup';
+      b.stateT = 0;
+      fx(gs, b.x, b.y, [emit('glint', b.x, b.y, 20, b.r * 1.5, 3), snd('whirl')]);
+      const dive = (k) => {
+        const t = someone(gs, b, p);
+        const tx = t.x;
+        const ty = t.y;
+        warn(gs, b, { x: tx, y: ty, r: 2.3, dur: 1.1, color: '#e8d8a8' }, () => {
+          b.x = tx;
+          b.y = ty;
+          fx(gs, tx, ty, [['shake', 0.45], add({ type: 'ring', x: tx, y: ty, r0: 0.4, r1: 2.6, color: '#ffffff', dur: 0.35, fill: true }), emit('dust', tx, ty, 22, 1.6, 4), snd('boom')]);
+          strike(gs, b, tx, ty, 2.3, b.dmg * 1.6, 'wind');
+          for (let i = 0; i < 12; i++) shot(gs, b, (i / 12) * Math.PI * 2, { speed: 6, damage: dmg * 0.5, size: 2 });
+          if (b.phase === 2 && k === 0) {
+            later(0.5, () => dive(1));
+          } else {
+            b.submerged = false;
+            b.state = 'move';
+          }
+        });
+      };
+      later(0.8, () => dive(0));
+      return b.phase === 2 ? 4.2 : 3.2;
+    }
+    case 'windwave': {
+      const t = someone(gs, b, p);
+      for (const w of windWave(b.x, b.y, b.r, t.x, t.y)) {
+        warn(gs, b, { shape: 'line', laser: true, x: w.x, y: w.y, x2: w.x2, y2: w.y2, r: 0.55, dur: w.delay, color: '#e8f4ff' }, () => {
+          fx(gs, w.x, w.y, [add({ type: 'line', points: [[w.x, w.y], [w.x2, w.y2]], color: '#ffffff', dur: 0.2, width: 5 })]);
+          for (const o of gs.playersNear((w.x + w.x2) / 2, (w.y + w.y2) / 2, 9)) {
+            if (o.dead || segmentDist2(o.x, o.y, w.x, w.y, w.x2, w.y2) > (0.55 + o.r) ** 2) continue;
+            combat.hurtPlayer(gs, o, b.dmg * 0.9, { element: 'wind', fromX: o.x - w.dx, fromY: o.y - w.dy, knock: 9 });
+          }
+        });
+      }
+      fx(gs, b.x, b.y, [snd('whirl')]);
+      return 3;
+    }
     case 'lasers': {
       // Laser fields around one of the fighters (as in single player).
       const t = someone(gs, b, p);

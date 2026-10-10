@@ -8,6 +8,7 @@
 import { createCanvas, ctx2d } from './canvas.js';
 import { renderChunk, TILE_PX } from './tiles-art.js';
 import { renderChunkRich, vignetteFor } from './terrain-rich.js';
+import { LEAP_TIME } from '../net/movement.js';
 import { boatSprite } from './boats.js';
 import { horseSprite, HORSE_W, HORSE_H } from './horses.js';
 import { CHUNK } from '../game/world.js';
@@ -371,6 +372,25 @@ export class Renderer {
       const r = a.r * T;
       const fade = Math.min(1, (a.dur - a.t) * 3);
       switch (a.kind) {
+        case 'mend': {
+          // A Mendbloom's healing glow: soft green, gently pulsing.
+          const pulse = 0.85 + 0.15 * Math.sin(a.t * 5);
+          this.#circle(x, y, r * pulse, 'rgba(154,255,200,0.16)', 'rgba(200,255,220,0.6)', fade);
+          this.#glow(x, y, '#9affc8', r * 0.9);
+          break;
+        }
+        case 'puff': {
+          // A Puffcap's spore cloud: murky yellow-green, swelling as it drifts.
+          const grow = Math.min(1, a.t * 3);
+          v.globalAlpha = 0.35 * fade;
+          for (let k = 0; k < 4; k++) {
+            const ang = a.t * 0.8 + k * 1.57;
+            this.#circle(x + Math.cos(ang) * r * 0.3, y + Math.sin(ang) * r * 0.2, r * 0.7 * grow, '#b8d84a', null, 0.35 * fade);
+          }
+          v.globalAlpha = 1;
+          this.#circle(x, y, r * grow, null, 'rgba(184,216,74,0.5)', fade);
+          break;
+        }
         case 'portal': {
           this.#circle(x, y, r * (a.big ? 1 : 0.8), 'rgba(20,6,40,0.75)', null, 0.8 * fade);
           v.strokeStyle = a.color;
@@ -557,7 +577,18 @@ export class Renderer {
         case 'ally': this.#drawCharacter(game, d.o, x, y, true); break;
         case 'pal': this.#drawPal(game, d.o, x, y); break;
         case 'horse': this.#drawHorse(d.o.breed, x, y, Math.cos(d.o.facing ?? 0) >= 0, d.o.moving ? 1 + (Math.floor(d.o.walkT ?? 0) % 2) : 0, 0, d.o.saddle); break;
-        case 'player': this.#drawCharacter(game, p, x, y, false); break;
+        case 'player': {
+          // Mid-leap (a horse clearing a gap): drawn along the arc.
+          if (p.leap) {
+            const k = Math.min(1, p.leap.t / LEAP_TIME);
+            p.leapLift = Math.sin(Math.PI * k) * 18;
+            this.#drawCharacter(game, p, this.#sx(p.leap.x0 + (p.x - p.leap.x0) * k), this.#sy(p.leap.y0 + (p.y - p.leap.y0) * k), false);
+          } else {
+            p.leapLift = 0;
+            this.#drawCharacter(game, p, x, y, false);
+          }
+          break;
+        }
         case 'remote': this.#drawRemote(game, d.o, x, y); break;
         default: break;
       }
@@ -1471,7 +1502,8 @@ export class Renderer {
     const target = over ? 8 : 0;
     const lift = c.rideLift ?? 0;
     c.rideLift = target > lift ? Math.min(target, lift + dt * 70) : Math.max(target, lift - dt * 45);
-    return c.rideLift;
+    // Leaping a gap in the clouds (yours) or seen leaping (another player).
+    return c.rideLift + (c.leapLift ?? 0) + (c.leaping ? 12 : 0);
   }
 
   /** You in your boat: mast and sails behind, hull in front of your legs. */

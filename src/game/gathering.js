@@ -54,7 +54,13 @@ export function forgePickaxe(data, save, tier) {
 export function harvestInfo(data, tileId) {
   const name = BLOCKER_NAME[tileId];
   const info = name ? data.gathering?.harvest?.[name] : null;
-  return info ? { key: name, ...info } : null;
+  // (Plants that burst when hit aren't chopped or mined.)
+  return info && !info.burst ? { key: name, ...info } : null;
+}
+
+/** How long a cut tile takes to grow back (plants that burst too). */
+export function regrowMinutes(data, tileId) {
+  return data.gathering?.harvest?.[BLOCKER_NAME[tileId]]?.regrowMinutes ?? 20;
 }
 
 /**
@@ -113,8 +119,7 @@ export function regrow(game, now = Date.now()) {
   const world = game.world;
   const radius = game.buildRadius();
   for (const [key, [at, id]] of Object.entries(world.harvested)) {
-    const info = harvestInfo(game.data, id);
-    const minutes = info?.regrowMinutes ?? 20;
+    const minutes = regrowMinutes(game.data, id);
     if (now - at < minutes * 60000) continue;
     const [tx, ty] = key.split(',').map(Number);
     if (Math.hypot(tx + 0.5 - 0.5, ty + 0.5 - 0.5) <= radius + 1) continue;

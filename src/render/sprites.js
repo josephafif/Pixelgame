@@ -198,6 +198,44 @@ const MAPS = {
     '........oo........',
     '..g..........g....',
   ],
+  // The Mireheart: a swollen heart of the bog on a tangle of roots, glowing within.
+  mireheart: [
+    '.......oooo.......',
+    '.....oogggGoo.....',
+    '....ogGGgggGGo....',
+    '...ogGGeggeGGGo...',
+    '..ogGGGggggGGGGo..',
+    '..oGGGgggggggGGo..',
+    '.ooGGgRRRRRRgGGoo.',
+    'oggGgRRyyyyRRgGggo',
+    'oGGGgRRyyyyRRgGGGo',
+    '.oGGgRRRRRRRRgGGo.',
+    '..oGGgggggggggGo..',
+    '...oGGGGgggGGGo...',
+    '..oo.oGGGGGGo.oo..',
+    '.oRo..oRooRo..oRo.',
+    'oRo..oRo..oRo..oRo',
+    'oo..oRo....oRo..oo',
+    '...oo........oo...',
+  ],
+  // The Aether Roc: a great bird with its wings spread.
+  roc: [
+    '........oo........',
+    '.......ohho.......',
+    '......ohehho......',
+    '......ohhhyo......',
+    'oo....ohhhho....oo',
+    'owoo..orrrro..oowo',
+    'owwwoorrrrrroowwwo',
+    '.owwwwrrrrrrwwwwo.',
+    '..owwwrrRRrrwwwo..',
+    '...oowrrRRrrwoo...',
+    '.....orrrrrro.....',
+    '......orrrro......',
+    '.....owo..owo.....',
+    '.....oyo..oyo.....',
+    '......o....o......',
+  ],
   // Sand Wyrm: a segmented worm rearing out of a sand mound.
   wyrm: [
     '......oooooo......',
@@ -630,6 +668,8 @@ const BOSS_SHAPES = {
   sand_wyrm: 'wyrm',
   tide_leviathan: 'leviathan',
   prism_warden: 'prism',
+  mireheart: 'mireheart',
+  aether_roc: 'roc',
 };
 
 export function bossSprites(bossId, color) {
@@ -647,6 +687,8 @@ export function bossSprites(bossId, color) {
     if (shape === 'lich') Object.assign(pal, { h: '#e8e4d4', H: '#a8a090', e: '#ff4040', g: '#ffd24a', t: '#161622' });
     if (shape === 'leviathan') Object.assign(pal, { h: '#bfe8ff', g: '#7ad8ff', e: '#ffe45c', w: '#e8f8ff', W: '#3a78c8' });
     if (shape === 'prism') Object.assign(pal, { h: '#e8fbff', r: '#9ae8ff', R: '#5ab0d0', v: '#c09aff', y: '#ffd27a', e: '#ffffff', g: '#ffd27a' });
+    if (shape === 'mireheart') Object.assign(pal, { g: '#4ac8a0', G: '#2a7a5a', R: '#5a3a22', y: '#d8ffb0', e: '#ffe45c' });
+    if (shape === 'roc') Object.assign(pal, { h: '#f8f4e8', e: '#202030', r: '#e8d8a8', R: '#b8a070', w: '#c8e0f8', y: '#ffd24a' });
     const base = spriteFromMap(MAPS[shape], pal);
     const right = scaled(base, 2);
     return { right, left: flipped(right), flash: silhouette(right) };

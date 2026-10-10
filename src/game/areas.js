@@ -186,6 +186,24 @@ export function updateAreas(game, dt) {
         }
         break;
       }
+      case 'mend':
+        // A Mendbloom's glow heals you while you stand in it.
+        if (tick && !player.dead && dist2(a.x, a.y, player.x, player.y) <= (a.r + player.r) * (a.r + player.r)) {
+          game.heal?.((game.pstats.maxHp * a.healPct * TICK) / 100);
+        }
+        if (Math.random() < 0.4) game.fx.emit('sparkle', a.x, a.y, 1, a.r * 0.8, 0.8);
+        break;
+      case 'puff':
+        // A Puffcap's cloud: poison for monsters inside, and half for you.
+        if (tick) {
+          if (!a.fromBoss) damageInside(game, a, a.dps * TICK, { source: 'plant', canCrit: false });
+          if (!player.dead && dist2(a.x, a.y, player.x, player.y) <= (a.r + player.r) * (a.r + player.r)) {
+            game.hurtPlayer(a.dps * TICK * 0.5, { element: 'poison' });
+            game.applyPlayerStatus('poison');
+          }
+        }
+        if (Math.random() < 0.5) game.fx.emit('smoke', a.x, a.y, 1, a.r * 0.9, 0.5);
+        break;
       case 'hazard':
         if (tick && !player.dead && dist2(a.x, a.y, player.x, player.y) <= (a.r + player.r) * (a.r + player.r)) {
           game.hurtPlayer(a.dps * TICK, { element: a.element });

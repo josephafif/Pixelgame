@@ -11,6 +11,8 @@ import { createCanvas, ctx2d } from './canvas.js';
 import { T, CHUNK, LIQUID } from '../game/world.js';
 import { tileCanvas, growthCanvas, TILE_PX, GROUND_STYLE } from './tiles-art.js';
 
+const SKY_GROUNDS = new Set([T.SKYBRIDGE, T.WIND_N, T.WIND_E, T.WIND_S, T.WIND_W]);
+
 const S = TILE_PX;
 const VARIANTS = 4;
 const O = '#141a16'; // outline
@@ -30,6 +32,9 @@ const RICH_GROUND = {
   [T.VOIDMOSS]: { base: '#36284c', tones: ['#2f2242', '#3f3058', '#33264a'], tuft: ['#55407a', '#261c38'] },
   [T.PRISMSAND]: { base: '#e2dbee', tones: ['#d6cde8', '#ece6f6', '#dcd4ec'], pebbles: ['#c4b8dc'], glints: ['#7ae8ff', '#ff9ad8', '#ffd27a'] },
   [T.PRISMGLASS]: { base: '#c4dfec', tones: ['#b6d6e6', '#d4eaf4', '#bcdaea'], ripples: '#a6cce0', glints: ['#ffffff', '#7ae8ff'] },
+  [T.FENMOSS]: { base: '#2e5a4a', tones: ['#285244', '#346454', '#2a5646'], tuft: ['#4a8a6a', '#1e4436'] },
+  [T.PEAT]: { base: '#463a30', tones: ['#3e332a', '#504236', '#43372e'], pebbles: ['#5a4a3e'] },
+  [T.SKYGRASS]: { base: '#64a456', tones: ['#5c9a50', '#6eb060', '#609e52'], tuft: ['#88c878', '#4a8a40'], flowers: ['#ffffff', '#ffe890'] },
 };
 
 function drawRichGround(ctx, style, rng) {
@@ -123,7 +128,7 @@ function groundColor(id) {
 }
 
 /** Ground kinds that blend into each other at their edges (not paving or the camp). */
-const FRAYS = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ICE, T.ASH, T.BASALT, T.VOIDSTONE, T.VOIDMOSS, T.PATH, T.PRISMSAND, T.PRISMGLASS]);
+const FRAYS = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ICE, T.ASH, T.BASALT, T.VOIDSTONE, T.VOIDMOSS, T.PATH, T.PRISMSAND, T.PRISMGLASS, T.FENMOSS, T.PEAT, T.BOG, T.SKYGRASS, T.SKYSTONE]);
 /** Grass and its kin count as one ground (they already look alike). */
 const FAMILY = { [T.FLOWERS]: T.GRASS, [T.MOSS]: T.GRASS };
 
@@ -131,7 +136,7 @@ const FAMILY = { [T.FLOWERS]: T.GRASS, [T.MOSS]: T.GRASS };
 const LIGHT = new Set([T.SNOW, T.ICE, T.SAND, T.SAND2, T.PRISMSAND, T.PRISMGLASS]);
 
 /** Grounds that get the big light and dark patches (natural ground, not paving). */
-const PATCHY = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ASH, T.VOIDMOSS, T.VOIDSTONE, T.BASALT, T.PRISMSAND]);
+const PATCHY = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ASH, T.VOIDMOSS, T.VOIDSTONE, T.BASALT, T.PRISMSAND, T.FENMOSS, T.PEAT, T.BOG, T.SKYGRASS, T.SKYSTONE]);
 
 // Smooth value noise over world pixels (a few tiles per bump), for the patches.
 function lattice(seed, x, y) {
@@ -155,9 +160,14 @@ function vnoise(seed, x, y) {
 // --- Upright things: trees, boulders and the rest ------------------------------------------
 
 /** Tiles drawn standing up (with a shadow), in row order, over the ground. */
-const UPRIGHT = new Set([T.TREE, T.PINE, T.PALM, T.ROCK, T.CACTUS, T.CRYSTAL, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM, T.MIRROR]);
+const UPRIGHT = new Set([
+  T.TREE, T.PINE, T.PALM, T.ROCK, T.CACTUS, T.CRYSTAL, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM, T.MIRROR,
+  T.LUMENCAP, T.ROOTS, T.RUIN, T.MENDBLOOM, T.PUFFCAP, T.AETHERCRYSTAL,
+]);
+/** Blocks that lie flat (drawn with the ground): liquids and Skyreach's clouds. */
+const FLAT_BLOCKS = new Set([...LIQUID, T.SKY]);
 /** How far (in tiles) a tile's shading reaches its neighbours. */
-const SHADES = new Set([T.TREE, T.PINE, T.PALM, T.ROCK, T.ORE, T.OBSIDIAN]);
+const SHADES = new Set([T.TREE, T.PINE, T.PALM, T.ROCK, T.ORE, T.OBSIDIAN, T.ROOTS, T.RUIN]);
 
 function disc(ctx, cx, cy, r, color) {
   ctx.fillStyle = color;
@@ -448,7 +458,7 @@ export function renderChunkRich(chunk, growth, world) {
       const v = variantOf(x0 + lx, y0 + ly);
       ctx.drawImage(groundTile(chunk.ground[i], v), lx * S, ly * S);
       const b = chunk.block[i];
-      if (b && LIQUID.has(b)) ctx.drawImage(tileCanvas(b, v, true), lx * S, ly * S);
+      if (b && FLAT_BLOCKS.has(b)) ctx.drawImage(tileCanvas(b, v, true), lx * S, ly * S);
     }
   }
 
@@ -458,14 +468,14 @@ export function renderChunkRich(chunk, growth, world) {
     for (let lx = 0; lx < CHUNK; lx++) {
       const i = ly * CHUNK + lx;
       const g = chunk.ground[i];
-      if (!FRAYS.has(g) || LIQUID.has(chunk.block[i])) continue;
+      if (!FRAYS.has(g) || FLAT_BLOCKS.has(chunk.block[i])) continue;
       const wx = x0 + lx;
       const wy = y0 + ly;
       const fam = FAMILY[g] ?? g;
       const rng = createRng(hashInts(wx, wy, 0xf4a7));
       for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
         const ng = groundAt(wx + dx, wy + dy);
-        if (!FRAYS.has(ng) || (FAMILY[ng] ?? ng) === fam || LIQUID.has(blockAt(wx + dx, wy + dy))) continue;
+        if (!FRAYS.has(ng) || (FAMILY[ng] ?? ng) === fam || FLAT_BLOCKS.has(blockAt(wx + dx, wy + dy))) continue;
         const color = groundColor(ng);
         if (!color) continue;
         ctx.fillStyle = color;
@@ -488,7 +498,7 @@ export function renderChunkRich(chunk, growth, world) {
       const lx = (cx * CELL / S) | 0;
       const ly = (cy * CELL / S) | 0;
       const i = ly * CHUNK + lx;
-      if (!PATCHY.has(chunk.ground[i]) || LIQUID.has(chunk.block[i])) continue;
+      if (!PATCHY.has(chunk.ground[i]) || FLAT_BLOCKS.has(chunk.block[i])) continue;
       const wx = (x0 * S + cx * CELL) / (S * 5);
       const wy = (y0 * S + cy * CELL) / (S * 5);
       const n = vnoise(seed ^ 0x5a7c, wx, wy) * 0.7 + vnoise(seed ^ 0x5a7d, wx * 2.3, wy * 2.3) * 0.3;
@@ -504,6 +514,28 @@ export function renderChunkRich(chunk, growth, world) {
     }
   }
 
+  // 2b. Mireglass Fen: drifting mist over the bog, and the soft light of the lumen caps.
+  for (let ly = 0; ly < CHUNK; ly++) {
+    for (let lx = 0; lx < CHUNK; lx++) {
+      const i = ly * CHUNK + lx;
+      const g = chunk.ground[i];
+      if (g !== T.FENMOSS && g !== T.PEAT && g !== T.BOG && chunk.block[i] !== T.FENWATER) continue;
+      const wx = x0 + lx;
+      const wy = y0 + ly;
+      const m = vnoise(seed ^ 0x3157, wx / 4, wy / 4);
+      if (m > 0.62) {
+        ctx.fillStyle = `rgba(210, 240, 232, ${((m - 0.62) * 0.35).toFixed(3)})`;
+        ctx.fillRect(lx * S, ly * S, S, S);
+      }
+      if (chunk.block[i] === T.LUMENCAP) {
+        for (const [rr, a] of [[11, 0.07], [7, 0.1]]) {
+          ctx.fillStyle = `rgba(120, 255, 200, ${a})`;
+          ellipse(ctx, lx * S + 8, ly * S + 9, rr, Math.round(rr * 0.6), ctx.fillStyle);
+        }
+      }
+    }
+  }
+
   // 3. Shade between trees and rocks (a darker forest floor), and banks along the water.
   for (let ly = 0; ly < CHUNK; ly++) {
     for (let lx = 0; lx < CHUNK; lx++) {
@@ -512,6 +544,22 @@ export function renderChunkRich(chunk, growth, world) {
       const b = chunk.block[ly * CHUNK + lx];
       const px = lx * S;
       const py = ly * S;
+      if (b === T.SKY) {
+        // A floating island's edge: its rock face hangs into the clouds below
+        // it, with a shadow under the face.
+        const up = blockAt(wx, wy - 1);
+        if (up !== T.SKY && !SKY_GROUNDS.has(groundAt(wx, wy - 1))) {
+          ctx.fillStyle = '#7a7e8a';
+          ctx.fillRect(px, py, S, 5);
+          ctx.fillStyle = '#5c606c';
+          for (let x = 0; x < S; x += 2) ctx.fillRect(px + x, py + 5, 2, 1 + ((x * 7 + wx) % 3));
+          ctx.fillStyle = '#9a9eaa';
+          ctx.fillRect(px, py, S, 1);
+          ctx.fillStyle = 'rgba(40, 60, 90, 0.18)';
+          ctx.fillRect(px, py + 7, S, 5);
+        }
+        continue;
+      }
       if (b && LIQUID.has(b)) {
         if (b === T.LAVA) {
           // A dark cooled crust where the lava meets the land.
@@ -531,12 +579,13 @@ export function renderChunkRich(chunk, growth, world) {
           const nb = blockAt(wx + dx, wy + dy);
           return !nb || !LIQUID.has(nb);
         };
-        ctx.fillStyle = 'rgba(150, 210, 240, 0.35)';
+        const fen = b === T.FENWATER;
+        ctx.fillStyle = fen ? 'rgba(110, 190, 160, 0.3)' : 'rgba(150, 210, 240, 0.35)';
         if (land(0, -1)) ctx.fillRect(px, py, S, 3);
         if (land(0, 1)) ctx.fillRect(px, py + S - 2, S, 2);
         if (land(-1, 0)) ctx.fillRect(px, py, 2, S);
         if (land(1, 0)) ctx.fillRect(px + S - 2, py, 2, S);
-        ctx.fillStyle = 'rgba(235, 248, 255, 0.75)';
+        ctx.fillStyle = fen ? 'rgba(200, 240, 220, 0.55)' : 'rgba(235, 248, 255, 0.75)';
         if (land(0, -1)) for (let x = 0; x < S; x += 3) ctx.fillRect(px + x, py + ((x >> 2) & 1), 2, 1);
         if (land(-1, 0)) for (let y = 1; y < S; y += 4) ctx.fillRect(px, py + y, 1, 2);
         if (land(1, 0)) for (let y = 2; y < S; y += 4) ctx.fillRect(px + S - 1, py + y, 1, 2);
@@ -575,7 +624,7 @@ export function renderChunkRich(chunk, growth, world) {
       // A damp bank next to water.
       const wet = (dx, dy) => {
         const nb = blockAt(wx + dx, wy + dy);
-        return nb === T.WATER || nb === T.SEA || nb === T.DEEP;
+        return nb === T.WATER || nb === T.SEA || nb === T.DEEP || nb === T.FENWATER;
       };
       ctx.fillStyle = 'rgba(30, 40, 20, 0.28)';
       if (wet(0, -1)) ctx.fillRect(px, py, S, 2);

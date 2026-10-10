@@ -3,6 +3,7 @@
 // attack patterns that every player near the altar fights together.
 
 import { SpatialGrid } from './grid.js';
+import { T } from '../src/game/world.js';
 import { moveMode } from '../src/game/enemies.js';
 import { inSafeZone } from '../src/net/rules.js';
 import { mixHex } from '../src/weapons/visuals.js';
@@ -639,6 +640,10 @@ export function update(gs, dt) {
     }
     tickStatuses(gs, e, dt);
     if (e.dead) continue;
+    // A Mire Troll mends in the bog (as in single player).
+    if (e.def?.bogRegen && e.hp < e.maxHp && gs.world.groundAt(Math.floor(e.x), Math.floor(e.y)) === T.BOG) {
+      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.def.bogRegen * dt);
+    }
     const near = gs.nearestPlayer(e.x, e.y, e.boss ? 45 : DESPAWN_DIST);
     // Out of everyone's sight (and reach), a monster rests: nobody can see
     // it, and thinking for it would only cost time every tick.

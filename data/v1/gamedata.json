@@ -480,7 +480,9 @@
     { "id": "tempest", "name": "Tempest", "desc": "Hits may call down lightning strikes.", "element": "lightning", "cost": 20, "weight": 10, "tags": ["lightning", "aoe", "shock"], "perf": 1, "vfx": 1,
       "hooks": [{ "on": "hit", "do": "strike", "chance": 25, "radius": 1.2, "dmg": 80, "delay": 0.15, "element": "lightning", "sprite": "bolt" }] },
     { "id": "singularity", "name": "Singularity", "desc": "Kills collapse into small black holes.", "element": "void", "cost": 22, "weight": 10, "tags": ["void", "pull", "portal", "control"], "perf": 2, "vfx": 1,
-      "hooks": [{ "on": "kill", "do": "portal", "chance": 60, "radius": 3, "duration": 2.5, "pull": 6, "dps": 30, "element": "void" }] }
+      "hooks": [{ "on": "kill", "do": "portal", "chance": 60, "radius": 3, "duration": 2.5, "pull": 6, "dps": 30, "element": "void" }] },
+    { "id": "lifebloom", "name": "Lifebloom", "desc": "Hits mend you a little, and kills often make you bloom with health.", "cost": 15, "weight": 6, "tags": ["sustain", "heal", "nature"], "perf": 0, "vfx": 0,
+      "hooks": [{ "on": "hit", "do": "heal", "pct": 3 }, { "on": "kill", "do": "heal", "flat": 10, "chance": 60 }] }
   ],
   "abilities": [
     { "id": "meteor", "affinity": "fire", "name": "Meteor", "desc": "Calls down a meteor on the target area.", "do": "meteor", "cost": [20, 30], "cooldown": [9, 14], "damage": [250, 400], "radius": [2.4, 3.4], "duration": [0.6, 0.6], "words": ["Star", "Comet", "Skyfall"], "sound": "boom", "weight": 10 },
@@ -967,7 +969,13 @@
     { "id": "tide_pearl", "name": "Tide Pearl", "type": "core", "tier": 4, "rarity": "legendary", "element": "ice", "boss": "tide_leviathan", "research": 0, "rarityBonus": 1, "desc": "Boss core. Cold, crashing weapons of the deep sea.", "craftTags": ["ice", "freeze", "chain"], "unlocks": {} },
     { "id": "prism_lens", "name": "Prism Lens", "type": "ability", "rarity": "rare", "research": 45, "desc": "Teaches the forge the Prism Split ability.", "unlocks": { "abilities": ["prism_split"] } },
     { "id": "prism_heart", "name": "Prism Heart", "type": "core", "tier": 4, "rarity": "legendary", "element": "arcane", "boss": "prism_warden", "research": 0, "rarityBonus": 1, "desc": "Boss core. Prism Split and weapons that bend light.", "craftTags": ["arcane", "chain", "multishot"], "unlocks": { "abilities": ["prism_split"] } },
-    { "id": "bp_prism_relay", "name": "Blueprint: Prism Relay", "type": "blueprint", "rarity": "epic", "research": 60, "desc": "A crystal module for your turrets: a turret next to it hits harder and its shots split.", "unlocks": { "structures": ["prism_relay"] } }
+    { "id": "bp_prism_relay", "name": "Blueprint: Prism Relay", "type": "blueprint", "rarity": "epic", "research": 60, "desc": "A crystal module for your turrets: a turret next to it hits harder and its shots split.", "unlocks": { "structures": ["prism_relay"] } },
+    { "id": "lumen_seed", "name": "Lumen Seed", "type": "material", "rarity": "rare", "research": 45, "desc": "A seed that glows with life: teaches the healing effect Lifebloom.", "unlocks": { "effects": ["lifebloom"] } },
+    { "id": "mire_heart", "name": "Mire Heart", "type": "core", "tier": 4, "rarity": "legendary", "element": "poison", "boss": "mireheart", "research": 0, "rarityBonus": 1, "desc": "Boss core. Lifebloom, and weapons that heal you as they rot your foes.", "craftTags": ["poison", "lifesteal", "dot"], "unlocks": { "effects": ["lifebloom"] } },
+    { "id": "bp_healing_garden", "name": "Blueprint: Healing Garden", "type": "blueprint", "rarity": "rare", "research": 50, "desc": "A garden for your camp: you heal over time, and it brews Lumen Tonic from Lumen Spores.", "unlocks": { "buildings": ["garden"] } },
+    { "id": "gale_feather", "name": "Gale Feather", "type": "ability", "rarity": "rare", "research": 50, "desc": "Teaches Gale Step: a short dash (V) that slips past attacks and through enemies.", "unlocks": { "skills": ["gale_step"] } },
+    { "id": "roc_plume", "name": "Roc Plume", "type": "core", "tier": 4, "rarity": "legendary", "element": "wind", "boss": "aether_roc", "research": 0, "rarityBonus": 1, "desc": "Boss core. Gale Step and weapons of the high winds.", "craftTags": ["wind", "knockback", "speed"], "unlocks": { "skills": ["gale_step"] } },
+    { "id": "bp_wind_beacon", "name": "Blueprint: Wind Beacon", "type": "blueprint", "rarity": "epic", "research": 60, "desc": "A beacon for your camp: you move faster everywhere, and Gale Step recharges sooner.", "unlocks": { "structures": ["wind_beacon"] } }
   ],
   "catalysts": [
     { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
@@ -1104,6 +1112,18 @@
           { "scrap": 720, "essence": 560, "wood": 380, "stone": 420, "playerLevel": 16 },
           { "scrap": 1120, "essence": 880, "wood": 510, "stone": 610, "playerLevel": 20, "boss": true }
         ]
+      },
+      {
+        "id": "garden", "name": "Healing Garden", "x": 4.5, "y": -6.5, "blueprint": "bp_healing_garden",
+        "desc": "Lumen-lit beds of healing herbs. Out of a fight you heal over time (more with every upgrade); from level 2 the fen's bogs no longer sicken you. Brew Lumen Tonic here from Lumen Spores.",
+        "perLevel": { "regenPct": 0.3 },
+        "levels": [
+          { "scrap": 160, "essence": 160, "wood": 80, "stone": 40, "spores": 10, "playerLevel": 9 },
+          { "scrap": 320, "essence": 320, "wood": 120, "stone": 90, "spores": 25, "playerLevel": 13 },
+          { "scrap": 560, "essence": 560, "wood": 180, "stone": 160, "spores": 50, "playerLevel": 18 },
+          { "scrap": 900, "essence": 900, "wood": 260, "stone": 260, "spores": 90, "playerLevel": 23, "boss": true },
+          { "scrap": 1300, "essence": 1300, "wood": 360, "stone": 380, "spores": 140, "playerLevel": 28, "boss": true }
+        ]
       }
     ],
     "workers": {
@@ -1153,7 +1173,13 @@
       "ore": { "name": "Iron Ore", "verb": "Mine", "hp": 18, "tier": 4, "drops": { "scrap": [6, 10], "stone": [2, 4] }, "regrowMinutes": 60, "chips": "#c87a3a" },
       "starstone": { "name": "Starstone", "verb": "Mine", "hp": 24, "tier": 5, "drops": { "essence": [8, 14] }, "bonus": { "shards": 0.1 }, "regrowMinutes": 90, "chips": "#ffd24a" },
       "prism": { "name": "Prism Crystal", "verb": "Mine", "hp": 9, "tier": 2, "drops": { "prismite": [1, 2], "essence": [1, 2] }, "regrowMinutes": 40, "chips": "#7ae8ff" },
-      "mirror": { "name": "Mirror Crystal", "verb": "Mine", "hp": 16, "tier": 3, "drops": { "prismite": [2, 4] }, "regrowMinutes": 60, "chips": "#e8fbff" }
+      "mirror": { "name": "Mirror Crystal", "verb": "Mine", "hp": 16, "tier": 3, "drops": { "prismite": [2, 4] }, "regrowMinutes": 60, "chips": "#e8fbff" },
+      "lumencap": { "name": "Lumen Cap", "verb": "Pick", "hp": 4, "tier": 1, "drops": { "spores": [1, 3] }, "regrowMinutes": 25, "chips": "#9affc8" },
+      "roots": { "name": "Great Roots", "verb": "Chop", "hp": 14, "tier": 2, "drops": { "wood": [5, 8] }, "regrowMinutes": 60, "chips": "#5a3a22" },
+      "ruin": { "name": "Sunken Ruin", "verb": "Mine", "hp": 12, "tier": 2, "drops": { "stone": [3, 5], "scrap": [1, 3] }, "regrowMinutes": 90, "chips": "#8a8a96" },
+      "mendbloom": { "name": "Mendbloom", "burst": true, "hp": 1, "tier": 0, "drops": {}, "regrowMinutes": 4 },
+      "puffcap": { "name": "Puffcap", "burst": true, "hp": 1, "tier": 0, "drops": {}, "regrowMinutes": 3 },
+      "aethercrystal": { "name": "Aether Crystal", "verb": "Mine", "hp": 14, "tier": 3, "drops": { "aether": [1, 3], "essence": [1, 3] }, "regrowMinutes": 50, "chips": "#d8ecff" }
     }
   },
   "building": {
@@ -1178,7 +1204,8 @@
       { "id": "iron_gate", "name": "Iron Gate", "kind": "gate", "hp": 560, "cost": { "wood": 10, "stone": 14, "scrap": 40 }, "requires": { "hearth": 3 }, "desc": "An iron-bound gate: you walk through, enemies batter it much longer." },
       { "id": "ballista", "name": "Ballista", "kind": "turret", "hp": 460, "cost": { "wood": 60, "stone": 50, "scrap": 180 }, "requires": { "training": 3, "forge": 2 }, "turret": { "range": 9, "interval": 1.4, "damage": 30, "speed": 18, "sprite": "arrow", "color": "#f0e0b8" }, "desc": "A heavy bolt thrower: long range and hard hits." },
       { "id": "iron_spikes", "name": "Iron Spikes", "kind": "trap", "walkable": true, "hp": 280, "cost": { "scrap": 35, "stone": 10 }, "requires": { "forge": 2 }, "trap": { "damage": 22, "interval": 0.6 }, "desc": "Sharper, sturdier spikes for the gates." },
-      { "id": "prism_relay", "name": "Prism Relay", "kind": "relay", "hp": 300, "cost": { "stone": 20, "scrap": 60, "prismite": 12 }, "blueprint": "bp_prism_relay", "relay": { "range": 1.5, "damage": 0.25, "split": 2 }, "desc": "Stand it next to a turret: the turret hits 25% harder and its shots split in three." }
+      { "id": "prism_relay", "name": "Prism Relay", "kind": "relay", "hp": 300, "cost": { "stone": 20, "scrap": 60, "prismite": 12 }, "blueprint": "bp_prism_relay", "relay": { "range": 1.5, "damage": 0.25, "split": 2 }, "desc": "Stand it next to a turret: the turret hits 25% harder and its shots split in three." },
+      { "id": "wind_beacon", "name": "Wind Beacon", "kind": "beacon", "hp": 260, "cost": { "stone": 30, "scrap": 80, "aether": 15 }, "blueprint": "bp_wind_beacon", "beacon": { "moveSpeedPct": 8, "dashCooldownPct": 40 }, "desc": "Build it in your camp: you move 8% faster everywhere, and Gale Step recharges 40% sooner." }
     ]
   },
   "sailing": {
@@ -1212,7 +1239,9 @@
     { "id": "highlands", "name": "Stormpeaks", "ground": "rockgrass", "alt": "grass", "blockers": { "rock": 0.09, "tree": 0.02, "ore": 0.012 }, "water": 0.04, "enemies": ["harpy", "golem", "bat", "skeleton"], "elements": ["lightning", "wind", "holy"], "components": ["lightning_core", "holy_core", "wind_core", "bp_scythe"], "boss": "storm_colossus" },
     { "id": "void", "name": "Voidreach", "ground": "voidstone", "alt": "voidmoss", "blockers": { "crystal": 0.06, "starstone": 0.006 }, "water": 0.0, "enemies": ["eye", "shade", "wisp", "bat"], "elements": ["void", "arcane", "bleed"], "components": ["void_core", "arcane_core", "blood_core", "shadow_ingot"], "boss": "void_herald" },
     { "id": "isles", "name": "Sunken Isles", "ground": "grass", "alt": "flowers", "blockers": { "palm": 0.08, "rock": 0.02 }, "water": 0.0, "enemies": ["crab", "slime", "bat"], "elements": ["wind", "holy", "physical"], "components": ["wind_core", "holy_core", "bp_chakram"] },
-    { "id": "prism", "name": "Prism Barrens", "far": true, "gen": 2, "ground": "prismsand", "alt": "prismglass", "blockers": { "prism": 0.05, "mirror": 0.022, "rock": 0.008 }, "water": 0.0, "enemies": ["shardling", "refractor", "mirror_knight"], "elements": ["arcane", "lightning", "holy"], "components": ["prism_lens", "crystal_heart", "holy_core"] }
+    { "id": "prism", "name": "Prism Barrens", "far": true, "gen": 2, "ground": "prismsand", "alt": "prismglass", "blockers": { "prism": 0.05, "mirror": 0.022, "rock": 0.008 }, "water": 0.0, "enemies": ["shardling", "refractor", "mirror_knight"], "elements": ["arcane", "lightning", "holy"], "components": ["prism_lens", "crystal_heart", "holy_core"] },
+    { "id": "fen", "name": "Mireglass Fen", "far": true, "gen": 3, "ground": "fenmoss", "alt": "peat", "blockers": { "tree": 0.05, "roots": 0.04, "lumencap": 0.03, "ruin": 0.008, "mendbloom": 0.006, "puffcap": 0.012 }, "water": 0.2, "waterTile": "fenwater", "bog": 0.16, "enemies": ["bogling", "glowmoth", "mire_troll"], "elements": ["poison", "holy", "earth"], "components": ["lumen_seed", "bp_healing_garden", "poison_core", "monster_fang"] },
+    { "id": "skyreach", "name": "Skyreach", "far": true, "gen": 3, "sky": true, "ground": "skygrass", "alt": "skystone", "blockers": { "rock": 0.03, "aethercrystal": 0.02, "ruin": 0.012, "tree": 0.015 }, "water": 0.0, "enemies": ["gale_sprite", "cloud_ray", "storm_griffin"], "elements": ["wind", "lightning", "holy"], "components": ["gale_feather", "bp_wind_beacon", "wind_core", "holy_core"] }
   ],
   "enemies": [
     { "id": "shark", "name": "Shark", "hp": 70, "damage": 12, "speed": 3.8, "size": 0.9, "sight": 9, "behavior": "shark", "xp": 20, "weight": 10, "color": "#7a8ca6", "swim": "sea", "sea": true },
@@ -1236,7 +1265,13 @@
     { "id": "crab", "name": "Reef Crab", "hp": 38, "damage": 9, "speed": 2.2, "size": 0.75, "sight": 6, "behavior": "scuttle", "windup": 0.3, "dash": 2.6, "dashTime": 0.22, "trigger": 1.8, "cooldown": 1.4, "xp": 9, "weight": 10, "color": "#e0603a" },
     { "id": "shardling", "name": "Shardling", "hp": 34, "damage": 9, "speed": 3, "size": 0.6, "sight": 9, "behavior": "pack", "windup": 0.25, "dash": 3.4, "dashTime": 0.28, "trigger": 3, "cooldown": 1.5, "group": [3, 4], "xp": 11, "weight": 10, "color": "#7ae8ff", "deathBurst": { "count": 5, "damage": 0.5, "speed": 6, "color": "#bff4ff" } },
     { "id": "refractor", "name": "Refractor", "hp": 48, "damage": 11, "speed": 1.6, "size": 0.75, "sight": 10, "behavior": "caster", "range": 7, "projSpeed": 6.5, "body": "float", "xp": 15, "weight": 7, "color": "#c09aff" },
-    { "id": "mirror_knight", "name": "Mirror Knight", "hp": 150, "damage": 20, "speed": 1.5, "size": 1, "sight": 8, "behavior": "charger", "windup": 0.7, "dash": 4.5, "dashTime": 0.45, "trigger": 4.5, "cooldown": 3.4, "group": [1, 1], "xp": 40, "weight": 2, "color": "#c8e8f8", "elite": true, "reflect": 0.4, "bigLoot": true }
+    { "id": "mirror_knight", "name": "Mirror Knight", "hp": 150, "damage": 20, "speed": 1.5, "size": 1, "sight": 8, "behavior": "charger", "windup": 0.7, "dash": 4.5, "dashTime": 0.45, "trigger": 4.5, "cooldown": 3.4, "group": [1, 1], "xp": 40, "weight": 2, "color": "#c8e8f8", "elite": true, "reflect": 0.4, "bigLoot": true },
+    { "id": "bogling", "name": "Bogling", "hp": 46, "damage": 10, "speed": 1.8, "size": 0.75, "sight": 7, "behavior": "chase", "body": "hop", "xp": 12, "weight": 10, "color": "#4a8a6a", "elemental": true },
+    { "id": "glowmoth", "name": "Glowmoth", "hp": 30, "damage": 8, "speed": 3.2, "size": 0.65, "sight": 9, "behavior": "swoop", "body": "fly", "xp": 11, "weight": 8, "color": "#9affc8" },
+    { "id": "mire_troll", "name": "Mire Troll", "hp": 190, "damage": 22, "speed": 1.3, "size": 1.25, "sight": 7, "behavior": "charger", "windup": 0.8, "dash": 4, "dashTime": 0.5, "trigger": 4, "cooldown": 3.4, "group": [1, 1], "xp": 46, "weight": 2, "color": "#5a7a4a", "elite": true, "bogRegen": 0.04, "bigLoot": true },
+    { "id": "gale_sprite", "name": "Gale Sprite", "hp": 32, "damage": 9, "speed": 3.6, "size": 0.6, "sight": 10, "behavior": "swoop", "body": "fly", "xp": 12, "weight": 10, "color": "#d8ecff" },
+    { "id": "cloud_ray", "name": "Cloud Ray", "hp": 52, "damage": 11, "speed": 2, "size": 0.9, "sight": 10, "behavior": "caster", "range": 7, "projSpeed": 6.5, "body": "fly", "xp": 16, "weight": 7, "color": "#a8c8f0" },
+    { "id": "storm_griffin", "name": "Storm Griffin", "hp": 170, "damage": 21, "speed": 2.4, "size": 1.15, "sight": 10, "behavior": "charger", "windup": 0.5, "dash": 5.5, "dashTime": 0.45, "trigger": 5, "cooldown": 3, "group": [1, 1], "body": "fly", "xp": 48, "weight": 2, "color": "#c8a050", "elite": true, "bigLoot": true }
   ],
   "bosses": [
     { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["meteors", "charge", "slam", "ring", "meteors", "summon"], "trail": "fire", "tip": "Meteors fall where you stand, and its charge leaves the ground burning.", "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "rare", "theme": "fire" } },
@@ -1247,6 +1282,8 @@
     { "id": "thornmother", "name": "Thornmother", "biome": "forest", "element": "poison", "hp": 1650, "damage": 21, "speed": 0.7, "size": 2.1, "xp": 420, "patterns": ["roots", "spores", "summon", "roots", "reroot", "spores"], "tip": "Roots burst from the ground towards you and spore clouds poison the air. She burrows away and roots again elsewhere.", "color": "#6ac04a", "drop": { "component": "heartwood", "minRarity": "rare", "theme": "plague" } },
     { "id": "sand_wyrm", "name": "Sand Wyrm", "biome": "desert", "element": "earth", "hp": 1800, "damage": 24, "speed": 1.5, "size": 2.2, "xp": 460, "patterns": ["burrow", "quake", "sandspit", "charge", "burrow", "quake"], "tip": "It dives under the sand and bursts up beneath you: run from the rumbling circle. Quakes ripple outward in rings.", "color": "#d8a858", "drop": { "component": "wyrm_fang", "minRarity": "rare", "theme": "earthshaker" } },
     { "id": "tide_leviathan", "name": "Tide Leviathan", "biome": "isles", "element": "ice", "hp": 1900, "damage": 24, "speed": 1.2, "size": 2.3, "xp": 480, "patterns": ["wave", "geysers", "whirlpool", "summon", "wave", "geysers"], "tip": "Walls of water sweep across the island: find the gap. Geysers burst under your feet and whirlpools drag you in.", "color": "#2f8fc4", "drop": { "component": "tide_pearl", "minRarity": "rare", "theme": "freeze" } },
-    { "id": "prism_warden", "name": "The Prism Warden", "biome": "prism", "far": true, "element": "arcane", "hp": 2600, "damage": 26, "speed": 0.9, "size": 2.2, "xp": 900, "patterns": ["lasers", "ring", "clones", "lasers", "spiral", "orbs"], "tip": "Laser fields sweep the arena: watch the glowing lines and step between them. Its mirror images hit for real, and the crystals around the arena send shots flying back.", "color": "#9ae8ff", "drop": { "component": "prism_heart", "minRarity": "epic", "theme": "arcanist" } }
+    { "id": "prism_warden", "name": "The Prism Warden", "biome": "prism", "far": true, "element": "arcane", "hp": 2600, "damage": 26, "speed": 0.9, "size": 2.2, "xp": 900, "patterns": ["lasers", "ring", "clones", "lasers", "spiral", "orbs"], "tip": "Laser fields sweep the arena: watch the glowing lines and step between them. Its mirror images hit for real, and the crystals around the arena send shots flying back.", "color": "#9ae8ff", "drop": { "component": "prism_heart", "minRarity": "epic", "theme": "arcanist" } },
+    { "id": "mireheart", "name": "The Mireheart", "biome": "fen", "far": true, "element": "poison", "hp": 2700, "damage": 25, "speed": 0.6, "size": 2.3, "xp": 950, "patterns": ["mirebloom", "roots", "spores", "mirebloom", "reroot", "summon"], "tip": "Roots and spore clouds fill the bog, and the fen itself fights: poison puffballs burst around you, while healing blooms open nearby. Keep moving, and use the blooms.", "color": "#4ac8a0", "drop": { "component": "mire_heart", "minRarity": "epic", "theme": "plague" } },
+    { "id": "aether_roc", "name": "The Aether Roc", "biome": "skyreach", "far": true, "element": "wind", "hp": 2600, "damage": 27, "speed": 1.4, "size": 2.3, "xp": 950, "patterns": ["skydive", "windwave", "ring", "skydive", "windwave", "summon"], "tip": "It climbs out of reach and dives down where you stand: run from the shadow. Walls of wind sweep across the island and throw you back.", "color": "#e8d8a8", "drop": { "component": "roc_plume", "minRarity": "epic", "theme": "tempest" } }
   ]
 }

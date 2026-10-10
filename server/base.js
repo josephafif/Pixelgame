@@ -5,7 +5,7 @@
 // Upgrades are paid from the clan vault, and from what you carry when the
 // vault runs short.
 
-import { COST_KEYS, buildingDef, maxLevel, wellPending } from '../src/game/base.js';
+import { COST_KEYS, buildingDef, maxLevel, wellPending, TONIC, canAfford, pay as payCost, shortfalls } from '../src/game/base.js';
 import { clanLevels, buildingOfStruct, BUILDING_SV, TOWN_LEVELS, baseStructId } from '../src/net/mpbase.js';
 import { mpVirtualSave, mpInventorySizes } from '../src/net/mpsave.js';
 import { canDo } from '../src/net/rules.js';
@@ -156,7 +156,21 @@ export function request(gs, p, msg) {
   if (msg.op === 'upgrade') return upgrade(gs, p, clan, id);
   if (msg.op === 'well') return collectWell(gs, p, clan);
   if (msg.op === 'hire' || msg.op === 'fire' || msg.op === 'role') return workers.request(gs, p, clan, msg);
+  if (msg.op === 'tonic') return brewTonic(gs, p);
   return 'Okänd begäran';
+}
+
+/** A Lumen Tonic from the clan's Healing Garden (paid with your own Lumen Spores). */
+function brewTonic(gs, p) {
+  if ((p.gardenLevel ?? 0) < 1) return 'Klanen har ingen läketrädgård';
+  if (!canAfford(p.ch.resources, TONIC.cost)) return shortfalls(p.ch.resources, TONIC.cost)[0];
+  payCost(p.ch.resources, TONIC.cost);
+  p.tonicUntil = gs.time + TONIC.seconds;
+  players.persist(gs, p);
+  players.markMe(p);
+  gs.toast(p, `Lumentonikum: du läker hela tiden, och gyttjan kan inte göra dig sjuk på ${TONIC.seconds / 60} minuter.`, 'component');
+  gs.event(p.x, p.y, { k: 'fx', fx: 'upgrade', x: p.x, y: p.y }, 16);
+  return null;
 }
 
 function upgrade(gs, p, clan, id) {

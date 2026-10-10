@@ -217,6 +217,20 @@ export class Audio {
       case 'boss':
         this.#tone({ wave: 'sawtooth', freq: 70, to: 55, dur: 1.2, vol: 0.25 });
         break;
+      case 'jump':
+        // A horse leaping: a rising whoosh.
+        this.#noiseBurst({ freq: 900, q: 1.5, dur: 0.25, vol: 0.12 });
+        this.#tone({ wave: 'triangle', freq: 220, to: 440, dur: 0.22, vol: 0.1 });
+        break;
+      case 'land':
+        // Hooves on solid ground again.
+        this.#noiseBurst({ freq: 260, q: 0.8, dur: 0.14, vol: 0.24, type: 'lowpass' });
+        this.#tone({ wave: 'triangle', freq: 160, to: 110, dur: 0.1, vol: 0.12, delay: 0.05 });
+        break;
+      case 'dash':
+        this.#noiseBurst({ freq: 1800, q: 1.2, dur: 0.16, vol: 0.14 });
+        this.#tone({ wave: 'sine', freq: 600, to: 1200, dur: 0.12, vol: 0.06 });
+        break;
       default:
         break;
     }

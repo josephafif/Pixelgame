@@ -19,7 +19,7 @@ import { attackDuration, impactDelay, MELEE_PATTERNS } from '../render/weapon-an
 import {
   ET, SF, CMD, BTN, encodeInput, decodeSnapshot, angleToByte,
 } from '../net/protocol.js';
-import { stepMove, quantizeAxis, TICK_RATE, TICK_DT, TICK_MS, PLAYER_RADIUS } from '../net/movement.js';
+import { stepMove, quantizeAxis, TICK_RATE, TICK_DT, TICK_MS, PLAYER_RADIUS, LEAP_TIME } from '../net/movement.js';
 import { mpGameData, mpStructureLock } from '../net/mpbuild.js';
 import { mpVirtualSave } from '../net/mpsave.js';
 import { inSafeZone, claimAt, canDo, bannerProblem, pvpBlock } from '../net/rules.js';
@@ -772,6 +772,7 @@ export class MpGame {
       this.#withGates(() => {
         for (const f of this.pending) stepMove(this.world, pred, f, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode);
       });
+      pred.leap = null; // (replayed leaps were already shown)
     }
     const dx = before.x - pred.x;
     const dy = before.y - pred.y;
@@ -896,6 +897,12 @@ export class MpGame {
     if (this.pending.length > 120) this.pending.shift();
     this.prev = { x: this.pred.x, y: this.pred.y };
     this.#withGates(() => stepMove(this.world, this.pred, frame, this.speed, this.sprintMult, PLAYER_RADIUS, this.moveMode));
+    if (this.pred.leap) {
+      // Your horse leapt a gap in the clouds: drawn along its arc.
+      this.player.leap = { x0: this.pred.leap.x0, y0: this.pred.leap.y0, t: 0 };
+      this.pred.leap = null;
+      this.audio.play('jump');
+    }
     p.moving = mx !== 0 || my !== 0;
     p.sprinting = p.moving && (buttons & BTN.SPRINT) !== 0;
     // Foam in the wake; dust under hooves.
@@ -1086,6 +1093,15 @@ export class MpGame {
     p.vy = dt > 0 ? (ny - p.y) / dt : 0;
     p.x = nx;
     p.y = ny;
+    if (p.leap) {
+      p.leap.t += dt;
+      if (p.leap.t >= LEAP_TIME) {
+        p.leap = null;
+        this.fx.emit('dust', p.x, p.y + 0.3, 10, 0.6, 1.2);
+        this.shake = Math.max(this.shake, 0.12);
+        this.audio.play('land');
+      }
+    }
     if (p.moving) p.walkT += dt * (p.sprinting ? 14 : 9);
     p.hurtFlash = Math.max(0, p.hurtFlash - dt);
     p.invuln = this.selfFlags & SF.PROTECTED ? 1 : 0;
@@ -1570,6 +1586,14 @@ export class MpGame {
     switch (ev.fx) {
       case 'text':
         this.fx.text(ev.x, ev.y, String(ev.text).slice(0, 40), String(ev.color ?? '#ffe890'), 1.2);
+        break;
+      case 'bloom':
+        this.fx.emit('sparkle', ev.x, ev.y, 16, 0.8, 2);
+        this.audio.play('pickup', { throttle: 100 });
+        break;
+      case 'puff':
+        this.fx.emit('smoke', ev.x, ev.y, 16, 0.8, 2);
+        this.audio.play('whirl', { throttle: 100 });
         break;
       case 'glint':
         // A shot glancing off a mirror crystal.

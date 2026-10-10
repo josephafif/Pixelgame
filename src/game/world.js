@@ -53,20 +53,40 @@ export const T = {
   ROCKGRASS: 10, VOIDSTONE: 11, VOIDMOSS: 12, CAMP: 13, PATH: 14,
   // Prism Barrens (far lands): pale crystal sand and glassy flats.
   PRISMSAND: 15, PRISMGLASS: 16,
+  // Mireglass Fen: dark moss, peat, and bog that slows and sickens you.
+  FENMOSS: 17, PEAT: 18, BOG: 19,
+  // Skyreach: island grass and stone, plank bridges, and wind currents
+  // (each blowing one way: north, east, south, west).
+  SKYGRASS: 42, SKYSTONE: 43, SKYBRIDGE: 44, WIND_N: 45, WIND_E: 46, WIND_S: 47, WIND_W: 48,
   WATER: 20, LAVA: 21, TREE: 22, PINE: 23, ROCK: 24, CACTUS: 25, CRYSTAL: 26,
   SEA: 27, DEEP: 28, PALM: 29, OBSIDIAN: 30, ORE: 31, STARSTONE: 32,
   // Prism Barrens: crystal formations, and mirror crystals that bounce shots.
   PRISM: 33, MIRROR: 34,
+  // Mireglass Fen: turquoise swamp water, glowing caps, great roots, sunken
+  // ruins, and two plants you can hit: a healing bloom and a poison puffball.
+  FENWATER: 35, LUMENCAP: 36, ROOTS: 37, RUIN: 38, MENDBLOOM: 39, PUFFCAP: 40,
+  // Skyreach: the sea of clouds between the islands, and aether crystals.
+  SKY: 49, AETHERCRYSTAL: 50,
 };
 
+/** Plants that burst when hit (they never block anyone). */
+export const PLANTS = new Set([T.MENDBLOOM, T.PUFFCAP]);
+/** Wind currents → the way they blow. */
+export const WIND = new Map([[T.WIND_N, [0, -1]], [T.WIND_E, [1, 0]], [T.WIND_S, [0, 1]], [T.WIND_W, [-1, 0]]]);
+
 /**
- * World generation version. 1: the original world. 2: the far lands (new
- * biomes far out, see #farBiome). Old worlds are upgraded, but the places
- * you had already seen keep their old land (World#legacy).
+ * World generation version. 1: the original world. 2: the far lands begin
+ * (Prism Barrens, see #farBiome). 3: Mireglass Fen and Skyreach. Old worlds
+ * are upgraded, but the places you had already seen keep their old land
+ * (World#legacy).
  */
-export const WORLD_GEN = 2;
+export const WORLD_GEN = 3;
 /** The far lands begin this far from the camp. */
 export const FAR_MIN = 280;
+/** Skyreach: an island here, open clouds there (World#skyAt), and the grid bridges follow. */
+export const SKY_LAND = 0;
+export const SKY_OPEN = 1;
+const SKY_GRID = 22;
 
 /**
  * Single player: which explored chunks keep the land of an older world
@@ -87,21 +107,24 @@ const GROUND_BY_NAME = {
   grass: T.GRASS, flowers: T.FLOWERS, moss: T.MOSS, sand: T.SAND, sand2: T.SAND2, snow: T.SNOW,
   ice: T.ICE, ash: T.ASH, basalt: T.BASALT, rockgrass: T.ROCKGRASS, voidstone: T.VOIDSTONE,
   voidmoss: T.VOIDMOSS, prismsand: T.PRISMSAND, prismglass: T.PRISMGLASS,
+  fenmoss: T.FENMOSS, peat: T.PEAT, skygrass: T.SKYGRASS, skystone: T.SKYSTONE,
 };
 const BLOCKER_BY_NAME = {
   tree: T.TREE, pine: T.PINE, rock: T.ROCK, cactus: T.CACTUS, crystal: T.CRYSTAL, palm: T.PALM,
   obsidian: T.OBSIDIAN, ore: T.ORE, starstone: T.STARSTONE, prism: T.PRISM, mirror: T.MIRROR,
+  lumencap: T.LUMENCAP, roots: T.ROOTS, ruin: T.RUIN, mendbloom: T.MENDBLOOM, puffcap: T.PUFFCAP,
+  aethercrystal: T.AETHERCRYSTAL,
 };
 /** Crystals that send shots off in a new direction instead of stopping them. */
 export const REFLECTS = new Set([T.MIRROR]);
 /** Blocker tile id → name used by game data (gathering.harvest). */
 export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).map(([k, v]) => [v, k]));
-export const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
+export const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP, T.FENWATER]);
 /** Water a boat can float on (lakes, coastal sea, open sea). */
 export const SAILABLE = new Set([T.WATER, T.SEA, T.DEEP]);
 // Shallow water (lakes, rivers, the coast) takes a floor: a bridge or a dock
 // you can walk on and build on. Deep sea and lava don't.
-export const BRIDGEABLE = new Set([T.WATER, T.SEA]);
+export const BRIDGEABLE = new Set([T.WATER, T.SEA, T.FENWATER]);
 /**
  * Trees, rocks and the like only block where they stand: a circle around
  * the trunk or the foot of the stone ([radius, centre height in the tile]),
@@ -112,6 +135,7 @@ export const PROP_SHAPE = new Map([
   [T.TREE, [0.3, 0.68]], [T.PINE, [0.28, 0.7]], [T.PALM, [0.26, 0.72]], [T.CACTUS, [0.3, 0.6]],
   [T.ROCK, [0.36, 0.58]], [T.ORE, [0.36, 0.58]], [T.OBSIDIAN, [0.36, 0.58]],
   [T.CRYSTAL, [0.34, 0.6]], [T.STARSTONE, [0.34, 0.6]], [T.PRISM, [0.34, 0.6]], [T.MIRROR, [0.36, 0.58]],
+  [T.LUMENCAP, [0.3, 0.62]], [T.ROOTS, [0.42, 0.6]], [T.RUIN, [0.38, 0.6]], [T.AETHERCRYSTAL, [0.34, 0.6]],
 ]);
 
 /** Numeric key for a tile (fast Map lookups for structures). */
@@ -195,6 +219,8 @@ export class World {
       // The far lands: about one part in seven of the land out there, split
       // between the three kinds by a slower noise.
       far: noiseThreshold(0.82),
+      // Skyreach: about half of it is island, the rest a sea of clouds.
+      island: noiseThreshold(0.5),
       farA: noiseThreshold(1 / 3),
       farB: noiseThreshold(2 / 3),
     };
@@ -532,6 +558,36 @@ export class World {
   }
 
   /**
+   * Skyreach at (x, y): SKY_LAND (an island), SKY_OPEN (clouds), or the
+   * ground of a bridge or a wind current (T.SKYBRIDGE, T.WIND_*). Bridges
+   * and currents run along a coarse grid, so most islands are reachable on
+   * foot; a horse leaps the narrow gaps.
+   */
+  skyAt(x, y) {
+    const s = this.seed;
+    const isl = fbm(s ^ 0x5c1e, x / 12, y / 12) * 0.75 + fbm(s ^ 0x5c1f, x / 40, y / 40) * 0.25;
+    if (isl > this.q.island) return SKY_LAND;
+    const gx = x - (s % SKY_GRID);
+    const gy = y - ((s >>> 8) % SKY_GRID);
+    const onV = ((gx % SKY_GRID) + SKY_GRID) % SKY_GRID === 0;
+    const onH = ((gy % SKY_GRID) + SKY_GRID) % SKY_GRID === 0;
+    if (onV && onH) return T.SKYBRIDGE;
+    if (onV || onH) {
+      const cx = Math.floor(gx / SKY_GRID);
+      const cy = Math.floor(gy / SKY_GRID);
+      const h = hashInts(s, cx, cy, onV ? 0x5b1 : 0x5b2);
+      if (h % 10 >= 6) return SKY_OPEN; // (not every link is there)
+      if ((h >>> 8) % 10 < 3) {
+        // A wind current: it blows one way along the link.
+        const back = (h >>> 16) & 1;
+        return onV ? (back ? T.WIND_N : T.WIND_S) : (back ? T.WIND_W : T.WIND_E);
+      }
+      return T.SKYBRIDGE;
+    }
+    return SKY_OPEN;
+  }
+
+  /**
    * Land or sea at (x, y): see SEA. Oceans are low-frequency blobs that
    * fade in beyond LAND_SAFE; islands dot the water; boss arenas stay dry.
    */
@@ -639,13 +695,27 @@ export class World {
           ground[i] = inner ? (market.material === 'stone' ? T.CAMP : T.PATH) : GROUND_BY_NAME[b.ground] ?? T.GRASS;
           continue;
         }
+        // Skyreach: islands in a sea of clouds, bridges and wind currents between them.
+        if (b.sky && !nearAltar(x + 0.5, y + 0.5) && !this.#nearLandmark(x, y, 4)) {
+          const sky = this.skyAt(x, y);
+          if (sky !== SKY_LAND) {
+            ground[i] = sky === SKY_OPEN ? T.SKYSTONE : sky;
+            if (sky === SKY_OPEN) block[i] = T.SKY;
+            continue;
+          }
+        }
         const detail = fbm(s ^ 0x4444, x / 6, y / 6);
         ground[i] = GROUND_BY_NAME[detail > this.q.detail ? b.alt : b.ground] ?? T.GRASS;
         if (d2 < CAMP_CLEAR * CAMP_CLEAR) continue; // keep the camp surroundings open
         if (this.#nearLandmark(x, y, 4) || nearAltar(x + 0.5, y + 0.5)) continue; // keep arenas open
         const w = fbm(s ^ 0x5555, x / 9, y / 9);
         if (b.water && w < noiseThreshold(b.water)) {
-          block[i] = T.WATER;
+          block[i] = b.waterTile === 'fenwater' ? T.FENWATER : T.WATER;
+          continue;
+        }
+        // Mireglass Fen: bog between the pools (walkable, but it slows and sickens you).
+        if (b.bog && fbm(s ^ 0x7b06, x / 7, y / 7) > noiseThreshold(1 - b.bog)) {
+          ground[i] = T.BOG;
           continue;
         }
         if (b.lava && w > noiseThreshold(1 - b.lava)) {
@@ -915,6 +985,10 @@ export class World {
     // Sea creatures: sharks swim anywhere in the sea, serpents only in the deep.
     if (mode === 'swim') return b !== T.SEA && b !== T.DEEP;
     if (mode === 'deepswim') return b !== T.DEEP;
+    // The sea of clouds: only flyers cross it (a horse leaps narrow gaps, see movement.js).
+    if (b === T.SKY) return mode !== 'fly';
+    // Plants are low: nobody bumps into them.
+    if (PLANTS.has(b)) b = 0;
     // Flyers (and pals, who slip through the undergrowth) pass trees and rocks;
     // so do horses, jumping them.
     if (b && ((mode !== 'fly' && mode !== 'pal' && mode !== 'horse') || LIQUID.has(b))) return true;

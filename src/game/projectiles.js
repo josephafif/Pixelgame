@@ -2,7 +2,7 @@
 // returning boomerangs/chakrams, homing, piercing, bouncing and splitting.
 
 import { dist2, normalize, angleTo, angleDiff } from '../core/math.js';
-import { T, REFLECTS } from './world.js';
+import { T, REFLECTS, PLANTS } from './world.js';
 
 const MAX_PROJECTILES = 260;
 const PASS_THROUGH = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
@@ -202,6 +202,8 @@ export function updateProjectiles(game, dt) {
         const tx = Math.floor(p.x);
         const ty = Math.floor(p.y);
         const block = game.world.isSolid(tx, ty) ? game.world.blockAt(tx, ty) : 0;
+        // A shot through a fen plant bursts it (and flies on).
+        if (PLANTS.has(block)) game.burstPlant?.(tx, ty);
         // Mirror crystals send shots off at an angle (a little stronger each
         // time), so you can hit what hides behind cover, or turn a monster's
         // shot on its own kind.

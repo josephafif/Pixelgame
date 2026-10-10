@@ -5,7 +5,9 @@
 import { CONFIG } from '../config.js';
 import { hashInts } from '../core/rng.js';
 import { angleTo, dist2 } from '../core/math.js';
-import { World, CHUNK, legacyFromExplored } from './world.js';
+import { World, CHUNK, T, legacyFromExplored } from './world.js';
+import { PLANT_AREAS, plantsHit, puffDps } from './plants.js';
+import { inShape } from './workers.js';
 import { Fx } from './fx.js';
 import { computePlayerStats, xpToNext } from './stats.js';
 import {
@@ -23,6 +25,7 @@ import {
 import { validateCraft, buildCraftRequest, craftCost, isCraftingUnlocked } from '../weapons/crafting.js';
 import {
   syncInventoryCaps, upgradeBuilding, upgradeBlockers, buildingLevel, buildingDef, collectWell, wellPending, researchCost,
+  baseBonuses, canAfford, pay, shortfalls, GARDEN_WARD_LEVEL, TONIC,
 } from './base.js';
 import { applyStatus } from './status.js';
 import {
@@ -32,7 +35,7 @@ import { Construction, buildRadius, structureDef, structureDefs, structureLock, 
 import { Markets } from './markets.js';
 import { Workforce } from './workforce.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
-import { slideMove } from '../net/movement.js';
+import { slideMove, groundEffect, tryLeap, LEAP_TIME } from '../net/movement.js';
 import { Stable } from './riding.js';
 import { BREED_BY_ID } from './horses.js';
 import { POI, isPoi, poiFound, interactPoi, readOldMap, chunksAround } from './discoveries.js';
@@ -330,6 +333,25 @@ export class Game {
     this.recomputeStats();
   }
 
+  /** Safe from the bogs: the Healing Garden at level 2, or a Lumen Tonic still working. */
+  get fenWarded() {
+    return (this.gardenLevel ?? 0) >= GARDEN_WARD_LEVEL || this.tonicUntil > this.time;
+  }
+
+  /** Brews a Lumen Tonic at the Healing Garden: healing over time and a ward against the bogs. */
+  brewTonic() {
+    if ((this.gardenLevel ?? 0) < 1) return 'Build the Healing Garden first';
+    if (!canAfford(this.save.resources, TONIC.cost)) return shortfalls(this.save.resources, TONIC.cost)[0];
+    pay(this.save.resources, TONIC.cost);
+    this.tonicUntil = this.time + TONIC.seconds;
+    this.fx.emit('sparkle', this.player.x, this.player.y - 0.5, 14, 0.6, 1.5);
+    this.audio.play('discover', { rarity: 2 });
+    this.toast(`Lumen Tonic: you heal over time, and the bogs can't sicken you for ${TONIC.seconds / 60} minutes.`, 'component');
+    this.emit('base');
+    this.requestSave();
+    return null;
+  }
+
   applyPlayerStatus(id) {
     const s = this.player.statuses;
     if (id === 'burn') s.burn = { until: this.time + 2, dps: 2 + this.save.player.level * 0.6 };
@@ -341,6 +363,9 @@ export class Game {
   recomputeStats() {
     const before = this.pstats?.maxHp ?? 0;
     this.pstats = computePlayerStats(this.data, this.save, this.weapon?.dna ?? null, this.buffs);
+    // The Healing Garden: healing out of a fight, and (from level 2) a ward against the bogs.
+    this.regenPct = baseBonuses(this.data, this.save).regenPct ?? 0;
+    this.gardenLevel = buildingLevel(this.data, this.save, 'garden');
     if (before && this.pstats.maxHp !== before) {
       this.player.hp = Math.min(this.pstats.maxHp, this.player.hp * (this.pstats.maxHp / before));
     }
@@ -1330,7 +1355,25 @@ export class Game {
   }
 
   /** Your attacks can hurt people at markets (see Markets.hitNpcs) and your own workers. */
+  /** A fen plant bursts (struck or shot): a healing glow or a poison cloud. It grows back in a few minutes. */
+  burstPlant(tx, ty) {
+    const spec = PLANT_AREAS[this.world.blockAt(tx, ty)];
+    if (!spec) return;
+    this.world.removeBlock(tx, ty);
+    const x = tx + 0.5;
+    const y = ty + 0.5;
+    this.spawnArea(spec.kind, {
+      owner: 'plant', x, y, r: spec.r, dur: spec.dur, healPct: spec.healPct ?? 0, dps: puffDps(this.world.worldLevel(x, y)),
+      color: spec.color, element: 'poison',
+    });
+    this.fx.emit(spec.kind === 'mend' ? 'sparkle' : 'smoke', x, y, 16, 0.8, 2);
+    this.audio.play(spec.kind === 'mend' ? 'pickup' : 'whirl', { throttle: 100 });
+  }
+
   hitNpcs(shape, damage) {
+    // Fen plants in the way of the blow burst.
+    const reach = shape.kind === 'arc' ? shape.range : shape.kind === 'circle' ? shape.r : Math.hypot(shape.ex - shape.x, shape.ey - shape.y) + shape.width;
+    for (const pl of plantsHit(this.world, shape.x, shape.y, reach, (x, y, r) => inShape({ x, y, r }, shape))) this.burstPlant(pl.tx, pl.ty);
     const market = this.markets.npcs.length ? this.markets.hitNpcs(shape, damage) : false;
     const worker = this.workforce.list.length ? this.workforce.hit(shape, damage) : false;
     return market || worker;
@@ -1844,6 +1887,20 @@ export class Game {
       }
     }
     const slow = st.chill?.until > this.time ? 0.65 : 1;
+    // The fen's bog sickens you, unless the Healing Garden or a Lumen Tonic wards you.
+    const underfoot = this.world.groundAt(Math.floor(p.x), Math.floor(p.y));
+    if (underfoot === T.BOG && !this.sailing && !this.fenWarded) {
+      this.bogT = (this.bogT ?? 0) + dt;
+      if (this.bogT >= 1.5) {
+        this.bogT = 0;
+        this.applyPlayerStatus('poison');
+      }
+    } else {
+      this.bogT = 0;
+    }
+    // Healing over time: the Healing Garden (out of a fight) and Lumen Tonic.
+    const regen = (this.time - (p.lastHurtAt ?? -99) > 5 ? this.regenPct ?? 0 : 0) + (this.tonicUntil > this.time ? TONIC.regenPct : 0);
+    if (regen > 0 && p.hp < this.pstats.maxHp) p.hp = Math.min(this.pstats.maxHp, p.hp + (this.pstats.maxHp * regen * dt) / 100);
 
     // Movement (sprint has no stamina cost and can be held indefinitely).
     const moving = Math.abs(sample.moveX) + Math.abs(sample.moveY) > 0.01;
@@ -1855,15 +1912,36 @@ export class Game {
       : horse
         ? horse.speed * (p.sprinting ? horse.gallop : 1) * slow
         : this.pstats.moveSpeed * (p.sprinting ? this.data.player.sprintMultiplier : 1) * slow;
-    const vx = sample.moveX * speed + p.kx;
-    const vy = sample.moveY * speed + p.ky;
+    // The fen's bog slows you; Skyreach's wind currents carry you (as in multiplayer).
+    const ground = groundEffect(this.world, p.x, p.y, this.moveMode);
+    const vx = sample.moveX * speed * ground.speed + p.kx + ground.wx;
+    const vy = sample.moveY * speed * ground.speed + p.ky + ground.wy;
     p.vx = vx; // bosses lead their shots with this
     p.vy = vy;
     const damp = Math.exp(-10 * dt);
     p.kx *= damp;
     p.ky *= damp;
     // Slides along walls and slips around trees and corners (as in multiplayer).
+    const x0 = p.x;
+    const y0 = p.y;
     slideMove(this.world, p, vx * dt, vy * dt, p.r, this.moveMode);
+    // On horseback, a narrow gap in the clouds is leapt.
+    if (horse && moving && !p.leap) {
+      const want = speed * ground.speed * dt;
+      if ((p.x - x0) ** 2 + (p.y - y0) ** 2 < want * want * 0.25 && tryLeap(this.world, p, sample.moveX, sample.moveY, p.r)) {
+        this.audio.play('jump');
+        this.fx.emit('glint', x0, y0, 8, 0.5, 1.5, ['#ffffff', '#d8ecff']);
+      }
+    }
+    if (p.leap) {
+      p.leap.t += dt;
+      if (p.leap.t >= LEAP_TIME) {
+        p.leap = null;
+        this.fx.emit('dust', p.x, p.y + 0.3, 10, 0.6, 1.2);
+        this.shake = Math.max(this.shake, 0.12);
+        this.audio.play('land');
+      }
+    }
     p.moving = moving;
     if (moving) p.walkT += dt * (p.sprinting ? 14 : 9);
     if (sailing) {

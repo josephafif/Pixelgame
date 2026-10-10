@@ -1,13 +1,15 @@
 // Players on the server: joining, inputs (with the anti-speedhack budget),
 // movement, actions, death and respawn, persistence.
 
-import { stepMove, PLAYER_RADIUS, TICK_DT, TICK_RATE } from '../src/net/movement.js';
+import { stepMove, PLAYER_RADIUS, TICK_DT, TICK_RATE, LEAP_TIME } from '../src/net/movement.js';
 import { BTN, CMD, byteToAngle } from '../src/net/protocol.js';
 import { computePlayerStats, xpToNext } from '../src/game/stats.js';
 import { compileWeapon } from '../src/game/combat.js';
 import { currentPickaxe, findHarvestTarget } from '../src/game/gathering.js';
 import { inSafeZone, isNewbie } from '../src/net/rules.js';
 import { MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
+import { T } from '../src/game/world.js';
+import { baseBonuses, GARDEN_WARD_LEVEL, TONIC } from '../src/game/base.js';
 import { currentBoat, boatMode, findLaunch, findLanding } from '../src/game/sailing.js';
 import * as combat from './combat.js';
 import * as loot from './loot.js';
@@ -144,7 +146,11 @@ function statSave(gs, p) {
 export function recomputeStats(gs, p) {
   const before = p.maxHp;
   const dna = p.weapon?.dna ?? null;
-  p.stats = computePlayerStats(gs.data, statSave(gs, p), dna, p.buffs);
+  const save = statSave(gs, p);
+  p.stats = computePlayerStats(gs.data, save, dna, p.buffs);
+  // The clan's Healing Garden: healing out of a fight, and from level 2 a ward against the bogs.
+  p.regenPct = baseBonuses(gs.data, save).regenPct ?? 0;
+  p.gardenLevel = save.base.buildings.garden ?? 0;
   p.maxHp = p.stats.maxHp;
   if (before && before !== p.maxHp && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp * (p.maxHp / before));
   const chilled = p.statuses.chill?.until > gs.time;
@@ -309,11 +315,23 @@ export function update(gs, p, now) {
     p.ch.playSeconds += dt;
   }
   tickStatuses(gs, p, dt, now);
-  // Out of a fight you slowly heal; in town quickly.
+  // The fen's bog sickens you, unless the clan's Healing Garden or a Lumen Tonic wards you.
+  if (!p.dead && !p.sailing && gs.world.groundAt(Math.floor(p.x), Math.floor(p.y)) === T.BOG
+    && (p.gardenLevel ?? 0) < GARDEN_WARD_LEVEL && !(p.tonicUntil > gs.time)) {
+    p.bogT = (p.bogT ?? 0) + dt;
+    if (p.bogT >= 1.5) {
+      p.bogT = 0;
+      applyPlayerStatus(gs, p, 'poison', 1.5 + p.ch.level * 0.4);
+    }
+  } else {
+    p.bogT = 0;
+  }
+  // Out of a fight you slowly heal; in town quickly (the Healing Garden and a Lumen Tonic help).
   if (!p.dead && p.hp < p.maxHp) {
     const town = inSafeZone(gs.rules, p.x, p.y);
     const calm = now - p.lastHurtAt > 6000;
-    if (town || calm) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * (town ? 0.08 : 0.012) * dt);
+    const extra = (calm ? p.regenPct ?? 0 : 0) / 100 + (p.tonicUntil > gs.time ? TONIC.regenPct / 100 : 0);
+    if (town || calm || extra) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * ((town ? 0.08 : calm ? 0.012 : 0) + extra) * dt);
   }
   if (p.buffs.length && p.buffs.some((b) => b.until <= gs.time)) {
     p.buffs = p.buffs.filter((b) => b.until > gs.time);
@@ -339,6 +357,11 @@ function applyFrame(gs, p, f, now) {
   const mv = moveParams(gs, p);
   stepMove(gs.world, p, f, mv.speed, mv.sprint, p.r, mv.mode);
   gs.world.gateFilter = null;
+  if (p.leap) {
+    // A horse leapt a gap in the clouds: everyone around sees the arc.
+    p.leapUntil = gs.time + LEAP_TIME;
+    p.leap = null;
+  }
   p.moving = f.mx !== 0 || f.my !== 0;
   p.sprinting = p.moving && (f.buttons & BTN.SPRINT) !== 0;
   const aim = byteToAngle(f.aim);

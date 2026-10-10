@@ -7,7 +7,8 @@ import { angleDiff, angleTo, segmentDist2 } from '../src/core/math.js';
 import { attackDuration, impactDelay, MELEE_PATTERNS } from '../src/render/weapon-anim.js';
 import { pvpBlock, inSafeZone } from '../src/net/rules.js';
 import { TICK_DT, TICK_RATE } from '../src/net/movement.js';
-import { T, CHUNK, REFLECTS } from '../src/game/world.js';
+import { T, CHUNK, REFLECTS, PLANTS } from '../src/game/world.js';
+import { PLANT_AREAS, plantsHit, puffDps } from '../src/game/plants.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
@@ -296,6 +297,8 @@ function meleeHits(gs, p, { x, y, reach, damage, view, knockback = 0, crit = tru
   if (!tool) markets.hitNpcs(gs, p, x, y, reach, damage, inside);
   // Workers out chopping (yours too: hit one and it turns on you).
   workers.hit(gs, p, x, y, reach, damage, inside);
+  // Fen plants in the way of the blow burst.
+  for (const pl of plantsHit(gs.world, x, y, reach, inside)) burstPlant(gs, pl.tx, pl.ty);
   // Walls, gates and turrets of other clans (only while their base can be raided).
   const r = Math.ceil(reach + 1);
   for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
@@ -580,10 +583,28 @@ function ownStructure(gs, pr, st) {
   return clanId === st.clanId;
 }
 
+/** A fen plant bursts: a healing glow or a poison cloud (as in single player). It grows back. */
+export function burstPlant(gs, tx, ty) {
+  const spec = PLANT_AREAS[gs.world.blockAt(tx, ty)];
+  if (!spec || !gs.removeBlock(tx, ty)) return;
+  const x = tx + 0.5;
+  const y = ty + 0.5;
+  spawnArea(gs, {
+    kind: spec.kind, x, y, r: spec.r, dur: spec.dur, healPct: spec.healPct ?? 0, dps: puffDps(gs.world.worldLevel(x, y)),
+    color: spec.color, element: 'poison',
+  });
+  gs.event(x, y, { k: 'fx', fx: spec.kind === 'mend' ? 'bloom' : 'puff', x, y }, 24);
+}
+
 function shotBlocked(gs, x, y) {
   const tx = Math.floor(x);
   const ty = Math.floor(y);
   const b = gs.world.blockAt(tx, ty);
+  // A shot through a fen plant bursts it (and flies on).
+  if (PLANTS.has(b)) {
+    burstPlant(gs, tx, ty);
+    return null;
+  }
   if (b && REFLECTS.has(b) && gs.world.propAt(x, y)) return { tx, ty, st: null, mirror: true };
   if (b && BLOCKS_SHOTS.has(b) && gs.world.propAt(x, y)) return { tx, ty, st: null };
   const st = gs.world.structureAt(tx, ty);
@@ -776,6 +797,28 @@ export function updateAreas(gs, dt) {
       if (a.tickT <= 0) {
         a.tickT = 0.5;
         for (const p of gs.playersNear(a.x, a.y, a.r)) if (!p.dead) hurtPlayer(gs, p, a.damage * 0.5, { element: a.element, dot: true });
+      }
+    }
+    if (a.kind === 'mend' || a.kind === 'puff') {
+      // A fen plant's glow heals the players in it; its spore cloud poisons
+      // monsters (and players, half as hard).
+      a.tickT = (a.tickT ?? 0) - dt;
+      if (a.tickT <= 0) {
+        a.tickT = 0.5;
+        for (const p of gs.playersNear(a.x, a.y, a.r + 0.4)) {
+          if (p.dead || (p.x - a.x) ** 2 + (p.y - a.y) ** 2 > (a.r + p.r) ** 2) continue;
+          if (a.kind === 'mend') heal(gs, p, (p.maxHp * a.healPct * 0.5) / 100);
+          else {
+            hurtPlayer(gs, p, a.dps * 0.25, { element: 'poison', dot: true });
+            players.applyPlayerStatus(gs, p, 'poison', a.dps * 0.15);
+          }
+        }
+        if (a.kind === 'puff' && !a.fromBoss) {
+          for (const e of gs.enemiesNear(a.x, a.y, a.r + 1)) {
+            if (e.dead || (e.x - a.x) ** 2 + (e.y - a.y) ** 2 > (a.r + e.r) ** 2) continue;
+            damageEnemy(gs, e, a.dps * 0.5, { element: 'poison', canCrit: false, depth: 2, source: 'plant' });
+          }
+        }
       }
     }
     if (a.t >= a.dur) {

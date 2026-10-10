@@ -44,7 +44,7 @@ const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
 
 /** Bit flags. */
-export const PF = { MOVING: 1, SPRINT: 2, DEAD: 4, ASLEEP: 8, PROTECTED: 16, TOOL: 32, EMPTY: 64, HURT: 128, ASCEND: 256 };
+export const PF = { MOVING: 1, SPRINT: 2, DEAD: 4, ASLEEP: 8, PROTECTED: 16, TOOL: 32, EMPTY: 64, HURT: 128, ASCEND: 256, LEAP: 512 };
 export const EF = { ELITE: 1, BOSS: 2, SUBMERGED: 4, STUNNED: 8, FROZEN: 16, ALERT: 32, CLONE: 64 };
 export const PRF = { ENEMY: 1, LOB: 2, MINE: 4 };
 export const PKF = { LOCKED: 1, MINE: 2 };
@@ -59,7 +59,7 @@ export const PAL_STATES = ['follow', 'fight', 'gather', 'down'];
 /** Projectile sprites. */
 export const PROJ_SPRITES = ['orb', 'arrow', 'bolt', 'knife', 'blade', 'leafblade', 'shard', 'bullet', 'boomerang', 'chakram', 'wave', 'ball', 'spit', 'rock', 'fireball', 'bone'];
 /** Area kinds. */
-export const AREA_KINDS = ['telegraph', 'hazard', 'cloud', 'quake', 'ring', 'portal', 'bladering', 'timewarp', 'field', 'orbit', 'gravity'];
+export const AREA_KINDS = ['telegraph', 'hazard', 'cloud', 'quake', 'ring', 'portal', 'bladering', 'timewarp', 'field', 'orbit', 'gravity', 'mend', 'puff'];
 /**
  * An area's 'extra' field: a count (blades, orbs) in the low 4 bits, flags,
  * and how fast it spins (× 2) from bit 9.

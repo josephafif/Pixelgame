@@ -9,6 +9,7 @@ import { structureDef } from '../src/game/construction.js';
 import { TOWN_LEVELS } from '../src/net/mpbase.js';
 import { townMarket } from '../src/game/markets.js';
 import { isPoi } from '../src/game/discoveries.js';
+import { regrowMinutes } from '../src/game/gathering.js';
 import * as players from './players.js';
 import * as combat from './combat.js';
 import * as enemies from './enemies.js';
@@ -580,8 +581,7 @@ export class GameServer {
     this.#upkeep(now);
     // Trees and rocks grow back (but never under a structure or a player).
     for (const [key, [at, id]] of Object.entries(this.world.harvested)) {
-      const info = loot.harvestInfoFor(this, id);
-      if (now - at < (info?.regrowMinutes ?? 20) * 60000) continue;
+      if (now - at < regrowMinutes(this.data, id) * 60000) continue;
       const [tx, ty] = key.split(',').map(Number);
       if (this.world.structureAt(tx, ty) || this.world.floorAt(tx, ty)) continue;
       let blocked = false;

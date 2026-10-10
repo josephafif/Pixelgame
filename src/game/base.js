@@ -5,8 +5,8 @@
 
 const HOUR_MS = 3600 * 1000;
 
-/** Resources a building level can cost, in display order. */
-export const COST_KEYS = ['scrap', 'essence', 'wood', 'stone'];
+/** Resources a building level (or a structure) can cost, in display order (the far lands' materials last). */
+export const COST_KEYS = ['scrap', 'essence', 'wood', 'stone', 'prismite', 'spores', 'aether'];
 
 /** True when `resources` covers every entry of `cost`. */
 export function canAfford(resources, cost) {
@@ -58,6 +58,11 @@ export function upgradeBlockers(data, save, id) {
   const next = nextLevelInfo(data, save, id);
   if (!next) return ['Max level'];
   const out = [];
+  // Some buildings need their blueprint researched before the first stone is laid.
+  const def = buildingDef(data, id);
+  if (def?.blueprint && buildingLevel(data, save, id) === 0 && !save.components?.[def.blueprint]?.researched) {
+    out.push(`Needs the ${data.byId.components.get(def.blueprint)?.name ?? def.blueprint}`);
+  }
   if (save.player.level < next.playerLevel) out.push(`Requires level ${next.playerLevel}`);
   if (next.boss && !Object.keys(save.bosses?.defeated ?? {}).length) out.push('Defeat a boss first');
   out.push(...shortfalls(save.resources, next));
@@ -73,7 +78,7 @@ function bonusLevels(def, level) {
 export function baseBonuses(data, save) {
   const out = {
     maxHpPct: 0, attackPower: 0, defense: 0, storage: 0, bag: 0,
-    craftDiscountPct: 0, craftLevel: 0, researchDiscountPct: 0, essencePerHour: 0,
+    craftDiscountPct: 0, craftLevel: 0, researchDiscountPct: 0, essencePerHour: 0, regenPct: 0,
   };
   for (const def of buildingDefs(data)) {
     const n = bonusLevels(def, buildingLevel(data, save, def.id));
@@ -81,6 +86,11 @@ export function baseBonuses(data, save) {
   }
   return out;
 }
+
+/** The Healing Garden from level 2 wards you against the fen's bogs. */
+export const GARDEN_WARD_LEVEL = 2;
+/** Lumen Tonic: brewed at the Healing Garden, it heals over time and wards against the bogs. */
+export const TONIC = { cost: { spores: 6 }, seconds: 180, regenPct: 1.5 };
 
 /** Bag/storage capacity follows the Vault. */
 export function syncInventoryCaps(data, save) {
@@ -185,6 +195,9 @@ export function describeBonus(data, id, level) {
       const tier = Math.max(1, Math.min(4, level - 1));
       return `Room for ${cap} workers · ${['', 'trees and rocks', '+ crystals', '+ obsidian', '+ iron ore'][tier]}`;
     }
+    case 'garden':
+      return [`Heal ${(p.regenPct * n).toFixed(1)}% Health a second out of a fight`, level >= 2 ? 'bogs no longer sicken you' : null, 'brew Lumen Tonic']
+        .filter(Boolean).join(' · ');
     default:
       return '';
   }

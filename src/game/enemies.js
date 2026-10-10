@@ -2,8 +2,9 @@
 // elemental variants per biome, elites, and multi-phase bosses.
 
 import { dist2, normalize, angleTo, segmentDist2 } from '../core/math.js';
-import { laserField, LASER_WIDTH } from './lasers.js';
+import { laserField, LASER_WIDTH, windWave } from './lasers.js';
 import { tickStatuses } from './status.js';
+import { T } from './world.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
 import { creatureSprites, hasCreature } from '../render/creatures.js';
 import { mixHex } from '../weapons/visuals.js';
@@ -601,6 +602,86 @@ function bossPattern(game, b, pattern) {
   const speed = b.phase === 2 ? 7 : 6;
   const color = b.color;
   switch (pattern) {
+    case 'mirebloom': {
+      // The fen fights for its heart: puffballs burst around you, while a
+      // healing bloom opens a few steps away (use it).
+      const n = b.phase === 2 ? 4 : 3;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = 1 + Math.random() * 2.2;
+        const tx = p.x + Math.cos(a) * d;
+        const ty = p.y + Math.sin(a) * d;
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 1.6, dur: 0.9 + i * 0.2, color: '#b8d84a',
+          onEnd: () => {
+            if (b.dead) return;
+            game.spawnArea('puff', { owner: 'enemy', x: tx, y: ty, r: 2, dur: 3.5, dps: b.dmg * 0.6, color: '#b8d84a', element: 'poison', fromBoss: true });
+            game.fx.emit('smoke', tx, ty, 14, 0.8, 2);
+            game.audio.play('whirl', { throttle: 100 });
+          },
+        });
+      }
+      const away = Math.atan2(p.y - b.y, p.x - b.x) + (Math.random() - 0.5) * 1.6;
+      const mx = p.x + Math.cos(away) * 4.5;
+      const my = p.y + Math.sin(away) * 4.5;
+      game.spawnArea('mend', { owner: 'plant', x: mx, y: my, r: 1.8, dur: 5, healPct: 5, color: '#9affc8' });
+      game.fx.emit('sparkle', mx, my, 16, 0.8, 2);
+      return b.phase === 2 ? 3.4 : 3;
+    }
+    case 'skydive': {
+      // It climbs out of reach, then dives on you: run from the shadow.
+      b.submerged = true;
+      b.state = 'windup';
+      game.fx.emit('glint', b.x, b.y, 20, b.r * 1.5, 3, ['#ffffff', '#e8d8a8']);
+      game.audio.play('whirl');
+      const dive = (k) => {
+        if (b.dead) return;
+        const tx = p.x;
+        const ty = p.y;
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'circle', x: tx, y: ty, r: 2.3, dur: 1.1, color: '#e8d8a8',
+          onEnd: () => {
+            if (b.dead) return;
+            b.x = tx;
+            b.y = ty;
+            game.shake = Math.max(game.shake, 0.45);
+            game.fx.add({ type: 'ring', x: tx, y: ty, r0: 0.4, r1: 2.6, color: '#ffffff', dur: 0.35, fill: true });
+            game.fx.emit('dust', tx, ty, 22, 1.6, 4);
+            game.audio.play('boom');
+            if (dist2(tx, ty, p.x, p.y) <= (2.3 + p.r) ** 2) game.hurtPlayer(b.dmg * 1.6, { element: 'wind', fromX: tx, fromY: ty });
+            // Feathers of wind fly out in a ring.
+            for (let i = 0; i < 12; i++) enemyShoot(game, b, (i / 12) * Math.PI * 2, { speed: 6, damage: dmg * 0.5, size: 2 });
+            if (b.phase === 2 && k === 0) {
+              game.schedule(0.5, () => dive(1));
+            } else {
+              b.submerged = false;
+              b.state = 'move';
+            }
+          },
+        });
+      };
+      game.schedule(0.8, () => dive(0));
+      return b.phase === 2 ? 4.2 : 3.2;
+    }
+    case 'windwave': {
+      // Walls of wind sweep out from the Roc and throw you back; one lane stays calm.
+      for (const w of windWave(b.x, b.y, b.r, p.x, p.y)) {
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'line', laser: true, x: w.x, y: w.y, x2: w.x2, y2: w.y2, r: 0.55, dur: w.delay, color: '#e8f4ff',
+          onEnd: () => {
+            if (b.dead) return;
+            game.fx.add({ type: 'line', points: [[w.x, w.y], [w.x2, w.y2]], color: '#ffffff', dur: 0.2, width: 5 });
+            if (segmentDist2(p.x, p.y, w.x, w.y, w.x2, w.y2) <= (0.55 + p.r) ** 2) {
+              game.hurtPlayer(b.dmg * 0.9, { element: 'wind', fromX: b.x, fromY: b.y });
+              p.kx += w.dx * 9;
+              p.ky += w.dy * 9;
+            }
+          },
+        });
+      }
+      game.audio.play('whirl');
+      return 3;
+    }
     case 'lasers': {
       // Laser fields: glowing lines across the arena, then they fire. Stand in a gap.
       for (const beam of laserField(p.x, p.y, b.phase)) {
@@ -1239,6 +1320,10 @@ export function updateEnemies(game, dt) {
     if (e.dead) continue;
     tickStatuses(game, e, dt);
     if (e.dead) continue;
+    // A Mire Troll mends in the bog: lure it out onto firm ground.
+    if (e.def?.bogRegen && e.hp < e.maxHp && game.world.groundAt(Math.floor(e.x), Math.floor(e.y)) === T.BOG) {
+      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.def.bogRegen * dt);
+    }
     e.flash = Math.max(0, e.flash - dt);
     if (e.squash) e.squash = Math.max(0, e.squash - dt * 7);
     if (e.expireAt && game.time >= e.expireAt) {

@@ -196,6 +196,7 @@ export function readPlayer(v) {
     protected: Boolean(flags & PF.PROTECTED),
     hurt: Boolean(flags & PF.HURT),
     ascending: Boolean(flags & PF.ASCEND),
+    leaping: Boolean(flags & PF.LEAP),
     boat: f('boat') ?? 0, // the boat tier while sailing (0 on land)
     horse: BREEDS[(f('horse') ?? 0) - 1]?.id ?? null, // the breed you ride
     anim: f('anim'),

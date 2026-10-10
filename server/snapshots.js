@@ -30,6 +30,7 @@ function playerValues(gs, p, now) {
   if (p.inv.activeSlot === 'none') flags |= PF.EMPTY;
   if (now - p.lastHurtAt < 160) flags |= PF.HURT;
   if (p.ascend?.until > gs.time) flags |= PF.ASCEND;
+  if (p.leapUntil > gs.time) flags |= PF.LEAP; // a horse leaping a gap in the clouds
   const boat = p.sailing ? p.ch.extra.boat ?? 0 : 0;
   const horse = p.sailing ? 0 : horses.breedIndex(horses.ridingOf(p)?.breed);
   return [quantize(p.x), quantize(p.y), angleToByte(p.facing), Math.ceil(Math.max(0, p.hp)), p.maxHp, flags, p.anim, SLOTS.indexOf(p.inv.activeSlot), p.ch.pickaxe, boat, Math.max(0, horse)];

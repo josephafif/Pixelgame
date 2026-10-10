@@ -29,3 +29,31 @@ export function laserField(tx, ty, phase, rng = Math.random) {
   }
   return out;
 }
+
+/**
+ * The Aether Roc's wind waves: fronts that sweep out from it towards
+ * (tx, ty), one after another, each with the same calm gap to stand in.
+ * [{ x, y, x2, y2, delay, dx, dy }] — (dx, dy) the way the wind throws you.
+ */
+export function windWave(bx, by, br, tx, ty, rng = Math.random) {
+  const ax = tx - bx;
+  const ay = ty - by;
+  const d = Math.sqrt(ax * ax + ay * ay) || 1;
+  const dx = ax / d;
+  const dy = ay / d;
+  const px = -dy;
+  const py = dx;
+  const gap = (rng() - 0.5) * 5; // where the calm lane is, across the front
+  const half = 7;
+  const out = [];
+  for (let k = 0; k < 6; k++) {
+    const dist = br + 1 + k * 1.6;
+    const cx = bx + dx * dist;
+    const cy = by + dy * dist;
+    for (const [a, b] of [[-half, gap - 1.3], [gap + 1.3, half]]) {
+      if (b - a < 0.5) continue;
+      out.push({ x: cx + px * a, y: cy + py * a, x2: cx + px * b, y2: cy + py * b, delay: 0.6 + k * 0.18, dx, dy });
+    }
+  }
+  return out;
+}

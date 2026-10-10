@@ -11,7 +11,7 @@
 
 import { COST_KEYS } from '../game/base.js';
 
-export const BASE_BUILDINGS = ['hearth', 'forge', 'vault', 'library', 'training', 'well', 'waystone', 'den', 'lodge'];
+export const BASE_BUILDINGS = ['hearth', 'forge', 'vault', 'library', 'training', 'well', 'waystone', 'den', 'lodge', 'garden'];
 
 /** Fristaden's buildings: a forge that makes common to rare weapons, and the town fire. */
 export const TOWN_LEVELS = { hearth: 1, forge: 1 };
@@ -19,6 +19,7 @@ export const TOWN_LEVELS = { hearth: 1, forge: 1 };
 export const BUILDING_SV = {
   hearth: 'Härd', forge: 'Smedja', vault: 'Förråd', library: 'Bibliotek',
   training: 'Träningsplats', well: 'Essensbrunn', waystone: 'Vägsten', den: 'Djurhus', lodge: 'Arbetarstuga',
+  garden: 'Läketrädgård',
 };
 
 const DESC_SV = {
@@ -31,6 +32,7 @@ const DESC_SV = {
   waystone: 'Res hem till basen från var som helst (nivå 2: och tillbaka igen).',
   den: 'Kläck pal-ägg. Varje nivå låter dina pals växa två nivåer till.',
   lodge: 'Anställ arbetare som hugger träd och bryter sten ute i vildmarken och bär hem allt till klanvalvet. Varje nivå ger plats för en till.',
+  garden: 'Läkeörter i lumenljus. Utanför strid läker hela klanen långsamt (mer för varje nivå), från nivå 2 gör träskens gyttja er inte sjuka, och här brygger ni Lumentonikum av lumensporer.',
 };
 
 /** Upkeep rates per day from the server's weekly rules. */
@@ -66,6 +68,7 @@ export function baseStructDefs(data) {
       hp: 5000,
       cost,
       mpLevel: Math.max(1, first.playerLevel ?? 1),
+      blueprint: b.blueprint ?? null,
       desc: DESC_SV[b.id] ?? b.desc,
     };
   });

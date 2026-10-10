@@ -208,6 +208,7 @@ export function hurtPlayer(game, amount, { element = 'physical', fromX, fromY, s
   if (selfInflicted) dmg = Math.min(dmg, Math.max(0, Math.ceil(p.hp) - 1));
   if (dmg <= 0) return 0;
   p.hp -= dmg;
+  p.lastHurtAt = game.time; // (the Healing Garden only heals you out of a fight)
   if (!selfInflicted) {
     p.invuln = 0.45;
     p.hurtFlash = 0.15;

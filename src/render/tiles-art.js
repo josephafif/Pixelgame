@@ -4,7 +4,7 @@
 
 import { createRng } from '../core/rng.js';
 import { createCanvas, ctx2d } from './canvas.js';
-import { T, CHUNK } from '../game/world.js';
+import { T, CHUNK, WIND } from '../game/world.js';
 
 export const TILE_PX = 16;
 const VARIANTS = 4;
@@ -27,6 +27,13 @@ export const GROUND_STYLE = {
   // Prism Barrens: pale sand full of glints, and glassy flats.
   [T.PRISMSAND]: { base: '#e6dff0', dots: ['#d6cce8', '#f6f2ff'], glints: ['#7ae8ff', '#ff9ad8', '#ffd27a'] },
   [T.PRISMGLASS]: { base: '#c8e2ee', dots: ['#b4d6e6', '#e4f4fa'], cracks: '#9cc8de', glints: ['#ffffff'] },
+  // Mireglass Fen: dark teal moss, peat, and bubbling bog.
+  [T.FENMOSS]: { base: '#2f5e4e', dots: ['#3a6e5a', '#264e40'], blades: '#4a8a6a' },
+  [T.PEAT]: { base: '#4a3e34', dots: ['#5a4a3e', '#3a3028'] },
+  [T.BOG]: { base: '#3a4a30', dots: ['#4a5a38', '#2a3a24'], bubbles: '#7a9a5a' },
+  // Skyreach: bright island grass and pale stone.
+  [T.SKYGRASS]: { base: '#6aa85a', dots: ['#7ab86a', '#5a984c'], blades: '#8ac87a' },
+  [T.SKYSTONE]: { base: '#a8acb8', dots: ['#b8bcc8', '#9498a4'], cracks: '#8a8e9a' },
 };
 
 function drawGround(ctx, style, rng) {
@@ -71,6 +78,18 @@ function drawGround(ctx, style, rng) {
       ctx.fillRect(x, y, 1, 1);
       y += 1;
       x += rng.int(-1, 1);
+    }
+  }
+  if (style.bubbles) {
+    // Bog bubbles: little rings coming up through the mud.
+    ctx.fillStyle = style.bubbles;
+    for (let i = 0; i < 2; i++) {
+      const x = rng.int(2, 12);
+      const y = rng.int(2, 12);
+      ctx.fillRect(x, y - 1, 2, 1);
+      ctx.fillRect(x - 1, y, 1, 1);
+      ctx.fillRect(x + 2, y, 1, 1);
+      ctx.fillRect(x, y + 1, 2, 1);
     }
   }
   if (style.glints) {
@@ -300,6 +319,128 @@ function drawBlocker(ctx, id, rng) {
       ctx.fillRect(11, 1, 1, 14);
       break;
     }
+    case T.FENWATER: {
+      // Swamp water: dark turquoise, slow ripples and a glint of light.
+      ctx.fillStyle = '#1f5a5a';
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.fillStyle = '#2a7070';
+      for (let i = 0; i < 5; i++) ctx.fillRect(rng.int(0, 12), rng.int(0, 15), rng.int(2, 4), 1);
+      ctx.fillStyle = '#5ab8a8';
+      if (rng.next() < 0.6) ctx.fillRect(rng.int(1, 13), rng.int(1, 14), 2, 1);
+      break;
+    }
+    case T.LUMENCAP: {
+      // Glowing mushrooms: pale stems and luminous caps.
+      const caps = [[5, 6, 4], [10, 9, 3], [4, 11, 2]];
+      for (const [x, y, r] of caps) {
+        ctx.fillStyle = '#161622';
+        ctx.fillRect(x - 1, y, 3, 16 - y);
+        ctx.fillStyle = '#e8f0e0';
+        ctx.fillRect(x, y, 1, 15 - y);
+      }
+      for (const [x, y, r] of caps) {
+        circle(ctx, x, y, r + 1, '#161622');
+        circle(ctx, x, y, r, '#3ad8a8');
+        circle(ctx, x - 1, y - 1, Math.max(1, r - 2), '#9affc8');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y - 1, 1, 1);
+      }
+      break;
+    }
+    case T.ROOTS: {
+      // Great roots heaving out of the mud.
+      const root = (pts) => {
+        for (const [x, y] of pts) {
+          ctx.fillStyle = '#161622';
+          ctx.fillRect(x - 1, y - 1, 4, 4);
+        }
+        for (const [x, y] of pts) {
+          ctx.fillStyle = '#5a3a22';
+          ctx.fillRect(x, y, 2, 2);
+          ctx.fillStyle = '#7a5232';
+          ctx.fillRect(x, y, 1, 1);
+        }
+      };
+      root([[1, 13], [3, 10], [5, 8], [7, 7], [9, 7], [11, 8], [13, 11], [14, 14]]);
+      root([[4, 14], [6, 12], [8, 11], [10, 12], [11, 14]]);
+      ctx.fillStyle = '#4f8a44';
+      ctx.fillRect(7, 6, 2, 1);
+      ctx.fillRect(12, 7, 1, 1);
+      break;
+    }
+    case T.RUIN: {
+      // A ruined pillar, half sunk in the ground, moss on top.
+      ctx.fillStyle = '#161622';
+      ctx.fillRect(3, 2, 10, 14);
+      ctx.fillStyle = '#8a8a96';
+      ctx.fillRect(4, 3, 8, 12);
+      ctx.fillStyle = '#a8a8b4';
+      ctx.fillRect(4, 3, 2, 12);
+      ctx.fillStyle = '#6a6a76';
+      ctx.fillRect(4, 7, 8, 1);
+      ctx.fillRect(4, 11, 8, 1);
+      ctx.fillRect(9, 3, 1, 4);
+      ctx.fillStyle = '#4f8a44';
+      ctx.fillRect(4, 3, 8, 1);
+      ctx.fillRect(5, 4, 3, 1);
+      ctx.fillStyle = '#161622';
+      ctx.fillRect(11, 2, 2, 2);
+      break;
+    }
+    case T.MENDBLOOM: {
+      // A healing bloom: soft pink petals over broad leaves.
+      ctx.fillStyle = '#161622';
+      ctx.fillRect(3, 9, 10, 5);
+      ctx.fillStyle = '#3a8a4a';
+      ctx.fillRect(4, 10, 8, 3);
+      ctx.fillStyle = '#5ab85a';
+      ctx.fillRect(4, 10, 3, 1);
+      circle(ctx, 8, 7, 4, '#161622');
+      circle(ctx, 8, 7, 3, '#ff9ad8');
+      circle(ctx, 7, 6, 1, '#ffd8f0');
+      ctx.fillStyle = '#9affc8';
+      ctx.fillRect(8, 7, 1, 1);
+      break;
+    }
+    case T.PUFFCAP: {
+      // A puffball: round, yellow-green and spotted (best not touched).
+      circle(ctx, 8, 10, 5, '#161622');
+      circle(ctx, 8, 10, 4, '#b8d84a');
+      circle(ctx, 7, 9, 2, '#d8f07a');
+      ctx.fillStyle = '#7a9a2a';
+      for (const [x, y] of [[10, 9], [6, 12], [9, 12], [11, 11]]) ctx.fillRect(x, y, 1, 1);
+      ctx.fillStyle = '#161622';
+      ctx.fillRect(7, 15, 3, 1);
+      break;
+    }
+    case T.SKY: {
+      // Looking down into the sea of clouds.
+      ctx.fillStyle = '#b8cce4';
+      ctx.fillRect(0, 0, 16, 16);
+      ctx.fillStyle = '#a4bcd8';
+      for (let i = 0; i < 4; i++) ctx.fillRect(rng.int(0, 11), rng.int(0, 15), rng.int(3, 6), 1);
+      for (let i = 0; i < 2; i++) circle(ctx, rng.int(3, 12), rng.int(3, 12), rng.int(1, 2), '#dce8f6');
+      ctx.fillStyle = '#ffffff';
+      if (rng.next() < 0.5) ctx.fillRect(rng.int(2, 12), rng.int(2, 13), 2, 1);
+      break;
+    }
+    case T.AETHERCRYSTAL: {
+      // Pale floating crystal, light as air.
+      const shards = [[6, 1, 4, 12], [10, 5, 3, 8], [3, 6, 3, 7]];
+      for (const [x, y, w, h] of shards) {
+        ctx.fillStyle = '#161622';
+        ctx.fillRect(x - 1, y - 1, w + 2, h + 1);
+      }
+      for (const [x, y, w, h] of shards) {
+        ctx.fillStyle = '#d8ecff';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, 1, h);
+        ctx.fillStyle = '#8ab8f0';
+        ctx.fillRect(x + w - 1, y + 1, 1, h - 1);
+      }
+      break;
+    }
     case T.STARSTONE: {
       // A golden crystal cluster that glitters.
       const shards = [[6, 2, 4, 13], [10, 6, 3, 9], [3, 8, 3, 7]];
@@ -325,6 +466,42 @@ function drawBlocker(ctx, id, rng) {
 
 const tileCache = new Map();
 
+/** Skyreach's plank bridges (over the clouds) and wind currents (arrows the way they blow). */
+function drawSkyGround(ctx, id, rng) {
+  drawBlocker(ctx, T.SKY, rng);
+  if (id === T.SKYBRIDGE) {
+    ctx.fillStyle = '#161622';
+    ctx.fillRect(1, 0, 14, 16);
+    for (let y = 0; y < 16; y += 4) {
+      ctx.fillStyle = (y / 4) % 2 ? '#9a6a3a' : '#a8784a';
+      ctx.fillRect(2, y, 12, 3);
+      ctx.fillStyle = '#c89a62';
+      ctx.fillRect(2, y, 12, 1);
+    }
+    ctx.fillStyle = '#5a3a1e';
+    ctx.fillRect(1, 0, 1, 16);
+    ctx.fillRect(14, 0, 1, 16);
+    return;
+  }
+  // A wind current: a pale streak of air with chevrons.
+  const [dx, dy] = WIND.get(id) ?? [0, -1];
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  if (dx) ctx.fillRect(0, 4, 16, 8);
+  else ctx.fillRect(4, 0, 8, 16);
+  ctx.fillStyle = '#ffffff';
+  for (let k = 0; k < 2; k++) {
+    const c = 4 + k * 8;
+    for (let i = -2; i <= 2; i++) {
+      // A chevron pointing (dx, dy).
+      const a = Math.abs(i);
+      if (dx) ctx.fillRect(c + dx * (2 - a) - (dx < 0 ? 0 : 1), 8 + i, 1, 1);
+      else ctx.fillRect(8 + i, c + dy * (2 - a) - (dy < 0 ? 0 : 1), 1, 1);
+    }
+  }
+}
+
+const SKY_GROUNDS = new Set([T.SKYBRIDGE, T.WIND_N, T.WIND_E, T.WIND_S, T.WIND_W]);
+
 export function tileCanvas(id, variant, blocker = false) {
   const key = `${blocker ? 'b' : 'g'}${id}:${variant}`;
   let c = tileCache.get(key);
@@ -333,6 +510,7 @@ export function tileCanvas(id, variant, blocker = false) {
     const ctx = ctx2d(c);
     const rng = createRng(id * 977 + variant * 131 + (blocker ? 7 : 0));
     if (blocker) drawBlocker(ctx, id, rng);
+    else if (SKY_GROUNDS.has(id)) drawSkyGround(ctx, id, rng);
     else drawGround(ctx, GROUND_STYLE[id] ?? GROUND_STYLE[T.GRASS], rng);
     tileCache.set(key, c);
   }

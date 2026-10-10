@@ -16,6 +16,10 @@ const COLORS = {
   [T.CACTUS]: '#5f9a40', [T.CRYSTAL]: '#9a5cff', [T.SEA]: '#2f8fc4', [T.DEEP]: '#1d4e8c', [T.PALM]: '#3f9a44',
   [T.OBSIDIAN]: '#3a2a52', [T.ORE]: '#9a7a5a', [T.STARSTONE]: '#ffd24a',
   [T.PRISMSAND]: '#e2dbee', [T.PRISMGLASS]: '#c4dfec', [T.PRISM]: '#7ae8ff', [T.MIRROR]: '#e8fbff',
+  [T.FENMOSS]: '#2e5a4a', [T.PEAT]: '#463a30', [T.BOG]: '#3a4a30', [T.FENWATER]: '#1f5a5a', [T.LUMENCAP]: '#5affc8',
+  [T.ROOTS]: '#5a3a22', [T.RUIN]: '#8a8a96', [T.MENDBLOOM]: '#ff9ad8', [T.PUFFCAP]: '#b8d84a',
+  [T.SKYGRASS]: '#64a456', [T.SKYSTONE]: '#a8acb8', [T.SKYBRIDGE]: '#a8784a', [T.SKY]: '#c8d8ec', [T.AETHERCRYSTAL]: '#d8ecff',
+  [T.WIND_N]: '#e8f4ff', [T.WIND_E]: '#e8f4ff', [T.WIND_S]: '#e8f4ff', [T.WIND_W]: '#e8f4ff',
 };
 
 // Chunk images (1 px per tile), kept for the session.
