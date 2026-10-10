@@ -374,6 +374,22 @@ Säkerheten kommer från att servern bestämmer.
   utanför strid, skyddar mot gyttjan från nivå 2, och `{ t: 'base', op: 'tonic' }` brygger en
   Lumen Tonic av dina egna Lumen Spores.
 - Protokollversion 13 (nya rutor, `PF.DASH`, `BTN.DASH`): äldre klienter ombeds ladda om.
+- **Soldater och trupper** (`server/army.js`, reglerna i `src/game/army.js`): klanens arbetare
+  tränas till soldater vid klanens träningsplats (`{ t: 'army', op: 'train', id, role }`), får
+  utrustning (`op: 'gear'`) och sätts i trupper (`squad-create`, `assign`, `order`, `stance`,
+  `squad-disband`). Bara de som får bygga (officerare och uppåt) leder armén. Soldaterna skickas
+  som arbetare i ögonblicksbilderna, med sin roll (`WORKER_ROLE_IDS`); var trupperna är och hur de
+  mår skickas till klanen varje sekund (`{ t: 'squads' }`). Nära spelare går och strider de på
+  riktigt; långt från alla avgörs striderna i ett slag med samma siffror.
+- **Territorier** ägs av klaner. Servern har ett tillstånd per ruta (sparat i `meta.territories`)
+  och skickar alla ägda och omstridda rutor till alla (`{ t: 'terr', list }`, högst en gång i
+  sekunden). En flagga tas av en klan som står vid den utan andra klaner och utan monster; en
+  annan klans ruta kan bara tas medan den klanens bas går att raida. Varje ruta betalar klanvalvet
+  varje timme. Utposterna (palissad och flagga) placeras likadant på servern och hos klienterna
+  (`placeOutpost` i `src/game/territory.js`). En utpost i (eller precis vid) en klans mark ligger
+  vilande: ingen palissad, inga väktare, inget att ta. Soldaternas lön (`upkeepPerSoldier`) ingår i
+  underhållet. `OUTPOSTS=false` stänger av utposterna på en server.
+- Protokollversion 14 (arbetarnas roll i ögonblicksbilderna).
 - **Underhåll:** dras ur klanvalvet en gång i timmen: 5 trä och 5 sten per
   bygge och vecka, 10 skrot och 10 essens per byggnadsnivå och vecka, och varje
   arbetares lön (126 skrot och 84 essens i veckan). Allt går att ändra per server

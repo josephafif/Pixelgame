@@ -5,7 +5,7 @@
 
 import {
   ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, NPCF, HF, WF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
-  byteToAngle, intToColor,
+  byteToAngle, intToColor, WORKER_ROLE_IDS,
 } from '../net/protocol.js';
 import { TICK_RATE } from '../net/movement.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
@@ -301,7 +301,8 @@ export function readWorker(v) {
   return {
     facing: byteToAngle(f('facing')), moving: Boolean(flags & WF.MOVING), hurt: Boolean(flags & WF.HURT),
     angry: Boolean(flags & WF.ANGRY), idle: Boolean(flags & WF.IDLE),
-    carrying: flags & WF.WOOD ? 'wood' : flags & WF.STONE ? 'stone' : null, role: flags & WF.MINER ? 'stone' : 'wood',
+    carrying: flags & WF.WOOD ? 'wood' : flags & WF.STONE ? 'stone' : null,
+    role: WORKER_ROLE_IDS[f('role')] ?? (flags & WF.MINER ? 'stone' : 'wood'),
     clan: f('clan'), wid: f('wid'), hp: f('hp'), maxHp: f('maxHp'), anim: f('anim'),
   };
 }

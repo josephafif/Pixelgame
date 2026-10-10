@@ -19,6 +19,7 @@ const loaders = {
   pals: () => import('../ui/pals.js'),
   research: () => import('../ui/research.js'),
   market: () => import('../ui/market.js'),
+  strategy: () => import('../ui/strategy.js'),
 };
 
 const DOCK = {
@@ -156,6 +157,7 @@ export class MpPanels {
         item('book', 'Forskning', go('research'), 'R'),
         item('hammer', 'Bygg', () => { closeModal(); g.toggleBuildMode(true); }, 'G'),
         item('pal', 'Pals', go('pals'), 'H'),
+        item('flag', 'Strategikarta', go('strategy'), 'N'),
         item('horse', 'Hästar', go('horses')),
         item('chat', 'Chatt', () => { closeModal(); this.app.mpHud?.openChat(); }, 'T'),
         item('players', 'Spelare online', go('players')),

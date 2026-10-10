@@ -9,6 +9,8 @@ import * as building from './building.js';
 import * as base from './base.js';
 import * as workers from './workers.js';
 import { workerCap, hireCost, workerTier } from '../src/game/workers.js';
+import { workerCount } from '../src/game/army.js';
+import * as army from './army.js';
 
 export function clanPayload(gs, clan) {
   const banner = building.bannerOf(gs, clan.id);
@@ -39,9 +41,12 @@ export function clanPayload(gs, clan) {
     upkeepPerWeek: upkeep,
     // Upkeep per day by cause, and what causes it (the vault tab shows how long the vault lasts).
     upkeep: { perDay, counts },
-    // The lodge's workers ({ id, role }); names come from workerLook(clan id, id).
-    workers: roster.map((r) => ({ id: r.id, role: r.role })),
-    lodge: level ? { level, cap: workerCap(gs.data, level), hire: hireCost(gs.data, roster.length), tier: workerTier(level) } : null,
+    // The lodge's workers and the soldiers ({ id, role, … }); names come from workerLook(clan id, id).
+    workers: roster.map((r) => ({
+      id: r.id, role: r.role, trainingTo: r.trainingTo, trainUntil: r.trainUntil, gear: r.gear, rank: r.rank, xp: r.xp,
+    })),
+    lodge: level ? { level, cap: workerCap(gs.data, level), hire: hireCost(gs.data, workerCount(gs.data, roster)), tier: workerTier(level), used: workerCount(gs.data, roster) } : null,
+    army: army.armyPayload(gs, clan),
     max: gs.rules.clanMax,
     base: basePayload(gs, clan),
   };

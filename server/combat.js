@@ -18,6 +18,7 @@ import * as bosses from './bosses.js';
 import * as markets from './markets.js';
 import * as workers from './workers.js';
 import * as horses from './horses.js';
+import * as army from './army.js';
 
 const DEG = Math.PI / 180;
 const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM]);
@@ -726,6 +727,7 @@ function projectileHits(gs, pr, now) {
         attacker: shooter, element: pr.element, canCrit: Boolean(shooter), depth: pr.source === 'weapon' ? 0 : 1,
         source: pr.turret ? 'turret' : pr.source, knockback: pr.knockback, fromX: pr.x - pr.vx, fromY: pr.y - pr.vy, status: pr.status,
       });
+      if (pr.soldier) army.soldierHit(gs, pr.soldier, e);
       if (pr.bounces > 0 && pr.kind === 'shot' && bounceOn(gs, pr)) return true;
       if (pr.kind !== 'boomerang' && pr.hit.size > pr.pierce) return false;
     }

@@ -9,6 +9,7 @@ import { inSafeZone } from '../src/net/rules.js';
 import { mixHex } from '../src/weapons/visuals.js';
 import * as combat from './combat.js';
 import { updateBoss, expireClones } from './bosses.js';
+import * as army from './army.js';
 
 const LEASH = 1.8;
 const DESPAWN_DIST = 42;
@@ -369,9 +370,34 @@ function wander(gs, e, dt) {
   }
 }
 
+/** Up close with a soldier: blows; otherwise towards it. */
+function brawl(gs, e, foe) {
+  const speed = e.speed * (e.slowMult ?? 1);
+  const rr = e.r + (foe.r ?? 0.3) + 0.45;
+  if ((foe.x - e.x) ** 2 + (foe.y - e.y) ** 2 < rr * rr) {
+    e.vx = e.vy = 0;
+    e.state = 'idle';
+    if (e.atkCd <= 0) {
+      e.atkCd = 1.1;
+      e.anim = (e.anim + 1) & 255;
+      army.hurt(gs, foe, e.dmg);
+    }
+    return;
+  }
+  e.state = 'move';
+  goToward(gs, e, foe.x, foe.y, speed);
+}
+
 function behave(gs, e, dt) {
   const p = pickTarget(gs, e);
   e.atkCd = Math.max(0, e.atkCd - dt);
+  // Soldiers are foes too: the one fighting it, or (for an outpost's guards
+  // and raiders) any soldier close by. Whoever is nearer.
+  const foe = e.state === 'charge' ? null : army.soldierFoe(gs, e, dt);
+  if (foe && (!p || (foe.x - e.x) ** 2 + (foe.y - e.y) ** 2 < (p.x - e.x) ** 2 + (p.y - e.y) ** 2)) {
+    brawl(gs, e, foe);
+    return;
+  }
   if (!p) {
     wander(gs, e, dt);
     return;
@@ -663,7 +689,7 @@ export function update(gs, dt) {
     e.ky = Math.abs(e.ky) < 0.01 ? 0 : e.ky * damp;
     // Nobody around: wander off the map (bosses go home after a while).
     e.lonely = near ? 0 : e.lonely + dt;
-    if (e.lonely > (e.boss ? 20 : 8)) {
+    if (e.lonely > (e.boss ? 20 : 8) && !e.keep) {
       gs.enemies.delete(e.id);
       if (e.boss) gs.event(e.x, e.y, { k: 'boss', id: e.id, active: false, victory: false }, 80);
     }

@@ -2,6 +2,7 @@
 // and routing to the game. Anything malformed gets the connection closed.
 
 import { PROTOCOL_VERSION, decodeInput, MSG } from '../src/net/protocol.js';
+import * as army from './army.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import { playerNameProblem, passwordProblem, describeRaidWindow } from '../src/net/rules.js';
 import { AuthError, hashPassword } from './auth.js';
@@ -198,6 +199,7 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
       spentAltars: [...gs.marks.values()].filter((m) => m.kind === 'altar').map((m) => m.key),
     });
     conn.sendJson(players.inventoryPayload(gs, p));
+    conn.sendJson(army.territoryPayload(gs));
     conn.sendJson(players.mePayload(gs, p));
     conn.sendJson(abilities.cooldownPayload(p));
     conn.sendJson({ t: 'claims', claims: gs.claims() });

@@ -241,7 +241,7 @@ export function open(game) {
       h('div.row',
         h('span.squad-dot', { style: { background: SQUAD_COLORS[i % SQUAD_COLORS.length] } }, String(i + 1)),
         h('button.link', { onclick: () => { state.squad = sq.id; rerender(); } }, h('b', sq.name)),
-        h('span.small.muted', `${sq.members.length} ${T.members}`),
+        h('span.small.muted', `· ${sq.members.length} ${T.members}`),
         h('span.spacer'),
         h('button.small.btn-danger', { onclick: () => act('squad-disband', { squad: sq.id }) }, T.disband)),
       h('div.meter.small', h('div', { style: { width: `${(100 * hp) / max}%` } })),

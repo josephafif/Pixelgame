@@ -11,6 +11,7 @@ import { inSafeZone, bannerProblem, claimAt, canDo } from '../src/net/rules.js';
 import { mpStructureLock } from '../src/net/mpbuild.js';
 import { relayFor } from '../src/game/construction.js';
 import { NO_BEACON } from '../src/game/skills.js';
+import { workerCount, soldierCount } from '../src/game/army.js';
 import { buildingOfStruct, BUILDING_SV, upkeepRates } from '../src/net/mpbase.js';
 import * as combat from './combat.js';
 import * as players from './players.js';
@@ -98,7 +99,7 @@ export function claimFor(gs, tx, ty) {
 
 /** May player `p` damage structure `st` right now? */
 export function canDamage(gs, p, st, now = Date.now()) {
-  if (!p || st.dead || st.marketId) return false; // markets' walls stand
+  if (!p || st.dead || st.marketId || st.outpost) return false; // markets' (and outposts') walls stand
   if (st.def?.kind === 'building') return false; // a clan's buildings can't be broken (raids are about walls and the vault)
   if (st.clanId && st.clanId === p.clanId) return false;
   if (inSafeZone(gs.rules, st.x + 0.5, st.y + 0.5)) return false;
@@ -116,7 +117,7 @@ export function turretMayHit(gs, st, p, now = Date.now()) {
 }
 
 export function damageStructure(gs, st, amount, attacker) {
-  if (!st || st.dead || amount <= 0 || st.marketId || st.def?.kind === 'building') return;
+  if (!st || st.dead || amount <= 0 || st.marketId || st.outpost || st.def?.kind === 'building') return;
   st.hp -= amount;
   st.rt.flash = 0.12;
   st.rt.lastHit = gs.time;
@@ -168,7 +169,7 @@ export function destroyStructure(gs, st, attacker) {
   // A floor on water was all that held up what stood on it.
   if (st.def.kind === 'floor' && onWater(gs.world, st.x, st.y)) {
     const top = gs.world.structureAt(st.x, st.y);
-    if (top && !top.dead && !top.marketId && top.def.kind !== 'building') destroyStructure(gs, top, attacker);
+    if (top && !top.dead && !top.marketId && !top.outpost && top.def.kind !== 'building') destroyStructure(gs, top, attacker);
   }
 }
 
@@ -331,7 +332,7 @@ export function remove(gs, p, tx, ty) {
 
 /** Why p can't upgrade `st` now (null = they can), and what it becomes. */
 function upgradeCheck(gs, p, clan, st) {
-  if (!st || st.marketId) return { problem: 'Här finns inget att uppgradera' };
+  if (!st || st.marketId || st.outpost) return { problem: 'Här finns inget att uppgradera' };
   if (!clan || st.clanId !== clan.id) return { problem: 'Det där är inte er klans' };
   const role = clan.members.get(p.accountId)?.role ?? 'member';
   if (!canDo(role, 'build')) return { problem: 'Du får inte bygga här' };
@@ -531,7 +532,8 @@ export function upkeepCounts(gs, clan, structures = null) {
   return {
     structures: n,
     buildingLevels: Object.values(levels).reduce((s, v) => s + v, 0),
-    workers: clan.base?.workers?.length ?? 0,
+    workers: workerCount(gs.data, clan.base?.workers ?? []),
+    soldiers: soldierCount(gs.data, clan.base?.workers ?? []),
   };
 }
 

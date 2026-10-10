@@ -42,6 +42,7 @@ export function upkeepRates(rules) {
     perStructure: perDay(rules.upkeepPerStructure),
     perBuildingLevel: perDay(rules.upkeepPerBuildingLevel),
     perWorker: perDay(rules.upkeepPerWorker),
+    perSoldier: perDay(rules.upkeepPerSoldier ?? rules.upkeepPerWorker),
   };
 }
 

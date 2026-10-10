@@ -6,7 +6,7 @@ import { CHUNK } from '../src/game/world.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import {
   ET, PF, EF, PRF, PKF, SF, AF, ALF, NPCF, HF, WF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
-  encodeSnapshot, changed, quantize, angleToByte, colorToInt,
+  encodeSnapshot, changed, quantize, angleToByte, colorToInt, WORKER_ROLE_IDS,
 } from '../src/net/protocol.js';
 import { inSafeZone, claimAt } from '../src/net/rules.js';
 import * as players from './players.js';
@@ -146,7 +146,7 @@ export function sendSnapshots(gs, now) {
       | (w.idle ? WF.IDLE : 0) | (carry === 'wood' ? WF.WOOD : carry ? WF.STONE : 0) | (w.role === 'stone' ? WF.MINER : 0);
     all.push({
       id: w.eid, type: ET.WORKER, x: w.x, y: w.y,
-      values: [quantize(w.x), quantize(w.y), angleToByte(w.facing), flags, w.clanId, w.id, Math.ceil(w.hp), Math.ceil(w.maxHp), w.anim],
+      values: [quantize(w.x), quantize(w.y), angleToByte(w.facing), flags, w.clanId, w.id, Math.ceil(Math.max(0, w.hp)), Math.ceil(w.maxHp), w.anim, Math.max(0, WORKER_ROLE_IDS.indexOf(w.role))],
       ref: w,
     });
   }

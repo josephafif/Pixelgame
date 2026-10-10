@@ -160,6 +160,12 @@ export function removeOutpost(world, structures) {
   }
 }
 
+/** An outpost in (or right by) a clan's claim lies dormant: no palisade, no guards, nothing to take. */
+export function outpostDormant(site, claims, claimRadius) {
+  const r = claimRadius + HALF + 3;
+  return (claims ?? []).some((c) => (c.x - site.x) ** 2 + (c.y - site.y) ** 2 < r * r);
+}
+
 /** The monsters guarding a neutral outpost: [{ kind, elite }] (more and tougher further out). */
 export function defendersFor(data, site) {
   const biome = data.byId.biomes.get(site.biome) ?? data.biomes[0];

@@ -30,6 +30,9 @@ import {
 } from './entities.js';
 import { BREED_BY_ID, describeHorse, HORSE_MODE } from '../game/horses.js';
 import { MpMarkets } from './markets.js';
+import { MpOutposts } from './outposts.js';
+import { roleDef, isSoldier, gearUpgrade, trainProblem, problemSv, ORDER_NAMES_SV } from '../game/army.js';
+import { territoryConfig, territoryAt, outpostFor } from '../game/territory.js';
 import { workerLook } from '../game/workers.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
 import { POI, isPoi, poiFound, chunksAround } from '../game/discoveries.js';
@@ -116,6 +119,9 @@ export class MpGame {
     this.frameMs = 16;
     this.godMode = false;
     this.markets = new MpMarkets(this);
+    // Outposts and who holds which territory (src/mp/outposts.js).
+    this.outposts = new MpOutposts(this);
+    this.squadPos = new Map(); // squad id → { x, y, hp, fight, march, soldiers }
     this.build = { active: false, selected: 'banner', tool: 'place', ghost: null, reason: null, hover: null, hoverAt: -99, painting: false, lastTile: null };
     this.player = {
       x: 0.5, y: 2.6, r: PLAYER_RADIUS, vx: 0, vy: 0, kx: 0, ky: 0, facing: 0, hp: 1, maxHp: 100, dead: false,
@@ -485,10 +491,18 @@ export class MpGame {
         for (const chunk of this.world?.chunks.values() ?? []) if (chunk.cut.size) chunk.canvas = null;
         this.emit('claims');
         break;
+      case 'terr':
+        this.outposts.setSquares(msg.list);
+        this.emit('army');
+        break;
+      case 'squads':
+        this.squadPos = new Map(msg.list.map((q) => [q.id, q]));
+        break;
       case 'clan':
         this.clan = msg.id ? msg : null;
         this.syncBase();
         this.emit('clan', this.clan);
+        this.emit('army');
         // The base's buildings decide what the pals and forge panels offer.
         this.emit('pals');
         this.emit('base');
@@ -1149,6 +1163,7 @@ export class MpGame {
     this.#drainEvents();
     this.#updateGates(dt);
     this.markets.update(dt);
+    this.outposts.update(dt);
     for (const st of this.structById.values()) if (st.rt.flash > 0) st.rt.flash -= dt;
     // Interaction hints and build preview.
     this.interactT = (this.interactT ?? 0) - dt;
@@ -1880,7 +1895,87 @@ export class MpGame {
 
   structuresForDraw() {
     const mine = [...this.structById.values()];
-    return this.markets.structures.length ? mine.concat(this.markets.structures) : mine;
+    const markets = this.markets.structures;
+    const outposts = this.outposts.structures;
+    if (!markets.length && !outposts.length) return mine;
+    return mine.concat(markets, outposts);
+  }
+
+  // --- The army and the territories (server/army.js; the strategy map, ui/strategy.js) ------
+
+  /** What the strategy map shows: the squares around (tx, ty), your clan's squads, soldiers and recruits. */
+  strategyView(tx, ty, radius) {
+    const data = this.data;
+    const clan = this.clan;
+    const mine = clan?.id ?? null;
+    const army = clan?.army ?? { squads: [], barracks: { used: 0, cap: 0 }, training: 0, forge: 0, owned: [] };
+    const roster = clan?.workers ?? [];
+    const near = new Map(this.workers.filter((w) => w.clanId === mine).map((w) => [w.id, w]));
+    const roleName = (id) => {
+      const r = roleDef(data, id);
+      return r ? r.sv ?? r.name : id === 'wood' ? 'Skogshuggare' : 'Gruvarbetare';
+    };
+    const territories = [];
+    for (let y = ty - radius; radius >= 0 && y <= ty + radius; y++) {
+      for (let x = tx - radius; x <= tx + radius; x++) {
+        const key = `${x},${y}`;
+        const home = x === 0 && y === 0;
+        const site = home || !this.world ? null : outpostFor(this.world, data, x, y);
+        const sq = this.outposts.squares.get(key);
+        const owner = sq?.owner ?? null;
+        const status = home ? 'home' : !site ? 'empty' : sq?.att && owner === mine ? 'attacked'
+          : owner ? (owner === mine ? 'own' : 'foreign') : sq?.cap > 0 ? 'contested' : 'neutral';
+        territories.push({ key, tx: x, ty: y, site, home, owner, ownerName: sq?.tag ? `[${sq.tag}]` : null, color: sq?.color, status, capture: sq?.cap ?? 0, tier: site?.tier ?? 0 });
+      }
+    }
+    const squadOfId = (id) => army.squads.find((q) => q.members.includes(id))?.id ?? 0;
+    const pos = (id) => {
+      for (const q of this.squadPos.values()) for (const [sid, hp, max] of q.soldiers ?? []) if (sid === id) return { hp, max };
+      const w = near.get(id);
+      return w ? { hp: w.hp, max: w.maxHp } : null;
+    };
+    const squads = army.squads.map((q) => {
+      const at = this.squadPos.get(q.id);
+      const members = roster.filter((r) => q.members.includes(r.id)).map((r) => {
+        const hp = pos(r.id);
+        return { id: r.id, name: workerLook(mine, r.id).name, role: r.role, hp: hp?.hp ?? 1, maxHp: hp?.max ?? 1 };
+      });
+      const name = ORDER_NAMES_SV[q.order?.kind] ?? q.order?.kind;
+      const doing = !members.length ? 'Inga soldater: sätt in några i listan'
+        : at?.fight ? `${name}: strider` : q.order?.kind === 'retreat' ? (at?.march ? 'På väg hem' : 'I basen')
+          : q.order?.kind === 'follow' ? 'Följer dig' : at?.march ? `${name}: på marsch` : `${name}: på plats`;
+      return { id: q.id, name: q.name, order: q.order, stance: q.stance, x: at?.x ?? null, y: at?.y ?? null, members, doing };
+    });
+    const soldiers = roster.filter((r) => isSoldier(data, r.role) || r.trainingTo).map((r) => {
+      const hp = pos(r.id);
+      return {
+        id: r.id, name: workerLook(mine, r.id).name, role: r.trainingTo ?? r.role, roleName: roleName(r.trainingTo ?? r.role), rank: r.rank ?? 0, gear: r.gear ?? 1,
+        hp: hp?.hp ?? 0, maxHp: isSoldier(data, r.role) ? hp?.max ?? 0 : 0, squad: squadOfId(r.id),
+        training: Boolean(r.trainingTo), trainLeft: r.trainingTo ? Math.max(0, Math.ceil((r.trainUntil - Date.now()) / 1000)) : 0,
+      };
+    });
+    const recruits = roster.filter((r) => !isSoldier(data, r.role) && !r.trainingTo).map((r) => ({ id: r.id, name: workerLook(mine, r.id).name, role: r.role, roleName: roleName(r.role) }));
+    return {
+      lang: 'sv', size: territoryConfig(data).size, here: territoryAt(data, this.player.x, this.player.y), player: { x: this.player.x, y: this.player.y },
+      territories, squads, soldiers, recruits, roles: data.army?.roles ?? [], barracks: army.barracks,
+      canCreateSquad: Boolean(clan) && army.squads.length < (data.army?.squads?.max ?? 4),
+      gear: (s) => {
+        const g = gearUpgrade(data, roster.find((r) => r.id === s.id) ?? {}, { forge: army.forge });
+        return { ...g, problem: g.problem ? problemSv(g.problem) : null };
+      },
+      trainProblem: (id, role) => {
+        if (!clan) return 'Gå med i en klan först';
+        const p = trainProblem(data, roster, roster.find((r) => r.id === id), role, { training: army.training });
+        return p ? problemSv(p) : null;
+      },
+    };
+  }
+
+  /** The strategy map's actions: a request to the server (it says what is wrong). */
+  async armyAction(op, args = {}) {
+    if (!this.clan) return 'Gå med i eller grunda en klan först';
+    await this.#ask({ t: 'army', op, ...args });
+    return null;
   }
 
   marketRequest(msg) {
@@ -2342,14 +2437,14 @@ export class MpGame {
   /** What the structure at (tx, ty) upgrades into, and what that costs (build bar), or null. */
   upgradeInfo(tx, ty) {
     const st = this.world.structureAt(tx, ty) ?? this.world.floorAt(tx, ty);
-    const to = st && !st.marketId ? upgradeDef(this.data, st.def) : null;
+    const to = st && !st.marketId && !st.outpost ? upgradeDef(this.data, st.def) : null;
     return to ? { from: st.def, to, cost: upgradeCost(this.data, st.def, to) } : null;
   }
 
   /** Client-side guess at why an upgrade would fail (the server decides). */
   #upgradeProblem(tx, ty) {
     const st = this.world.structureAt(tx, ty) ?? this.world.floorAt(tx, ty);
-    if (!st || st.marketId) return 'Här finns inget att uppgradera';
+    if (!st || st.marketId || st.outpost) return 'Här finns inget att uppgradera';
     if (!st.clanId || st.clanId !== this.me?.clan?.id) return 'Det där är inte er klans';
     const info = this.upgradeInfo(tx, ty);
     if (!info) return `${st.def.name} går inte att förstärka mer`;

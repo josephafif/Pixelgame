@@ -38,7 +38,8 @@ const SPOTS = { hearth: [-4, -3], forge: [0, -4], vault: [4, -3], library: [-4, 
 const quiet = { info() {}, debug() {}, warn() {}, error: (...a) => console.error(...a) };
 
 export async function testServer(overrides = {}) {
-  const srv = await startServer({ port: 0, host: '127.0.0.1', dbPath: ':memory:', allowGuests: true, log: quiet, ...overrides });
+  // Outposts (and their guards) only where a test asks for them.
+  const srv = await startServer({ port: 0, host: '127.0.0.1', dbPath: ':memory:', allowGuests: true, log: quiet, outposts: false, ...overrides });
   const url = `ws://127.0.0.1:${srv.port}/ws`;
   const bots = [];
   return {

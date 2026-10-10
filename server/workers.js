@@ -8,8 +8,9 @@
 // The roster ({ id, role }) lives in clan.base.workers (saved with the clan).
 
 import {
-  workerCap, hireCost, workerStats, createWorker, stepWorker, hurtWorker, workerLook, WORKER_ROLES, ROLE_NAMES_SV,
+  workerCap, hireCost, workerStats, createWorker, stepWorker, hurtWorker, workerLook, walk, WORKER_ROLES, ROLE_NAMES_SV,
 } from '../src/game/workers.js';
+import { isSoldier, workerCount, makeSoldier, hurtSoldier } from '../src/game/army.js';
 import { rollDrops } from '../src/game/gathering.js';
 import { canDo, inSafeZone } from '../src/net/rules.js';
 import * as base from './base.js';
@@ -25,6 +26,16 @@ function roster(clan) {
   b.workers ??= [];
   b.nextWorker ??= 1;
   return b;
+}
+
+/** A worker's (or soldier's) name and colours. */
+export function lookOf(clan, id) {
+  return workerLook(clan.id, id);
+}
+
+/** Room at the lodge for workers (soldiers live in the barracks). */
+export function capOf(gs, level) {
+  return workerCap(gs.data, level);
 }
 
 /** The clan's lodge level (0 while no lodge stands in the base). */
@@ -66,14 +77,21 @@ export function sync(gs, clan) {
       Object.assign(w, workerLook(clan.id, rec.id), { eid: gs.newId(), clanId: clan.id, hurtT: -9 });
       all.set(w.eid, w);
     }
+    const soldier = isSoldier(gs.data, rec.role);
+    if (soldier && !('target' in w)) makeSoldier(w);
     if (w.role !== rec.role) {
       release(gs, w);
       w.job = null;
-      if (w.state === 'go' || w.state === 'work') w.state = 'return';
+      w.carry = {};
+      w.statsKey = null;
+      w.state = soldier ? 'post' : w.state === 'go' || w.state === 'work' ? 'return' : w.state;
       w.role = rec.role;
     }
-    w.hp = Math.min(stats.hp, w.hp + Math.max(0, stats.hp - w.maxHp));
-    w.maxHp = stats.hp;
+    w.training = Boolean(rec.trainingTo);
+    if (!soldier) {
+      w.hp = Math.min(stats.hp, w.hp + Math.max(0, stats.hp - w.maxHp));
+      w.maxHp = stats.hp;
+    }
   }
 }
 
@@ -131,9 +149,12 @@ export function update(gs, dt) {
     }
     let ctx = ctxs.get(clan.id);
     if (!ctx) ctxs.set(clan.id, (ctx = ctxFor(gs, clan, st)));
+    // Soldiers are server/army.js's; recruits drill at the Training Grounds.
+    if (isSoldier(gs.data, w.role)) continue;
     // Workers go through their own clan's gates (and a market's), nobody else's.
     gs.world.gateFilter = (s) => Boolean(s.clanId) && s.clanId === clan.id;
-    stepWorker(w, ctx, dt);
+    if (w.training) drill(gs, clan, w, ctx, dt);
+    else stepWorker(w, ctx, dt);
     gs.world.gateFilter = null;
     if (w.dead) died(gs, clan, w, null);
   }
@@ -145,6 +166,42 @@ export function update(gs, dt) {
       clans.sendClan(gs, clan);
     }
   }
+}
+
+/** A recruit in training: off to the Training Grounds, and drilling there. */
+function drill(gs, clan, w, ctx, dt) {
+  const st = base.placed(gs, clan.id).get('training');
+  if (!st) return;
+  release(gs, w);
+  w.job = null;
+  w.angry = null;
+  w.t += dt;
+  w.clock += dt;
+  const tx = st.x + 0.5 + ((w.id % 3) - 1) * 0.9;
+  const ty = st.y + 2 + Math.floor((w.id % 6) / 3) * 0.8;
+  if (walk(ctx, w, tx, ty, ctx.stats.speed, dt, 0.3)) {
+    w.moving = false;
+    w.swingT = (w.swingT ?? 0) - dt;
+    if (w.swingT <= 0) {
+      w.swingT = 0.8;
+      w.anim = (w.anim + 1) & 255;
+    }
+  }
+}
+
+/** Takes someone off a clan's roster (a fallen soldier). */
+export function remove(gs, clan, w, text) {
+  release(gs, w);
+  state(gs).delete(w.eid);
+  const b = roster(clan);
+  b.workers = b.workers.filter((r) => r.id !== w.id);
+  clan.dirty = true;
+  gs.db.saveClan(clan);
+  for (const id of clan.members.keys()) {
+    const m = gs.byAccount.get(id);
+    if (m?.conn) gs.toast(m, text, 'warn');
+  }
+  clans.sendClan(gs, clan);
 }
 
 function died(gs, clan, w, killer) {
@@ -179,6 +236,17 @@ export function hit(gs, p, x, y, reach, damage, inside) {
     const clan = gs.clans.get(w.clanId);
     if (!clan) continue;
     const dmg = Math.max(1, Math.round(damage));
+    if (isSoldier(gs.data, w.role)) {
+      // Your own soldiers step aside from your swings; another clan's can be cut down in a raid.
+      if (w.clanId === p.clanId) continue;
+      gs.event(w.x, w.y, { k: 'npchurt', id: w.eid, n: dmg }, 24);
+      if (hurtSoldier(w, dmg)) {
+        gs.event(w.x, w.y, { k: 'kill', id: w.eid, x: w.x, y: w.y, r: w.r }, 24);
+        remove(gs, clan, w, `${p.name} dödade er soldat ${w.name}!`);
+      }
+      any = true;
+      continue;
+    }
     const was = w.angry;
     const ctx = { time: gs.time, stats: workerStats(gs.data, Math.max(1, lodgeLevel(gs, clan))), taken: gs.workerTaken };
     const killed = hurtWorker(w, ctx, dmg, p.id);
@@ -206,8 +274,9 @@ export function request(gs, p, clan, msg) {
   const b = roster(clan);
   if (msg.op === 'hire') {
     const job = WORKER_ROLES.includes(msg.role) ? msg.role : 'wood';
-    if (b.workers.length >= workerCap(gs.data, level)) return 'Arbetarstugan är full: uppgradera den för att få plats med fler';
-    const cost = hireCost(gs.data, b.workers.length);
+    const count = workerCount(gs.data, b.workers);
+    if (count >= workerCap(gs.data, level)) return 'Arbetarstugan är full: uppgradera den för att få plats med fler';
+    const cost = hireCost(gs.data, count);
     const short = base.shortfall(clan, p, cost);
     if (short) return short;
     const paid = base.pay(clan, p, cost);
@@ -239,6 +308,7 @@ export function request(gs, p, clan, msg) {
     b.workers = b.workers.filter((r) => r !== rec);
   } else if (msg.op === 'role') {
     if (!WORKER_ROLES.includes(msg.role)) return 'Okänt jobb';
+    if (isSoldier(gs.data, rec.role) || rec.trainingTo) return 'Soldater styrs på strategikartan (N)';
     rec.role = msg.role;
   } else {
     return 'Okänd begäran';

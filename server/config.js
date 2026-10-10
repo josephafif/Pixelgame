@@ -70,6 +70,8 @@ export function loadConfig(overrides = {}, source = globalThis.process?.env ?? {
     // world sleeps whenever nobody plays, but its time goes on).
     upkeepCatchUp: bool('UPKEEP_CATCH_UP', false),
     maxEnemies: num('MAX_ENEMIES', 500),
+    // Territories' outposts and their guards (server/army.js).
+    outposts: bool('OUTPOSTS', true),
     logLevel: env.LOG_LEVEL || 'info',
     ...overrides,
     rules,

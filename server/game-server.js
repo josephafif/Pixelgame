@@ -21,6 +21,7 @@ import * as pals from './pals.js';
 import * as horses from './horses.js';
 import * as markets from './markets.js';
 import * as workers from './workers.js';
+import * as army from './army.js';
 import { sendSnapshots } from './snapshots.js';
 import { SpatialGrid, PAD } from './grid.js';
 
@@ -256,6 +257,7 @@ export class GameServer {
     building.update(this, TICK_DT, now);
     markets.update(this, TICK_DT);
     workers.update(this, TICK_DT);
+    army.update(this, TICK_DT);
     this.#recordHistory();
     prof.mark('world');
     sendSnapshots(this, now);

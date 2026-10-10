@@ -8,7 +8,7 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-territories-4',
+  id: '2026-10-territories-5',
   title: { sv: 'Territorier och fraktioner', en: 'Territories and Factions' },
   teaser: {
     sv: 'Den största uppdateringen hittills är på väg: tre nya biomer, soldater, en strategikarta och fraktioner som för krig.',
@@ -45,19 +45,19 @@ export const NEWS = {
       title: { sv: 'Krig om territorier', en: 'War for territory' },
       items: [
         {
-          live: false,
-          sv: '**Soldater**: träna arbetare till vakter, infanterister, bågskyttar, ryttare och ingenjörer.',
-          en: '**Soldiers**: train workers as guards, infantry, archers, riders and engineers.',
+          live: true,
+          sv: '**Soldater**: träna arbetare vid träningsplatsen till vakter, infanterister, bågskyttar, ryttare och ingenjörer (som lagar murar). De bor i kasernen (två platser per nivå), får bättre utrustning och stiger i grad när de strider.',
+          en: '**Soldiers**: train workers at the Training Grounds as guards, infantry, archers, riders and engineers (who mend walls). They live in the barracks (two places per level), get better gear and rise in rank as they fight.',
         },
         {
-          live: false,
-          sv: '**Strategikartan**: se världen ovanifrån och ge order till trupperna: flytta, försvara, anfalla, patrullera, retirera.',
-          en: '**The strategy map**: see the world from above and order your squads: move, defend, attack, patrol, retreat.',
+          live: true,
+          sv: '**Strategikartan** (N): världen i rutor ovanifrån. Välj en trupp och en ruta: anfall, försvara, patrullera eller flytta dit. Eller följ mig, håll och retirera, med en hållning från defensiv till aggressiv.',
+          en: '**The strategy map** (N): the world from above in squares. Pick a squad and a square: attack, defend, patrol or move there. Or follow me, hold and retreat, with a stance from defensive to aggressive.',
         },
         {
-          live: false,
-          sv: '**Territorier**: erövra utposter, försvara dem mot motanfall och ta tillbaka det du förlorat.',
-          en: '**Territories**: take outposts, hold them against counterattacks and win back what you lose.',
+          live: true,
+          sv: '**Territorier**: varje ruta har en utpost med palissad och flagga. Besegra väktarna och håll flaggan, så är den er och ger inkomst varje timme. Monster gör motanfall, en lång front är svår att hålla, och det ni förlorar kan ni ta tillbaka. I multiplayer tar klaner territorier av varandra.',
+          en: '**Territories**: every square has an outpost with a palisade and a flag. Beat its guards and hold the flag, and it is yours and pays every hour. Monsters counterattack, a long front is hard to hold, and what you lose you can take back. In multiplayer, clans take territory from each other.',
         },
         {
           live: false,

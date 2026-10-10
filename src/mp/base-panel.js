@@ -12,6 +12,7 @@ import { ROLE_SV, canDo } from '../net/rules.js';
 import { workerLook, ROLE_NAMES_SV, WORKER_ROLES } from '../game/workers.js';
 import { structureDef, upgradeDef, upgradeCost } from '../game/construction.js';
 import { mpStructureLock } from '../net/mpbuild.js';
+import { isSoldier } from '../game/army.js';
 import { roundUp } from '../game/upkeep.js';
 import { upkeepBox } from '../ui/upkeep-view.js';
 import { workerPortrait } from '../render/workers-art.js';
@@ -211,6 +212,7 @@ function useButtons(game, panels, id, b) {
     case 'lodge': return [btn('players', `Arbetare (${game.clan?.workers?.length ?? 0})`, () => panels.clanTab('workers'))];
     case 'library': return [btn('book', 'Forska', () => panels.show('research'))];
     case 'den': return [btn('pal', 'Pals', () => panels.show('pals'))];
+    case 'training': return [btn('flag', 'Träna soldater · strategikarta', () => { closeModal(); panels.show('strategy'); })];
     case 'well': {
       const n = Math.floor(b.well ?? 0);
       return [btn('essence', n > 0 ? `Hämta ${n}` : 'Fylls…', () => game.collectWell(), n <= 0)];
@@ -286,6 +288,9 @@ function workersTab(game, panels, role) {
       h('button.btn-primary', { onclick: () => { closeModal(); game.toggleBuildMode(true); game.selectStructure(baseStructId('lodge')); } }, icon('hammer', 20), 'Bygg arbetarstugan'));
   }
   const may = canDo(role, 'build');
+  // Soldiers and recruits are on the strategy map; these are the ones who work.
+  const workers = clan.workers.filter((r) => !isSoldier(data, r.role) && !r.trainingTo);
+  const soldiers = clan.workers.length - workers.length;
   const wallet = game.buildWallet({ kind: 'building' });
   const poor = COST_KEYS.some((k) => (wallet[k] ?? 0) < (lodge.hire[k] ?? 0));
   const act = (op, args) => game.request({ t: 'base', op, ...args });
@@ -313,10 +318,12 @@ function workersTab(game, panels, role) {
     h('p.small.muted', `Arbetarstuga nivå ${lodge.level}: plats för ${lodge.cap}. De arbetar med ${TIER_SV[lodge.tier]} utanför er mark, medan någon i klanen är online.`),
     h('div.row.worker-wage', h('span.small', 'Lön per arbetare och dygn:'), costChips(wage), h('span.small.muted', '(ur valvet)')),
     clan.unpaid ? h('p.warn.small', icon('skull', 16), ' Underhållet betalas inte, så arbetarna har slutat. Lägg in förråd i valvet.') : null,
-    h('div.worker-list', clan.workers.length ? clan.workers.map(row) : h('p.muted', 'Inga arbetare än.')),
-    clan.workers.length < lodge.cap
+    h('div.worker-list', workers.length ? workers.map(row) : h('p.muted', 'Inga arbetare än.')),
+    soldiers ? h('p.small', `${soldiers} av era är soldater (eller tränar till det).`) : null,
+    h('button', { onclick: () => { closeModal(); panels.show('strategy'); } }, icon('flag', 20), 'Armén och strategikartan (N)'),
+    workers.length < lodge.cap
       ? h('section.worker-hire',
-        h('h3', `Anställ (${clan.workers.length} / ${lodge.cap})`),
+        h('h3', `Anställ (${workers.length} / ${lodge.cap})`),
         h('div.row', costChips(lodge.hire, wallet), h('span.small.muted', 'ur valvet och det du bär')),
         may ? h('div.row',
           h('button.btn-primary', { disabled: poor, onclick: () => act('hire', { role: 'wood' }) }, icon('wood', 20), 'Anställ skogshuggare'),

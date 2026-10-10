@@ -432,3 +432,21 @@ export function squadHealth(members) {
   }
   return max ? hp / max : 1;
 }
+
+/** The army's problems in Swedish (multiplayer). */
+export function problemSv(text) {
+  const map = {
+    'Unknown role': 'Okänd roll', 'No such worker': 'Ingen sådan arbetare', 'Already training': 'Tränar redan',
+    'Build the Training Grounds first': 'Bygg en träningsplats i basen först', 'The barracks are full: upgrade the Training Grounds': 'Kasernen är full: uppgradera träningsplatsen',
+    'Best gear already': 'Har redan den bästa utrustningen', 'Unknown order': 'Okänd order', 'Nowhere to hold': 'Ingenstans att hålla',
+    'No outpost there': 'Ingen utpost där', 'Pick a place on the map': 'Välj en plats på kartan',
+  };
+  if (map[text]) return map[text];
+  let m = /^Needs the Training Grounds at level (\d+)$/.exec(text);
+  if (m) return `Kräver träningsplatsen på nivå ${m[1]}`;
+  m = /^Needs the Forge at level (\d+)$/.exec(text);
+  if (m) return `Kräver smedjan på nivå ${m[1]}`;
+  m = /^Already a (.+)$/.exec(text);
+  if (m) return 'Har redan den rollen';
+  return text;
+}

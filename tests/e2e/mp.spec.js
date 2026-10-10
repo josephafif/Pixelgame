@@ -478,3 +478,51 @@ test('on the game\'s website: the official server, a friend\'s server by its cod
     await friend.stop();
   }
 });
+
+test('the army in multiplayer: train soldiers, a squad on the strategy map (N), outposts and who holds them', async ({ browser }) => {
+  const a = await join(browser, 'Generalen');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Generalen');
+  p.protectUntil = Date.now() + 10 * 60 * 1000;
+  p.ch.level = 20;
+  const at = await giveBase(p, { lodge: 3, training: 3 });
+  Object.assign(p, { x: at.x + 0.5, y: at.y + 2.5 });
+  srv.gs.send(p, { t: 'teleport', x: p.x, y: p.y });
+  const clan = srv.gs.clans.get(p.clanId);
+  clan.vault = { scrap: 99999, essence: 99999, wood: 9999, stone: 9999 };
+  const clans = await import('../../server/clans.js');
+  const workers = await import('../../server/workers.js');
+  clan.base.workers = [{ id: 1, role: 'wood' }, { id: 2, role: 'wood' }];
+  clan.base.nextWorker = 3;
+  workers.sync(srv.gs, clan);
+  clans.sendClan(srv.gs, clan);
+  await a.page.waitForFunction(() => window.__pixelgame.game.clan?.workers?.length === 2);
+  await a.page.keyboard.press('KeyN');
+  const panel = a.page.locator('.strategy-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('Strategikarta');
+  await panel.locator('[data-recruit] button', { hasText: 'Träna: Infanterist' }).first().click();
+  await expect(panel.locator('[data-soldier]')).toHaveCount(1);
+  for (const r of clan.base.workers) if (r.trainingTo) r.trainUntil = Date.now() - 1;
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.clan.workers.some((r) => r.role === 'infantry')), { timeout: 5000 }).toBe(true);
+  await panel.locator('button', { hasText: 'Ny trupp' }).click();
+  await expect(panel.locator('.squad-card')).toHaveCount(1);
+  await panel.locator('[data-soldier] select').first().selectOption({ index: 1 });
+  await expect(panel.locator('.squad-card')).toContainText('1 soldater');
+  await panel.locator('.squad-card button', { hasText: 'Följ mig' }).click();
+  await expect(panel.locator('.squad-card')).toContainText('Följer dig');
+  // The soldier is drawn with its role.
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.workers.filter((w) => w.role === 'infantry').length)).toBe(1);
+  await a.page.keyboard.press('Escape');
+  // An outpost: its palisade and flag stand on the client too; it turns to the clan's colour when taken.
+  const { outpostFor } = await import('../../src/game/territory.js');
+  const army = await import('../../server/army.js');
+  const site = outpostFor(srv.gs.world, srv.gs.data, 2, 0) ?? outpostFor(srv.gs.world, srv.gs.data, 2, 1);
+  await a.page.evaluate(([x, y]) => window.__pixelgame.game.chat(`/tp ${x} ${y}`), [site.x + 1, site.y + 2]);
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.outposts.structures.filter((s) => s.id === 'palisade').length)).toBeGreaterThan(10);
+  srv.gs.terr.map.set(site.key, { owner: clan.id, since: Date.now(), capture: 1, cleared: 0, by: null, attackedUntil: 0 });
+  srv.gs.terr.dirty = true;
+  await expect.poll(() => a.page.evaluate((k) => window.__pixelgame.game.outposts.squares.get(k)?.owner ?? null, site.key)).toBe(clan.id);
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.outposts.structures.find((s) => s.id === 'outpost_flag')?.color)).toBe(army.clanColor(clan.id));
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});

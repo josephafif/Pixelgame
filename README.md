@@ -45,6 +45,7 @@ npm run server       # spelservern i produktion (inställningar i server/.env, s
 | Lägg undan (tomma händer) | Tryck på platsen du redan håller | Samma siffra igen | – |
 | Segla ut / gå i land | Handknappen vid vattnet / nära land | E | A |
 | Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
+| Strategikartan (trupper och territorier) | I menyn | N | – |
 | Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
 | Pals | I menyn, eller tryck på pal-chippen under hälsan | H | – |
 | Byggläge (i lägret) | Hammarknappen; tryck på en ruta för att välja den, tryck igen (eller på hammaren) för att bygga, dra från den valda rutan för en mur | G (1–9 väljer, X river, U uppgraderar, Esc klar) | – |
@@ -678,6 +679,52 @@ de har alltid något att göra.
 Logik: `src/game/workers.js` (delad med servern), vägen i `src/game/pathfind.js` (A* över
 rutorna), `src/game/workforce.js`; panelen
 `src/ui/workers.js`; grafiken `src/render/workers-art.js`.
+
+### Soldater, trupper och territorier
+
+**Träna soldater.** Vid **Training Grounds** blir en arbetare soldat (strategikartan, tangent
+**N**, eller knappen vid träningsplatsen i lägerpanelen). Det kostar resurser och tar en stund;
+under tiden drillar rekryten vid träningsplatsen. Soldater hugger inga träd. De bor i
+**kasernen**: två platser per nivå på träningsplatsen, så stugan får plats för nya arbetare.
+
+| Roll | Kräver träningsplats | Gör |
+| --- | --- | --- |
+| Vakt | nivå 1 | Tålig, med sköld. Håller en post |
+| Infanterist | nivå 2 | Slår hårt på nära håll |
+| Bågskytt | nivå 3 | Skjuter på avstånd |
+| Ryttare | nivå 4 | Snabb, ser långt |
+| Ingenjör | nivå 2 | Lagar murar, portar och torn vid sin post |
+
+Soldater får **utrustning** (nivå 1–5, de två bästa kräver smedjan på nivå 3 och 5) och
+**stiger i grad** när de strider. Träningsplatsens nivå gör dem också starkare. Soldaternas
+lön är högre än arbetarnas och ingår i underhållet.
+
+**Trupper.** Gör upp till fyra trupper på strategikartan och sätt soldater i dem (upp till åtta i
+varje). En trupp har en **order**: *anfall*, *försvara* och *patrullera* en utpost, *flytta* till en
+ruta, *följ mig*, *håll* platsen eller *retirera* hem. Och en **hållning**: defensiv (håller sig
+nära), balanserad, aggressiv (jagar långt) eller *retirera vid förluster* (drar sig hem när
+truppen är svårt skadad). Utan trupp står soldaterna vid träningsplatsen och försvarar lägret.
+
+**Territorier.** Världen är delad i rutor på 96 × 96, med lägret mitt i sin egen. I nästan varje
+ruta med torr mark står en **utpost**: en palissad med en öppning i söder och en flagga i mitten,
+alltid på samma plats. Monster från landet vaktar den, fler och starkare längre ut (nivå 1–5).
+**Besegra väktarna och stå vid flaggan** (själv eller med soldater) utan monster i närheten, så
+fylls mätaren och utposten blir din. Den betalar varje timme till valvet (mer ju längre ut),
+även för timmar du var borta (upp till 12). Du kan hålla högst 16.
+
+- Långt från dig avgörs striderna i ett slag, med samma siffror som nära: en trupp du skickar
+  till en utpost tar den (eller slås tillbaka) när den kommer fram.
+- **Motanfall:** ungefär var tjugonde minut försöker monster ta tillbaka en av dina utposter.
+  Är du där kommer de på riktigt, mot flaggan. Annars möter de **garnisonen** (trupper som
+  försvarar, patrullerar eller håller där) och palissaden. En lång front är svårare att hålla:
+  varje gränsruta sänker försvaret lite. Förlorar du en utpost kan du ta tillbaka den.
+- **Strategikartan** visar rutorna ovanifrån: dina (gröna), neutrala (grå flagga), andras (röda),
+  de som tas just nu (gult, med mätare) och de som anfalls (blinkar), trupperna och vart de är på
+  väg. Välj en trupp och klicka på en ruta för att ge en order.
+
+Logik: `src/game/army.js` (soldater och trupper) och `src/game/territory.js` (rutor, utposter,
+erövring och strider), båda delade med servern; singleplayer i `src/game/campaign.js`, panelen i
+`src/ui/strategy.js`.
 
 ### Valvet och underhållet
 

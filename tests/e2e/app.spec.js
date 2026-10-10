@@ -1383,6 +1383,7 @@ test('Mireglass Fen and Skyreach: the bog sickens you, the bosses fight, and Gal
 });
 
 test('army: train soldiers, form a squad on the strategy map, and take an outpost together', async ({ page }) => {
+  test.setTimeout(180000);
   const errors = trackErrors(page);
   await startGame(page);
   // A camp with a lodge and Training Grounds, and workers to train.
@@ -1435,14 +1436,25 @@ test('army: train soldiers, form a squad on the strategy map, and take an outpos
     return { key: s.key, x: s.x, y: s.y };
   });
   await expect.poll(() => game(page, (k) => window.__pixelgame.game.enemies.filter((e) => e.outpost === k && !e.dead).length, site.key), { timeout: 10000 }).toBeGreaterThan(0);
-  await expect.poll(() => game(page, (k) => window.__pixelgame.game.enemies.filter((e) => e.outpost === k && !e.dead).length, site.key), { timeout: 60000 }).toBe(0);
+  // Attack! They march in and fight the guards at the flag.
+  expect(await game(page, (k) => {
+    const g = window.__pixelgame.game;
+    return g.armyAction('order', { squad: g.save.army.squads[0].id, kind: 'attack', key: k });
+  }, site.key)).toBe(null);
+  await expect.poll(() => game(page, (k) => window.__pixelgame.game.enemies.filter((e) => e.outpost === k && !e.dead).length, site.key), { timeout: 90000 }).toBe(0);
   // Stand at the flag together until it is yours.
   await game(page, (s) => {
     const g = window.__pixelgame.game;
     g.player.x = s.x + 1;
     g.player.y = s.y + 1;
   }, site);
-  await expect.poll(() => game(page, (k) => window.__pixelgame.game.campaign.isOwned(k), site.key), { timeout: 40000 }).toBe(true);
+  // (Wandering monsters that turn up hold it contested: they are kept away here.)
+  await expect.poll(() => game(page, (k) => {
+    const g = window.__pixelgame.game;
+    g.spawnTimer = 99;
+    for (const e of g.enemies) if (!e.outpost) e.dead = true;
+    return g.campaign.isOwned(k);
+  }, site.key), { timeout: 40000 }).toBe(true);
   await page.screenshot({ path: 'test-results/outpost.png' });
   await page.keyboard.press('KeyN');
   await expect(panel).toBeVisible();

@@ -33,6 +33,7 @@ export const DEFAULT_RULES = {
   upkeepPerStructure: { wood: 5, stone: 5 },
   upkeepPerBuildingLevel: { scrap: 10, essence: 10 },
   upkeepPerWorker: { scrap: 126, essence: 84 },
+  upkeepPerSoldier: { scrap: 210, essence: 140 },
   // Bosses: you get loot if you did at least this share of the damage.
   bossShare: 0.1,
   // Weapons are tuned for monsters; against players they hit softer, so a

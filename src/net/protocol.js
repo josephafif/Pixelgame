@@ -12,7 +12,7 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 13;
+export const PROTOCOL_VERSION = 14;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
@@ -38,8 +38,12 @@ export const FIELDS = {
   // Horses: wild ones, and players' own (owner = the player's id, ref = the horse's id in their stable).
   [ET.HORSE]: ['x', 'y', 'facing', 'breed', 'flags', 'owner', 'ref'],
   // Workers from clan lodges: their clan and number say who they are; anim counts their blows.
-  [ET.WORKER]: ['x', 'y', 'facing', 'flags', 'clan', 'wid', 'hp', 'maxHp', 'anim'],
+  // role: its place in WORKER_ROLE_IDS (workers and soldiers).
+  [ET.WORKER]: ['x', 'y', 'facing', 'flags', 'clan', 'wid', 'hp', 'maxHp', 'anim', 'role'],
 };
+
+/** Every role a clan's people can have (army.js): its place here goes on the wire. */
+export const WORKER_ROLE_IDS = ['wood', 'stone', 'guard', 'infantry', 'archer', 'rider', 'engineer'];
 const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
 

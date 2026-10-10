@@ -10,7 +10,7 @@ import {
 } from '../../src/game/army.js';
 import {
   territoryAt, outpostFor, outpostLayout, defendersFor, monsterPower, outpostLevel, abstractBattle, stepCapture,
-  frontier, defenseFactor, incomeFor, territoryKey,
+  frontier, defenseFactor, incomeFor, territoryKey, outpostDormant,
 } from '../../src/game/territory.js';
 import { createWorker } from '../../src/game/workers.js';
 import { upkeepPerDay } from '../../src/game/upkeep.js';
@@ -68,6 +68,9 @@ test('outposts: guards by the land and distance; a fight far away uses the same 
   assert.ok(frontier(line) >= frontier(block));
   assert.ok(defenseFactor(data, 4, 6) < defenseFactor(data, 4, 1));
   assert.ok(incomeFor(data, 3).scrap > incomeFor(data, 1).scrap);
+  // A clan base right by an outpost puts it to sleep (multiplayer).
+  assert.equal(outpostDormant(near, [{ x: near.x + 10, y: near.y }], 16), true);
+  assert.equal(outpostDormant(near, [{ x: near.x + 60, y: near.y }], 16), false);
 });
 
 test('soldiers: trained at the Training Grounds, better with gear and rank, room in the barracks', () => {
