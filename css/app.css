@@ -1390,3 +1390,7 @@ button.link { background: none; border: none; padding: 0; min-height: 0; color: 
   .strategy-top { grid-template-columns: 1fr; }
   .strategy-map { max-width: none; }
 }
+
+.strategy-factions .faction-list { display: flex; flex-direction: column; gap: 4px; }
+.faction-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.faction-row.fallen { opacity: 0.5; text-decoration: line-through; }

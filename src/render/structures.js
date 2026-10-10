@@ -528,6 +528,7 @@ export function structureSprite(id, mask = 0, state = 0, tint = null) {
     case 'stone_wall': stoneWall(g, mask); break;
     case 'iron_wall': ironWall(g, mask); break;
     case 'palisade': woodWall(g, mask); break;
+    case 'rampart': stoneWall(g, mask); break;
     case 'outpost_flag': outpostFlag(g, tint ?? undefined); break;
     case 'aegis_wall': aegisWall(g, mask); break;
     case 'sunfire_obelisk': sunfireObelisk(g); break;

@@ -79,7 +79,7 @@ export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite
     stateT: 0,
     facing: 1,
     phase: Math.random() * 10,
-    sprites: hasCreature(def.id) ? creatureSprites(def.id, color) : enemySprites(def.id, color),
+    sprites: hasCreature(def.look ?? def.id) ? creatureSprites(def.look ?? def.id, color) : enemySprites(def.id, color),
     color,
     boss: false,
     dead: false,

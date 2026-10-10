@@ -89,7 +89,7 @@ export function enemyLook(data, defIdx, elementIdx, boss) {
     const el = data.elements[elementIdx]?.id ?? 'physical';
     const elColor = el !== 'physical' ? data.byId.elements.get(el)?.palette?.[1] : null;
     const color = !elColor ? def.color : def.elemental ? elColor : mixHex(def.color, elColor, 0.55);
-    look = { def, color, sprites: hasCreature(def.id) ? creatureSprites(def.id, color) : enemySprites(def.id, color) };
+    look = { def, color, sprites: hasCreature(def.look ?? def.id) ? creatureSprites(def.look ?? def.id, color) : enemySprites(def.id, color) };
   }
   spriteCache.set(key, look);
   return look;

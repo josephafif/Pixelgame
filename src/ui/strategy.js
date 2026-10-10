@@ -9,6 +9,7 @@ import { h } from './dom.js';
 import { icon, costChips } from './icons.js';
 import { openModal, replaceModalBody } from './modal.js';
 import { ORDER_NAMES, ORDER_NAMES_SV, STANCES, STANCE_NAMES, STANCE_NAMES_SV } from '../game/army.js';
+import { PERSONALITY_NAMES, PERSONALITY_NAMES_SV } from '../game/factions.js';
 
 const BIOME = {
   plains: '#4f9a44', forest: '#3c7437', desert: '#d8bc78', snow: '#dfe8f2', volcanic: '#4a4450', highlands: '#6e8f5a',
@@ -26,6 +27,7 @@ const TEXT = {
     own: 'Yours', neutral: 'Neutral', foreign: 'Held by others', contested: 'Contested', attacked: 'Under attack', home: 'Your camp', empty: 'No outpost (sea or rough land)',
     tier: 'Tier', move: 'Move here', legend: 'Green: yours · grey flag: neutral · red: someone else’s · yellow: being taken · flashing: under attack',
     training: 'training', bestGear: 'best gear', squadOf: 'in', members: 'soldiers', zoomIn: 'Closer', zoomOut: 'Further',
+    factions: 'Factions', squares: 'squares', ai: 'cunning', fallen: 'fallen', armies: 'armies on the march near you', toYou: 'coming for your land',
   },
   sv: {
     title: 'Strategikarta', squads: 'Trupper', soldiers: 'Soldater', recruits: 'Träna rekryter', newSquad: 'Ny trupp',
@@ -36,6 +38,7 @@ const TEXT = {
     own: 'Er', neutral: 'Neutral', foreign: 'Någon annans', contested: 'Omstridd', attacked: 'Under attack', home: 'Er bas', empty: 'Ingen utpost (hav eller oländig mark)',
     tier: 'Nivå', move: 'Flytta hit', legend: 'Grön: er · grå flagga: neutral · röd: någon annans · gul: tas just nu · blinkar: under attack',
     training: 'tränar', bestGear: 'bästa utrustning', squadOf: 'i', members: 'soldater', zoomIn: 'Närmare', zoomOut: 'Längre ut',
+    factions: 'Fraktioner', squares: 'rutor', ai: 'list', fallen: 'fallen', armies: 'arméer på marsch nära er', toYou: 'på väg mot er mark',
   },
 };
 
@@ -99,7 +102,13 @@ export function open(game) {
       g.fillStyle = 'rgba(10, 8, 20, 0.28)';
       g.fillRect(x, y, cell, cell);
       const tint = { own: 'rgba(63, 168, 106, 0.42)', home: 'rgba(255, 210, 74, 0.28)', foreign: 'rgba(200, 54, 74, 0.42)', attacked: 'rgba(255, 60, 60, 0.45)', contested: 'rgba(255, 210, 74, 0.32)' }[c.status];
-      if (tint && (c.status !== 'attacked' || blink)) {
+      if (c.status === 'foreign' && c.color) {
+        // Someone else's: in their colour.
+        g.globalAlpha = 0.45;
+        g.fillStyle = c.color;
+        g.fillRect(x, y, cell, cell);
+        g.globalAlpha = 1;
+      } else if (tint && (c.status !== 'attacked' || blink)) {
         g.fillStyle = tint;
         g.fillRect(x, y, cell, cell);
       }
@@ -142,6 +151,40 @@ export function open(game) {
         g.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
         g.lineWidth = 1;
       }
+    }
+    // Factions' armies on the march (close to you or your land), a line to where they head.
+    for (const a of view.factions?.armies ?? []) {
+      const [ax, ay] = toPx(a.x, a.y);
+      const tk = a.to.split(',').map(Number);
+      const target = view.territories.find((c) => c.tx === tk[0] && c.ty === tk[1]);
+      if (target?.site) {
+        const [tx2, ty2] = toPx(target.site.x, target.site.y);
+        g.strokeStyle = a.toMe ? '#ff5050' : a.color;
+        g.setLineDash([2, 3]);
+        g.beginPath();
+        g.moveTo(ax, ay);
+        g.lineTo(tx2, ty2);
+        g.stroke();
+        g.setLineDash([]);
+      }
+      g.fillStyle = '#161622';
+      g.beginPath();
+      g.moveTo(ax, ay - 8);
+      g.lineTo(ax + 8, ay);
+      g.lineTo(ax, ay + 8);
+      g.lineTo(ax - 8, ay);
+      g.fill();
+      g.fillStyle = a.color ?? '#c8364a';
+      g.beginPath();
+      g.moveTo(ax, ay - 6);
+      g.lineTo(ax + 6, ay);
+      g.lineTo(ax, ay + 6);
+      g.lineTo(ax - 6, ay);
+      g.fill();
+      g.fillStyle = '#161622';
+      g.font = 'bold 8px monospace';
+      g.textAlign = 'center';
+      g.fillText(String(a.troops), ax, ay + 3);
     }
     // You (under your squads' markers).
     const [px, py] = toPx(view.player.x, view.player.y);
@@ -285,6 +328,21 @@ export function open(game) {
       })));
   }
 
+  function factionsBox() {
+    const T = t();
+    const fx = view.factions;
+    if (!fx?.list?.length) return null;
+    const pers = (k) => (view.lang === 'sv' ? PERSONALITY_NAMES_SV : PERSONALITY_NAMES)[k] ?? k;
+    const coming = fx.armies.filter((a) => a.toMe).length;
+    return h('section.strategy-factions',
+      h('h3', T.factions),
+      h('div.faction-list', fx.list.map((f) => h(`div.faction-row${f.alive ? '' : '.fallen'}`,
+        h('span.squad-dot', { style: { background: f.color } }, ''),
+        h('b', f.name),
+        h('span.small.muted', f.alive ? ` · ${pers(f.personality)} · ${T.ai} ${'★'.repeat(f.quality)} · ${f.squares} ${T.squares}` : ` · ${T.fallen}`)))),
+      fx.armies.length ? h('p.small', `${fx.armies.length} ${T.armies}${coming ? ` (${coming} ${T.toYou})` : ''}.`) : null);
+  }
+
   function build() {
     const T = t();
     canvas = h('canvas.strategy-map', { onclick: onMapClick, 'aria-label': T.title });
@@ -315,6 +373,7 @@ export function open(game) {
           h('h3', T.squads),
           view.squads.length ? view.squads.map(squadCard) : h('p.small.muted', T.noSquads),
           h('button', { disabled: !view.canCreateSquad, onclick: () => act('squad-create', {}) }, icon('flag', 18), T.newSquad))),
+      factionsBox(),
       h('h3', `${T.soldiers} (${T.barracks} ${view.barracks.used} / ${view.barracks.cap})`),
       view.soldiers.length ? h('div.worker-list', view.soldiers.map(soldierRow)) : h('p.small.muted', T.noSoldiers),
       h('h3', T.recruits),

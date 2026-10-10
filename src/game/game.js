@@ -1472,7 +1472,7 @@ export class Game {
     return {
       lang: 'en', size: territoryConfig(data).size, here: territoryAt(data, this.player.x, this.player.y), player: { x: this.player.x, y: this.player.y },
       territories: radius >= 0 ? c.territoriesAround(tx, ty, radius) : [],
-      squads: c.squadsView(), soldiers, recruits, roles: data.army?.roles ?? [],
+      squads: c.squadsView(), soldiers, recruits, roles: data.army?.roles ?? [], factions: c.factionsView(),
       barracks: { used: this.workforce.soldierCount(), cap: barracksCap(data, c.levels().training) },
       canCreateSquad: c.army.squads.length < (data.army?.squads?.max ?? 4),
       gear: (s) => c.gearInfo(s.id),

@@ -175,3 +175,46 @@ test('the army and the territories are saved', () => {
   assert.deepEqual(up.army.squads, []);
   assert.deepEqual(up.territories.owned, {});
 });
+
+test('factions: their bases are guarded by their troops; beat them and hold the flag to take a base', () => {
+  const save = campSave();
+  const game = stubGame(save);
+  const st = save.factions;
+  assert.ok(st.list.length >= 3, 'the world has factions');
+  const key = Object.keys(st.owned).find((k) => st.owned[k].tier === 'camp') ?? Object.keys(st.owned)[0];
+  const fid = st.owned[key].faction;
+  const site = game.campaign.site(key);
+  Object.assign(game.player, { x: site.x, y: site.y + 1 });
+  run(game, 1);
+  const troops = game.enemies.filter((e) => e.outpost === key && e.faction === fid);
+  assert.ok(troops.length >= 1, 'its garrison stands');
+  assert.equal(game.campaign.structures.find((s) => s.id === 'outpost_flag' && s.outpost === key).color, st.list.find((f) => f.id === fid).color);
+  for (const e of troops) e.dead = true;
+  game.enemies = [];
+  run(game, 25);
+  assert.ok(game.campaign.isOwned(key), 'yours now');
+  assert.equal(st.owned[key], undefined, 'not theirs');
+  const view = game.campaign.factionsView();
+  assert.ok(view.list.some((f) => f.id === fid));
+});
+
+test('factions: an army comes for your outpost while you are away and takes it', () => {
+  const save = campSave();
+  const game = stubGame(save);
+  const st = save.factions;
+  // Your outpost right next to a faction's land, no garrison; you far away.
+  const fkey = Object.keys(st.owned)[0];
+  const { tx, ty } = { tx: Number(fkey.split(',')[0]), ty: Number(fkey.split(',')[1]) };
+  let mine = null;
+  for (const [x, y] of [[tx + 1, ty], [tx - 1, ty], [tx, ty + 1], [tx, ty - 1]]) {
+    const k = `${x},${y}`;
+    if (!st.owned[k] && k !== '0,0' && game.campaign.site(k)) mine = k;
+  }
+  assert.ok(mine);
+  save.territories.owned[mine] = { since: 1 };
+  Object.assign(game.player, { x: -5000, y: -5000 });
+  for (const f of st.list) f.bank = 600;
+  for (let i = 0; i < 400 && game.campaign.isOwned(mine); i++) run(game, 3, 3);
+  assert.equal(game.campaign.isOwned(mine), false, 'lost');
+  assert.ok(game.toasts.some((t) => /took your outpost|plundered/.test(t)), game.toasts.slice(-5).join(' | '));
+});

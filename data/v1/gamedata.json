@@ -1265,6 +1265,31 @@
       "maxOwned": 16
     }
   },
+  "factions": {
+    "count": [3, 5],
+    "pool": [
+      { "id": "iron_legion", "name": "The Iron Legion", "sv": "Järnlegionen", "color": "#c8364a", "personality": "expansionist" },
+      { "id": "ash_covenant", "name": "The Ash Covenant", "sv": "Askförbundet", "color": "#e86a2a", "personality": "raider" },
+      { "id": "silver_wardens", "name": "The Silver Wardens", "sv": "Silverväktarna", "color": "#9fb4d8", "personality": "defender" },
+      { "id": "night_court", "name": "The Night Court", "sv": "Nattens hov", "color": "#9a5cff", "personality": "strategist" },
+      { "id": "greenwood_band", "name": "The Greenwood Band", "sv": "Gröna bandet", "color": "#4fb04f", "personality": "raider" }
+    ],
+    "tiers": {
+      "camp": { "name": "Camp", "sv": "Läger", "garrison": 3, "income": 1 },
+      "stronghold": { "name": "Stronghold", "sv": "Fäste", "garrison": 5, "income": 2, "upgrade": 90 },
+      "hq": { "name": "Headquarters", "sv": "Högkvarter", "garrison": 8, "income": 3 }
+    },
+    "aiEverySeconds": 12,
+    "marchSpeed": 2.2,
+    "reach": 4,
+    "maxTerritories": 7,
+    "maxArmies": 2,
+    "startBank": 60,
+    "incomePerMinute": 4,
+    "troopCost": 12,
+    "catchUpHours": 3,
+    "plunderPct": 15
+  },
   "blueprintLoot": {
     "sources": {
       "chest": { "chance": 0.05, "tiers": { "common": 80, "rare": 20 } },
@@ -1327,7 +1352,22 @@
     { "id": "mire_troll", "name": "Mire Troll", "hp": 190, "damage": 22, "speed": 1.3, "size": 1.25, "sight": 7, "behavior": "charger", "windup": 0.8, "dash": 4, "dashTime": 0.5, "trigger": 4, "cooldown": 3.4, "group": [1, 1], "xp": 46, "weight": 2, "color": "#5a7a4a", "elite": true, "bogRegen": 0.04, "bigLoot": true },
     { "id": "gale_sprite", "name": "Gale Sprite", "hp": 32, "damage": 9, "speed": 3.6, "size": 0.6, "sight": 10, "behavior": "swoop", "body": "fly", "xp": 12, "weight": 10, "color": "#d8ecff" },
     { "id": "cloud_ray", "name": "Cloud Ray", "hp": 52, "damage": 11, "speed": 2, "size": 0.9, "sight": 10, "behavior": "caster", "range": 7, "projSpeed": 6.5, "body": "fly", "xp": 16, "weight": 7, "color": "#a8c8f0" },
-    { "id": "storm_griffin", "name": "Storm Griffin", "hp": 170, "damage": 21, "speed": 2.4, "size": 1.15, "sight": 10, "behavior": "charger", "windup": 0.5, "dash": 5.5, "dashTime": 0.45, "trigger": 5, "cooldown": 3, "group": [1, 1], "body": "fly", "xp": 48, "weight": 2, "color": "#c8a050", "elite": true, "bigLoot": true }
+    { "id": "storm_griffin", "name": "Storm Griffin", "hp": 170, "damage": 21, "speed": 2.4, "size": 1.15, "sight": 10, "behavior": "charger", "windup": 0.5, "dash": 5.5, "dashTime": 0.45, "trigger": 5, "cooldown": 3, "group": [1, 1], "body": "fly", "xp": 48, "weight": 2, "color": "#c8a050", "elite": true, "bigLoot": true },
+    { "id": "iron_legion_warrior", "name": "Iron Legion Warrior", "look": "legionary", "faction": "iron_legion", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#c8364a" },
+    { "id": "iron_legion_archer", "name": "Iron Legion Archer", "look": "marksman", "faction": "iron_legion", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#c8364a" },
+    { "id": "iron_legion_captain", "name": "Iron Legion Captain", "look": "warlord", "faction": "iron_legion", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#c8364a" },
+    { "id": "ash_covenant_warrior", "name": "Ash Covenant Warrior", "look": "legionary", "faction": "ash_covenant", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#e86a2a" },
+    { "id": "ash_covenant_archer", "name": "Ash Covenant Archer", "look": "marksman", "faction": "ash_covenant", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#e86a2a" },
+    { "id": "ash_covenant_captain", "name": "Ash Covenant Captain", "look": "warlord", "faction": "ash_covenant", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#e86a2a" },
+    { "id": "silver_wardens_warrior", "name": "Silver Wardens Warrior", "look": "legionary", "faction": "silver_wardens", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#9fb4d8" },
+    { "id": "silver_wardens_archer", "name": "Silver Wardens Archer", "look": "marksman", "faction": "silver_wardens", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#9fb4d8" },
+    { "id": "silver_wardens_captain", "name": "Silver Wardens Captain", "look": "warlord", "faction": "silver_wardens", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#9fb4d8" },
+    { "id": "night_court_warrior", "name": "Night Court Warrior", "look": "legionary", "faction": "night_court", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#9a5cff" },
+    { "id": "night_court_archer", "name": "Night Court Archer", "look": "marksman", "faction": "night_court", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#9a5cff" },
+    { "id": "night_court_captain", "name": "Night Court Captain", "look": "warlord", "faction": "night_court", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#9a5cff" },
+    { "id": "greenwood_band_warrior", "name": "Greenwood Band Warrior", "look": "legionary", "faction": "greenwood_band", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#4fb04f" },
+    { "id": "greenwood_band_archer", "name": "Greenwood Band Archer", "look": "marksman", "faction": "greenwood_band", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#4fb04f" },
+    { "id": "greenwood_band_captain", "name": "Greenwood Band Captain", "look": "warlord", "faction": "greenwood_band", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#4fb04f" }
   ],
   "bosses": [
     { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["meteors", "charge", "slam", "ring", "meteors", "summon"], "trail": "fire", "tip": "Meteors fall where you stand, and its charge leaves the ground burning.", "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "rare", "theme": "fire" } },

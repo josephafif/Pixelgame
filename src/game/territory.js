@@ -18,6 +18,7 @@ export const TERRITORY_DEFAULTS = {
 /** The palisade, its flag: structures only outposts have (never in the build menu). */
 export const OUTPOST_DEFS = {
   palisade: { id: 'palisade', name: 'Palisade', kind: 'wall', hp: 999 },
+  rampart: { id: 'rampart', name: 'Rampart', kind: 'wall', hp: 999 },
   outpost_flag: { id: 'outpost_flag', name: 'Outpost flag', kind: 'decor', hp: 999 },
 };
 
@@ -109,19 +110,23 @@ export function outpostFor(world, data, tx, ty) {
 /**
  * The outpost's structures, relative to the flag: a palisade around a 9 × 9
  * square with a three-tile gap on the south side, torches inside and the
- * flag in the middle.
+ * flag in the middle. A faction's stronghold has two towers inside; its
+ * headquarters stone ramparts and four towers.
  */
-export function outpostLayout() {
+export function outpostLayout(tier = 'camp') {
+  const wall = tier === 'hq' ? 'rampart' : 'palisade';
   const out = [{ id: 'outpost_flag', x: 0, y: 0 }];
   for (let i = -HALF; i <= HALF; i++) {
-    out.push({ id: 'palisade', x: i, y: -HALF });
-    if (Math.abs(i) > 1) out.push({ id: 'palisade', x: i, y: HALF });
+    out.push({ id: wall, x: i, y: -HALF });
+    if (Math.abs(i) > 1) out.push({ id: wall, x: i, y: HALF });
     if (Math.abs(i) < HALF) {
-      out.push({ id: 'palisade', x: -HALF, y: i });
-      out.push({ id: 'palisade', x: HALF, y: i });
+      out.push({ id: wall, x: -HALF, y: i });
+      out.push({ id: wall, x: HALF, y: i });
     }
   }
   for (const [x, y] of [[-3, -3], [3, -3]]) out.push({ id: 'torch', x, y });
+  if (tier === 'stronghold' || tier === 'hq') for (const [x, y] of [[-2, -2], [2, -2]]) out.push({ id: 'arrow_turret', x, y });
+  if (tier === 'hq') for (const [x, y] of [[-3, 2], [3, 2]]) out.push({ id: 'arrow_turret', x, y });
   return out;
 }
 
@@ -133,9 +138,9 @@ const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, wri
  * structures placed. Single player, the server and the multiplayer client
  * all place them the same way.
  */
-export function placeOutpost(world, data, site, color) {
+export function placeOutpost(world, data, site, color, tier = 'camp') {
   const out = [];
-  for (const s of outpostLayout()) {
+  for (const s of outpostLayout(tier)) {
     const def = OUTPOST_DEFS[s.id] ?? structureDef(data, s.id);
     if (!def) continue;
     const x = site.fx + s.x;
