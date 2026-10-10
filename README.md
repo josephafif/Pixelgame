@@ -233,8 +233,10 @@ Kod: `src/game/sailing.js` (båtar, sjösättning, landstigning), `World#seaAt` 
 
 ## Hästar
 
-Små flockar med **vilda hästar** betar här och där i världen, långt från lägret (några få i varje
-stor region, så de är inte lätta att hitta). Gå fram till en häst och tryck **Use** för att rida
+Flockar med **vilda hästar** (två till fyra) betar här och där i världen, ungefär en per hundra
+rutor och den första en kort ritt från lägret. Flockar du har sett syns på kartan, och byborna
+berättar var flockarna runt deras by betar (de syns på kartan när du har besökt byn). Gå fram
+till en häst och tryck **Use** för att rida
 den: då är den din. Till häst är du mycket snabbare, galopperar när du springer, har extra hälsa
 och **hoppar över träd och stenar** (men aldrig över vatten eller murar). Tryck Use igen för att
 kliva av.
@@ -572,7 +574,7 @@ de har alltid något att göra.
 
 - Stugans nivå bestämmer hur många som får plats (2 till 6) och vad de klarar: träd och sten,
   sedan kristaller (nivå 3), obsidian (4) och järnmalm (5).
-- Att anställa kostar skrot och essence, varje ny lite mer. **Lönen** (10 skrot och 6 essence per
+- Att anställa kostar skrot och essence, varje ny lite mer. **Lönen** (18 skrot och 12 essence per
   dygn) ingår i underhållet.
 - **Skadar du en arbetare** (ett slarvigt slag, en explosion) blir den arg på dig och slår
   tillbaka tills den lugnat ner sig. Dör den är den borta.

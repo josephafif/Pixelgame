@@ -990,12 +990,12 @@
         "perLevel": { "maxHpPct": 6 },
         "levels": [
           { "scrap": 0, "essence": 0, "playerLevel": 1 },
-          { "scrap": 40, "essence": 30, "wood": 20, "playerLevel": 3 },
-          { "scrap": 100, "essence": 80, "wood": 50, "stone": 40, "playerLevel": 7 },
-          { "scrap": 220, "essence": 180, "wood": 90, "stone": 100, "playerLevel": 12 },
-          { "scrap": 400, "essence": 350, "wood": 150, "stone": 200, "playerLevel": 17 },
-          { "scrap": 650, "essence": 600, "wood": 240, "stone": 320, "playerLevel": 22, "boss": true },
-          { "scrap": 950, "essence": 900, "wood": 340, "stone": 460, "playerLevel": 27, "boss": true }
+          { "scrap": 65, "essence": 50, "wood": 30, "playerLevel": 3 },
+          { "scrap": 160, "essence": 130, "wood": 80, "stone": 65, "playerLevel": 7 },
+          { "scrap": 350, "essence": 290, "wood": 140, "stone": 160, "playerLevel": 12 },
+          { "scrap": 640, "essence": 560, "wood": 240, "stone": 320, "playerLevel": 17 },
+          { "scrap": 1040, "essence": 960, "wood": 380, "stone": 510, "playerLevel": 22, "boss": true },
+          { "scrap": 1520, "essence": 1440, "wood": 540, "stone": 740, "playerLevel": 27, "boss": true }
         ]
       },
       {
@@ -1003,13 +1003,13 @@
         "desc": "Craft weapons and pickaxes. Upgrades make crafting cheaper, crafted weapons stronger and unlock better catalysts and tools.",
         "perLevel": { "craftDiscountPct": 5, "craftLevel": 1 },
         "levels": [
-          { "scrap": 40, "essence": 25, "playerLevel": 3 },
-          { "scrap": 120, "essence": 100, "wood": 30, "stone": 40, "playerLevel": 7 },
-          { "scrap": 260, "essence": 240, "wood": 60, "stone": 100, "playerLevel": 12 },
-          { "scrap": 480, "essence": 450, "wood": 100, "stone": 180, "playerLevel": 17, "boss": true },
-          { "scrap": 800, "essence": 800, "wood": 160, "stone": 300, "playerLevel": 22, "boss": true },
-          { "scrap": 1200, "essence": 1150, "wood": 240, "stone": 420, "playerLevel": 26, "boss": true },
-          { "scrap": 1700, "essence": 1600, "wood": 320, "stone": 560, "playerLevel": 30, "boss": true }
+          { "scrap": 65, "essence": 40, "playerLevel": 3 },
+          { "scrap": 190, "essence": 160, "wood": 50, "stone": 65, "playerLevel": 7 },
+          { "scrap": 420, "essence": 380, "wood": 95, "stone": 160, "playerLevel": 12 },
+          { "scrap": 770, "essence": 720, "wood": 160, "stone": 290, "playerLevel": 17, "boss": true },
+          { "scrap": 1280, "essence": 1280, "wood": 260, "stone": 480, "playerLevel": 22, "boss": true },
+          { "scrap": 1920, "essence": 1840, "wood": 380, "stone": 670, "playerLevel": 26, "boss": true },
+          { "scrap": 2720, "essence": 2560, "wood": 510, "stone": 900, "playerLevel": 30, "boss": true }
         ]
       },
       {
@@ -1017,13 +1017,13 @@
         "desc": "Your stash. Every upgrade adds storage slots and a bigger bag.",
         "perLevel": { "storage": 30, "bag": 4 },
         "levels": [
-          { "scrap": 40, "essence": 20, "playerLevel": 2 },
-          { "scrap": 90, "essence": 70, "wood": 30, "playerLevel": 5 },
-          { "scrap": 180, "essence": 150, "wood": 60, "stone": 50, "playerLevel": 9 },
-          { "scrap": 320, "essence": 280, "wood": 100, "stone": 120, "playerLevel": 13 },
-          { "scrap": 500, "essence": 450, "wood": 160, "stone": 220, "playerLevel": 17 },
-          { "scrap": 750, "essence": 650, "wood": 230, "stone": 320, "playerLevel": 21, "boss": true },
-          { "scrap": 1050, "essence": 900, "wood": 320, "stone": 440, "playerLevel": 25, "boss": true }
+          { "scrap": 65, "essence": 30, "playerLevel": 2 },
+          { "scrap": 140, "essence": 110, "wood": 50, "playerLevel": 5 },
+          { "scrap": 290, "essence": 240, "wood": 95, "stone": 80, "playerLevel": 9 },
+          { "scrap": 510, "essence": 450, "wood": 160, "stone": 190, "playerLevel": 13 },
+          { "scrap": 800, "essence": 720, "wood": 260, "stone": 350, "playerLevel": 17 },
+          { "scrap": 1200, "essence": 1040, "wood": 370, "stone": 510, "playerLevel": 21, "boss": true },
+          { "scrap": 1680, "essence": 1440, "wood": 510, "stone": 700, "playerLevel": 25, "boss": true }
         ]
       },
       {
@@ -1031,13 +1031,13 @@
         "desc": "Study weapon components. Every upgrade makes research cheaper.",
         "perLevel": { "researchDiscountPct": 10 },
         "levels": [
-          { "scrap": 50, "essence": 50, "wood": 20, "playerLevel": 4 },
-          { "scrap": 120, "essence": 140, "wood": 50, "stone": 30, "playerLevel": 8 },
-          { "scrap": 240, "essence": 280, "wood": 90, "stone": 80, "playerLevel": 12 },
-          { "scrap": 400, "essence": 450, "wood": 140, "stone": 160, "playerLevel": 16 },
-          { "scrap": 600, "essence": 700, "wood": 200, "stone": 260, "playerLevel": 20 },
-          { "scrap": 850, "essence": 1000, "wood": 280, "stone": 360, "playerLevel": 24, "boss": true },
-          { "scrap": 1150, "essence": 1350, "wood": 360, "stone": 480, "playerLevel": 28, "boss": true }
+          { "scrap": 80, "essence": 80, "wood": 30, "playerLevel": 4 },
+          { "scrap": 190, "essence": 220, "wood": 80, "stone": 50, "playerLevel": 8 },
+          { "scrap": 380, "essence": 450, "wood": 140, "stone": 130, "playerLevel": 12 },
+          { "scrap": 640, "essence": 720, "wood": 220, "stone": 260, "playerLevel": 16 },
+          { "scrap": 960, "essence": 1120, "wood": 320, "stone": 420, "playerLevel": 20 },
+          { "scrap": 1360, "essence": 1600, "wood": 450, "stone": 580, "playerLevel": 24, "boss": true },
+          { "scrap": 1840, "essence": 2160, "wood": 580, "stone": 770, "playerLevel": 28, "boss": true }
         ]
       },
       {
@@ -1045,13 +1045,13 @@
         "desc": "Drill every day. Every upgrade adds Attack Power and Defense.",
         "perLevel": { "attackPower": 4, "defense": 2 },
         "levels": [
-          { "scrap": 60, "essence": 50, "wood": 25, "stone": 15, "playerLevel": 4 },
-          { "scrap": 150, "essence": 130, "wood": 50, "stone": 50, "playerLevel": 8 },
-          { "scrap": 280, "essence": 260, "wood": 90, "stone": 110, "playerLevel": 12 },
-          { "scrap": 460, "essence": 420, "wood": 140, "stone": 180, "playerLevel": 16 },
-          { "scrap": 700, "essence": 650, "wood": 200, "stone": 280, "playerLevel": 20 },
-          { "scrap": 1000, "essence": 900, "wood": 280, "stone": 380, "playerLevel": 24, "boss": true },
-          { "scrap": 1350, "essence": 1250, "wood": 380, "stone": 500, "playerLevel": 28, "boss": true }
+          { "scrap": 95, "essence": 80, "wood": 40, "stone": 25, "playerLevel": 4 },
+          { "scrap": 240, "essence": 210, "wood": 80, "stone": 80, "playerLevel": 8 },
+          { "scrap": 450, "essence": 420, "wood": 140, "stone": 180, "playerLevel": 12 },
+          { "scrap": 740, "essence": 670, "wood": 220, "stone": 290, "playerLevel": 16 },
+          { "scrap": 1120, "essence": 1040, "wood": 320, "stone": 450, "playerLevel": 20 },
+          { "scrap": 1600, "essence": 1440, "wood": 450, "stone": 610, "playerLevel": 24, "boss": true },
+          { "scrap": 2160, "essence": 2000, "wood": 610, "stone": 800, "playerLevel": 28, "boss": true }
         ]
       },
       {
@@ -1059,13 +1059,13 @@
         "desc": "Draws essence from the ground, even while you are away. Come back and collect it.",
         "perLevel": { "essencePerHour": 15 },
         "levels": [
-          { "scrap": 40, "essence": 10, "playerLevel": 3 },
-          { "scrap": 120, "essence": 60, "stone": 40, "playerLevel": 6 },
-          { "scrap": 240, "essence": 150, "wood": 30, "stone": 90, "playerLevel": 10 },
-          { "scrap": 380, "essence": 260, "wood": 60, "stone": 150, "playerLevel": 14 },
-          { "scrap": 560, "essence": 420, "wood": 100, "stone": 240, "playerLevel": 18 },
-          { "scrap": 800, "essence": 600, "wood": 150, "stone": 340, "playerLevel": 22, "boss": true },
-          { "scrap": 1100, "essence": 850, "wood": 210, "stone": 460, "playerLevel": 26, "boss": true }
+          { "scrap": 65, "essence": 15, "playerLevel": 3 },
+          { "scrap": 190, "essence": 95, "stone": 65, "playerLevel": 6 },
+          { "scrap": 380, "essence": 240, "wood": 50, "stone": 140, "playerLevel": 10 },
+          { "scrap": 610, "essence": 420, "wood": 95, "stone": 240, "playerLevel": 14 },
+          { "scrap": 900, "essence": 670, "wood": 160, "stone": 380, "playerLevel": 18 },
+          { "scrap": 1280, "essence": 960, "wood": 240, "stone": 540, "playerLevel": 22, "boss": true },
+          { "scrap": 1760, "essence": 1360, "wood": 340, "stone": 740, "playerLevel": 26, "boss": true }
         ]
       },
       {
@@ -1073,11 +1073,11 @@
         "desc": "A cosy nest for pals. Hatch pal eggs here; every upgrade lets your pals grow two levels stronger.",
         "perLevel": { "palLevelCap": 2 },
         "levels": [
-          { "scrap": 150, "essence": 150, "wood": 80, "stone": 40, "playerLevel": 6 },
-          { "scrap": 260, "essence": 260, "wood": 120, "stone": 90, "playerLevel": 10 },
-          { "scrap": 420, "essence": 420, "wood": 180, "stone": 160, "playerLevel": 14 },
-          { "scrap": 640, "essence": 640, "wood": 240, "stone": 240, "playerLevel": 18, "boss": true },
-          { "scrap": 900, "essence": 900, "wood": 320, "stone": 340, "playerLevel": 22, "boss": true }
+          { "scrap": 240, "essence": 240, "wood": 130, "stone": 65, "playerLevel": 6 },
+          { "scrap": 420, "essence": 420, "wood": 190, "stone": 140, "playerLevel": 10 },
+          { "scrap": 670, "essence": 670, "wood": 290, "stone": 260, "playerLevel": 14 },
+          { "scrap": 1020, "essence": 1020, "wood": 380, "stone": 380, "playerLevel": 18, "boss": true },
+          { "scrap": 1440, "essence": 1440, "wood": 510, "stone": 540, "playerLevel": 22, "boss": true }
         ]
       },
       {
@@ -1085,8 +1085,8 @@
         "desc": "Level 1: recall to camp from anywhere. Level 2: step back through to where you left.",
         "perLevel": {},
         "levels": [
-          { "scrap": 60, "essence": 60, "stone": 40, "playerLevel": 5 },
-          { "scrap": 220, "essence": 220, "wood": 40, "stone": 120, "playerLevel": 11 }
+          { "scrap": 95, "essence": 95, "stone": 65, "playerLevel": 5 },
+          { "scrap": 350, "essence": 350, "wood": 65, "stone": 190, "playerLevel": 11 }
         ]
       },
       {
@@ -1094,19 +1094,19 @@
         "desc": "Hire workers who chop trees and break rocks out in the wild and carry it all to the Vault. Every upgrade houses one more worker and teaches them harder rock.",
         "perLevel": { "workers": 1 },
         "levels": [
-          { "scrap": 80, "essence": 40, "wood": 60, "stone": 20, "playerLevel": 5 },
-          { "scrap": 160, "essence": 100, "wood": 120, "stone": 80, "playerLevel": 8 },
-          { "scrap": 280, "essence": 200, "wood": 180, "stone": 160, "playerLevel": 12 },
-          { "scrap": 450, "essence": 350, "wood": 240, "stone": 260, "playerLevel": 16 },
-          { "scrap": 700, "essence": 550, "wood": 320, "stone": 380, "playerLevel": 20, "boss": true }
+          { "scrap": 130, "essence": 65, "wood": 95, "stone": 30, "playerLevel": 5 },
+          { "scrap": 260, "essence": 160, "wood": 190, "stone": 130, "playerLevel": 8 },
+          { "scrap": 450, "essence": 320, "wood": 290, "stone": 260, "playerLevel": 12 },
+          { "scrap": 720, "essence": 560, "wood": 380, "stone": 420, "playerLevel": 16 },
+          { "scrap": 1120, "essence": 880, "wood": 510, "stone": 610, "playerLevel": 20, "boss": true }
         ]
       }
     ],
     "workers": {
       "baseCap": 1,
-      "hire": { "scrap": 60, "essence": 40 },
+      "hire": { "scrap": 120, "essence": 80 },
       "hireGrowth": 0.5,
-      "wagePerDay": { "scrap": 10, "essence": 6 },
+      "wagePerDay": { "scrap": 18, "essence": 12 },
       "hp": 90,
       "hpPerLevel": 20,
       "speed": 1.9,
@@ -1123,8 +1123,8 @@
       "offlineCapHours": 12
     },
     "upkeep": {
-      "perStructurePerDay": { "wood": 0.3, "stone": 0.3 },
-      "perBuildingLevelPerDay": { "scrap": 0.5, "essence": 0.5 },
+      "perStructurePerDay": { "wood": 0.8, "stone": 0.8 },
+      "perBuildingLevelPerDay": { "scrap": 1.5, "essence": 1.5 },
       "catchUpHours": 12,
       "decayPerHour": 0.01,
       "decayFloor": 0.25
@@ -1158,20 +1158,20 @@
     "refund": 0.5,
     "repairPerSec": 0.02,
     "structures": [
-      { "id": "wood_wall", "name": "Wooden Wall", "kind": "wall", "hp": 120, "cost": { "wood": 3 }, "upgradesTo": "stone_wall", "desc": "Blocks enemies. Cheap and quick." },
-      { "id": "stone_wall", "name": "Stone Wall", "kind": "wall", "hp": 380, "cost": { "stone": 4, "wood": 1 }, "requires": { "hearth": 2 }, "upgradesTo": "iron_wall", "desc": "Sturdy wall that holds much longer." },
-      { "id": "gate", "name": "Gate", "kind": "gate", "hp": 220, "cost": { "wood": 8, "scrap": 5 }, "upgradesTo": "iron_gate", "desc": "You walk through it. Enemies can't." },
-      { "id": "arrow_turret", "name": "Arrow Turret", "kind": "turret", "hp": 220, "cost": { "wood": 15, "stone": 10, "scrap": 30 }, "requires": { "training": 1 }, "upgradesTo": "ballista", "turret": { "range": 7, "interval": 1.0, "damage": 12, "speed": 14, "sprite": "arrow", "color": "#e8d8b0" }, "desc": "Shoots arrows at enemies in range." },
-      { "id": "flame_turret", "name": "Flame Turret", "kind": "turret", "hp": 320, "cost": { "stone": 30, "scrap": 60, "essence": 60 }, "requires": { "forge": 3, "training": 2 }, "turret": { "range": 5.5, "interval": 0.8, "damage": 9, "speed": 9, "sprite": "orb", "element": "fire", "status": "burn", "color": "#ff7a2a" }, "desc": "Hurls fire that sets enemies ablaze." },
-      { "id": "spikes", "name": "Spike Trap", "kind": "trap", "walkable": true, "hp": 150, "cost": { "wood": 4, "scrap": 6 }, "upgradesTo": "iron_spikes", "trap": { "damage": 10, "interval": 0.7 }, "desc": "Hurts enemies that walk over it. Safe for you." },
-      { "id": "torch", "name": "Torch", "kind": "light", "hp": 60, "cost": { "wood": 2, "stone": 1 }, "desc": "Lights up your camp." },
-      { "id": "banner", "name": "Banner", "kind": "decor", "hp": 80, "cost": { "wood": 3, "scrap": 2 }, "desc": "Shows everyone whose camp this is." },
-      { "id": "wood_floor", "name": "Wooden Floor", "kind": "floor", "walkable": true, "hp": 60, "cost": { "wood": 1 }, "upgradesTo": "stone_floor", "desc": "Decorative planks." },
-      { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 1 }, "desc": "Decorative paving." },
-      { "id": "iron_wall", "name": "Reinforced Wall", "kind": "wall", "hp": 900, "cost": { "stone": 6, "scrap": 8 }, "requires": { "hearth": 4, "forge": 3 }, "desc": "Stone bound with iron. Holds out far longer than stone." },
-      { "id": "iron_gate", "name": "Iron Gate", "kind": "gate", "hp": 560, "cost": { "wood": 4, "stone": 6, "scrap": 16 }, "requires": { "hearth": 3 }, "desc": "An iron-bound gate: you walk through, enemies batter it much longer." },
-      { "id": "ballista", "name": "Ballista", "kind": "turret", "hp": 460, "cost": { "wood": 25, "stone": 20, "scrap": 70 }, "requires": { "training": 3, "forge": 2 }, "turret": { "range": 9, "interval": 1.4, "damage": 30, "speed": 18, "sprite": "arrow", "color": "#f0e0b8" }, "desc": "A heavy bolt thrower: long range and hard hits." },
-      { "id": "iron_spikes", "name": "Iron Spikes", "kind": "trap", "walkable": true, "hp": 280, "cost": { "scrap": 14, "stone": 4 }, "requires": { "forge": 2 }, "trap": { "damage": 22, "interval": 0.6 }, "desc": "Sharper, sturdier spikes for the gates." }
+      { "id": "wood_wall", "name": "Wooden Wall", "kind": "wall", "hp": 120, "cost": { "wood": 8 }, "upgradesTo": "stone_wall", "desc": "Blocks enemies. Cheap and quick." },
+      { "id": "stone_wall", "name": "Stone Wall", "kind": "wall", "hp": 380, "cost": { "stone": 10, "wood": 2 }, "requires": { "hearth": 2 }, "upgradesTo": "iron_wall", "desc": "Sturdy wall that holds much longer." },
+      { "id": "gate", "name": "Gate", "kind": "gate", "hp": 220, "cost": { "wood": 20, "scrap": 12 }, "upgradesTo": "iron_gate", "desc": "You walk through it. Enemies can't." },
+      { "id": "arrow_turret", "name": "Arrow Turret", "kind": "turret", "hp": 220, "cost": { "wood": 40, "stone": 30, "scrap": 80 }, "requires": { "training": 1 }, "upgradesTo": "ballista", "turret": { "range": 7, "interval": 1.0, "damage": 12, "speed": 14, "sprite": "arrow", "color": "#e8d8b0" }, "desc": "Shoots arrows at enemies in range." },
+      { "id": "flame_turret", "name": "Flame Turret", "kind": "turret", "hp": 320, "cost": { "stone": 70, "scrap": 150, "essence": 140 }, "requires": { "forge": 3, "training": 2 }, "turret": { "range": 5.5, "interval": 0.8, "damage": 9, "speed": 9, "sprite": "orb", "element": "fire", "status": "burn", "color": "#ff7a2a" }, "desc": "Hurls fire that sets enemies ablaze." },
+      { "id": "spikes", "name": "Spike Trap", "kind": "trap", "walkable": true, "hp": 150, "cost": { "wood": 10, "scrap": 15 }, "upgradesTo": "iron_spikes", "trap": { "damage": 10, "interval": 0.7 }, "desc": "Hurts enemies that walk over it. Safe for you." },
+      { "id": "torch", "name": "Torch", "kind": "light", "hp": 60, "cost": { "wood": 4, "stone": 2 }, "desc": "Lights up your camp." },
+      { "id": "banner", "name": "Banner", "kind": "decor", "hp": 80, "cost": { "wood": 10, "scrap": 6 }, "desc": "Shows everyone whose camp this is." },
+      { "id": "wood_floor", "name": "Wooden Floor", "kind": "floor", "walkable": true, "hp": 60, "cost": { "wood": 2 }, "upgradesTo": "stone_floor", "desc": "Decorative planks." },
+      { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 2 }, "desc": "Decorative paving." },
+      { "id": "iron_wall", "name": "Reinforced Wall", "kind": "wall", "hp": 900, "cost": { "stone": 14, "scrap": 20 }, "requires": { "hearth": 4, "forge": 3 }, "desc": "Stone bound with iron. Holds out far longer than stone." },
+      { "id": "iron_gate", "name": "Iron Gate", "kind": "gate", "hp": 560, "cost": { "wood": 10, "stone": 14, "scrap": 40 }, "requires": { "hearth": 3 }, "desc": "An iron-bound gate: you walk through, enemies batter it much longer." },
+      { "id": "ballista", "name": "Ballista", "kind": "turret", "hp": 460, "cost": { "wood": 60, "stone": 50, "scrap": 180 }, "requires": { "training": 3, "forge": 2 }, "turret": { "range": 9, "interval": 1.4, "damage": 30, "speed": 18, "sprite": "arrow", "color": "#f0e0b8" }, "desc": "A heavy bolt thrower: long range and hard hits." },
+      { "id": "iron_spikes", "name": "Iron Spikes", "kind": "trap", "walkable": true, "hp": 280, "cost": { "scrap": 35, "stone": 10 }, "requires": { "forge": 2 }, "trap": { "damage": 22, "interval": 0.6 }, "desc": "Sharper, sturdier spikes for the gates." }
     ]
   },
   "sailing": {

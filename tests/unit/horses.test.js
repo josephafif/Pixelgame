@@ -32,14 +32,15 @@ function setBlock(world, x, y, b) {
   chunk.block[(y - chunk.cy * CHUNK) * CHUNK + (x - chunk.cx * CHUNK)] = b;
 }
 
-test('herds: few and far between, on land, the same every time', () => {
+test('herds: here and there (a short ride from the start), on land, the same every time', () => {
   const world = new World(data, 4242);
   const herds = herdsNear(world, 0, 0, 600);
-  assert.ok(herds.length >= 3, `some herds (${herds.length})`);
-  assert.ok(herds.length < 40, 'but not everywhere');
+  assert.ok(herds.length >= 20, `plenty of herds (${herds.length})`);
+  assert.ok(herds.length < 90, 'but not everywhere');
+  assert.ok(herds.some((h) => Math.hypot(h.x, h.y) < 160), 'one within a short ride');
   for (const h of herds) {
-    assert.ok(Math.hypot(h.x, h.y) > 90, 'none right next to the start');
-    assert.ok(h.size >= 1 && h.size <= 3);
+    assert.ok(Math.hypot(h.x, h.y) > 60, 'none right next to the start');
+    assert.ok(h.size >= 2 && h.size <= 4);
     assert.equal(h.breeds.length, h.size);
     for (const b of h.breeds) assert.ok(BREEDS.find((x) => x.id === b).biomes.includes(h.biome), 'breeds live in their biomes');
   }

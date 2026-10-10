@@ -6,6 +6,7 @@ import { h } from './dom.js';
 import { icon } from './icons.js';
 import { openModal } from './modal.js';
 import { CHUNK, T, SEA } from '../game/world.js';
+import { herdsNear, BREED_BY_ID, HERD_RUMOUR_RANGE } from '../game/horses.js';
 
 const COLORS = {
   [T.GRASS]: '#4f9a44', [T.FLOWERS]: '#58a24a', [T.MOSS]: '#3c7437', [T.SAND]: '#e3c886', [T.SAND2]: '#dcbf7a',
@@ -81,6 +82,7 @@ export function open(game) {
     h('span', h('i.lg.market'), 'Market'), h('span', h('i.lg.village'), 'Village'), h('span', h('i.lg.shrine'), 'Shrine'), h('span', h('i.lg.chest'), 'Chest'),
     h('span', h('i.lg.pin'), 'Your pins'), h('span', h('i.lg.sea'), 'Sea'),
     save.horses?.owned.length ? h('span', h('i.lg.horse'), game.mp ? 'Hästar' : 'Horses') : null,
+    h('span', h('i.lg.herd'), game.mp ? 'Vilda hästar' : 'Wild horses'),
     game.mapMarkers ? h('span', h('i.lg.mate'), 'Klan') : null);
 
   const markers = () => {
@@ -112,6 +114,22 @@ export function open(game) {
     }
     if (save.base.recall) out.push({ kind: 'portal', x: save.base.recall.x, y: save.base.recall.y, label: 'Waystone return point' });
     save.world.pins.forEach((pin, i) => out.push({ kind: 'pin', x: pin.x, y: pin.y, index: i, label: pin.label || 'Pin' }));
+    // Wild herds you have seen, and the ones villagers told you about.
+    const villages = [];
+    for (const [id, st] of Object.entries({ ...save.markets, ...game.me?.markets })) {
+      if (id === 'town' || !st.visited) continue;
+      const m = world.marketById(id);
+      if (m?.village) villages.push(m);
+    }
+    for (const herd of herdsNear(world, p.x, p.y, 1600)) {
+      const seen = game.explored.has(`${Math.floor(herd.x / CHUNK)},${Math.floor(herd.y / CHUNK)}`);
+      if (!seen && !villages.some((v) => (v.x - herd.x) ** 2 + (v.y - herd.y) ** 2 < HERD_RUMOUR_RANGE ** 2)) continue;
+      const names = [...new Set(herd.breeds)].map((b) => {
+        const breed = BREED_BY_ID.get(b);
+        return game.mp ? breed?.sv : breed?.name;
+      });
+      out.push({ kind: 'herd', x: herd.x, y: herd.y, label: `${game.mp ? 'Vilda hästar' : 'Wild horses'}: ${names.join(', ')}` });
+    }
     // Where you left your horses.
     for (const hr of save.horses?.owned ?? []) {
       if (hr.id !== save.horses.riding && Number.isFinite(hr.x)) out.push({ kind: 'horse', x: hr.x, y: hr.y, label: hr.name });
@@ -282,13 +300,14 @@ export function open(game) {
           g.stroke();
           break;
         case 'horse':
-          // A horseshoe.
+        case 'herd':
+          // A horseshoe (your horses brown, wild herds pale).
           g.strokeStyle = '#0e0c18';
           g.lineWidth = 5;
           g.beginPath();
           g.arc(x, y, Math.max(3, r - 2), Math.PI * 0.85, Math.PI * 2.15);
           g.stroke();
-          g.strokeStyle = '#d89a50';
+          g.strokeStyle = mk.kind === 'herd' ? '#f0e2c0' : '#d89a50';
           g.lineWidth = 3;
           g.stroke();
           break;

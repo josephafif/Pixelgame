@@ -97,9 +97,9 @@ export const NEWS = {
           en: 'The attack button hits sharks and serpents from the boat.',
         },
         {
-          live: false,
-          sv: 'Hästar blir lättare att hitta. Byggen och underhåll blir dyrare.',
-          en: 'Horses get easier to find. Building and upkeep cost more.',
+          live: true,
+          sv: 'Fler hästflockar, närmare starten, och de syns på kartan (byborna vet var de betar). Byggen, arbetare och underhåll kostar mer.',
+          en: 'More horse herds, closer to the start, and they show on the map (villagers know where they graze). Building, workers and upkeep cost more.',
         },
         {
           live: true,

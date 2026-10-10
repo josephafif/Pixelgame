@@ -1127,6 +1127,7 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 .lg.sea { background: #2f8fc4; }
 .lg.mate { background: #7ae07a; border-radius: 50%; }
 .lg.horse { background: transparent; border: 3px solid #d89a50; border-bottom-color: transparent; border-radius: 50%; }
+.lg.herd { background: transparent; border: 3px solid #f0e2c0; border-bottom-color: transparent; border-radius: 50%; }
 @media (max-width: 640px) {
   .map-panel { height: 100%; }
   .map-status { flex-basis: 100%; margin: 0; }

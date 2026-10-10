@@ -242,7 +242,8 @@ test('bases: banners claim land, only the clan builds there, raids follow the ru
     res = await owner.request({ t: 'build', id: 'wood_wall', x: wx, y: wy });
     assert.equal(res.ok, true, res.error);
     const wall = t.gs.world.structureAt(wx, wy);
-    assert.equal(po.ch.resources.wood, 200 - 3 - 3, 'paid for banner and wall');
+    const cost = (id) => t.gs.data.building.structures.find((d) => d.id === id).cost.wood;
+    assert.equal(po.ch.resources.wood, 200 - cost('banner') - cost('wood_wall'), 'paid for banner and wall');
     // The raider can't build in someone else's claim.
     await raider.request({ t: 'clan', op: 'create', name: 'Rovarna', tag: 'ROV' });
     t.place(raider, wx + 0.5, wy + 2.5);

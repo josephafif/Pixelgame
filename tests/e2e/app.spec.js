@@ -1108,7 +1108,7 @@ test('exploring: a watchtower shows the land around, a runestone points somewher
 test('horses: tame a wild horse, gallop over trees, leave it in camp, find it in the camp panel', async ({ page }) => {
   const errors = trackErrors(page);
   await startGame(page);
-  // Off to the nearest herd (far from camp: not easy to find).
+  // Off to the nearest herd (a short ride out from camp, never right next to it).
   const herd = await game(page, async () => {
     const { herdsNear } = await import('/src/game/horses.js');
     const g = window.__pixelgame.game;
@@ -1118,7 +1118,7 @@ test('horses: tame a wild horse, gallop over trees, leave it in camp, find it in
     g.player.invuln = 999;
     return { x: h.x, y: h.y, dist: Math.hypot(h.x, h.y) };
   });
-  expect(herd.dist).toBeGreaterThan(90);
+  expect(herd.dist).toBeGreaterThan(60);
   await expect.poll(() => game(page, () => window.__pixelgame.game.horses.length)).toBeGreaterThan(0);
   await game(page, () => {
     const g = window.__pixelgame.game;

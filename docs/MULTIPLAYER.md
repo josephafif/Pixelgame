@@ -358,9 +358,9 @@ Säkerheten kommer från att servern bestämmer.
   - Den egna väskan och de egna vapnen är fortfarande personliga.
 - **Klanvalvet** nås överallt på klanens mark. I panelen (B, fliken Valv)
   lägger du i 10, 100 eller allt med ett tryck.
-- **Underhåll:** dras ur klanvalvet en gång i timmen: 2 trä och 2 sten per
-  bygge och vecka, 3 skrot och 3 essens per byggnadsnivå och vecka, och varje
-  arbetares lön (70 skrot och 42 essens i veckan). Allt går att ändra per server
+- **Underhåll:** dras ur klanvalvet en gång i timmen: 5 trä och 5 sten per
+  bygge och vecka, 10 skrot och 10 essens per byggnadsnivå och vecka, och varje
+  arbetares lön (126 skrot och 84 essens i veckan). Allt går att ändra per server
   (`upkeepPerStructure`, `upkeepPerBuildingLevel`, `upkeepPerWorker` i
   `src/net/rules.js`). Valvfliken visar underhållet per dygn uppdelat på murar,
   byggnader och löner, och hur länge förråden i valvet räcker. Om ingen betalar

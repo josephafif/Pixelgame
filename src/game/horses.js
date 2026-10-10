@@ -1,5 +1,6 @@
-// Horses: small wild herds here and there in the world (not easy to find:
-// a few in each big region). Walk up to one and press Use to ride it. On
+// Horses: wild herds here and there in the world (a herd every hundred
+// tiles or so; villagers know where they graze, and herds you have seen are
+// on the map). Walk up to one and press Use to ride it. On
 // horseback you are much faster and you jump over trees and rocks (not over
 // water or walls). Press Use again to get off. Leave a horse in your camp
 // (single player) or your clan's base (multiplayer) and it stays there for
@@ -34,8 +35,12 @@ export const STRAY_SECONDS = 180;
 /** A herd that lost a horse to a rider grows it back after this long. */
 export const REGROW_MS = 45 * 60 * 1000;
 
-const HERD_CELL = 150;
-const HERD_CHANCE = 0.45;
+const HERD_CELL = 110;
+const HERD_CHANCE = 0.75;
+/** No herds this close to the start (the first ones a short ride out). */
+const HERD_CLEAR = 60;
+/** Villagers know the herds within this many tiles of their village (they show on the map). */
+export const HERD_RUMOUR_RANGE = 140;
 
 const NAMES = ['Blixt', 'Stjärna', 'Molly', 'Freja', 'Saga', 'Storm', 'Pärla', 'Ronja', 'Tor', 'Vinter', 'Kanel', 'Skugga', 'Dimma', 'Siri', 'Bamse', 'Lotta', 'Viking', 'Ylva'];
 
@@ -46,18 +51,28 @@ export function herdForCell(world, hx, hy) {
   if (world.herdCache.has(key)) return world.herdCache.get(key);
   let herd = null;
   const h = hashInts(world.objSeed ?? world.seed, hx, hy, 0x40125);
-  if ((h % 1000) / 1000 < HERD_CHANCE) {
-    const x = hx * HERD_CELL + 20 + ((h >>> 10) % (HERD_CELL - 40)) + 0.5;
-    const y = hy * HERD_CELL + 20 + ((h >>> 20) % (HERD_CELL - 40)) + 0.5;
-    const far = x * x + y * y > 90 * 90;
-    if (far && world.seaAt(x, y) === SEA.LAND && !world.marketAt(x, y, 12)) {
+  // A few spots to try in the cell (the first on dry land, away from markets, wins).
+  let x = NaN;
+  let y = NaN;
+  for (let t = 0; t < 4 && (h % 1000) / 1000 < HERD_CHANCE; t++) {
+    const s = t ? hashInts(h, t, 0x7e2d) : h;
+    const tx = hx * HERD_CELL + 20 + ((s >>> 10) % (HERD_CELL - 40)) + 0.5;
+    const ty = hy * HERD_CELL + 20 + ((s >>> 20) % (HERD_CELL - 40)) + 0.5;
+    if (tx * tx + ty * ty <= HERD_CLEAR * HERD_CLEAR) continue;
+    if (world.seaAt(tx, ty) !== SEA.LAND || world.marketAt(tx, ty, 12)) continue;
+    x = tx;
+    y = ty;
+    break;
+  }
+  if (Number.isFinite(x)) {
+    {
       const biome = world.biomeAt(Math.floor(x), Math.floor(y)).id;
       const local = BREEDS.filter((b) => b.biomes.includes(biome));
       const total = local.reduce((s, b) => s + b.weight, 0);
       const rng = createRng(h);
       // Where only rare breeds live (Voidreach), herds are rare too.
       if (local.length && rng.next() < Math.min(1, total / 40)) {
-        const size = 1 + Math.floor(rng.next() * 3);
+        const size = 2 + Math.floor(rng.next() * 3);
         const breeds = [];
         for (let i = 0; i < size; i++) {
           let r = rng.next() * total;

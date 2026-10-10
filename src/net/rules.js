@@ -30,9 +30,9 @@ export const DEFAULT_RULES = {
   // Weekly upkeep, paid from the clan vault once an hour: per structure in the
   // claim (walls, floors, turrets …), per level of the camp's buildings, and
   // per hired worker (their wages).
-  upkeepPerStructure: { wood: 2, stone: 2 },
-  upkeepPerBuildingLevel: { scrap: 3, essence: 3 },
-  upkeepPerWorker: { scrap: 70, essence: 42 },
+  upkeepPerStructure: { wood: 5, stone: 5 },
+  upkeepPerBuildingLevel: { scrap: 10, essence: 10 },
+  upkeepPerWorker: { scrap: 126, essence: 84 },
   // Bosses: you get loot if you did at least this share of the damage.
   bossShare: 0.1,
   // Weapons are tuned for monsters; against players they hit softer, so a
