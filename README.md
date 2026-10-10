@@ -46,7 +46,7 @@ npm run server       # spelservern i produktion (inställningar i server/.env, s
 | Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
 | Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
 | Pals | I menyn, eller tryck på pal-chippen under hälsan | H | – |
-| Byggläge (i lägret) | Hammarknappen; tryck på en ruta för att välja den, tryck igen (eller på hammaren) för att bygga, dra från den valda rutan för en mur | G (1–9 väljer, X river, Esc klar) | – |
+| Byggläge (i lägret) | Hammarknappen; tryck på en ruta för att välja den, tryck igen (eller på hammaren) för att bygga, dra från den valda rutan för en mur | G (1–9 väljer, X river, U uppgraderar, Esc klar) | – |
 | Hugga / bryta | Byt till hackan (3), sedan svärdknappen nära träd/sten | 3, sedan Space / E (håll inne) | A |
 | Handla på en marknad | Handknappen nära en handlare | E | A |
 
@@ -333,8 +333,11 @@ legendariskt.
    | Starforged | Forge 5 + två olika bossar | **Stjärnsten** (Voidreach): mycket essence, ibland en Star Shard | +50 % material, snabbast sving |
 2. Byt till hackan (plats 3), gå fram till ett träd eller en sten och tryck på attack eller Use
    (håll inne för att fortsätta). Träd ger
-   **trä** och stenar ger **sten**. Utanför lägret växer de tillbaka efter en stund; inne i lägret
-   förblir marken röjd så att du kan bygga där.
+   **trä** och stenar ger **sten**. Utanför lägret **växer de tillbaka i steg** som syns: först en
+   stubbe, sedan ett skott, en planta och ett ungträd innan trädet är fullvuxet igen (20 minuter
+   för träd, längre för sten, kristaller och malm, som först är grus). Inne i lägret förblir
+   marken röjd så att du kan bygga där. Samma sak i multiplayer: servern skickar hur länge sedan
+   varje träd höggs, så alla ser det växa.
 3. Tryck **G** (eller hammarknappen) i lägret för **byggläget**. Välj något i listan och klicka
    på marken. Dra för att bygga en hel rad. Högerklick eller X-verktyget river och ger tillbaka
    halva kostnaden.
@@ -349,6 +352,17 @@ legendariskt.
 | Pilturret / eldturret | Skjuter på fiender inom räckvidd; skadan växer med din nivå och Training Grounds |
 | Spikfälla | Skadar fiender som går över den |
 | Fackla, banderoll, trägolv, stenväg | För att göra lägret till ditt |
+| Armerad mur | Sten med järnband, 900 HP (kräver Hearth 4 och Forge 3) |
+| Järngrind | Grind som tål mycket mer (kräver Hearth 3) |
+| Ballista | Tung pilkastare: lång räckvidd, hårda träffar (kräver Training Grounds 3 och Forge 2) |
+| Järnspikar | Vassare och starkare spikfälla (kräver Forge 2) |
+
+**Uppgradera på plats:** välj **Upgrade** i byggläget (U), tryck på en mur, grind, ett torn, en
+fälla eller ett golv, så blir den nästa nivå med full hälsa: trävägg → stenmur → armerad mur,
+grind → järngrind, pilturret → ballista, spikfälla → järnspikar, trägolv → stengång. Dra längs
+en mur för att uppgradera hela. Det kostar den nya nivån minus det den gamla hade gett tillbaka.
+I lägerpanelen listar **Fortify** allt du har byggt som går att förstärka, med en knapp som
+uppgraderar alla av ett slag på en gång.
 
 **Golv** ligger i ett eget lager: torn, murar, facklor och fällor kan stå på ett golv, och ett
 golv kan läggas under något som redan står. River du tar verktyget det översta först och golvet
@@ -366,9 +380,35 @@ lägret är lugnt. Logik: `src/game/construction.js` och `src/game/gathering.js`
 ## Huvudmeny
 
 Innan du kommer in i världen visas en huvudmeny: **Play** (med en rad om din sparfil: nivå,
-antal vapen och speltid), **New world**, **Settings** (samma inställningar som i spelet),
-**How to play** och **Multiplayer** (lobbyn: logga in och välj server, se nedan). Bakom menyn
-driver världen sakta förbi.
+antal vapen och speltid), **New world**, **Multiplayer** (lobbyn: logga in och välj server, se
+nedan), **Weapon Workshop** (se nedan), **Settings** (samma inställningar som i spelet) och
+**How to play**. Bakom menyn driver världen sakta förbi.
+
+Alla frågor och meddelanden visas **i spelet**: "Skrota det här vapnet?", "Sälja ditt
+legendariska?", "Ny värld?", "Sparka spelaren?" och resten är små rutor i spelets stil ovanpå
+panelen du har öppen (`askConfirm` och `showText` i `src/ui/modal.js`). Esc eller bakåtknappen
+svarar nej. Webbläsarens egna popup-rutor används aldrig.
+
+## Vapenverkstaden
+
+**Weapon Workshop** i huvudmenyn (och i pausmenyn) är en sida där du gör vilket vapen du vill,
+helt fritt och utan kostnad (`src/ui/workshop.js`, verktygen i `src/weapons/workshop.js`):
+
+- **Smid ett nytt:** välj sällsynthet, vapentyp, material, element, förmåga, runa, nivå och seed,
+  eller tryck *Surprise me*. Generatorn bygger ett riktigt vapen av valen.
+- **Ändra allt för hand:** namn (eller *New name*), sällsynthet, typ (attack, grundvärden och
+  utseende följer med), material, element, spelstil, nivå, den legendariska kraften, varje stat
+  (antingen uträknad från grundvärden och modifierare med spelets tak, eller helt fri),
+  attackens bredd, båge och radie, modifierare (lägg till vilken som helst med vilket värde som
+  helst), specialeffekter, förmågan och dess varje siffra och twist, en nackdel, utseendet (form,
+  storlekar, alla färger, kant, glöd, runor, partiklar, spår) och ljudet (med *Play*).
+- **Vapenkortet** uppdateras medan du ändrar, med DPS, guldvärde, skrotvärde och jämförelse mot
+  vapnet du har utrustat. *Undo* ångrar.
+- **Kod:** *Copy code* ger en kod (`PGX1.…`) som bär hela vapnet med varje ändring. Klistra in
+  vilken vapenkod som helst (även de vanliga `PGW1.…`) för att öppna vapnet i verkstaden. Koder
+  går också att förhandsvisa i Codex, och varje vapen i inventoryt har en *Workshop*-knapp.
+- **Ta med det in i spelet** (singleplayer): *Add to my bag* eller *Add and equip*. Vapnet märks
+  *Made in the Weapon Workshop*. I multiplayer bestämmer servern alla vapen, så där delar man koden.
 
 ## Multiplayer
 
@@ -415,8 +455,11 @@ servrar loggar man in med namn och lösenord.
 - **Klaner och baser:** grunda en klan och bjud in vänner (B), res ett **klanbanér** i
   vildmarken. Marken runt banéret blir er. Där bygger ni alla byggnader från singleplayerlägret
   (smedja, förråd, bibliotek, träningsplats, brunn, vägsten, djurhus och härd) och uppgraderar
-  dem ur klanvalvet, plus murar, grindar, torn och fällor. Klanmedlemmar syns på kartan och som
-  små pilar vid skärmkanten.
+  dem ur klanvalvet, plus murar, grindar, torn och fällor (som går att förstärka på plats).
+  Klanmedlemmar syns på kartan och som små pilar vid skärmkanten.
+- **Arbetarstuga och underhåll:** anställ arbetare som hugger och bryter åt klanen och fyller
+  valvet. Underhållet (murar, byggnadsnivåer och löner) dras ur valvet varje timme, och valvet
+  visar hur länge förråden räcker.
 - **Raider:** en bas kan bara skadas när någon i klanen är online, 15 minuter efter att den
   sista loggat ut, eller under serverns raidfönster (lördag 18–21 som standard). Hälften av
   valvet kan aldrig tas.
@@ -512,9 +555,60 @@ Use, eller öppna lägerpanelen (B / hus-knappen). Varje byggnad har nivåer med
 | Essence Well | Producerar essence i realtid, även när du inte spelar (med tak). Ger 15 essence/timme per nivå |
 | Pal Den | Kläck pal-ägg. Varje nivå låter dina pals växa två nivåer till |
 | Waystone | Teleportera hem till lägret. Nivå 2: gå tillbaka dit du var |
+| Workers' Lodge | Anställ arbetare (se nedan). Varje nivå ger plats för en till och lär dem bryta hårdare sten |
+
+Hearth, Forge, Vault, Library, Training Grounds och Essence Well går upp till **nivå 7** (nivå 6
+och 7 kräver en besegrad boss och mycket material). På nivå 7 vajar gyllene vimplar över
+byggnaden.
+
+### Arbetare
+
+Bygg **Workers' Lodge** (nivå 5) och anställ arbetare i den (tryck Use vid stugan, eller
+*Workers* i lägerpanelen). Varje arbetare är **skogshuggare** eller **gruvarbetare** (byt när du
+vill). De går ut i världen, upp till drygt 40 rutor från lägret men aldrig inne i det, hugger
+träd eller bryter sten med yxa och hacka, bär hem det de fått (du ser bylten på ryggen) och
+lägger allt i valvet. Sedan vilar de en stund och går ut igen. Fällda träd växer tillbaka, så
+de har alltid något att göra.
+
+- Stugans nivå bestämmer hur många som får plats (2 till 6) och vad de klarar: träd och sten,
+  sedan kristaller (nivå 3), obsidian (4) och järnmalm (5).
+- Att anställa kostar skrot och essence, varje ny lite mer. **Lönen** (10 skrot och 6 essence per
+  dygn) ingår i underhållet.
+- **Skadar du en arbetare** (ett slarvigt slag, en explosion) blir den arg på dig och slår
+  tillbaka tills den lugnat ner sig. Dör den är den borta.
+- När du är borta räknas en del av det de hade hämtat in (upp till 12 timmar).
+
+Logik: `src/game/workers.js` (delad med servern), `src/game/workforce.js`; panelen
+`src/ui/workers.js`; grafiken `src/render/workers-art.js`.
+
+### Valvet och underhållet
+
+**Vault** har nu också ett förråd för trä, sten, skrot och essence (*Supplies* i lägerpanelen,
+eller Use vid valvet). Lägg i 10, 100 eller allt med ett tryck; arbetarna lägger sitt där. Ur
+valvet betalas **underhållet** en gång i timmen: lite trä och sten för varje mur och annat du
+byggt, lite skrot och essence per byggnadsnivå, och arbetarnas löner. Valvet visar underhållet
+per dygn uppdelat på murar, byggnader och löner, och **hur länge förråden räcker** (och vad som
+tar slut först). När valvet är tomt tas underhållet från det du bär. Betalas det inte slutar
+arbetarna, murarna lagar sig inte längre och förfaller långsamt (aldrig under en fjärdedel).
+Underhållet räknas också när du inte spelar, upp till 12 timmar. Logik: `src/game/upkeep.js`
+(delad med multiplayer, där klanvalvet betalar samma sorts underhåll, lite dyrare).
 
 Logiken ligger i `src/game/base.js` (rena funktioner, testade i `tests/unit/base.test.js`),
 panelen i `src/ui/base.js` och pixelgrafiken för varje byggnad och nivå i `src/render/buildings.js`.
+
+## Byar
+
+Här och där i världen ligger **byar**, större än marknaderna: 5 till 8 hus runt en äng med en
+brunn, två handlare vid sina stånd och ett par vakttorn. Varje hus är **byggt av samma block som
+ditt läger**: murar runt om (trä, eller sten i bergen och kylan), golv, en dörröppning mot ängen,
+en säng, ett bord och en tunna eller låda. **Stigar** av jord går från varje dörr till ängen, och
+vid en del hus finns en grönsaksodling. Mellan husen går **bybor** (två per hus) längs stigarna:
+hem, till ängen, till grannen och till odlingarna.
+
+Den första byn ligger en kort promenad från lägret. Handlarna handlar som på en marknad, och
+skadar du någon vänder sig vakttornen mot dig en stund. Byar syns på kartan som ett litet hus.
+I multiplayer går servern med byborna; alla ser samma by. Logik: `src/game/villages.js`
+(planlösning, stigar och vägval) och `src/game/markets.js`.
 
 ## Gränssnitt och animationer
 
@@ -681,12 +775,14 @@ src/
   main.js, config.js          uppstart, livscykel, PWA-kopplingar
   core/                       deterministisk RNG, matematik
   data/                       laddning, validering, klientens kapabiliteter
-  weapons/                    generator, regler, namn, visuals, DNA, crafting, worker
+  weapons/                    generator, regler, namn, visuals, DNA, crafting, worker,
+                              vapenverkstadens verktyg (workshop.js)
   game/                       värld, fiender/bossar, strid, abilities, loot, status, fx, läger,
                               insamling (gathering.js), byggen (construction.js),
                               marknader (markets.js), ekonomi och vapenvärde (economy.js),
                               segling (sailing.js), småfynd (discoveries.js), pals (pals.js),
-                              hästar (horses.js, riding.js)
+                              hästar (horses.js, riding.js), byar (villages.js), arbetare
+                              (workers.js, workforce.js), underhåll (upkeep.js)
   render/                     renderer, pixelsprites, animerade monster och pals (creatures.js),
                               tiles, vapensprites, byggnader, konstruktioner, båtar, hästar, animationer
   input/, audio/, storage/, pwa/, ui/
@@ -722,8 +818,10 @@ GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 - Du kan bara ha en pal med dig åt gången, och pals har inga egna förmågor utöver bett, zap och
   insamling. Fler sorter och specialförmågor vore ett naturligt nästa steg.
 - Ljud och grafik genereras procedurellt (ingen musik ännu).
-- Marknadernas NPC:er är enkla (handlare står still, bybor strövar). Nästa steg kan vara
-  karavaner mellan marknader och uppdrag från handlarna.
+- Marknadernas och byarnas NPC:er är enkla (handlare står still, bybor går mellan husen). Nästa
+  steg kan vara karavaner mellan marknader och byar och uppdrag från handlarna.
+- Arbetare bryr sig inte om monster (och monster inte om dem). Vakter som försvarar dem vore ett
+  naturligt nästa steg.
 - Havsdjuren är enkla (hajar och sjöormar). Fler sorter, och boss-sjömonster, vore ett naturligt
   nästa steg.
 - Fiender attackerar inte lägret på egen hand ännu. Ett naturligt nästa steg är räder mot

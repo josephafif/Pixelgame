@@ -192,7 +192,7 @@ test('your clan base: the camp buildings, the base panel, upgrades and the vault
   players.markMe(p);
   await a.page.waitForFunction(() => window.__pixelgame.game.clan?.base?.placed?.forge);
   await a.page.keyboard.press('KeyB');
-  await expect(a.page.locator('.mp-clan .bcard')).toHaveCount(8);
+  await expect(a.page.locator('.mp-clan .bcard')).toHaveCount(9); // (with the Workers' Lodge)
   const forge = a.page.locator('.mp-clan .bcard[data-building="forge"]');
   await expect(forge).toContainText('Nivå 1');
   await forge.locator('button', { hasText: 'Uppgradera' }).click();
@@ -306,6 +306,41 @@ test('sailing in multiplayer: set sail at the shore and sail smoothly (predicted
   expect(after.x).toBeGreaterThan(shore.x + 2);
   expect(Math.abs(after.x - p.x)).toBeLessThan(0.3);
   expect(p.sailing).toBe(true);
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
+test('workers and villages in multiplayer: hire at the lodge, see them work, the upkeep in the vault, villagers walking', async ({ browser }) => {
+  const a = await join(browser, 'Arbetsledare');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Arbetsledare');
+  p.protectUntil = Date.now() + 10 * 60 * 1000;
+  p.ch.level = 12;
+  const at = await giveBase(p, { lodge: 2 });
+  const players = await import('../../server/players.js');
+  Object.assign(p, { x: at.x + 0.5, y: at.y + 2.5 });
+  srv.gs.send(p, { t: 'teleport', x: p.x, y: p.y });
+  const clan = srv.gs.clans.get(p.clanId);
+  clan.vault = { scrap: 3000, essence: 3000, wood: 50, stone: 50 };
+  players.markMe(p);
+  const clans = await import('../../server/clans.js');
+  clans.sendClan(srv.gs, clan);
+  await a.page.waitForFunction(() => window.__pixelgame.game.clan?.lodge);
+  await a.page.keyboard.press('KeyB');
+  await a.page.locator('.mp-clan .tab', { hasText: 'Arbetare' }).click();
+  await a.page.locator('.mp-clan button', { hasText: 'Anställ skogshuggare' }).click();
+  await expect(a.page.locator('.mp-clan .worker-row')).toHaveCount(1);
+  // The worker is sent to the client and drawn.
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.workers.length)).toBe(1);
+  // The vault tab: upkeep per day with the wages, and how long the vault lasts.
+  await a.page.locator('.mp-clan .tab', { hasText: 'Valv' }).click();
+  await expect(a.page.locator('.upkeep-box')).toContainText('löner');
+  await expect(a.page.locator('.upkeep-lasts')).toContainText('räcker');
+  await a.page.keyboard.press('Escape');
+  // A village: houses, paths and people walking about.
+  const v = srv.gs.world.firstVillage;
+  await a.page.evaluate(([x, y]) => window.__pixelgame.game.chat(`/tp ${x} ${y}`), [v.x + 0.5, v.y + 3.5]);
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.markets.npcs.length)).toBeGreaterThan(8);
+  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.markets.structures.filter((s) => s.id.endsWith('_wall')).length)).toBeGreaterThan(40);
   expect(a.errors).toEqual([]);
   await a.ctx.close();
 });

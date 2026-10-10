@@ -207,6 +207,7 @@ class App {
     $('#title-settings')?.addEventListener('click', () => import('./ui/settings.js').then((m) => m.open(this.game, this)));
     $('#title-howto')?.addEventListener('click', () => this.#howToPlay());
     $('#title-multiplayer')?.addEventListener('click', () => this.#multiplayer());
+    $('#title-workshop')?.addEventListener('click', () => this.openWorkshop());
     // Served by a game server (a friend's `npm run share` link) or opened from
     // an invitation: multiplayer first.
     if (document.querySelector('meta[name="pixelgame-server"]') || invite.get('join') || invite.get('server')) {
@@ -327,9 +328,18 @@ class App {
         h('li', 'Follow the arrow at the top-left to find the bosses.'),
         h('li', 'Press 1, 2 and 3 (or tap the hotbar) for your main weapon, second weapon and pickaxe; press the same one again to put it away.'),
         h('li', 'Far out lie seas and islands: build a boat at the Forge to sail there — but beware of what swims beneath.'),
+        h('li', 'Villages dot the land, with traders on the green. At home, a Workers\u2019 Lodge lets you hire workers who chop and mine for you; keep supplies in the Vault to pay their wages and the camp\u2019s upkeep.'),
+        h('li', 'The Weapon Workshop (main menu) lets you make and change any weapon you like and share its code.'),
         h('li', touch
           ? 'Rare Pal Eggs hatch at the Pal Den into pals that fight with you or gather wood and stone (menu → Pals).'
           : 'Rare Pal Eggs hatch at the Pal Den into pals that fight with you or gather wood and stone (H).'))];
+  }
+
+  /** The Weapon Workshop: make and change any weapon, copy its code. */
+  openWorkshop(opts = {}) {
+    import('./ui/workshop.js')
+      .then((m) => m.open(this.game, this, opts))
+      .catch((err) => this.game.toast(`The workshop could not open: ${err.message}`, 'warn'));
   }
 
   #howToPlay() {

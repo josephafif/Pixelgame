@@ -13,6 +13,7 @@ import { weaponCard, weaponIconEl } from './weapon-card.js';
 import { statSheet } from '../game/stats.js';
 import { baseBonuses } from '../game/base.js';
 import { encodeDnaCode, decodeDnaCode } from '../weapons/dna.js';
+import { decodeWeaponCode, encodeWeaponCode } from '../weapons/workshop.js';
 import { rarityInfo, summaryLine, dpsEstimate, archetypeName } from '../weapons/describe.js';
 import { salvageValue } from '../game/loot.js';
 
@@ -187,7 +188,8 @@ export function open(game, app, arg = {}) {
     const equipped = main || second;
     const fav = i.favorites.includes(dna.id);
     const value = salvageValue(dna);
-    const code = encodeDnaCode(dna);
+    // A Workshop weapon can't be rolled again from its seed: its code carries all of it.
+    const codeOf = async () => (dna.custom ? encodeWeaponCode(dna) : encodeDnaCode(dna));
     return h('div.inv-detail',
       weaponCard(data, dna, { compareTo: game.weapon?.dna?.id === dna.id ? null : game.weapon?.dna, compact: true }),
       h('div.actions',
@@ -210,6 +212,7 @@ export function open(game, app, arg = {}) {
         h('button', {
           title: 'A short code that rebuilds this exact weapon on any device',
           onclick: async () => {
+            const code = await codeOf();
             try {
               if (navigator.share && game.input.mode === 'touch') await navigator.share({ title: dna.name.text, text: code });
               else await navigator.clipboard.writeText(code);
@@ -218,7 +221,11 @@ export function open(game, app, arg = {}) {
               showText({ title: 'Weapon code', text: 'Copy this code to rebuild the weapon on any device.', value: code });
             }
           },
-        }, 'Share code')));
+        }, 'Share code'),
+        app?.openWorkshop && !game.mp ? h('button', {
+          title: 'Open a copy of this weapon in the Weapon Workshop',
+          onclick: () => app.openWorkshop({ dna }),
+        }, icon('anvil', 20), 'Workshop') : null));
   }
 
   function bulkPanel(which) {
@@ -308,7 +315,7 @@ export function open(game, app, arg = {}) {
   function codexTab() {
     const codex = game.save.codex;
     const entries = Object.entries(codex.weapons).sort((a, b) => b[1].at - a[1].at);
-    const input = h('input', { type: 'text', placeholder: 'Paste a weapon code (PGW1.…)', 'aria-label': 'Weapon code' });
+    const input = h('input', { type: 'text', placeholder: 'Paste a weapon code (PGW1.… or a Workshop PGX1.…)', 'aria-label': 'Weapon code' });
     const preview = async (inputs) => {
       try {
         const dna = await game.weapons.regenerate(inputs);
@@ -324,16 +331,24 @@ export function open(game, app, arg = {}) {
     return h('div.codex',
       h('p', `${entries.length} weapons discovered · ${codex.modifiers.length} modifiers known · ${codex.abilities.length} abilities unlocked`),
       h('div.code-row', input, h('button', {
-        onclick: () => {
+        onclick: async () => {
+          const text = input.value.trim();
           try {
-            preview(decodeDnaCode(input.value.trim()));
+            if (text.startsWith('PGX')) {
+              // A Workshop code carries the whole weapon.
+              codexPreview = await decodeWeaponCode(data, text);
+              rerender();
+            } else {
+              preview(decodeDnaCode(text));
+            }
           } catch (err) {
             game.toast(err.message, 'warn');
           }
         },
       }, 'Preview')),
       codexPreview ? h('div.codex-preview', weaponCard(data, codexPreview, { compact: true }),
-        h('p.muted', 'Rebuilt from its seed — identical on every device with the same game version.')) : null,
+        h('p.muted', codexPreview.custom || codexPreview.ctx?.src === 'workshop' ? 'Made in the Weapon Workshop.' : 'Rebuilt from its seed — identical on every device with the same game version.'),
+        h('button', { onclick: () => app.openWorkshop?.({ dna: codexPreview }) }, icon('anvil', 18), 'Open in the Workshop')) : null,
       h('ul.codex-list', entries.slice(0, 200).map(([, e]) => {
         const r = rarityInfo(data, e.rarity);
         return h('li', h('button.linkish', {

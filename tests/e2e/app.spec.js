@@ -131,8 +131,11 @@ test('inventory: keyboard navigation, favorites, filters and quick salvage', asy
 
   // Quick salvage keeps the equipped weapon and favorites.
   await page.click('.inv-count .chip:has-text("Quick salvage")');
-  page.once('dialog', (d) => d.accept());
   await page.click('.bulk button:has-text("Uncommon and below")');
+  // An in-game question over the panel (never the browser's confirm()).
+  await expect(page.locator('.dialog')).toContainText('Salvage');
+  await page.click('.dialog .btn-danger');
+  await expect(page.locator('.dialog')).toHaveCount(0);
   await expect(page.locator('.inv-grid .slot:not(.empty)')).toHaveCount(2);
   const left = await game(page, () => window.__pixelgame.game.save.inventory.bag.map((w) => w.name.text));
   expect(left).toContain(equippedName);
@@ -1096,7 +1099,8 @@ test('exploring: a watchtower shows the land around, a runestone points somewher
     const g = window.__pixelgame.game;
     g.pickups.push({ kind: 'mapscroll', x: g.player.x + 0.3, y: g.player.y, t: 1, vx: 0, vy: 0, z: 0, vz: 0, color: '#ecdcb0' });
   });
-  await expect.poll(explored).toBeGreaterThan(e1 + 60);
+  // (A random new world each run: the place it shows may border land you have already seen.)
+  await expect.poll(explored).toBeGreaterThan(e1 + 30);
   await expect(page.locator('.toast').last()).toContainText('old map');
   expect(errors).toEqual([]);
 });
@@ -1157,5 +1161,72 @@ test('horses: tame a wild horse, gallop over trees, leave it in camp, find it in
   await page.keyboard.press('b');
   await expect(page.locator('.horse-row')).toHaveCount(1);
   await expect(page.locator('.horse-row')).toContainText('In camp');
+  expect(errors).toEqual([]);
+});
+
+test('weapon workshop: forge anything from the main menu, change it, copy its code and take it into the game', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/?debug=1');
+  await expect(page.locator('#title-workshop')).toBeVisible();
+  await page.click('#title-workshop');
+  const panel = page.locator('.workshop-panel');
+  await expect(panel).toBeVisible();
+  const forgeSel = (label) => panel.locator(`.ws-section[data-section="forge"] .ws-field:has(span:text-is("${label}")) select`);
+  await forgeSel('Rarity').selectOption('legendary');
+  await forgeSel('Type').selectOption('hammer');
+  await forgeSel('Element').selectOption('fire');
+  await panel.locator('.ws-section[data-section="forge"] button.btn-primary').click();
+  await expect(panel.locator('.weapon-card .rarity')).toHaveText('LEGENDARY');
+  await expect(panel.locator('.weapon-card .subtitle')).toContainText('Hammer');
+  // Rename it and set its damage freely.
+  const name = panel.locator('.ws-section[data-section="identity"] .ws-field:has(span:text-is("Name")) input');
+  await name.fill('Workshop Wonder');
+  await name.press('Enter');
+  await expect(panel.locator('.weapon-card .weapon-name')).toHaveText('Workshop Wonder');
+  await panel.locator('.ws-section[data-section="stats"] summary').click();
+  await panel.locator('.ws-section[data-section="stats"] .ws-check input').uncheck();
+  const dmg = panel.locator('.ws-section[data-section="stats"] .ws-field:has(span:text-is("Damage")) input');
+  await dmg.fill('4321');
+  await dmg.press('Enter');
+  await expect(panel.locator('.weapon-card dl.stats').first()).toContainText('4321');
+  // The code carries all of it, and opens again.
+  await expect.poll(() => panel.locator('.ws-code-field').inputValue()).toMatch(/^PGX[01]\./);
+  const code = await panel.locator('.ws-code-field').inputValue();
+  const decoded = await game(page, async (c) => {
+    const { decodeWeaponCode } = await import('./src/weapons/workshop.js');
+    const dna = await decodeWeaponCode(window.__pixelgame.game.data, c);
+    return { name: dna.name.text, damage: dna.stats.damage };
+  }, code);
+  expect(decoded).toEqual({ name: 'Workshop Wonder', damage: 4321 });
+  // Into the bag (an in-game question first).
+  await panel.locator('.ws-actions button:has-text("Add to my bag")').click();
+  await page.click('.dialog .btn-primary');
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.inventory.bag.some((w) => w.custom && w.name.text === 'Workshop Wonder'))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('workers and the vault: hire at the lodge, put supplies in, see how long they last', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  await game(page, () => {
+    const g = window.__pixelgame.game;
+    g.save.player.level = 20;
+    Object.assign(g.save.resources, { scrap: 2000, essence: 2000, wood: 500, stone: 500 });
+    Object.assign(g.save.base.buildings, { lodge: 1, vault: 1 });
+    g.workforce.sync();
+  });
+  await game(page, () => window.__pixelgame.game.emit('ui', 'workers'));
+  const panel = page.locator('.workers-panel');
+  await expect(panel).toBeVisible();
+  await panel.locator('button:has-text("Hire a lumberjack")').click();
+  await expect(panel.locator('.worker-row')).toHaveCount(1);
+  expect(await game(page, () => window.__pixelgame.game.workers.length)).toBe(1);
+  await panel.locator('button:has-text("Vault")').click();
+  const vault = page.locator('.vault-panel');
+  await expect(vault).toBeVisible();
+  await vault.locator('button:has-text("Put in all")').click();
+  await expect(vault.locator('.vault-row[data-res="scrap"] .vault-stock')).not.toHaveText('0');
+  await expect(vault.locator('.upkeep-box')).toContainText('Workers');
+  await expect(vault.locator('.upkeep-lasts')).toContainText('last');
   expect(errors).toEqual([]);
 });

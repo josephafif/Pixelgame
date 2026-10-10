@@ -344,16 +344,36 @@ Säkerheten kommer från att servern bestämmer.
     och smidning med bättre katalysatorer.
   - Uppgraderingar betalas ur klanvalvet först, och resten tas från det du bär
     (`server/base.js`).
-  - Byggnaderna kan inte förstöras och kostar inget underhåll. Rivs en byggnad
-    finns nivån kvar, och den kan byggas upp gratis någon annanstans i basen.
+  - Byggnaderna kan inte förstöras. Rivs en byggnad finns nivån kvar, och den
+    kan byggas upp gratis någon annanstans i basen.
+  - **Arbetarstugan** (`server/workers.js`): anställ skogshuggare och
+    gruvarbetare (klanpanelen, fliken Arbetare). De går ut utanför klanens mark,
+    hugger träd och bryter sten och bär hem allt till klanvalvet, medan någon i
+    klanen är online och underhållet är betalt. De skickas som en egen
+    entitetstyp (`ET.WORKER`, protokoll 11). Skadar du en blir den arg på dig och
+    slår tillbaka; dör den är den borta. Andra klaner kan bara skada dem när
+    basen går att raida.
   - Förrådet för vapen står i basen. Vägstenen tar dig hem till basen (nivå 2:
     och tillbaka igen). Djurhuset kläcker ägg.
   - Den egna väskan och de egna vapnen är fortfarande personliga.
 - **Klanvalvet** nås överallt på klanens mark. I panelen (B, fliken Valv)
   lägger du i 10, 100 eller allt med ett tryck.
-- **Underhåll:** banéret drar lite trä, sten och essence varje vecka. Om ingen
-  betalar förfaller basen långsamt, så att övergivna baser inte blir kvar för
-  alltid.
+- **Underhåll:** dras ur klanvalvet en gång i timmen: 2 trä och 2 sten per
+  bygge och vecka, 3 skrot och 3 essens per byggnadsnivå och vecka, och varje
+  arbetares lön (70 skrot och 42 essens i veckan). Allt går att ändra per server
+  (`upkeepPerStructure`, `upkeepPerBuildingLevel`, `upkeepPerWorker` i
+  `src/net/rules.js`). Valvfliken visar underhållet per dygn uppdelat på murar,
+  byggnader och löner, och hur länge förråden i valvet räcker. Om ingen betalar
+  förfaller murarna långsamt och arbetarna slutar, så att övergivna baser inte
+  blir kvar för alltid.
+- **Förstärkning:** murar, grindar, torn, fällor och golv uppgraderas på plats
+  (trä → sten → armerad mur, järngrind, ballista, järnspikar) med
+  Uppgradera-verktyget i byggläget eller Förstärk-listan i klanpanelen. Betalas
+  ur valvet och det du bär (`building.upgrade`).
+- **Byar:** större byar här och där i världen (samma celler som marknaderna).
+  Servern väcker dem som marknader när någon är nära, går med byborna längs
+  stigarna och skickar dem som marknadsfolk; klienten bygger husen själv ur
+  byns plan (`src/game/villages.js`).
 - Murar, turrets, fällor och golv fungerar som i dag. Det befintliga
   byggläget och mobilflödet återanvänds. Turrets skjuter mot fiender och mot
   spelare från andra klaner som är inne i claimen när basen går att raida.

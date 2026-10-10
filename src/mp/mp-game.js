@@ -50,7 +50,7 @@ const SNAP_DIST = 2; // corrections bigger than this jump instead of gliding
 const BUILDING_LABELS = { hearth: 'Vila vid Fristadens eld', forge: 'Smid i Fristadens smedja (upp till sällsynt)' };
 const BASE_LABELS = {
   hearth: 'Vila vid härden', forge: 'Smid', vault: 'Förrådet', library: 'Forska', training: 'Träningsplatsen',
-  well: 'Hämta essens', den: 'Djurhuset (pals)', waystone: 'Vägstenen',
+  well: 'Hämta essens', den: 'Djurhuset (pals)', waystone: 'Vägstenen', lodge: 'Arbetarstugan (arbetare)',
 };
 const SOUND_KINDS = { essence: 'pickup', scrap: 'pickup', wood: 'pickup', stone: 'pickup', gold: 'pickup' };
 

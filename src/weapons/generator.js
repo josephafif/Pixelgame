@@ -98,11 +98,11 @@ function fitMagnitude(def, wanted, available10) {
   return null;
 }
 
-function fillTemplate(template, v) {
+export function fillTemplate(template, v) {
   return template.replace('{v}', String(v));
 }
 
-function resolveHooks(hooks, v) {
+export function resolveHooks(hooks, v) {
   if (!hooks) return undefined;
   return hooks.map((h) => {
     const out = {};
@@ -405,7 +405,7 @@ function generateAbility(data, pool, state, budget, rarityIdx, ctx, coreDef, see
 const critFactor = (chance, dmg) => 1 + (chance / 100) * (dmg / 100 - 1);
 
 /** Applies modifiers to base stats, enforces caps and the rating ceiling. */
-function finalizeStats(data, archetype, rarity, base, modifiers, levelMult) {
+export function finalizeStats(data, archetype, rarity, base, modifiers, levelMult) {
   const caps = data.balance.caps;
   const totals = {};
   for (const m of modifiers) if (m.stat) totals[m.stat] = (totals[m.stat] ?? 0) + m.v;
@@ -457,7 +457,7 @@ function finalizeStats(data, archetype, rarity, base, modifiers, levelMult) {
   };
 }
 
-function collectPlayerBonuses(modifiers, drawback) {
+export function collectPlayerBonuses(modifiers, drawback) {
   const bonuses = {};
   for (const m of [...modifiers, ...(drawback ? [drawback] : [])]) {
     if (m.playerStat) bonuses[m.playerStat] = (bonuses[m.playerStat] ?? 0) + m.v;

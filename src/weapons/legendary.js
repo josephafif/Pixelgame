@@ -23,6 +23,9 @@ function abilityRoll(data, ab) {
 export function signatureTemplate(data, dna) {
   const list = data.legendaryAbilities ?? [];
   if (dna?.rarity !== 'legendary' || !dna.ability || !list.length) return null;
+  // (A weapon made in the Weapon Workshop may name its power.)
+  const chosen = dna.signature ? list.find((a) => a.id === dna.signature) : null;
+  if (chosen) return chosen;
   const own = list.filter((a) => a.affinity.includes(dna.element));
   const pool = own.length ? own : list;
   return pool[hashInts(dna.seed >>> 0, 0x1e6e9d) % pool.length];
