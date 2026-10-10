@@ -21,6 +21,10 @@ const MP_OVERRIDES = {
   torch: { mpLevel: 1, name: 'Fackla', desc: 'Lyser upp basen.' },
   wood_floor: { mpLevel: 1, name: 'Trägolv', desc: 'Plankor att gå på.' },
   stone_floor: { mpLevel: 1, name: 'Stengång', desc: 'Stenlagd gång.' },
+  iron_wall: { mpLevel: 14, name: 'Armerad mur', desc: 'Sten med järnband. Håller mycket längre än sten.' },
+  iron_gate: { mpLevel: 8, name: 'Järngrind', desc: 'Järnbeslagen grind. Öppnas bara för din klan och tål mycket mer.' },
+  ballista: { mpLevel: 10, name: 'Ballista', desc: 'Tung pilkastare: lång räckvidd och hårda träffar.' },
+  iron_spikes: { mpLevel: 7, name: 'Järnspikar', desc: 'Vassare och starkare spikar, perfekt vid grindarna.' },
 };
 
 /** Structure definitions as used in multiplayer. */

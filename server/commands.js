@@ -65,6 +65,8 @@ export function handle(gs, p, msg) {
       return building.place(gs, p, String(msg.id ?? ''), Number(msg.x), Number(msg.y));
     case 'unbuild':
       return building.remove(gs, p, Number(msg.x), Number(msg.y));
+    case 'upgrade':
+      return msg.all ? building.upgradeAll(gs, p, String(msg.all)) : building.upgrade(gs, p, Number(msg.x), Number(msg.y));
     case 'equip':
       return equip(gs, p, String(msg.id ?? ''), msg.slot === 'secondary' ? 'secondary' : 'main');
     case 'pal':

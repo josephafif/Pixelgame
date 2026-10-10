@@ -4,11 +4,17 @@
 
 import { h, pixelCanvas } from '../ui/dom.js';
 import { icon, costChips } from '../ui/icons.js';
-import { closeModal } from '../ui/modal.js';
+import { closeModal, askConfirm } from '../ui/modal.js';
 import { buildingSprite } from '../render/buildings.js';
 import { buildingDef, maxLevel, COST_KEYS } from '../game/base.js';
 import { BASE_BUILDINGS, BUILDING_SV, baseStructId } from '../net/mpbase.js';
 import { ROLE_SV, canDo } from '../net/rules.js';
+import { workerLook, ROLE_NAMES_SV, WORKER_ROLES } from '../game/workers.js';
+import { structureDef, upgradeDef, upgradeCost } from '../game/construction.js';
+import { mpStructureLock } from '../net/mpbuild.js';
+import { roundUp } from '../game/upkeep.js';
+import { upkeepBox } from '../ui/upkeep-view.js';
+import { workerPortrait } from '../render/workers-art.js';
 
 const RES = [
   ['wood', 'Trä'], ['stone', 'Sten'], ['scrap', 'Skrot'], ['essence', 'Essens'], ['gold', 'Guld'], ['shards', 'Stjärnskärvor'],
@@ -38,6 +44,11 @@ export function bonusSv(data, id, level) {
     case 'well': return `${p.essencePerHour * n} essens i timmen`;
     case 'waystone': return ['', 'Res hem från var som helst', 'Res hem och tillbaka igen'][level] ?? '';
     case 'den': return `Kläck ägg · pals upp till nivå ${Math.min(data.pals?.maxLevel ?? 10, (p.palLevelCap ?? 2) * n)}`;
+    case 'lodge': {
+      const cap = (data.base.workers?.baseCap ?? 1) + level;
+      const tier = Math.max(1, Math.min(4, level - 1));
+      return `Plats för ${cap} arbetare · ${['', 'träd och sten', '+ kristaller', '+ obsidian', '+ järnmalm'][tier]}`;
+    }
     default: return '';
   }
 }
@@ -65,7 +76,7 @@ export function clanPanelBody(game, panels, state) {
   const clan = game.clan;
   if (!clan) return noClan(game);
   const myRole = game.me?.clan?.role ?? 'member';
-  const tabs = [['base', 'Bas', 'home'], ['vault', 'Valv', 'chest'], ['members', 'Medlemmar', 'players']];
+  const tabs = [['base', 'Bas', 'home'], ['vault', 'Valv', 'chest'], ['workers', 'Arbetare', 'pickaxe'], ['members', 'Medlemmar', 'players']];
   const raid = clan.raid;
   const head = h('header.mp-clan-head',
     h('h3', `[${clan.tag}] ${clan.name}`),
@@ -77,6 +88,7 @@ export function clanPanelBody(game, panels, state) {
   }, icon(ic, 20), h('span', label))));
   let body;
   if (state.tab === 'vault') body = vaultTab(game, myRole);
+  else if (state.tab === 'workers') body = workersTab(game, panels, myRole);
   else if (state.tab === 'members') body = membersTab(game, panels, myRole);
   else body = baseTab(game, panels, state);
   return h('div.mp-clan', head, bar, clan.unpaid ? h('p.warn.small', icon('skull', 16), ' Valvet räcker inte till underhållet: basen förfaller. Lägg i trä och sten.') : null, body);
@@ -156,14 +168,44 @@ function baseTab(game, panels, state) {
       h('span.small.muted', 'Valvet + det du bär:'),
       ['scrap', 'essence', 'wood', 'stone'].map((k) => h('span.cost', { title: k }, icon(ICON[k], 18), String(Math.floor(wallet[k] ?? 0))))),
     h('div.base-grid.mp-base-grid', BASE_BUILDINGS.map(card)),
-    h('p.small.muted', 'Byggnaderna byggs med Bygg-menyn på er mark. Alla i klanen får deras bonusar. Uppgraderingar betalas ur valvet (och resten av det du bär).'));
+    h('p.small.muted', 'Byggnaderna byggs med Bygg-menyn på er mark. Alla i klanen får deras bonusar. Uppgraderingar betalas ur valvet (och resten av det du bär).'),
+    fortify(game, wallet));
+}
+
+/** Förstärk: uppgradera alla murar (grindar, torn …) av ett slag på en gång. */
+function fortify(game, wallet) {
+  const { data } = game;
+  const clanId = game.clan?.id;
+  const counts = new Map();
+  for (const st of game.structById?.values() ?? []) {
+    if (st.clanId === clanId && st.def?.upgradesTo) counts.set(st.id, (counts.get(st.id) ?? 0) + 1);
+  }
+  if (!counts.size) return null;
+  const level = game.save.player.level;
+  const rows = [...counts].map(([id, n]) => {
+    const from = structureDef(data, id);
+    const to = upgradeDef(data, from);
+    const each = upgradeCost(data, from, to);
+    const lock = mpStructureLock(to, level);
+    const affordable = Math.min(n, ...Object.entries(each).map(([k, c]) => Math.floor((wallet[k] ?? 0) / c)));
+    return h('div.fortify-row',
+      h('span', h('b', `${n} × ${from.name}`), ' → ', to.name),
+      h('span.bcost', costChips(each, wallet), h('span.small.muted', ' styck')),
+      lock ? h('span.small.req', icon('lock', 14), ' ', lock)
+        : h('button.small', { disabled: affordable < 1, onclick: () => game.fortify(id) }, icon('up', 16), affordable >= n ? 'Förstärk alla' : `Förstärk ${Math.max(0, affordable)}`));
+  });
+  return h('section.fortify',
+    h('h3', 'Förstärk basen'),
+    h('p.small.muted', 'Uppgradera på plats: trä → sten → armerad mur, järngrindar, ballistor och järnspikar. Betalas ur valvet och det du bär. Eller använd Uppgradera-verktyget i byggläget (U).'),
+    rows);
 }
 
 function useButtons(game, panels, id, b) {
   const btn = (ic, label, onclick, disabled = false) => h('button', { onclick, disabled }, icon(ic, 18), label);
   switch (id) {
     case 'forge': return [btn('anvil', 'Smid', () => panels.show('crafting'))];
-    case 'vault': return [btn('chest', 'Förråd', () => panels.show('inventory', { tab: 'storage' }))];
+    case 'vault': return [btn('bag', 'Förråd', () => panels.show('inventory', { tab: 'storage' })), btn('chest', 'Valv', () => panels.clanTab('vault'))];
+    case 'lodge': return [btn('players', `Arbetare (${game.clan?.workers?.length ?? 0})`, () => panels.clanTab('workers'))];
     case 'library': return [btn('book', 'Forska', () => panels.show('research'))];
     case 'den': return [btn('pal', 'Pals', () => panels.show('pals'))];
     case 'well': {
@@ -213,11 +255,73 @@ function vaultTab(game, role) {
       h('button.btn-primary', { onclick: everything }, icon('chest', 20), 'Lägg i allt trä, sten, skrot och essens'),
       h('span.small.muted', 'Valvet nås på er mark.')),
     h('div.vault-rows', RES.map(row)),
-    h('p.small.muted', 'Underhåll per vecka: ', costChips(clan.upkeepPerWeek, clan.vault), ' · Hälften av valvet kan aldrig tas av raiders.'),
+    clan.upkeep
+      ? upkeepBox({ perDay: clan.upkeep.perDay, counts: clan.upkeep.counts, vault: clan.vault, unpaid: clan.unpaid, lang: 'sv',
+        note: 'Dras ur valvet en gång i timmen. Räcker det inte förfaller murarna och arbetarna slutar. Hälften av valvet kan aldrig tas av raiders.' })
+      : h('p.small.muted', 'Underhåll per vecka: ', costChips(clan.upkeepPerWeek, clan.vault), ' · Hälften av valvet kan aldrig tas av raiders.'),
     officer ? null : h('p.small.muted', 'Bara ledare och officerare kan ta ut ur valvet.'));
 }
 
+// --- Workers: hired at the lodge, they fill the vault ------------------------------------------------------
+
+const TIER_SV = ['', 'träd och sten', 'kristaller också', 'obsidian också', 'järnmalm också'];
+
+function workersTab(game, panels, role) {
+  const clan = game.clan;
+  const { data } = game;
+  const lodge = clan.lodge;
+  if (!lodge) {
+    return h('section.workers',
+      h('p', 'Bygg en arbetarstuga i er bas för att anställa arbetare. De hugger träd och bryter sten ute i vildmarken och bär hem allt till klanvalvet, mot en daglig lön.'),
+      h('button.btn-primary', { onclick: () => { closeModal(); game.toggleBuildMode(true); game.selectStructure(baseStructId('lodge')); } }, icon('hammer', 20), 'Bygg arbetarstugan'));
+  }
+  const may = canDo(role, 'build');
+  const wallet = game.buildWallet({ kind: 'building' });
+  const poor = COST_KEYS.some((k) => (wallet[k] ?? 0) < (lodge.hire[k] ?? 0));
+  const act = (op, args) => game.request({ t: 'base', op, ...args });
+  const wage = roundUp(Object.fromEntries(Object.entries(game.rules.upkeepPerWorker ?? {}).map(([k, v]) => [k, v / 7])));
+  const row = (rec) => {
+    const look = workerLook(clan.id, rec.id);
+    const live = game.workers?.find((w) => w.clanId === clan.id && w.id === rec.id);
+    const art = pixelCanvas(workerPortrait(look));
+    art.style.width = '30px';
+    art.style.height = '36px';
+    const doing = !live ? 'Ute i världen' : live.angry ? 'Arg!' : live.idle ? (clan.unpaid ? 'Strejkar: ingen lön' : 'Vilar vid stugan')
+      : live.carrying ? `Bär hem ${live.carrying === 'wood' ? 'trä' : 'sten'}` : live.moving ? 'På väg' : 'Arbetar';
+    return h('div.worker-row', { 'data-worker': rec.id },
+      art,
+      h('div.worker-info', h('b', look.name), h('span.small.muted', `${ROLE_NAMES_SV[rec.role]} · ${doing}`)),
+      h('span.spacer'),
+      may ? h('div.worker-roles', WORKER_ROLES.map((r) => h(`button.small${rec.role === r ? '.btn-primary' : ''}`, {
+        'aria-pressed': String(rec.role === r), onclick: () => act('role', { id: rec.id, role: r }),
+      }, icon(r === 'wood' ? 'wood' : 'stone', 16), ROLE_NAMES_SV[r]))) : null,
+      may ? h('button.small.btn-danger', {
+        onclick: async () => await askConfirm({ title: `Säga upp ${look.name}?`, text: 'Arbetaren lämnar er bas för gott. En ny kostar fullt pris.', ok: 'Säg upp', cancel: 'Avbryt', danger: true }) && act('fire', { id: rec.id }),
+      }, 'Säg upp') : null);
+  };
+  return h('section.workers',
+    h('p.small.muted', `Arbetarstuga nivå ${lodge.level}: plats för ${lodge.cap}. De arbetar med ${TIER_SV[lodge.tier]} utanför er mark, medan någon i klanen är online.`),
+    h('div.row.worker-wage', h('span.small', 'Lön per arbetare och dygn:'), costChips(wage), h('span.small.muted', '(ur valvet)')),
+    clan.unpaid ? h('p.warn.small', icon('skull', 16), ' Underhållet betalas inte, så arbetarna har slutat. Lägg in förråd i valvet.') : null,
+    h('div.worker-list', clan.workers.length ? clan.workers.map(row) : h('p.muted', 'Inga arbetare än.')),
+    clan.workers.length < lodge.cap
+      ? h('section.worker-hire',
+        h('h3', `Anställ (${clan.workers.length} / ${lodge.cap})`),
+        h('div.row', costChips(lodge.hire, wallet), h('span.small.muted', 'ur valvet och det du bär')),
+        may ? h('div.row',
+          h('button.btn-primary', { disabled: poor, onclick: () => act('hire', { role: 'wood' }) }, icon('wood', 20), 'Anställ skogshuggare'),
+          h('button.btn-primary', { disabled: poor, onclick: () => act('hire', { role: 'stone' }) }, icon('stone', 20), 'Anställ gruvarbetare'))
+          : h('p.small.muted', 'Du får inte anställa.'))
+      : h('p.small.muted', lodge.level < 5 ? 'Stugan är full. Uppgradera den för att få plats med en till.' : 'Stugan är full.'),
+    h('p.small.muted', 'Akta dig: en arbetare du slår blir arg på dig, och en som dör är borta. Andra klaner kan bara skada dem när er bas kan raidas.'));
+}
+
 // --- Members --------------------------------------------------------------------------------------------
+
+/** An in-game yes/no question, in Swedish. */
+function ask(title, text, ok, danger = false) {
+  return askConfirm({ title, text, ok, cancel: 'Avbryt', danger });
+}
 
 function membersTab(game, panels, myRole) {
   const clan = game.clan;
@@ -237,9 +341,9 @@ function membersTab(game, panels, myRole) {
       leader && m.name !== game.myName ? h('span.mp-member-actions',
         m.role === 'member' ? h('button.small', { onclick: () => act('promote', { name: m.name }) }, 'Befordra') : null,
         m.role === 'officer' ? h('button.small', { onclick: () => act('demote', { name: m.name }) }, 'Degradera') : null,
-        h('button.small', { onclick: () => confirm(`Göra ${m.name} till ledare?`) && act('transfer', { name: m.name }) }, 'Gör till ledare')) : null,
+        h('button.small', { onclick: async () => await ask(`Göra ${m.name} till ledare?`, 'Du blir själv officer.', 'Gör till ledare') && act('transfer', { name: m.name }) }, 'Gör till ledare')) : null,
       officer && m.name !== game.myName && m.role !== 'leader' && (leader || m.role === 'member')
-        ? h('button.small.btn-danger', { onclick: () => confirm(`Sparka ${m.name}?`) && act('kick', { name: m.name }) }, 'Sparka') : null))),
+        ? h('button.small.btn-danger', { onclick: async () => await ask(`Sparka ${m.name}?`, `${m.name} åker ur klanen och kan inte längre bygga i er bas.`, 'Sparka', true) && act('kick', { name: m.name }) }, 'Sparka') : null))),
     clan.invited.length ? h('p.small.muted', `Inbjudna: ${clan.invited.join(', ')}`) : null,
     officer ? h('div.row', invite, h('button', { onclick: () => act('invite', { name: invite.value.trim() }) }, 'Bjud in')) : null,
     h('div.row',
@@ -253,8 +357,8 @@ function membersTab(game, panels, myRole) {
       }, at === 'banner' ? 'Banéret' : 'Fristaden'))),
     h('p.small.muted', `Raidfönster: ${clan.raidWindow}. Er bas kan bara anfallas när någon i klanen är online, en kort stund efter att ni loggat ut, eller under raidfönstret.`),
     h('div.row',
-      h('button', { onclick: () => confirm('Lämna klanen?') && act('leave') }, 'Lämna klanen'),
-      leader ? h('button.btn-danger', { onclick: () => confirm('Upplösa klanen? Basen blir ägarlös och förfaller.') && act('disband') }, 'Upplös klanen') : null));
+      h('button', { onclick: async () => await ask('Lämna klanen?', 'Du förlorar klanens bonusar och kan inte bygga i basen längre.', 'Lämna', true) && act('leave') }, 'Lämna klanen'),
+      leader ? h('button.btn-danger', { onclick: async () => await ask('Upplösa klanen?', 'Basen blir ägarlös och förfaller.', 'Upplös', true) && act('disband') }, 'Upplös klanen') : null));
 }
 
 // --- No clan yet --------------------------------------------------------------------------------------------

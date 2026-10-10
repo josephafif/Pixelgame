@@ -4,7 +4,7 @@
 
 import { h } from './dom.js';
 import { icon, costChip, resourceIcon, RESOURCE_NAMES } from './icons.js';
-import { openModal, replaceModalBody } from './modal.js';
+import { openModal, replaceModalBody, askConfirm } from './modal.js';
 import { weaponCard, weaponIconEl } from './weapon-card.js';
 import { marketStock, weaponPrice, sellPrice, SELL_BUNDLES } from '../game/markets.js';
 import { rarityInfo, summaryLine } from '../weapons/describe.js';
@@ -161,9 +161,10 @@ export function open(game, app, { marketId } = {}) {
             h('button', {
               disabled: hostile(),
               title: fav ? 'This is a favorite' : null,
-              onclick: () => {
-                if (fav && !confirm(`${w.name.text} is a favorite. Sell it anyway?`)) return;
-                if (w.rarity === 'legendary' && !confirm(`Sell your legendary ${w.name.text} for ${sellPrice(w)} gold?`)) return;
+              onclick: async () => {
+                if (fav && !await askConfirm({ title: 'Sell a favorite?', icon: 'coin', ok: 'Sell', danger: true, text: `${w.name.text} is a favorite. Sell it anyway?` })) return;
+                if (w.rarity === 'legendary' && !await askConfirm({ title: 'Sell a legendary?', icon: 'coin', ok: 'Sell', danger: true, text: `Sell your legendary ${w.name.text} for ${sellPrice(w)} gold?` })) return;
+                if (!game.findWeapon(w.id)) return;
                 act(() => `Sold ${w.name.text} for ${game.markets.sellWeapon(m, w.id)} gold`);
               },
             }, 'Sell')));

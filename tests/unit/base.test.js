@@ -50,9 +50,11 @@ test('upgrades check level, boss and resources, then deduct the cost', () => {
   for (let i = 0; i < 3; i++) upgradeBuilding(data, s, 'forge');
   assert.ok(upgradeBlockers(data, s, 'forge').includes('Defeat a boss first'), 'Forge 4 needs a boss kill');
   s.bosses.defeated.inferno_titan = 1;
-  upgradeBuilding(data, s, 'forge');
-  upgradeBuilding(data, s, 'forge');
-  assert.equal(buildingLevel(data, s, 'forge'), maxLevel(data.base.buildings.find((b) => b.id === 'forge')));
+  s.player.level = 40;
+  const max = maxLevel(data.base.buildings.find((b) => b.id === 'forge'));
+  while (buildingLevel(data, s, 'forge') < max) upgradeBuilding(data, s, 'forge');
+  assert.equal(buildingLevel(data, s, 'forge'), max);
+  assert.ok(max >= 7, 'the forge goes up to level 7');
   assert.deepEqual(upgradeBlockers(data, s, 'forge'), ['Max level']);
 });
 

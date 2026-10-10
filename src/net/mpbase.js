@@ -11,14 +11,14 @@
 
 import { COST_KEYS } from '../game/base.js';
 
-export const BASE_BUILDINGS = ['hearth', 'forge', 'vault', 'library', 'training', 'well', 'waystone', 'den'];
+export const BASE_BUILDINGS = ['hearth', 'forge', 'vault', 'library', 'training', 'well', 'waystone', 'den', 'lodge'];
 
 /** Fristaden's buildings: a forge that makes common to rare weapons, and the town fire. */
 export const TOWN_LEVELS = { hearth: 1, forge: 1 };
 
 export const BUILDING_SV = {
   hearth: 'Härd', forge: 'Smedja', vault: 'Förråd', library: 'Bibliotek',
-  training: 'Träningsplats', well: 'Essensbrunn', waystone: 'Vägsten', den: 'Djurhus',
+  training: 'Träningsplats', well: 'Essensbrunn', waystone: 'Vägsten', den: 'Djurhus', lodge: 'Arbetarstuga',
 };
 
 const DESC_SV = {
@@ -30,7 +30,18 @@ const DESC_SV = {
   well: 'Fylls med essens av sig själv. Gå dit och hämta.',
   waystone: 'Res hem till basen från var som helst (nivå 2: och tillbaka igen).',
   den: 'Kläck pal-ägg. Varje nivå låter dina pals växa två nivåer till.',
+  lodge: 'Anställ arbetare som hugger träd och bryter sten ute i vildmarken och bär hem allt till klanvalvet. Varje nivå ger plats för en till.',
 };
+
+/** Upkeep rates per day from the server's weekly rules. */
+export function upkeepRates(rules) {
+  const perDay = (m) => Object.fromEntries(Object.entries(m ?? {}).map(([k, v]) => [k, v / 7]));
+  return {
+    perStructure: perDay(rules.upkeepPerStructure),
+    perBuildingLevel: perDay(rules.upkeepPerBuildingLevel),
+    perWorker: perDay(rules.upkeepPerWorker),
+  };
+}
 
 export function baseStructId(id) {
   return `b_${id}`;

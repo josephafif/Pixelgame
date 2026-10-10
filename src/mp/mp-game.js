@@ -10,7 +10,7 @@
 import { World, CHUNK, tileKey } from '../game/world.js';
 import { Fx } from '../game/fx.js';
 import { compileWeapon } from '../game/combat.js';
-import { structureDef, structureDefs, groundProblem, onWater } from '../game/construction.js';
+import { structureDef, structureDefs, groundProblem, onWater, stony, upgradeDef, upgradeCost } from '../game/construction.js';
 import { currentPickaxe, findHarvestTarget, harvestInfo, pickaxeDefs } from '../game/gathering.js';
 import { canAfford, shortfalls, baseBonuses } from '../game/base.js';
 import { salvageValue } from '../game/loot.js';
@@ -25,10 +25,11 @@ import { mpVirtualSave } from '../net/mpsave.js';
 import { inSafeZone, claimAt, canDo, bannerProblem, pvpBlock } from '../net/rules.js';
 import { Connection } from './connection.js';
 import {
-  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal, readNpc, readHorse,
+  EntityStore, makeEnemy, updateEnemy, readPlayer, readProjectile, readPickup, readArea, readAlly, readPal, readNpc, readHorse, readWorker,
 } from './entities.js';
 import { BREED_BY_ID, describeHorse, HORSE_MODE } from '../game/horses.js';
 import { MpMarkets } from './markets.js';
+import { workerLook } from '../game/workers.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
 import { POI, isPoi, poiFound, chunksAround } from '../game/discoveries.js';
 import { currentBoat, boatMode, boatDefs, findLaunch, findLanding } from '../game/sailing.js';
@@ -95,6 +96,7 @@ export class MpGame {
     this.pal = null;
     this.otherPals = []; // other players' pals
     this.horses = []; // wild horses and players' own nearby
+    this.workers = []; // clan workers nearby (from the server)
     this.boss = null;
     this.shake = 0;
     this.hitstop = 0;
@@ -357,6 +359,8 @@ export class MpGame {
     this.save.worldSeed = w.seed; // (market stock is drawn from the world's seed)
     this.save.worldSeed = w.seed;
     this.world = new World(this.data, w.seed, { hideObjects: true, maxChunks: 220, townBuildings: Object.keys(TOWN_LEVELS), townMarket: townMarket(w.seed) });
+    // Inside a clan's claim the ground stays cleared (the server never regrows it there).
+    this.world.noRegrow = (tx, ty) => Boolean(claimAt(this.rules, this.claims, tx, ty));
     // Server objects (chests, shrines) join the world's own (town, altars).
     const own = this.world.objectsNear.bind(this.world);
     this.world.objectsNear = (x, y, radius = 1) => {
@@ -471,6 +475,7 @@ export class MpGame {
         break;
       case 'claims':
         this.claims = msg.claims;
+        for (const chunk of this.world?.chunks.values() ?? []) if (chunk.cut.size) chunk.canvas = null;
         this.emit('claims');
         break;
       case 'clan':
@@ -611,13 +616,21 @@ export class MpGame {
 
   #applyChunk(msg) {
     const key = `${msg.cx},${msg.cy}`;
-    // Trees and rocks: the server's list is the truth for this chunk.
+    // Trees and rocks: the server's list is the truth for this chunk, with
+    // how long ago each was cut (so saplings show how far they have grown).
     const cut = new Set(msg.harvested.map(([x, y]) => `${x},${y}`));
     for (const k of Object.keys(this.world.harvested)) {
       const [x, y] = k.split(',').map(Number);
       if (Math.floor(x / CHUNK) === msg.cx && Math.floor(y / CHUNK) === msg.cy && !cut.has(k)) this.world.restoreBlock(x, y);
     }
-    for (const [x, y] of msg.harvested) if (!this.world.harvested[`${x},${y}`]) this.world.removeBlock(x, y);
+    const now = Date.now();
+    for (const [x, y, age = 0] of msg.harvested) {
+      const entry = this.world.harvested[`${x},${y}`];
+      if (entry) entry[0] = now - age * 1000;
+      else this.world.removeBlock(x, y, now - age * 1000);
+    }
+    const chunk = this.world.chunks.get(key);
+    if (chunk) chunk.canvas = null;
     for (const st of [...(this.structByChunk.get(key) ?? [])]) this.#detachStructure(st);
     for (const raw of msg.structures) this.#attachStructure(raw);
     this.serverObjects.set(key, msg.objects.map((o) => ({ ...o })));
@@ -653,7 +666,7 @@ export class MpGame {
         const st = this.structById.get(msg.sid);
         if (st) {
           this.#detachStructure(st);
-          this.fx.emit(st.id.startsWith('stone') ? 'stone' : 'wood', st.x + 0.5, st.y + 0.5, 12, 0.8, 2.5);
+          this.fx.emit(stony(st.id) ? 'stone' : 'wood', st.x + 0.5, st.y + 0.5, 12, 0.8, 2.5);
           this.fx.emit('smoke', st.x + 0.5, st.y + 0.5, 6, 0.6, 1);
           if (msg.broken) this.audio.play('break');
         }
@@ -665,7 +678,7 @@ export class MpGame {
         if (st) {
           if (msg.hp < st.hp) {
             st.rt.flash = 0.12;
-            this.fx.emit(st.id.startsWith('stone') ? 'stone' : 'wood', st.x + 0.5, st.y + 0.4, 2, 0.4, 1.5);
+            this.fx.emit(stony(st.id) ? 'stone' : 'wood', st.x + 0.5, st.y + 0.4, 2, 0.4, 1.5);
           }
           st.hp = msg.hp;
         }
@@ -1098,6 +1111,7 @@ export class MpGame {
       this.#explore();
     }
     if (this.frame % 120 === 0) this.world.prune(this.frame);
+    if (this.frame % 300 === 0) this.world.refreshGrowth();
     this.hudT = (this.hudT ?? 0) - dt;
     if (this.hudT <= 0) {
       this.hudT = 0.1;
@@ -1132,6 +1146,7 @@ export class MpGame {
     const otherPals = [];
     const horses = [];
     const npcs = [];
+    const workers = [];
     let myPal = null;
     let boss = null;
     const myClan = this.me?.clan?.id ?? null;
@@ -1227,6 +1242,21 @@ export class MpGame {
             }
           }
           if (a.t >= 0 && a.t <= a.dur) areas.push(a);
+          break;
+        }
+        case ET.WORKER: {
+          const info = readWorker(s.v);
+          let o = ent.obj;
+          if (!o || o.clanId !== info.clan || o.id !== info.wid) {
+            o = { eid: ent.id, clanId: info.clan, id: info.wid, r: 0.3, walkT: 0, hurtFlash: 0, ...workerLook(info.clan, info.wid) };
+            ent.obj = o;
+          }
+          Object.assign(o, { x: s.x, y: s.y, facing: info.facing, moving: info.moving, angry: info.angry, idle: info.idle });
+          Object.assign(o, { carrying: info.carrying, role: info.role, hp: info.hp, maxHp: info.maxHp, anim: info.anim });
+          if (o.moving) o.walkT += dt * 8;
+          if (info.hurt) o.hurtFlash = 0.15;
+          o.hurtFlash = Math.max(0, o.hurtFlash - dt);
+          workers.push(o);
           break;
         }
         case ET.NPC: {
@@ -1327,6 +1357,7 @@ export class MpGame {
     this.pal = myPal;
     this.otherPals = otherPals;
     this.horses = horses;
+    this.workers = workers;
     this.markets.npcs = npcs;
     if (boss !== this.boss) {
       this.boss = boss;
@@ -1526,6 +1557,13 @@ export class MpGame {
 
   #fxEvent(ev) {
     switch (ev.fx) {
+      case 'text':
+        this.fx.text(ev.x, ev.y, String(ev.text).slice(0, 40), String(ev.color ?? '#ffe890'), 1.2);
+        break;
+      case 'upgrade':
+        this.fx.emit('sparkle', ev.x, ev.y - 0.3, 6, 0.5, 1.5);
+        this.fx.add({ type: 'ring', x: ev.x, y: ev.y, r0: 0.2, r1: 0.9, color: '#7ae0ff', dur: 0.3 });
+        break;
       case 'ring':
         this.fx.add({ type: 'ring', x: ev.x, y: ev.y, r0: 0.5, r1: ev.r, color: ev.color, dur: 0.3 });
         break;
@@ -2158,7 +2196,7 @@ export class MpGame {
 
   selectStructure(id) {
     const b = this.build;
-    if (id === 'remove') b.tool = b.tool === 'remove' ? 'place' : 'remove';
+    if (id === 'remove' || id === 'upgrade') b.tool = b.tool === id ? 'place' : id;
     else if (structureDef(this.data, id)) {
       b.selected = id;
       b.tool = 'place';
@@ -2228,11 +2266,44 @@ export class MpGame {
     return out;
   }
 
+  /** What the structure at (tx, ty) upgrades into, and what that costs (build bar), or null. */
+  upgradeInfo(tx, ty) {
+    const st = this.world.structureAt(tx, ty) ?? this.world.floorAt(tx, ty);
+    const to = st && !st.marketId ? upgradeDef(this.data, st.def) : null;
+    return to ? { from: st.def, to, cost: upgradeCost(this.data, st.def, to) } : null;
+  }
+
+  /** Client-side guess at why an upgrade would fail (the server decides). */
+  #upgradeProblem(tx, ty) {
+    const st = this.world.structureAt(tx, ty) ?? this.world.floorAt(tx, ty);
+    if (!st || st.marketId) return 'Här finns inget att uppgradera';
+    if (!st.clanId || st.clanId !== this.me?.clan?.id) return 'Det där är inte er klans';
+    const info = this.upgradeInfo(tx, ty);
+    if (!info) return `${st.def.name} går inte att förstärka mer`;
+    const lock = mpStructureLock(info.to, this.save.player.level);
+    if (lock) return `${info.to.name}: ${lock.toLowerCase()}`;
+    if (dist2(this.player.x, this.player.y, tx + 0.5, ty + 0.5) > (this.data.building.reach + 0.5) ** 2) return 'För långt bort';
+    const wallet = this.buildWallet({ kind: 'building' });
+    if (!canAfford(wallet, info.cost)) return shortfalls(wallet, info.cost)[0];
+    return null;
+  }
+
+  /** Upgrades every structure of one kind in the base (clan panel → Förstärk). */
+  fortify(id) {
+    return this.#ask({ t: 'upgrade', all: id });
+  }
+
   buildAt(tx, ty, tool = this.build.tool) {
     if (tool === 'remove') {
       const st = this.world.structureAt(tx, ty) ?? this.world.floorAt(tx, ty);
       if (!st) return 'Här finns inget att riva';
       this.#ask({ t: 'unbuild', x: tx, y: ty });
+      return null;
+    }
+    if (tool === 'upgrade') {
+      const problem = this.#upgradeProblem(tx, ty);
+      if (problem) return problem;
+      this.#ask({ t: 'upgrade', x: tx, y: ty });
       return null;
     }
     const def = structureDef(this.data, this.build.selected);
@@ -2270,7 +2341,7 @@ export class MpGame {
         b.hoverAt = this.time;
         const tool = button === 2 ? 'remove' : b.tool;
         const problem = this.buildAt(tx, ty, tool);
-        if (problem && tool === 'place') this.toast(problem, 'warn');
+        if (problem && tool !== 'remove') this.toast(problem, 'warn');
         b.painting = tool;
         b.lastTile = `${tx},${ty}`;
       },
@@ -2326,6 +2397,8 @@ export class MpGame {
     b.ghost = tile;
     if (b.tool === 'remove') {
       b.reason = this.world.structureAt(tile.tx, tile.ty) || this.world.floorAt(tile.tx, tile.ty) ? null : 'Här finns inget att riva';
+    } else if (b.tool === 'upgrade') {
+      b.reason = this.#upgradeProblem(tile.tx, tile.ty);
     } else {
       const def = structureDef(this.data, b.selected);
       b.reason = def ? this.#placementProblem(def, tile.tx, tile.ty) : 'Välj något att bygga';

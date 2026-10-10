@@ -12,6 +12,7 @@ import {
   buildingDefs, buildingLevel, maxLevel, nextLevelInfo, upgradeBlockers, describeBonus, campRank,
   wellPending, baseBonuses,
 } from '../game/base.js';
+import { structureDef, upgradeDef, upgradeCost, structureLock } from '../game/construction.js';
 
 function pips(level, max) {
   return h('div.pips', { 'aria-label': `Level ${level} of ${max}` },
@@ -34,7 +35,11 @@ export function open(game, app, { focus = null } = {}) {
       case 'forge':
         return [h('button', { onclick: () => app.panels.show('crafting') }, icon('anvil', 20), 'Craft')];
       case 'vault':
-        return [h('button', { onclick: () => app.panels.show('inventory', { tab: 'storage' }) }, icon('chest', 20), 'Storage')];
+        return [
+          h('button', { onclick: () => app.panels.show('vault') }, icon('chest', 20), 'Supplies'),
+          h('button', { onclick: () => app.panels.show('inventory', { tab: 'storage' }) }, icon('bag', 20), 'Storage')];
+      case 'lodge':
+        return [h('button', { onclick: () => app.panels.show('workers') }, icon('players', 20), `Workers (${save.base.workers.length})`)];
       case 'library':
         return [h('button', { onclick: () => app.panels.show('research') }, icon('book', 20), 'Research')];
       case 'den':
@@ -126,6 +131,29 @@ export function open(game, app, { focus = null } = {}) {
       ...extraActions(def, level)));
   }
 
+  /** Fortify: upgrade every wall (gate, turret …) of one kind at once. */
+  function fortify() {
+    const counts = new Map();
+    for (const st of save.base.structures) if (st.def?.upgradesTo) counts.set(st.id, (counts.get(st.id) ?? 0) + 1);
+    if (!counts.size) return null;
+    const rows = [...counts].map(([id, n]) => {
+      const from = structureDef(data, id);
+      const to = upgradeDef(data, from);
+      const each = upgradeCost(data, from, to);
+      const lock = structureLock(data, save, to);
+      const affordable = Math.min(n, ...Object.entries(each).map(([k, c]) => Math.floor((save.resources[k] ?? 0) / c)));
+      return h('div.fortify-row',
+        h('span', h('b', `${n} × ${from.name}`), ' → ', to.name),
+        h('span.bcost', costChips(each, save.resources), h('span.small.muted', ' each')),
+        lock ? h('span.small.req', icon('lock', 14), ' ', lock)
+          : h('button.small', { disabled: affordable < 1, onclick: () => game.fortify(id) }, icon('up', 16), affordable >= n ? 'Upgrade all' : `Upgrade ${Math.max(0, affordable)}`));
+    });
+    return h('section.fortify',
+      h('h3', 'Fortify'),
+      h('p.small.muted', 'Upgrade in place: wood → stone → reinforced walls, iron gates, ballistas and iron spikes. Or use the Upgrade tool in build mode (U).'),
+      rows);
+  }
+
   /** Your horses: where each one is, and letting one go. */
   function horses() {
     const st = save.horses;
@@ -173,10 +201,11 @@ export function open(game, app, { focus = null } = {}) {
         h('span.small.muted', 'Camp area grows with every Hearth upgrade. Chop trees and break rocks with a pickaxe (Forge) for wood and stone.')),
       h('p.small.muted', 'Upgrade buildings with scrap, essence, wood and stone. Walk up to a building in camp to use it.'),
       h('div.base-grid', defs.map(card)),
+      fortify(),
       horses());
   }
 
-  const offs = [game.on('base', rerender), game.on('inventory', rerender), game.on('riding', rerender)];
+  const offs = [game.on('base', rerender), game.on('inventory', rerender), game.on('riding', rerender), game.on('structures', rerender)];
   openModal({
     title: 'Camp', icon: 'home', body: build(), className: 'wide base-panel',
     onDispose: () => offs.forEach((off) => off()),

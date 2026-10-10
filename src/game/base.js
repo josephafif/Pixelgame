@@ -179,6 +179,12 @@ export function describeBonus(data, id, level) {
       return ['', 'Recall to camp', 'Recall + return'][level] ?? '';
     case 'den':
       return `Hatch pal eggs · pals up to level ${Math.min(data.pals?.maxLevel ?? 10, (p.palLevelCap ?? 2) * n)}`;
+    case 'lodge': {
+      // (workers.js: workerCap / workerTier)
+      const cap = (data.base.workers?.baseCap ?? 1) + level;
+      const tier = Math.max(1, Math.min(4, level - 1));
+      return `Room for ${cap} workers · ${['', 'trees and rocks', '+ crystals', '+ obsidian', '+ iron ore'][tier]}`;
+    }
     default:
       return '';
   }

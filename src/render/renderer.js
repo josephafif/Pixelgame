@@ -17,13 +17,14 @@ import { buildingSprite, BUILDING_W, BUILDING_H } from './buildings.js';
 import { siteSprite, SITE_TYPES } from './sites.js';
 import { buildingLevel, wellPending } from '../game/base.js';
 import {
-  structureSprite, isFlat, drawFlame, drawTurretHead, pickaxeSprite, STRUCT_H, LEFT, RIGHT, UP, DOWN,
+  structureSprite, isFlat, drawFlame, drawTurretHead, drawBallistaHead, pickaxeSprite, STRUCT_H, LEFT, RIGHT, UP, DOWN,
 } from './structures.js';
 import { structureDef } from '../game/construction.js';
 import { currentPickaxe } from '../game/gathering.js';
 import { palSpecies } from '../game/pals.js';
 import { palSprites } from './creatures.js';
 import { drawPixelText } from './font.js';
+import { workerSprites, axeSprite, carrySprite } from './workers-art.js';
 import { installHd, uninstallHd, hdFrame } from './hd.js';
 
 const T = TILE_PX;
@@ -304,7 +305,7 @@ export class Renderer {
       for (let col = c0; col <= c1; col++) {
         const chunk = game.world.getChunk(col, row);
         if (!chunk.canvas && rendered < NEW_CHUNKS_PER_FRAME) {
-          chunk.canvas = renderChunk(chunk);
+          chunk.canvas = renderChunk(chunk, game.world.growthOf(chunk));
           rendered += 1;
         }
         if (chunk.canvas) this.v.drawImage(chunk.canvas, col * size - cx, row * size - cy);
@@ -498,6 +499,7 @@ export class Renderer {
       if (!isFlat(st.id)) list.push({ y: st.y + 0.95, kind: 'structure', o: st });
     }
     for (const n of game.markets.npcs) if (!n.dead) list.push({ y: n.y, kind: 'npc', o: n });
+    for (const w of game.workers ?? []) if (!w.dead) list.push({ y: w.y, kind: 'worker', o: w });
     for (const e of game.enemies) if (!e.dead) list.push({ y: e.y, kind: 'enemy', o: e });
     for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
     if (game.pal && !game.pal.hidden) list.push({ y: game.pal.y, kind: 'pal', o: game.pal });
@@ -516,6 +518,7 @@ export class Renderer {
         case 'object': this.#drawObject(game, d.o, x, y); break;
         case 'structure': this.#drawStructure(game, d.o); break;
         case 'npc': this.#drawNpc(game, d.o, x, y); break;
+        case 'worker': this.#drawWorker(game, d.o, x, y); break;
         case 'pickup': this.#drawPickup(game, d.o, x, y); break;
         case 'enemy': this.#drawEnemy(game, d.o, x, y); break;
         case 'ally': this.#drawCharacter(game, d.o, x, y, true); break;
@@ -563,7 +566,7 @@ export class Renderer {
       const x = this.#sx(st.x);
       const y = this.#sy(st.y);
       if (x < -16 || y < -16 || x > W || y > H) continue;
-      const up = st.id === 'spikes' && game.time - st.rt.trig < 0.35 ? 1 : 0;
+      const up = st.def?.kind === 'trap' && game.time - st.rt.trig < 0.35 ? 1 : 0;
       v.drawImage(structureSprite(st.id, 0, up), x, y);
       if (st.rt.flash > 0) this.#flashRect(x, y, 16, 16);
     }
@@ -593,12 +596,14 @@ export class Renderer {
     const y = this.#sy(st.y + 1) - STRUCT_H;
     const t = game.time;
     const id = st.id;
-    const state = id === 'gate' && st.rt.open > 0.5 ? 1 : 0;
+    const state = st.def.kind === 'gate' && st.rt.open > 0.5 ? 1 : 0;
     const img = structureSprite(id, this.#mask(game, st), state, id === 'stall' ? st.color : null);
     v.drawImage(img, x, y);
     if (st.rt.flash > 0 && st.def.kind !== 'turret') this.#flashRect(x, y + 2, 16, STRUCT_H - 2);
     if (id === 'arrow_turret') {
       drawTurretHead(v, x + 8, y + 7, st.rt.aim, st.rt.flash > 0 ? 2 : 0);
+    } else if (id === 'ballista') {
+      drawBallistaHead(v, x + 8, y + 6, st.rt.aim, st.rt.flash > 0 ? 3 : 0);
     } else if (id === 'flame_turret') {
       drawFlame(v, x + 8, y + 7, t + st.x, st.rt.flash > 0 ? 3 : 2);
       this.#glow(x + 8, y + 4, '#ff7a2a', 14);
@@ -636,6 +641,54 @@ export class Renderer {
     }
     if (near) drawPixelText(v, n.name.toUpperCase(), x, y - 29, n.role === 'merchant' ? '#ffe890' : '#c8c8d8');
     if (n.hp < n.maxHp) this.#healthBar(x, y - 16, 12, n.hp / n.maxHp, '#6cd66c');
+  }
+
+  /** Hired workers: a cap, an axe or a pickaxe (swung while they work), a bundle on the way home. */
+  #drawWorker(game, w, x, y) {
+    const v = this.v;
+    const sprites = workerSprites(w);
+    const right = Math.cos(w.facing) >= 0;
+    const frame = w.moving ? 1 + (Math.floor(w.walkT) % 2) : 0;
+    let img = (right ? sprites.right : sprites.left)[frame];
+    if (w.hurtFlash > 0) img = sprites.flash;
+    // A swing starts each time the worker's blow counter moves on.
+    if (w.anim !== w.seenAnim) {
+      if (w.seenAnim !== undefined) w.swingAt = game.time;
+      w.seenAnim = w.anim;
+    }
+    const bob = w.moving ? Math.floor(w.walkT) % 2 : 0;
+    const carrying = w.carrying ?? (w.carry && Object.keys(w.carry).length ? Object.keys(w.carry)[0] : null);
+    this.#shadow(x, y + 1, 5);
+    if (carrying && !right) v.drawImage(carrySprite(carrying === 'wood' ? 'wood' : 'stone'), x - 1, y - 11 - bob);
+    v.drawImage(img, x - 5, y - 12 - bob);
+    if (carrying && right) v.drawImage(carrySprite(carrying === 'wood' ? 'wood' : 'stone'), x - 7, y - 11 - bob);
+    // The tool: resting on the shoulder, or coming down on a tree, a rock (or you).
+    const side = right ? 1 : -1;
+    const k = w.swingAt !== undefined ? (game.time - w.swingAt) / 0.3 : 9;
+    let angle;
+    if (k < 1) {
+      const swing = k < 0.4 ? -1.9 + k * 0.5 : -1.7 + Math.min(1, (k - 0.4) / 0.25) * 2.4;
+      angle = w.facing + swing * side * (Math.sin(w.facing) < -0.5 ? -1 : 1);
+    } else {
+      angle = -Math.PI / 2 + side * (0.55 + (w.moving ? Math.sin((w.walkT ?? 0) * Math.PI) * 0.1 : 0));
+    }
+    const hx = x + side * 3;
+    const hy = y - 5 - bob;
+    v.save();
+    v.translate(Math.round(hx + Math.cos(angle) * 3), Math.round(hy + Math.sin(angle) * 3));
+    v.rotate(angle + Math.PI / 2);
+    v.drawImage(w.role === 'wood' ? axeSprite() : pickaxeSprite('#a4abb6'), -6, -13);
+    v.restore();
+    const p = game.player;
+    const near = (p.x - w.x) ** 2 + (p.y - w.y) ** 2 < 20;
+    if (w.angry) {
+      drawPixelText(v, '!', x, y - 22, '#ff5050');
+    } else if (w.idle && !w.moving) {
+      // On strike (no wages) or nothing to do: a little 'z'.
+      if (Math.floor(game.time * 2 + w.id) % 4 < 2) drawPixelText(v, 'Z', x + 4, y - 20, '#c8c8d8');
+    }
+    if (near || w.angry) drawPixelText(v, w.name.toUpperCase(), x, y - 29, w.angry ? '#ff8a8a' : '#e8d8b0');
+    if (w.hp < w.maxHp) this.#healthBar(x, y - 16, 12, w.hp / w.maxHp, w.angry ? '#ff5050' : '#6cd66c');
   }
 
   #drawHarvestTarget(game) {
@@ -714,7 +767,7 @@ export class Renderer {
       }
     }
     v.globalAlpha = 1;
-    const color = b.tool === 'remove' ? (ok ? '#ff6a7a' : '#8a8a96') : ok ? '#6cd66c' : '#ff5050';
+    const color = b.tool === 'remove' ? (ok ? '#ff6a7a' : '#8a8a96') : b.tool === 'upgrade' ? (ok ? '#7ae0ff' : '#ff5050') : ok ? '#6cd66c' : '#ff5050';
     if (b.tool === 'place') {
       const def = structureDef(game.data, b.selected);
       if (def) {
@@ -722,9 +775,19 @@ export class Renderer {
         if (def.kind === 'building') {
           v.drawImage(buildingSprite(def.building, 1), x + 8 - (BUILDING_W >> 1), y + 8 - BUILDING_H + 3);
         } else {
-          const img = structureSprite(def.id, 0, def.id === 'spikes' ? 1 : 0);
+          const img = structureSprite(def.id, 0, def.kind === 'trap' ? 1 : 0);
           v.drawImage(img, x, isFlat(def.id) ? y : y + 16 - STRUCT_H);
         }
+        v.globalAlpha = 1;
+      }
+    } else if (b.tool === 'upgrade') {
+      // The next tier, shimmering over what stands there now.
+      const st = game.world.structureAt(g.tx, g.ty) ?? game.world.floorAt(g.tx, g.ty);
+      const to = st?.def?.upgradesTo ? structureDef(game.data, st.def.upgradesTo) : null;
+      if (to) {
+        v.globalAlpha = 0.5 + 0.2 * Math.sin(game.time * 6);
+        const img = structureSprite(to.id, this.#mask(game, st), to.kind === 'trap' ? 1 : 0);
+        v.drawImage(img, x, isFlat(to.id) ? y : y + 16 - STRUCT_H);
         v.globalAlpha = 1;
       }
     }

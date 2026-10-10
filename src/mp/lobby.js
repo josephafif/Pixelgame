@@ -5,7 +5,7 @@
 import { CONFIG } from '../config.js';
 import { h, clear, $ } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
-import { openModal, closeModal, replaceModalBody } from '../ui/modal.js';
+import { openModal, closeModal, replaceModalBody, askConfirm } from '../ui/modal.js';
 import { PROTOCOL_VERSION } from '../net/protocol.js';
 import { MpAuth, configuredServers, customServers, addServer, removeServer, infoUrl, sameOriginServer, loginWithPassword } from './auth.js';
 import {
@@ -248,9 +248,11 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
         if (e.key === 'Enter') submit();
       });
     }
-    const fresh = () => {
-      if (mine?.name && !mine.password
-        && !window.confirm(`${mine.name} har inget lösenord. Om du skapar en ny karaktär kan du inte komma tillbaka till ${mine.name}. Fortsätta?`)) return;
+    const fresh = async () => {
+      if (mine?.name && !mine.password && !await askConfirm({
+        title: 'Ny karaktär?', ok: 'Fortsätt', cancel: 'Avbryt', danger: true,
+        text: `${mine.name} har inget lösenord. Om du skapar en ny karaktär kan du inte komma tillbaka till ${mine.name}. Fortsätta?`,
+      })) return;
       auth.forgetCharacter(serverKey(s));
       join(s, 'guest');
     };

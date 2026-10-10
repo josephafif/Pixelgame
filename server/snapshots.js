@@ -5,7 +5,7 @@
 import { CHUNK } from '../src/game/world.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import {
-  ET, PF, EF, PRF, PKF, SF, AF, ALF, NPCF, HF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
+  ET, PF, EF, PRF, PKF, SF, AF, ALF, NPCF, HF, WF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   encodeSnapshot, changed, quantize, angleToByte, colorToInt,
 } from '../src/net/protocol.js';
 import { inSafeZone, claimAt } from '../src/net/rules.js';
@@ -135,6 +135,17 @@ export function sendSnapshots(gs, now) {
       const flags = (n.moving ? NPCF.MOVING : 0) | (gs.time - n.hurtT < 0.15 ? NPCF.HURT : 0);
       all.push({ id: n.eid, type: ET.NPC, x: n.x, y: n.y, values: [quantize(n.x), quantize(n.y), angleToByte(n.facing), flags, m.mx, m.my, n.idx, Math.ceil(n.hp)], ref: n });
     }
+  }
+  for (const w of gs.workers?.values() ?? []) {
+    if (w.dead) continue;
+    const carry = Object.keys(w.carry)[0];
+    const flags = (w.moving ? WF.MOVING : 0) | (gs.time - w.hurtT < 0.15 ? WF.HURT : 0) | (w.angry ? WF.ANGRY : 0)
+      | (w.idle ? WF.IDLE : 0) | (carry === 'wood' ? WF.WOOD : carry ? WF.STONE : 0) | (w.role === 'stone' ? WF.MINER : 0);
+    all.push({
+      id: w.eid, type: ET.WORKER, x: w.x, y: w.y,
+      values: [quantize(w.x), quantize(w.y), angleToByte(w.facing), flags, w.clanId, w.id, Math.ceil(w.hp), Math.ceil(w.maxHp), w.anim],
+      ref: w,
+    });
   }
   for (const h of gs.horses?.values() ?? []) {
     const flags = (h.moving ? HF.MOVING : 0) | (h.own ? HF.SADDLE : 0);

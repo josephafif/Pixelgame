@@ -368,6 +368,11 @@ export class GameDb {
     this.run('UPDATE structures SET hp = ? WHERE id = ?', hp, sid);
   }
 
+  /** An upgraded structure: its new kind and health. */
+  updateStructureDef(sid, def, hp) {
+    this.run('UPDATE structures SET def = ?, hp = ? WHERE id = ?', def, hp, sid);
+  }
+
   // --- World ------------------------------------------------------------------------------------
 
   loadHarvested() {

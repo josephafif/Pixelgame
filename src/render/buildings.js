@@ -1,6 +1,7 @@
 // Procedural pixel art for the base buildings. Every building has a
-// construction plot (not built yet) and three looks that grow with its level:
-// tier 1 (levels 1–2), tier 2 (3–4) and tier 3 (5). Sprites are 32×36, drawn
+// construction plot (not built yet) and looks that grow with its level:
+// tier 1 (levels 1–2), tier 2 (3–4), tier 3 (5–6) and, at level 7, tier 3
+// crowned with golden pennants. Sprites are 32×36, drawn
 // with an automatic dark outline, anchored bottom-centre on the building's
 // world position, and cached.
 
@@ -305,6 +306,51 @@ const DRAW = {
     banner(p, 1, '#6ad35a');
     banner(p, 25, '#ff7a3a');
   },
+  lodge(p, tier) {
+    const axe = (x, y) => {
+      p.rect(x, y, 1, 7, C.woodDark);
+      p.rect(x - 2, y, 3, 2, C.ironLight);
+      p.set(x - 2, y + 2, C.iron);
+    };
+    const logs = (x, n) => {
+      for (let i = 0; i < n; i++) {
+        p.box(x, GROUND - 3 - i * 3, 8 - (i % 2) * 2 + (i % 2), 3, WOOD);
+        p.set(x + 1, GROUND - 2 - i * 3, C.woodLight);
+      }
+    };
+    if (tier === 1) {
+      // A canvas tent, a chopping stump with an axe and a log pile.
+      for (let j = 0; j < 14; j++) p.rect(4 + Math.floor(j * 0.6), GROUND - 1 - j, 18 - Math.floor(j * 1.2), 1, j % 4 === 0 ? C.rope : C.cloth);
+      p.rect(12, GROUND - 7, 3, 7, '#3a2a1a');
+      p.box(23, GROUND - 4, 6, 4, WOOD);
+      axe(26, GROUND - 11);
+      logs(1, 1);
+      return;
+    }
+    if (tier === 2) {
+      // A log cabin with a plank door and a woodpile.
+      p.box(4, 15, 22, GROUND - 15, WOOD);
+      for (let y = 17; y < GROUND; y += 3) p.rect(4, y, 22, 1, C.woodDark);
+      p.roof(2, 27, 15, 8, [C.roof, C.roofDark]);
+      p.box(12, 23, 6, GROUND - 23, [C.woodLight, C.woodDark, C.outline]);
+      p.rect(6, 19, 3, 3, C.paper);
+      logs(26, 2);
+      axe(29, GROUND - 14);
+      return;
+    }
+    // A timber hall on a stone footing, with a tool rack and a big woodpile.
+    p.box(2, GROUND - 4, 28, 4, STONE);
+    p.box(3, 12, 26, GROUND - 16, WOOD);
+    for (let y = 14; y < GROUND - 4; y += 3) p.rect(3, y, 26, 1, C.woodDark);
+    p.roof(1, 30, 12, 10, [C.roofBlue, C.roofBlueDark]);
+    p.box(13, 20, 7, GROUND - 24, IRON);
+    p.rect(16, 20, 1, GROUND - 24, C.outline);
+    p.rect(5, 16, 3, 3, C.paper);
+    p.rect(24, 16, 3, 3, C.paper);
+    axe(8, 21);
+    p.rect(9, 22, 1, 6, C.woodDark);
+    p.rect(8, 22, 3, 1, C.stoneLight);
+  },
   waystone(p, tier) {
     if (tier >= 2) {
       p.box(4, 8, 5, GROUND - 8, STONE);
@@ -329,7 +375,17 @@ export function tierForLevel(level) {
   if (level <= 0) return 0;
   if (level <= 2) return 1;
   if (level <= 4) return 2;
-  return 3;
+  if (level <= 6) return 3;
+  return 4;
+}
+
+/** Level 7: golden pennants fly over a fully upgraded building. */
+function crown(p) {
+  for (const x of [2, 28]) {
+    p.rect(x, 0, 1, 9, C.woodDark);
+    p.rect(x + 1, 1, 3, 2, C.gold);
+    p.rect(x + 1, 3, 2, 1, C.goldDark);
+  }
 }
 
 /** Sprite for a building at a given level (0 = construction plot). */
@@ -340,7 +396,8 @@ export function buildingSprite(id, level) {
   if (!c) {
     const p = new Painter();
     if (tier === 0) DRAW.plot(p);
-    else (DRAW[id] ?? DRAW.plot)(p, tier);
+    else (DRAW[id] ?? DRAW.plot)(p, Math.min(3, tier));
+    if (tier >= 4) crown(p);
     p.outline();
     c = p.toCanvas();
     cache.set(key, c);

@@ -15,6 +15,7 @@ import * as enemies from './enemies.js';
 import * as abilities from './abilities.js';
 import * as bosses from './bosses.js';
 import * as markets from './markets.js';
+import * as workers from './workers.js';
 import * as horses from './horses.js';
 
 const DEG = Math.PI / 180;
@@ -281,6 +282,8 @@ function meleeHits(gs, p, { x, y, reach, damage, view, knockback = 0, crit = tru
   }
   // People at markets (a careless swing: the market turns on you).
   if (!tool) markets.hitNpcs(gs, p, x, y, reach, damage, inside);
+  // Workers out chopping (yours too: hit one and it turns on you).
+  workers.hit(gs, p, x, y, reach, damage, inside);
   // Walls, gates and turrets of other clans (only while their base can be raided).
   const r = Math.ceil(reach + 1);
   for (let ty = Math.floor(y) - r; ty <= Math.floor(y) + r; ty++) {
@@ -630,6 +633,7 @@ function projectileHits(gs, pr, now) {
     const shooter = gs.players.get(pr.owner);
     if (!shooter) return true;
     if (gs.markets.size && markets.hitNpcs(gs, shooter, pr.x, pr.y, 1, pr.damage, (x, y, r) => (x - pr.x) ** 2 + (y - pr.y) ** 2 <= (rad + r) ** 2)) return false;
+    if (gs.workers?.size && workers.hit(gs, shooter, pr.x, pr.y, 1, pr.damage, (x, y, r) => (x - pr.x) ** 2 + (y - pr.y) ** 2 <= (rad + r) ** 2)) return false;
     for (const v of gs.playersNear(pr.x, pr.y, 1.6)) {
       if (v === shooter || v.dead || pr.hit.has(v.id)) continue;
       if ((v.x - pr.x) ** 2 + (v.y - pr.y) ** 2 > (rad + v.r) ** 2) continue;

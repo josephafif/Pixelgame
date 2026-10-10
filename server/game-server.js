@@ -19,6 +19,7 @@ import * as abilities from './abilities.js';
 import * as pals from './pals.js';
 import * as horses from './horses.js';
 import * as markets from './markets.js';
+import * as workers from './workers.js';
 import { sendSnapshots } from './snapshots.js';
 import { SpatialGrid, PAD } from './grid.js';
 
@@ -116,6 +117,8 @@ export class GameServer {
     for (const c of this.clans.values()) for (const id of c.members.keys()) this.memberOf.set(id, c.id);
     this.structures = new Map(); // sid → structure
     building.loadStructures(this);
+    // Workers hired at the clans' lodges.
+    workers.syncAll(this);
   }
 
   newId() {
@@ -218,6 +221,7 @@ export class GameServer {
     loot.updatePickups(this, TICK_DT, now);
     building.update(this, TICK_DT, now);
     markets.update(this, TICK_DT);
+    workers.update(this, TICK_DT);
     this.#recordHistory();
     prof.mark('world');
     sendSnapshots(this, now);
@@ -487,13 +491,11 @@ export class GameServer {
   /** World data for one chunk, as the client needs it. */
   chunkPayload(cx, cy) {
     const chunk = this.world.getChunk(cx, cy);
+    // Cut trees and rocks: [x, y, seconds since cut] (the client draws them growing back).
     const harvested = [];
-    for (let ly = 0; ly < CHUNK; ly++) {
-      for (let lx = 0; lx < CHUNK; lx++) {
-        const x = cx * CHUNK + lx;
-        const y = cy * CHUNK + ly;
-        if (this.world.harvested[`${x},${y}`]) harvested.push([x, y]);
-      }
+    const now = Date.now();
+    for (const [i, [at]] of chunk.cut) {
+      harvested.push([cx * CHUNK + (i % CHUNK), cy * CHUNK + ((i / CHUNK) | 0), Math.max(0, Math.round((now - at) / 1000))]);
     }
     const structures = [];
     for (let ly = 0; ly < CHUNK; ly++) {

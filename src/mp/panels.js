@@ -4,7 +4,7 @@
 
 import { h, pixelCanvas } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
-import { openModal, closeModal, isModalOpen, isModalLocked, replaceModalBody } from '../ui/modal.js';
+import { openModal, closeModal, isModalOpen, isModalLocked, replaceModalBody, askConfirm } from '../ui/modal.js';
 import { BuildBar } from '../ui/build.js';
 import { describeRaidWindow, parseRaidWindow } from '../net/rules.js';
 import { clanPanelBody } from './base-panel.js';
@@ -90,6 +90,12 @@ export class MpPanels {
     if (name === 'base') {
       // At a building in your base: the base tab, with that building.
       this.clanState = { tab: 'base', focus: arg.focus ?? null };
+      this.show('clan');
+      return;
+    }
+    if (name === 'clan' && arg.tab) {
+      // Straight to a tab (the lodge opens the workers).
+      this.clanState = { tab: arg.tab, focus: null };
       this.show('clan');
       return;
     }
@@ -330,7 +336,7 @@ export class MpPanels {
         h('span.small', 'Du har nybörjarskydd.'),
         h('button.btn-danger', {
           onclick: async () => {
-            if (!confirm('Stänga av nybörjarskyddet för gott?')) return;
+            if (!await askConfirm({ title: 'Stänga av skyddet?', text: 'Stänga av nybörjarskyddet för gott? Andra spelare kan då anfalla dig i vildmarken.', ok: 'Stäng av', cancel: 'Avbryt', danger: true })) return;
             const res = await g.request({ t: 'pvp' });
             if (res.ok && g.me) g.me.newbie = false;
             this.#town();

@@ -27,8 +27,12 @@ export const DEFAULT_RULES = {
   spawnProtectSeconds: 10,
   // Logging out in the wild leaves your body for this long.
   sleepSeconds: 30,
-  // Weekly banner upkeep per structure in the claim (paid from the vault).
-  upkeepPerStructure: { wood: 0.5, stone: 0.5 },
+  // Weekly upkeep, paid from the clan vault once an hour: per structure in the
+  // claim (walls, floors, turrets …), per level of the camp's buildings, and
+  // per hired worker (their wages).
+  upkeepPerStructure: { wood: 2, stone: 2 },
+  upkeepPerBuildingLevel: { scrap: 3, essence: 3 },
+  upkeepPerWorker: { scrap: 70, essence: 42 },
   // Bosses: you get loot if you did at least this share of the damage.
   bossShare: 0.1,
   // Weapons are tuned for monsters; against players they hit softer, so a

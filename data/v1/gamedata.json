@@ -993,7 +993,9 @@
           { "scrap": 40, "essence": 30, "wood": 20, "playerLevel": 3 },
           { "scrap": 100, "essence": 80, "wood": 50, "stone": 40, "playerLevel": 7 },
           { "scrap": 220, "essence": 180, "wood": 90, "stone": 100, "playerLevel": 12 },
-          { "scrap": 400, "essence": 350, "wood": 150, "stone": 200, "playerLevel": 17 }
+          { "scrap": 400, "essence": 350, "wood": 150, "stone": 200, "playerLevel": 17 },
+          { "scrap": 650, "essence": 600, "wood": 240, "stone": 320, "playerLevel": 22, "boss": true },
+          { "scrap": 950, "essence": 900, "wood": 340, "stone": 460, "playerLevel": 27, "boss": true }
         ]
       },
       {
@@ -1005,7 +1007,9 @@
           { "scrap": 120, "essence": 100, "wood": 30, "stone": 40, "playerLevel": 7 },
           { "scrap": 260, "essence": 240, "wood": 60, "stone": 100, "playerLevel": 12 },
           { "scrap": 480, "essence": 450, "wood": 100, "stone": 180, "playerLevel": 17, "boss": true },
-          { "scrap": 800, "essence": 800, "wood": 160, "stone": 300, "playerLevel": 22, "boss": true }
+          { "scrap": 800, "essence": 800, "wood": 160, "stone": 300, "playerLevel": 22, "boss": true },
+          { "scrap": 1200, "essence": 1150, "wood": 240, "stone": 420, "playerLevel": 26, "boss": true },
+          { "scrap": 1700, "essence": 1600, "wood": 320, "stone": 560, "playerLevel": 30, "boss": true }
         ]
       },
       {
@@ -1017,7 +1021,9 @@
           { "scrap": 90, "essence": 70, "wood": 30, "playerLevel": 5 },
           { "scrap": 180, "essence": 150, "wood": 60, "stone": 50, "playerLevel": 9 },
           { "scrap": 320, "essence": 280, "wood": 100, "stone": 120, "playerLevel": 13 },
-          { "scrap": 500, "essence": 450, "wood": 160, "stone": 220, "playerLevel": 17 }
+          { "scrap": 500, "essence": 450, "wood": 160, "stone": 220, "playerLevel": 17 },
+          { "scrap": 750, "essence": 650, "wood": 230, "stone": 320, "playerLevel": 21, "boss": true },
+          { "scrap": 1050, "essence": 900, "wood": 320, "stone": 440, "playerLevel": 25, "boss": true }
         ]
       },
       {
@@ -1029,7 +1035,9 @@
           { "scrap": 120, "essence": 140, "wood": 50, "stone": 30, "playerLevel": 8 },
           { "scrap": 240, "essence": 280, "wood": 90, "stone": 80, "playerLevel": 12 },
           { "scrap": 400, "essence": 450, "wood": 140, "stone": 160, "playerLevel": 16 },
-          { "scrap": 600, "essence": 700, "wood": 200, "stone": 260, "playerLevel": 20 }
+          { "scrap": 600, "essence": 700, "wood": 200, "stone": 260, "playerLevel": 20 },
+          { "scrap": 850, "essence": 1000, "wood": 280, "stone": 360, "playerLevel": 24, "boss": true },
+          { "scrap": 1150, "essence": 1350, "wood": 360, "stone": 480, "playerLevel": 28, "boss": true }
         ]
       },
       {
@@ -1041,7 +1049,9 @@
           { "scrap": 150, "essence": 130, "wood": 50, "stone": 50, "playerLevel": 8 },
           { "scrap": 280, "essence": 260, "wood": 90, "stone": 110, "playerLevel": 12 },
           { "scrap": 460, "essence": 420, "wood": 140, "stone": 180, "playerLevel": 16 },
-          { "scrap": 700, "essence": 650, "wood": 200, "stone": 280, "playerLevel": 20 }
+          { "scrap": 700, "essence": 650, "wood": 200, "stone": 280, "playerLevel": 20 },
+          { "scrap": 1000, "essence": 900, "wood": 280, "stone": 380, "playerLevel": 24, "boss": true },
+          { "scrap": 1350, "essence": 1250, "wood": 380, "stone": 500, "playerLevel": 28, "boss": true }
         ]
       },
       {
@@ -1053,7 +1063,9 @@
           { "scrap": 120, "essence": 60, "stone": 40, "playerLevel": 6 },
           { "scrap": 240, "essence": 150, "wood": 30, "stone": 90, "playerLevel": 10 },
           { "scrap": 380, "essence": 260, "wood": 60, "stone": 150, "playerLevel": 14 },
-          { "scrap": 560, "essence": 420, "wood": 100, "stone": 240, "playerLevel": 18 }
+          { "scrap": 560, "essence": 420, "wood": 100, "stone": 240, "playerLevel": 18 },
+          { "scrap": 800, "essence": 600, "wood": 150, "stone": 340, "playerLevel": 22, "boss": true },
+          { "scrap": 1100, "essence": 850, "wood": 210, "stone": 460, "playerLevel": 26, "boss": true }
         ]
       },
       {
@@ -1076,8 +1088,47 @@
           { "scrap": 60, "essence": 60, "stone": 40, "playerLevel": 5 },
           { "scrap": 220, "essence": 220, "wood": 40, "stone": 120, "playerLevel": 11 }
         ]
+      },
+      {
+        "id": "lodge", "name": "Workers' Lodge", "x": -3.5, "y": -6.5,
+        "desc": "Hire workers who chop trees and break rocks out in the wild and carry it all to the Vault. Every upgrade houses one more worker and teaches them harder rock.",
+        "perLevel": { "workers": 1 },
+        "levels": [
+          { "scrap": 80, "essence": 40, "wood": 60, "stone": 20, "playerLevel": 5 },
+          { "scrap": 160, "essence": 100, "wood": 120, "stone": 80, "playerLevel": 8 },
+          { "scrap": 280, "essence": 200, "wood": 180, "stone": 160, "playerLevel": 12 },
+          { "scrap": 450, "essence": 350, "wood": 240, "stone": 260, "playerLevel": 16 },
+          { "scrap": 700, "essence": 550, "wood": 320, "stone": 380, "playerLevel": 20, "boss": true }
+        ]
       }
-    ]
+    ],
+    "workers": {
+      "baseCap": 1,
+      "hire": { "scrap": 60, "essence": 40 },
+      "hireGrowth": 0.5,
+      "wagePerDay": { "scrap": 10, "essence": 6 },
+      "hp": 90,
+      "hpPerLevel": 20,
+      "speed": 1.9,
+      "power": 1,
+      "powerPerLevel": 0.3,
+      "swing": 1.0,
+      "restSeconds": 15,
+      "range": 42,
+      "fellsPerTrip": 2,
+      "damage": 7,
+      "damagePerLevel": 2.5,
+      "calmSeconds": 30,
+      "offlinePerHour": { "wood": 90, "stone": 70 },
+      "offlineCapHours": 12
+    },
+    "upkeep": {
+      "perStructurePerDay": { "wood": 0.3, "stone": 0.3 },
+      "perBuildingLevelPerDay": { "scrap": 0.5, "essence": 0.5 },
+      "catchUpHours": 12,
+      "decayPerHour": 0.01,
+      "decayFloor": 0.25
+    }
   },
   "gathering": {
     "pickaxes": [
@@ -1088,11 +1139,11 @@
       { "tier": 5, "name": "Starforged Pickaxe", "power": 5.5, "yield": 1.5, "swing": 0.27, "requiresForge": 5, "requiresBosses": 2, "cost": { "scrap": 800, "essence": 800, "wood": 160, "stone": 320 }, "color": "#ffd24a", "desc": "Cracks starstone in the Voidreach (essence, sometimes a Star Shard). 50% more of everything, and the fastest swing." }
     ],
     "harvest": {
-      "tree": { "name": "Tree", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 15, "chips": "#8a5a33" },
-      "pine": { "name": "Pine", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 15, "chips": "#6b4a2a" },
+      "tree": { "name": "Tree", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 20, "chips": "#8a5a33" },
+      "pine": { "name": "Pine", "verb": "Chop", "hp": 5, "tier": 1, "drops": { "wood": [3, 5] }, "regrowMinutes": 20, "chips": "#6b4a2a" },
       "cactus": { "name": "Cactus", "verb": "Cut", "hp": 3, "tier": 1, "drops": { "wood": [1, 3] }, "regrowMinutes": 10, "chips": "#5fb050" },
       "rock": { "name": "Rock", "verb": "Mine", "hp": 7, "tier": 1, "drops": { "stone": [3, 5] }, "regrowMinutes": 30, "chips": "#8d8a9e" },
-      "palm": { "name": "Palm", "verb": "Chop", "hp": 4, "tier": 1, "drops": { "wood": [2, 4] }, "regrowMinutes": 15, "chips": "#9a6a3a" },
+      "palm": { "name": "Palm", "verb": "Chop", "hp": 4, "tier": 1, "drops": { "wood": [2, 4] }, "regrowMinutes": 20, "chips": "#9a6a3a" },
       "crystal": { "name": "Crystal", "verb": "Mine", "hp": 10, "tier": 2, "drops": { "stone": [2, 3], "essence": [2, 4] }, "regrowMinutes": 45, "chips": "#cdb2ff" },
       "obsidian": { "name": "Obsidian", "verb": "Mine", "hp": 14, "tier": 3, "drops": { "stone": [4, 6], "essence": [3, 5] }, "regrowMinutes": 45, "chips": "#4a3a66" },
       "ore": { "name": "Iron Ore", "verb": "Mine", "hp": 18, "tier": 4, "drops": { "scrap": [6, 10], "stone": [2, 4] }, "regrowMinutes": 60, "chips": "#c87a3a" },
@@ -1107,16 +1158,20 @@
     "refund": 0.5,
     "repairPerSec": 0.02,
     "structures": [
-      { "id": "wood_wall", "name": "Wooden Wall", "kind": "wall", "hp": 120, "cost": { "wood": 3 }, "desc": "Blocks enemies. Cheap and quick." },
-      { "id": "stone_wall", "name": "Stone Wall", "kind": "wall", "hp": 380, "cost": { "stone": 4, "wood": 1 }, "requires": { "hearth": 2 }, "desc": "Sturdy wall that holds much longer." },
-      { "id": "gate", "name": "Gate", "kind": "gate", "hp": 220, "cost": { "wood": 8, "scrap": 5 }, "desc": "You walk through it. Enemies can't." },
-      { "id": "arrow_turret", "name": "Arrow Turret", "kind": "turret", "hp": 220, "cost": { "wood": 15, "stone": 10, "scrap": 30 }, "requires": { "training": 1 }, "turret": { "range": 7, "interval": 1.0, "damage": 12, "speed": 14, "sprite": "arrow", "color": "#e8d8b0" }, "desc": "Shoots arrows at enemies in range." },
+      { "id": "wood_wall", "name": "Wooden Wall", "kind": "wall", "hp": 120, "cost": { "wood": 3 }, "upgradesTo": "stone_wall", "desc": "Blocks enemies. Cheap and quick." },
+      { "id": "stone_wall", "name": "Stone Wall", "kind": "wall", "hp": 380, "cost": { "stone": 4, "wood": 1 }, "requires": { "hearth": 2 }, "upgradesTo": "iron_wall", "desc": "Sturdy wall that holds much longer." },
+      { "id": "gate", "name": "Gate", "kind": "gate", "hp": 220, "cost": { "wood": 8, "scrap": 5 }, "upgradesTo": "iron_gate", "desc": "You walk through it. Enemies can't." },
+      { "id": "arrow_turret", "name": "Arrow Turret", "kind": "turret", "hp": 220, "cost": { "wood": 15, "stone": 10, "scrap": 30 }, "requires": { "training": 1 }, "upgradesTo": "ballista", "turret": { "range": 7, "interval": 1.0, "damage": 12, "speed": 14, "sprite": "arrow", "color": "#e8d8b0" }, "desc": "Shoots arrows at enemies in range." },
       { "id": "flame_turret", "name": "Flame Turret", "kind": "turret", "hp": 320, "cost": { "stone": 30, "scrap": 60, "essence": 60 }, "requires": { "forge": 3, "training": 2 }, "turret": { "range": 5.5, "interval": 0.8, "damage": 9, "speed": 9, "sprite": "orb", "element": "fire", "status": "burn", "color": "#ff7a2a" }, "desc": "Hurls fire that sets enemies ablaze." },
-      { "id": "spikes", "name": "Spike Trap", "kind": "trap", "walkable": true, "hp": 150, "cost": { "wood": 4, "scrap": 6 }, "trap": { "damage": 10, "interval": 0.7 }, "desc": "Hurts enemies that walk over it. Safe for you." },
+      { "id": "spikes", "name": "Spike Trap", "kind": "trap", "walkable": true, "hp": 150, "cost": { "wood": 4, "scrap": 6 }, "upgradesTo": "iron_spikes", "trap": { "damage": 10, "interval": 0.7 }, "desc": "Hurts enemies that walk over it. Safe for you." },
       { "id": "torch", "name": "Torch", "kind": "light", "hp": 60, "cost": { "wood": 2, "stone": 1 }, "desc": "Lights up your camp." },
       { "id": "banner", "name": "Banner", "kind": "decor", "hp": 80, "cost": { "wood": 3, "scrap": 2 }, "desc": "Shows everyone whose camp this is." },
-      { "id": "wood_floor", "name": "Wooden Floor", "kind": "floor", "walkable": true, "hp": 60, "cost": { "wood": 1 }, "desc": "Decorative planks." },
-      { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 1 }, "desc": "Decorative paving." }
+      { "id": "wood_floor", "name": "Wooden Floor", "kind": "floor", "walkable": true, "hp": 60, "cost": { "wood": 1 }, "upgradesTo": "stone_floor", "desc": "Decorative planks." },
+      { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 1 }, "desc": "Decorative paving." },
+      { "id": "iron_wall", "name": "Reinforced Wall", "kind": "wall", "hp": 900, "cost": { "stone": 6, "scrap": 8 }, "requires": { "hearth": 4, "forge": 3 }, "desc": "Stone bound with iron. Holds out far longer than stone." },
+      { "id": "iron_gate", "name": "Iron Gate", "kind": "gate", "hp": 560, "cost": { "wood": 4, "stone": 6, "scrap": 16 }, "requires": { "hearth": 3 }, "desc": "An iron-bound gate: you walk through, enemies batter it much longer." },
+      { "id": "ballista", "name": "Ballista", "kind": "turret", "hp": 460, "cost": { "wood": 25, "stone": 20, "scrap": 70 }, "requires": { "training": 3, "forge": 2 }, "turret": { "range": 9, "interval": 1.4, "damage": 30, "speed": 18, "sprite": "arrow", "color": "#f0e0b8" }, "desc": "A heavy bolt thrower: long range and hard hits." },
+      { "id": "iron_spikes", "name": "Iron Spikes", "kind": "trap", "walkable": true, "hp": 280, "cost": { "scrap": 14, "stone": 4 }, "requires": { "forge": 2 }, "trap": { "damage": 22, "interval": 0.6 }, "desc": "Sharper, sturdier spikes for the gates." }
     ]
   },
   "sailing": {

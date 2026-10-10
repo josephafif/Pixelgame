@@ -94,6 +94,30 @@ function stoneWall(g, mask) {
   if (!(mask & RIGHT)) rect(g, 15, side, 1, (down ? 24 : 22) - side, O);
 }
 
+/** Stone wall bound with iron: darker blocks, iron bands and rivets. */
+function ironWall(g, mask) {
+  stoneWall(g, mask);
+  const up = mask & UP;
+  const down = mask & DOWN;
+  const bottom = down ? 24 : 21;
+  const body = up ? 0 : 9;
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(40, 36, 60, 0.28)';
+  g.fillRect(0, body, 16, bottom - body);
+  g.globalCompositeOperation = 'source-over';
+  // Iron bands on the same 8 px grid as the rope bindings of wooden walls.
+  for (const y of up ? [3, 11, 19] : [11, 19]) {
+    if (y >= bottom) continue;
+    rect(g, 0, y, 16, 2, '#4a4a5a');
+    rect(g, 0, y, 16, 1, '#8a8aa0');
+    for (const x of [3, 12]) rect(g, x, y, 1, 1, '#d0d4e0');
+  }
+  if (!up) {
+    // Iron caps on the merlons.
+    for (const mx of [1, 10]) rect(g, mx, 2, 5, 1, '#8a8aa0');
+  }
+}
+
 function gate(g, mask, open) {
   // Posts.
   for (const x of [0, 13]) {
@@ -120,6 +144,56 @@ function gate(g, mask, open) {
     rect(g, 7, 13, 2, 2, '#e0b040');
   }
   rect(g, 0, 22, 16, 2, O);
+}
+
+/** Iron-bound gate: dark posts, iron plates and a big ring handle. */
+function ironGate(g, mask, open) {
+  for (const x of [0, 13]) {
+    rect(g, x, 1, 3, 22, '#5d5a6e');
+    rect(g, x, 1, 1, 22, '#8d8a9e');
+    rect(g, x, 0, 3, 1, O);
+    rect(g, x + 3, 1, 1, 22, O);
+    rect(g, x - 1 < 0 ? 0 : x - 1, 1, 1, 22, O);
+    for (const y of [5, 12, 19]) rect(g, x + 1, y, 1, 1, '#d0d4e0');
+  }
+  rect(g, 3, 2, 10, 3, '#4a4a5a');
+  rect(g, 3, 2, 10, 1, '#8a8aa0');
+  rect(g, 3, 1, 10, 1, O);
+  if (open) {
+    rect(g, 3, 5, 10, 17, '#1a1420');
+    rect(g, 3, 5, 2, 17, '#6e6b80');
+    rect(g, 5, 5, 1, 17, O);
+  } else {
+    rect(g, 3, 5, 10, 17, '#7a5432');
+    for (let x = 3; x < 13; x += 3) rect(g, x, 5, 1, 17, '#5a3a22');
+    for (const y of [7, 13, 19]) {
+      rect(g, 3, y, 10, 2, '#4a4a5a');
+      rect(g, 3, y, 10, 1, '#8a8aa0');
+    }
+    rect(g, 7, 15, 2, 1, '#e0b040');
+    rect(g, 6, 16, 1, 2, '#e0b040');
+    rect(g, 9, 16, 1, 2, '#e0b040');
+    rect(g, 7, 18, 2, 1, '#e0b040');
+  }
+  rect(g, 0, 22, 16, 2, O);
+}
+
+/** Ballista: a heavy timber platform on a stone plinth. */
+function ballistaBase(g) {
+  rect(g, 2, 12, 12, 10, '#6e6b80');
+  rect(g, 2, 12, 12, 2, '#a4a8b8');
+  g.fillStyle = '#5d5a6e';
+  g.fillRect(2, 16, 12, 1);
+  g.fillRect(2, 19, 12, 1);
+  rect(g, 1, 11, 1, 11, O);
+  rect(g, 14, 11, 1, 11, O);
+  rect(g, 1, 22, 14, 2, O);
+  rect(g, 0, 7, 16, 4, '#7a5432');
+  rect(g, 0, 7, 16, 1, '#b07a48');
+  rect(g, 0, 10, 16, 1, '#4a3220');
+  for (const x of [2, 13]) rect(g, x, 8, 1, 1, '#d0d4e0');
+  rect(g, 0, 6, 16, 1, O);
+  rect(g, 0, 11, 16, 1, O);
 }
 
 function turretBase(g, flame) {
@@ -253,25 +327,49 @@ function spikes(g, up) {
   }
 }
 
+function ironSpikes(g, up) {
+  rect(g, 1, 1, 14, 14, '#3a3646');
+  rect(g, 1, 1, 14, 1, '#5d5a6e');
+  rect(g, 0, 0, 16, 1, O);
+  rect(g, 0, 15, 16, 1, O);
+  rect(g, 0, 0, 1, 16, O);
+  rect(g, 15, 0, 1, 16, O);
+  for (const [x, y] of [[3, 3], [7, 3], [11, 3], [5, 7], [9, 7], [3, 11], [7, 11], [11, 11]]) {
+    if (up) {
+      rect(g, x, y - 1, 1, 4, '#ffffff');
+      rect(g, x + 1, y, 1, 3, '#a4a8b8');
+    } else {
+      rect(g, x, y, 2, 2, O);
+      rect(g, x, y, 1, 1, '#7a7a8e');
+    }
+  }
+}
+
+const FLAT = new Set(['wood_floor', 'stone_floor', 'spikes', 'iron_spikes']);
+
 /** 16×24 sprite (or 16×16 for flat kinds) for a structure. */
 export function structureSprite(id, mask = 0, state = 0, tint = null) {
   const key = `${id}:${mask}:${state}:${tint ?? ''}`;
   let c = cache.get(key);
   if (c) return c;
-  const flat = id === 'wood_floor' || id === 'stone_floor' || id === 'spikes';
+  const flat = FLAT.has(id);
   c = createCanvas(STRUCT_W, flat ? 16 : STRUCT_H);
   const g = ctx2d(c);
   switch (id) {
     case 'wood_wall': woodWall(g, mask); break;
     case 'stone_wall': stoneWall(g, mask); break;
+    case 'iron_wall': ironWall(g, mask); break;
     case 'gate': gate(g, mask, state); break;
+    case 'iron_gate': ironGate(g, mask, state); break;
     case 'arrow_turret': turretBase(g, false); break;
+    case 'ballista': ballistaBase(g); break;
     case 'flame_turret': turretBase(g, true); break;
     case 'torch': torch(g); break;
     case 'banner': banner(g); break;
     case 'wood_floor': woodFloor(g); break;
     case 'stone_floor': stoneFloor(g); break;
     case 'spikes': spikes(g, state); break;
+    case 'iron_spikes': ironSpikes(g, state); break;
     case 'stall': stall(g, tint ?? undefined); break;
     case 'crate': crate(g); break;
     default: rect(g, 2, 8, 12, 14, '#8d8a9e');
@@ -281,7 +379,7 @@ export function structureSprite(id, mask = 0, state = 0, tint = null) {
 }
 
 export function isFlat(id) {
-  return id === 'wood_floor' || id === 'stone_floor' || id === 'spikes';
+  return FLAT.has(id);
 }
 
 /** Draws a flickering flame centred at (x, y) (bottom of the flame). */
@@ -294,6 +392,26 @@ export function drawFlame(g, x, y, t, size = 1) {
   g.fillRect(x - s, y - (4 + f) * s, 2 * s, (4 + f) * s);
   g.fillStyle = '#ffe890';
   g.fillRect(x - Math.max(1, s >> 1), y - 2 * s, Math.max(1, s), 2 * s);
+}
+
+/** The ballista's big bow, rotated to `angle`, centred at (x, y). */
+export function drawBallistaHead(g, x, y, angle, recoil) {
+  g.save();
+  g.translate(x, y);
+  g.rotate(angle);
+  g.translate(-recoil, 0);
+  g.fillStyle = O;
+  g.fillRect(-6, -2, 14, 4);
+  g.fillRect(2, -7, 3, 14);
+  g.fillStyle = '#6b4a2a';
+  g.fillRect(-5, -1, 12, 2);
+  g.fillStyle = '#9a6a3c';
+  g.fillRect(3, -6, 1, 12);
+  g.fillStyle = '#4a4a5a';
+  g.fillRect(-5, -1, 2, 2);
+  g.fillStyle = '#e8ecf4';
+  g.fillRect(7, -1, 2, 1);
+  g.restore();
 }
 
 /** Crossbow head for arrow turrets, rotated to `angle`, centred at (x, y). */
@@ -321,11 +439,12 @@ export function structureIcon(id) {
   const key = `icon:${id}`;
   let c = cache.get(key);
   if (c) return c;
-  const base = structureSprite(id, 0, id === 'spikes' ? 1 : 0);
+  const base = structureSprite(id, 0, id === 'spikes' || id === 'iron_spikes' ? 1 : 0);
   c = createCanvas(STRUCT_W, STRUCT_H);
   const g = ctx2d(c);
   g.drawImage(base, 0, isFlat(id) ? 6 : 0);
   if (id === 'arrow_turret') drawTurretHead(g, 8, 8, -Math.PI / 4, 0);
+  if (id === 'ballista') drawBallistaHead(g, 8, 8, -Math.PI / 4, 0);
   if (id === 'flame_turret') drawFlame(g, 8, 8, 0, 2);
   if (id === 'torch') drawFlame(g, 8, 7, 0, 1);
   cache.set(key, c);

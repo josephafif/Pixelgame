@@ -7,14 +7,19 @@ import { BASE_BUILDINGS } from '../src/net/mpbase.js';
 import * as players from './players.js';
 import * as building from './building.js';
 import * as base from './base.js';
+import * as workers from './workers.js';
+import { workerCap, hireCost, workerTier } from '../src/game/workers.js';
 
 export function clanPayload(gs, clan) {
   const banner = building.bannerOf(gs, clan.id);
   const raid = gs.raidState(clan.id);
   let structures = 0;
   for (const st of gs.structures.values()) if (st.clanId === clan.id) structures++;
-  const per = gs.rules.upkeepPerStructure ?? {};
-  const upkeep = Object.fromEntries(Object.entries(per).map(([k, v]) => [k, Math.ceil(structures * v)]));
+  const counts = building.upkeepCounts(gs, clan);
+  const perDay = building.upkeepOf(gs, clan);
+  const upkeep = Object.fromEntries(Object.entries(perDay.total).map(([k, v]) => [k, Math.ceil(v * 7)]));
+  const level = workers.lodgeLevel(gs, clan);
+  const roster = clan.base?.workers ?? [];
   const invited = [...clan.invites].map((id) => gs.db.account(id)?.name).filter(Boolean);
   return {
     t: 'clan',
@@ -32,6 +37,11 @@ export function clanPayload(gs, clan) {
     raidWindow: describeRaidWindow(gs.raidWindows),
     structures,
     upkeepPerWeek: upkeep,
+    // Upkeep per day by cause, and what causes it (the vault tab shows how long the vault lasts).
+    upkeep: { perDay, counts },
+    // The lodge's workers ({ id, role }); names come from workerLook(clan id, id).
+    workers: roster.map((r) => ({ id: r.id, role: r.role })),
+    lodge: level ? { level, cap: workerCap(gs.data, level), hire: hireCost(gs.data, roster.length), tier: workerTier(level) } : null,
     max: gs.rules.clanMax,
     base: basePayload(gs, clan),
   };

@@ -12,11 +12,11 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
-export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, PAL: 7, NPC: 8, HORSE: 9 };
+export const ET = { PLAYER: 1, ENEMY: 2, PROJ: 3, PICKUP: 4, AREA: 5, ALLY: 6, PAL: 7, NPC: 8, HORSE: 9, WORKER: 10 };
 
 /**
  * Fields per entity type, all integers on the wire. Position-like fields
@@ -37,6 +37,8 @@ export const FIELDS = {
   [ET.NPC]: ['x', 'y', 'facing', 'flags', 'mx', 'my', 'idx', 'hp'],
   // Horses: wild ones, and players' own (owner = the player's id, ref = the horse's id in their stable).
   [ET.HORSE]: ['x', 'y', 'facing', 'breed', 'flags', 'owner', 'ref'],
+  // Workers from clan lodges: their clan and number say who they are; anim counts their blows.
+  [ET.WORKER]: ['x', 'y', 'facing', 'flags', 'clan', 'wid', 'hp', 'maxHp', 'anim'],
 };
 const Q_FIELDS = new Set(['x', 'y', 'vx', 'vy', 'r', 'x2', 'y2']);
 export const Q = 64;
@@ -67,6 +69,8 @@ export const AF = { COUNT: 15, BIG: 16, FLOWER: 32, LAVA: 64, FOLLOW: 128, LINE:
 export const NPCF = { MOVING: 1, HURT: 2 };
 /** Horse flags. */
 export const HF = { MOVING: 1, SADDLE: 2 };
+/** Worker flags: what they do, carry and feel. */
+export const WF = { MOVING: 1, HURT: 2, ANGRY: 4, IDLE: 8, WOOD: 16, STONE: 32, MINER: 64 };
 /** Ally flags. */
 export const ALF = { MOVING: 1 };
 /** Slots on the wire. */

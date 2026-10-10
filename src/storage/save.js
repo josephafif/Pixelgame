@@ -55,7 +55,9 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     abilityState: { cooldowns: {} },
     counters: { drop: 0, craft: 0 },
     settings: { ...DEFAULT_SETTINGS },
-    base: { buildings: {}, wellAt: null, recall: null, structures: [] },
+    // vault: the camp's supplies (wood, stone, scrap, essence) that pay the upkeep;
+    // workers: hired at the Workers' Lodge ({ id, role }); owed: upkeep due but not yet paid.
+    base: { buildings: {}, wellAt: null, recall: null, structures: [], vault: {}, workers: [], nextWorker: 1, owed: {}, upkeepAt: null, unpaid: false },
     tools: { pickaxe: 0, boat: 0 },
     // Pals: eggs waiting (hatchAt = when the Den hatches it), owned pals, the one with you.
     pals: { eggs: [], owned: [], active: null, mode: 'fight', nextId: 1 },
@@ -105,6 +107,9 @@ export function fillDefaults(save) {
   out.components = { ...(save.components ?? {}) };
   out.base.buildings = { ...(save.base?.buildings ?? {}) };
   out.base.structures = Array.isArray(save.base?.structures) ? save.base.structures.map((st) => ({ ...st })) : [];
+  out.base.vault = { ...(save.base?.vault ?? {}) };
+  out.base.owed = { ...(save.base?.owed ?? {}) };
+  out.base.workers = Array.isArray(save.base?.workers) ? save.base.workers.map((w) => ({ ...w })) : [];
   out.world.harvested = { ...(save.world?.harvested ?? {}) };
   // Older saves: a boss you beat was beaten at its great altar.
   if (!Array.isArray(save.world?.altars)) out.world.altars = Object.keys(save.bosses?.defeated ?? {}).map((id) => `a:${id}`);

@@ -1,7 +1,7 @@
 // Build bar: shown while build mode is on. Pick a structure (or the
-// remove tool), then click the ground in your camp; drag to build a line
-// of walls. Keyboard: 1–9 pick, X remove, Space builds in front of you,
-// Esc/G leaves build mode.
+// remove or upgrade tool), then click the ground in your camp; drag to build
+// a line of walls (or upgrade a whole run of them). Keyboard: 1–9 pick,
+// X remove, U upgrade, Space builds in front of you, Esc/G leaves build mode.
 //
 // On touch screens the bar is a slim strip of icons along the top (the
 // picked structure's name and cost underneath), so the camp stays in view:
@@ -37,6 +37,9 @@ export class BuildBar {
     } else if (e.code === 'KeyX' || e.key === 'Delete') {
       g.selectStructure('remove');
       e.preventDefault();
+    } else if (e.code === 'KeyU') {
+      g.selectStructure('upgrade');
+      e.preventDefault();
     }
   }
 
@@ -70,6 +73,7 @@ export class BuildBar {
       touch ? null : h('span.num', String(i + 1)));
     });
     const removing = g.build.tool === 'remove';
+    const upgrading = g.build.tool === 'upgrade';
     const done = h('button.btn-primary.done', {
       onclick: (e) => {
         e.currentTarget.blur();
@@ -80,7 +84,6 @@ export class BuildBar {
     el.classList.toggle('compact', touch);
     clear(el).append(
       h('div.build-list', { role: 'toolbar', 'aria-label': 'Structures' },
-        items,
         h('button.bitem.remove', {
           class: removing ? 'on' : null,
           'aria-pressed': String(removing),
@@ -90,13 +93,26 @@ export class BuildBar {
             e.currentTarget.blur();
             g.selectStructure('remove');
           },
-        }, h('span.art', icon('remove', touch ? 24 : 32)), touch ? null : h('span.name', 'Remove'), touch ? null : h('span.num', 'X'))),
+        }, h('span.art', icon('remove', touch ? 24 : 32)), touch ? null : h('span.name', 'Remove'), touch ? null : h('span.num', 'X')),
+        h('button.bitem.upgrade', {
+          class: upgrading ? 'on' : null,
+          'aria-pressed': String(upgrading),
+          'aria-label': 'Upgrade',
+          title: 'Make walls, gates, turrets, traps and floors stronger in place (wood → stone → reinforced)',
+          onclick: (e) => {
+            e.currentTarget.blur();
+            g.selectStructure('upgrade');
+          },
+        }, h('span.art', icon('up', touch ? 24 : 32)), touch ? null : h('span.name', 'Upgrade'), touch ? null : h('span.num', 'U')),
+        items),
       touch
         ? h('div.build-foot',
           h('div.build-sel',
-            removing || !sel
-              ? [icon('remove', 16), h('b', 'Remove'), h('span.small.muted', 'half the materials back')]
-              : [h('b', sel.name), h('span.bcost', costChips(g.structureCost?.(sel) ?? sel.cost, g.buildWallet?.(sel) ?? g.save.resources))]),
+            upgrading
+              ? [icon('up', 16), h('b', 'Upgrade'), h('span.small.muted', 'wood → stone → reinforced')]
+              : removing || !sel
+                ? [icon('remove', 16), h('b', 'Remove'), h('span.small.muted', 'half the materials back')]
+                : [h('b', sel.name), h('span.bcost', costChips(g.structureCost?.(sel) ?? sel.cost, g.buildWallet?.(sel) ?? g.save.resources))]),
           done)
         : h('div.build-foot', h('span.status'), done));
     if (touch) el.append(h('div.status'));
@@ -110,10 +126,16 @@ export class BuildBar {
     const status = this.el.querySelector('.status');
     if (status) {
       const touch = g.input.mode === 'touch';
-      const hint = g.build.tool === 'remove'
+      const tool = g.build.tool;
+      const hint = tool === 'remove'
         ? (touch ? 'Tap a structure, then tap it again (or the hammer) to take it down.' : 'Click a structure to take it down.')
-        : touch ? 'Tap a tile, then tap it again (or the hammer) to build · drag from it for a line.' : 'Click to build · drag for a line · right-click removes · Space builds ahead.';
-      status.textContent = g.build.reason && g.build.ghost ? g.build.reason : hint;
+        : tool === 'upgrade'
+          ? (touch ? 'Tap a wall, gate, turret or floor, then tap it again to upgrade it.' : 'Click a structure to upgrade it · drag along a wall to upgrade it all.')
+          : touch ? 'Tap a tile, then tap it again (or the hammer) to build · drag from it for a line.' : 'Click to build · drag for a line · right-click removes · Space builds ahead.';
+      // Upgrading: what the picked structure becomes, and what it costs.
+      const up = tool === 'upgrade' && g.build.ghost && !g.build.reason ? g.upgradeInfo?.(g.build.ghost.tx, g.build.ghost.ty) : null;
+      const upText = up ? `→ ${up.to.name}: ${Object.entries(up.cost).map(([k, n]) => `${n} ${k}`).join(', ') || 'free'}` : null;
+      status.textContent = g.build.reason && g.build.ghost ? g.build.reason : upText ?? hint;
       status.classList.toggle('bad', Boolean(g.build.reason));
     }
     const costOf = (def) => g.structureCost?.(def) ?? def.cost;

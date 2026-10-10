@@ -97,6 +97,8 @@ export class Input {
       const action = KEYMAP[e.code];
       if (!action) return;
       this.#setMode('keyboard');
+      // A question on screen (askConfirm) gets every key: Enter, Esc, Tab.
+      if (e.target instanceof Element && e.target.closest('#dialog-root')) return;
       // Inside dialogs, Space/Enter/arrows belong to the focused control.
       const inDialog = e.target instanceof Element && e.target.closest('#overlay-root, #title, #update-banner');
       if (inDialog && !UI_ACTIONS.has(action)) return;

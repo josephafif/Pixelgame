@@ -21,6 +21,8 @@ const loaders = {
   market: () => import('./market.js'),
   odds: () => import('./odds.js'),
   pals: () => import('./pals.js'),
+  vault: () => import('./vault.js'),
+  workers: () => import('./workers.js'),
   settings: () => import('./settings.js'),
 };
 

@@ -341,7 +341,7 @@ body[data-input="touch"] .build-bar { top: calc(158px + var(--safe-t)); bottom: 
 .bitem .bcost .cost { font-size: 11px; padding: 0 3px; gap: 1px; border-width: 3px; border-image-width: 3px; }
 .bitem .bcost .cost .icon { width: 12px; height: 12px; }
 .bitem .num { position: absolute; top: 2px; left: 4px; font-size: 11px; color: var(--muted); }
-.bitem.remove .art { height: 48px; }
+.bitem.remove .art, .bitem.upgrade .art { height: 48px; }
 .build-foot { display: flex; align-items: center; gap: 8px; }
 .build-foot .status { flex: 1; font-size: 13px; color: var(--muted); min-height: 1.2em; }
 .build-foot .status.bad { color: #ffb070; }
@@ -626,15 +626,29 @@ body[data-input="touch"] .menu kbd { display: none; }
   .tab .icon { display: none; }
   .tab { font-size: 13px; }
 }
+/* In-game questions (askConfirm / showText): above every panel and banner. */
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6, 4, 12, 0.6);
+  padding: calc(12px + var(--safe-t)) calc(12px + var(--safe-r)) calc(12px + var(--safe-b)) calc(12px + var(--safe-l));
+}
+.panel.dialog { width: min(440px, 100%); }
+.dialog-text p { margin: 0 0 8px; font-size: 16px; line-height: 1.4; }
+.dialog-actions { margin-top: 14px; }
+.dialog-actions > button { flex: 1 1 120px; min-height: 46px; }
+.dialog-copy { flex-wrap: nowrap; }
+.dialog-field { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 16px; user-select: text; -webkit-user-select: text; }
 /* With a panel open, only the newest notice shows (the panel stays readable). */
 body:has(#overlay-root .backdrop) .toasts .toast:not(:last-child) { display: none; }
 .menu-foot { margin: 6px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
 
 @media (max-width: 640px) {
   .backdrop { padding: 0; align-items: stretch; }
-  .panel, .panel.wide { width: 100%; border-width: 0; border-image: none; background: var(--panel); }
+  .panel:not(.dialog), .panel.wide { width: 100%; border-width: 0; border-image: none; background: var(--panel); }
   .panel-body { padding: 12px calc(12px + var(--safe-r)) calc(16px + var(--safe-b)) calc(12px + var(--safe-l)); }
   .panel-head { padding-top: calc(8px + var(--safe-t)); }
+  .panel.dialog .panel-head { padding-top: 6px; }
 }
 
 /* ---------- Weapon card ---------- */
@@ -1223,4 +1237,41 @@ button.small { min-height: 30px; padding: 0 8px; font-size: 13px; }
   .mp-chat-log { font-size: 11px; width: 60vw; bottom: calc(42% + var(--safe-b)); }
   .mp-chat-btn, body.mp:has(.hud-pal:not([hidden])) .mp-chat-btn { top: calc(78px + var(--safe-t)); left: calc(6px + var(--safe-l)); }
   .mp-debug { font-size: 9px; white-space: normal; width: 96vw; text-align: center; }
+}
+
+/* ---------- Vault supplies, upkeep, workers, fortify ---------- */
+
+.vault { display: flex; flex-direction: column; gap: 10px; }
+.vault-top { display: flex; flex-wrap: wrap; gap: 8px; }
+.vault-rows.locked { opacity: 0.6; }
+.upkeep-box { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line); }
+.upkeep-box h3 { margin: 0; font-size: 17px; }
+.upkeep-box p { margin: 0; }
+.upkeep-rows { display: flex; flex-direction: column; gap: 3px; }
+.upkeep-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; font-size: 14px; }
+.upkeep-row.total { border-top: 1px solid var(--line); padding-top: 4px; }
+.upkeep-cost { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.upkeep-cost .cost { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; }
+.upkeep-lasts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 16px; }
+.upkeep-lasts b { color: var(--gold); }
+.upkeep-lasts.low b { color: var(--ember); }
+.workers { display: flex; flex-direction: column; gap: 10px; }
+.worker-wage { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.worker-list { display: flex; flex-direction: column; gap: 6px; }
+.worker-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 8px; background: rgba(255, 255, 255, 0.04); border-radius: 4px; }
+.worker-row canvas { flex: none; image-rendering: pixelated; }
+.worker-row .spacer { flex: 1; }
+.worker-info { display: flex; flex-direction: column; min-width: 0; }
+.worker-info .meter.small { height: 4px; width: 80px; }
+.worker-roles { display: inline-flex; gap: 4px; }
+.worker-hire { display: flex; flex-direction: column; gap: 6px; }
+.worker-hire h3 { margin: 0; }
+.worker-hire .row, .workers > .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fortify { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.fortify h3 { margin: 0; }
+.fortify-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 8px; background: rgba(255, 255, 255, 0.04); border-radius: 4px; }
+.fortify-row .bcost { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+@media (max-width: 640px) {
+  .worker-roles { flex: 1 1 100%; }
+  .worker-roles button { flex: 1; }
 }

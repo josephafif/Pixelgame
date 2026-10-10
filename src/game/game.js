@@ -28,8 +28,9 @@ import { applyStatus } from './status.js';
 import {
   currentPickaxe, forgePickaxe, findHarvestTarget, rollDrops, regrow, REGROW_INTERVAL,
 } from './gathering.js';
-import { Construction, buildRadius, structureDef, structureDefs, structureLock } from './construction.js';
+import { Construction, buildRadius, structureDef, structureDefs, structureLock, upgradeDef, upgradeCost } from './construction.js';
 import { Markets } from './markets.js';
+import { Workforce } from './workforce.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
 import { slideMove } from '../net/movement.js';
 import { Stable } from './riding.js';
@@ -63,6 +64,8 @@ export class Game {
 
     this.world = new World(data, save.worldSeed);
     this.world.harvested = save.world.harvested;
+    // The camp's ground stays cleared: nothing grows back there.
+    this.world.noRegrow = (tx, ty) => Math.hypot(tx, ty) <= this.buildRadius() + 1;
     this.fx = new Fx();
     this.time = 0;
     this.frame = 0;
@@ -99,6 +102,8 @@ export class Game {
     this.damageEnemy = (e, amount, opts) => dealDamage(this, e, amount, opts);
     this.construction = new Construction(this);
     this.markets = new Markets(this);
+    // Workers from the Workers' Lodge, the Vault's supplies and the camp's upkeep.
+    this.workforce = new Workforce(this);
     this.stable = new Stable(this);
     // Build mode (camp construction) and gathering state.
     this.build = {
@@ -1128,6 +1133,8 @@ export class Game {
         if (level === 0) return `Build ${def.name}`;
         if (o.buildingId === 'hearth') return 'Rest & manage camp';
         if (o.buildingId === 'den') return 'Visit your pals';
+        if (o.buildingId === 'lodge') return 'Manage your workers';
+        if (o.buildingId === 'vault') return 'Open the Vault';
         if (o.buildingId === 'well') {
           const n = wellPending(this.data, this.save);
           return n > 0 ? `Collect ${n} essence` : 'Essence Well (filling…)';
@@ -1306,9 +1313,57 @@ export class Game {
     return markets.length ? mine.concat(markets) : mine;
   }
 
-  /** Your attacks can hurt people at markets (see Markets.hitNpcs). */
+  /** Your attacks can hurt people at markets (see Markets.hitNpcs) and your own workers. */
   hitNpcs(shape, damage) {
-    return this.markets.npcs.length ? this.markets.hitNpcs(shape, damage) : false;
+    const market = this.markets.npcs.length ? this.markets.hitNpcs(shape, damage) : false;
+    const worker = this.workforce.list.length ? this.workforce.hit(shape, damage) : false;
+    return market || worker;
+  }
+
+  /** Your hired workers (drawn by the renderer). */
+  get workers() {
+    return this.workforce.list;
+  }
+
+  // --- Workers and the Vault's supplies -----------------------------------------------------
+
+  hireWorker(role) {
+    try {
+      const w = this.workforce.hire(role);
+      this.audio.play('levelup');
+      this.toast(`${w.name} joins your camp as a ${w.role === 'wood' ? 'lumberjack' : 'miner'}!`, 'level');
+      this.emit('base');
+      this.emit('inventory');
+      this.saveNow();
+      return w;
+    } catch (err) {
+      this.toast(err.message, 'warn');
+      return null;
+    }
+  }
+
+  fireWorker(id) {
+    const w = this.workforce.list.find((x) => x.id === id);
+    if (!this.workforce.fire(id)) return false;
+    if (w) this.toast(`${w.name} packs up and leaves the camp.`, 'info');
+    this.emit('base');
+    this.saveNow();
+    return true;
+  }
+
+  setWorkerRole(id, role) {
+    if (!this.workforce.setRole(id, role)) return false;
+    this.emit('base');
+    this.requestSave();
+    return true;
+  }
+
+  vaultDeposit(res) {
+    return this.workforce.deposit(res);
+  }
+
+  vaultWithdraw(res) {
+    return this.workforce.withdraw(res);
   }
 
   /** A turret's projectile reached an enemy. */
@@ -1357,8 +1412,8 @@ export class Game {
 
   selectStructure(id) {
     const b = this.build;
-    if (id === 'remove') {
-      b.tool = b.tool === 'remove' ? 'place' : 'remove';
+    if (id === 'remove' || id === 'upgrade') {
+      b.tool = b.tool === id ? 'place' : id;
     } else if (structureDef(this.data, id)) {
       b.selected = id;
       b.tool = 'place';
@@ -1374,6 +1429,11 @@ export class Game {
       const text = Object.entries(refund).map(([k, n]) => `+${n} ${k}`).join(' ');
       if (text) this.fx.text(tx + 0.5, ty, text.toUpperCase(), '#c8ccd8', 1);
       return null;
+    }
+    if (tool === 'upgrade') {
+      const res = this.construction.upgrade(tx, ty);
+      if (res.ok) this.fx.text(tx + 0.5, ty, res.structure.def.name.toUpperCase(), '#7ae0ff', 1);
+      return res.ok ? null : res.reason;
     }
     const res = this.construction.place(this.build.selected, tx, ty);
     return res.ok ? null : res.reason;
@@ -1405,7 +1465,7 @@ export class Game {
         b.hoverAt = this.time;
         const tool = button === 2 ? 'remove' : b.tool;
         const problem = this.buildAt(tx, ty, tool);
-        if (problem && tool === 'place') this.toast(problem, 'warn');
+        if (problem && tool !== 'remove') this.toast(problem, 'warn');
         b.painting = tool;
         b.lastTile = `${tx},${ty}`;
       },
@@ -1465,6 +1525,8 @@ export class Game {
     b.ghost = tile;
     if (b.tool === 'remove') {
       b.reason = this.construction.at(tile.tx, tile.ty) ? null : 'Nothing to remove here';
+    } else if (b.tool === 'upgrade') {
+      b.reason = this.construction.upgradeProblem(tile.tx, tile.ty);
     } else {
       const def = structureDef(this.data, b.selected);
       b.reason = def ? this.construction.placementProblem(def, tile.tx, tile.ty) : 'Pick something to build';
@@ -1475,6 +1537,25 @@ export class Game {
     return structureLock(this.data, this.save, def);
   }
 
+  /** What the structure at (tx, ty) upgrades into, and what that costs (build bar), or null. */
+  upgradeInfo(tx, ty) {
+    const st = this.construction.at(tx, ty);
+    const to = st ? upgradeDef(this.data, st.def) : null;
+    return to ? { from: st.def, to, cost: upgradeCost(this.data, st.def, to) } : null;
+  }
+
+  /** Upgrades every structure of one kind you can afford (camp panel → Fortify). */
+  fortify(id) {
+    const def = structureDef(this.data, id);
+    const n = this.construction.upgradeAll(id);
+    const to = def?.upgradesTo ? structureDef(this.data, def.upgradesTo) : null;
+    if (n) this.toast(`${n} × ${def.name} → ${to?.name ?? 'stronger'}`, 'level');
+    else this.toast(to ? this.construction.upgradeProblem(0, 0, { reach: false, st: this.save.base.structures.find((st) => st.id === id) }) ?? 'Nothing to upgrade' : 'Nothing to upgrade', 'warn');
+    this.emit('base');
+    this.emit('inventory');
+    return n;
+  }
+
   // --- Base -------------------------------------------------------------------------
 
   upgradeBuilding(id) {
@@ -1482,6 +1563,7 @@ export class Game {
     try {
       const level = upgradeBuilding(this.data, this.save, id);
       this.recomputeStats();
+      if (id === 'lodge') this.workforce.sync();
       this.audio.play('levelup');
       this.fx.emit('sparkle', def.x, def.y - 0.5, 24, 1, 3);
       this.fx.add({ type: 'ring', x: def.x, y: def.y, r0: 0.3, r1: 2, color: '#ffd24a', dur: 0.4 });
@@ -1644,7 +1726,9 @@ export class Game {
         } else if (id === 'forge') {
           this.emit('ui', 'crafting');
         } else if (id === 'vault') {
-          this.emit('ui', { name: 'inventory', tab: 'storage' });
+          this.emit('ui', 'vault');
+        } else if (id === 'lodge') {
+          this.emit('ui', 'workers');
         } else if (id === 'library') {
           this.emit('ui', 'research');
         } else if (id === 'den') {
@@ -1844,6 +1928,7 @@ export class Game {
     updatePickups(this, dt);
     this.construction.update(dt);
     this.markets.update(dt);
+    this.workforce.update(dt);
     this.stable.update(dt);
     this.#ambience(dt);
     this.exploreT -= dt;
@@ -1855,6 +1940,7 @@ export class Game {
     if (this.regrowT <= 0) {
       this.regrowT = REGROW_INTERVAL;
       regrow(this);
+      this.world.refreshGrowth();
     }
     this.fx.update(dt);
     this.shake = Math.max(0, this.shake - dt);

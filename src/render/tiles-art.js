@@ -291,8 +291,130 @@ export function tileCanvas(id, variant, blocker = false) {
   return c;
 }
 
-/** Pre-renders a chunk (ground + blockers) into one canvas. */
-export function renderChunk(chunk) {
+const STUMP_TREES = new Set([T.TREE, T.PINE, T.PALM]);
+
+/**
+ * A cut tree or rock growing back, stage 0 (stump / rubble) to 3 (nearly
+ * grown). Drawn over the ground like a blocker, but walkable.
+ */
+function drawGrowth(ctx, id, stage) {
+  const O = '#161622';
+  if (STUMP_TREES.has(id)) {
+    if (stage <= 1) {
+      // A cut stump with rings on top (and a first green shoot).
+      ctx.fillStyle = O;
+      ctx.fillRect(5, 9, 6, 6);
+      ctx.fillStyle = id === T.PALM ? '#9a6a3a' : '#6a4424';
+      ctx.fillRect(6, 11, 4, 3);
+      ctx.fillStyle = '#d8b07a';
+      ctx.fillRect(6, 10, 4, 1);
+      ctx.fillStyle = '#a87a48';
+      ctx.fillRect(7, 10, 2, 1);
+      if (stage === 1) {
+        ctx.fillStyle = O;
+        ctx.fillRect(10, 6, 4, 5);
+        ctx.fillStyle = '#5cb85a';
+        ctx.fillRect(11, 8, 1, 2);
+        ctx.fillRect(11, 7, 2, 1);
+        ctx.fillRect(12, 6, 1, 1);
+      }
+      return;
+    }
+    if (id === T.PINE) {
+      const rows = stage === 2 ? 6 : 9;
+      const top = 15 - rows - 2;
+      ctx.fillStyle = '#5a3a22';
+      ctx.fillRect(7, 13, 2, 3);
+      for (let row = 0; row < rows; row++) {
+        const half = Math.floor(row / 2) + 1;
+        ctx.fillStyle = O;
+        ctx.fillRect(8 - half - 1, top + row, half * 2 + 2, 1);
+        ctx.fillStyle = row % 4 < 2 ? '#2a5a3a' : '#3a7a4a';
+        ctx.fillRect(8 - half, top + row, half * 2, 1);
+      }
+      return;
+    }
+    if (id === T.PALM) {
+      const h = stage === 2 ? 5 : 8;
+      ctx.fillStyle = O;
+      ctx.fillRect(6, 15 - h, 4, h + 1);
+      ctx.fillStyle = '#9a6a3a';
+      ctx.fillRect(7, 16 - h, 2, h - 1);
+      ctx.fillStyle = '#4fb04f';
+      const y = 15 - h;
+      ctx.fillRect(3, y, 4, 1);
+      ctx.fillRect(9, y, 4, 1);
+      ctx.fillRect(5, y - 1, 6, 1);
+      ctx.fillStyle = '#2f8a3c';
+      ctx.fillRect(2, y + 1, 2, 1);
+      ctx.fillRect(12, y + 1, 2, 1);
+      return;
+    }
+    // A broadleaf sapling, then a young tree.
+    const r = stage === 2 ? 3 : 5;
+    const cy = stage === 2 ? 9 : 8;
+    ctx.fillStyle = O;
+    ctx.fillRect(7, cy + r - 1, 3, 16 - (cy + r - 1));
+    ctx.fillStyle = '#6a4424';
+    ctx.fillRect(8, cy + r - 1, 1, 15 - (cy + r - 1));
+    circle(ctx, 8, cy, r + 1, O);
+    circle(ctx, 8, cy, r, '#3f9a44');
+    circle(ctx, 7, cy - 1, Math.max(1, r - 2), '#5cb85a');
+    return;
+  }
+  if (id === T.CACTUS) {
+    const h = [3, 5, 8, 10][stage];
+    ctx.fillStyle = O;
+    ctx.fillRect(6, 15 - h, 4, h + 1);
+    ctx.fillStyle = '#4a9a4a';
+    ctx.fillRect(7, 16 - h, 2, h - 1);
+    ctx.fillStyle = '#7ac86a';
+    ctx.fillRect(7, 16 - h, 1, h - 2);
+    return;
+  }
+  // Rocks, ore, obsidian, crystals and starstone: rubble that slowly builds up again.
+  const colors = {
+    [T.CRYSTAL]: ['#6b3fc6', '#cdb2ff'], [T.STARSTONE]: ['#c8961a', '#fff4b0'],
+    [T.OBSIDIAN]: ['#2a2238', '#9a7aff'], [T.ORE]: ['#6a6a76', '#c87a3a'],
+  }[id] ?? ['#6a6a76', '#b0b0bc'];
+  if (stage <= 1) {
+    const bits = stage === 0 ? [[4, 11], [9, 12], [7, 9]] : [[4, 11], [9, 12], [7, 9], [11, 9], [6, 13]];
+    for (const [x, y] of bits) {
+      ctx.fillStyle = O;
+      ctx.fillRect(x - 1, y - 1, 4, 3);
+      ctx.fillStyle = colors[0];
+      ctx.fillRect(x, y, 2, 1);
+      ctx.fillStyle = colors[1];
+      ctx.fillRect(x, y, 1, 1);
+    }
+    return;
+  }
+  const r = stage === 2 ? 3 : 4;
+  circle(ctx, 8, 11, r + 1, O);
+  circle(ctx, 8, 11, r, colors[0]);
+  ctx.fillStyle = colors[1];
+  ctx.fillRect(7, 10 - (r >> 1), 2, 1);
+}
+
+const growthCache = new Map();
+
+export function growthCanvas(id, stage) {
+  const key = `${id}:${stage}`;
+  let c = growthCache.get(key);
+  if (!c) {
+    c = createCanvas(TILE_PX, TILE_PX);
+    drawGrowth(ctx2d(c), id, stage);
+    growthCache.set(key, c);
+  }
+  return c;
+}
+
+/**
+ * Pre-renders a chunk (ground + blockers) into one canvas. `growth` lists
+ * cut trees and rocks growing back ([[tile index, tile id, stage]], from
+ * World#growthOf).
+ */
+export function renderChunk(chunk, growth = null) {
   const size = CHUNK * TILE_PX;
   const canvas = createCanvas(size, size);
   const ctx = ctx2d(canvas);
@@ -306,5 +428,6 @@ export function renderChunk(chunk) {
       if (chunk.block[i]) ctx.drawImage(tileCanvas(chunk.block[i], variant, true), lx * TILE_PX, ly * TILE_PX);
     }
   }
+  for (const [i, id, stage] of growth ?? []) ctx.drawImage(growthCanvas(id, stage), (i % CHUNK) * TILE_PX, ((i / CHUNK) | 0) * TILE_PX);
   return canvas;
 }

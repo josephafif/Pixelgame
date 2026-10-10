@@ -4,11 +4,12 @@
 // Turrets and spike traps defend against monsters and intruders.
 
 import { tileKey } from '../src/game/world.js';
-import { structureDef, refundFor, groundProblem, onWater } from '../src/game/construction.js';
+import { structureDef, refundFor, groundProblem, onWater, upgradeDef, upgradeCost } from '../src/game/construction.js';
 import { canAfford, pay, shortfalls } from '../src/game/base.js';
+import { upkeepPerDay, chargeUpkeep } from '../src/game/upkeep.js';
 import { inSafeZone, bannerProblem, claimAt, canDo } from '../src/net/rules.js';
 import { mpStructureLock } from '../src/net/mpbuild.js';
-import { buildingOfStruct, BUILDING_SV } from '../src/net/mpbase.js';
+import { buildingOfStruct, BUILDING_SV, upkeepRates } from '../src/net/mpbase.js';
 import * as combat from './combat.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
@@ -296,6 +297,95 @@ export function remove(gs, p, tx, ty) {
   return null;
 }
 
+// --- Upgrades: wood → stone → reinforced, gates, turrets, traps and floors ---------------------------
+
+/** Why p can't upgrade `st` now (null = they can), and what it becomes. */
+function upgradeCheck(gs, p, clan, st) {
+  if (!st || st.marketId) return { problem: 'Här finns inget att uppgradera' };
+  if (!clan || st.clanId !== clan.id) return { problem: 'Det där är inte er klans' };
+  const role = clan.members.get(p.accountId)?.role ?? 'member';
+  if (!canDo(role, 'build')) return { problem: 'Du får inte bygga här' };
+  const to = upgradeDef(gs.data, st.def);
+  if (!to) return { problem: `${st.def.name} går inte att förstärka mer` };
+  const lock = mpStructureLock(to, p.ch.level);
+  if (lock) return { problem: `${to.name}: ${lock.toLowerCase()}` };
+  if (st.rt.lastHit > gs.time - 10) return { problem: 'Inte medan basen anfalls' };
+  return { to, cost: upgradeCost(gs.data, st.def, to) };
+}
+
+function applyUpgrade(gs, st, to) {
+  st.id = to.id;
+  st.def = to;
+  st.hp = to.hp;
+  st.dirtyHp = false;
+  gs.db.updateStructureDef(st.sid, to.id, to.hp);
+  gs.broadcastTile(st.x, st.y, { t: 'wd', k: 'st+', st: structurePayload(st, gs) });
+  gs.event(st.x + 0.5, st.y + 0.5, { k: 'fx', fx: 'upgrade', x: st.x + 0.5, y: st.y + 0.5 }, 24);
+}
+
+/** Upgrades the structure at (tx, ty), paid from the clan vault and then your pockets. Problem text or null. */
+export function upgrade(gs, p, tx, ty) {
+  if (!Number.isInteger(tx) || !Number.isInteger(ty)) return 'Ogiltig plats';
+  if ((p.x - (tx + 0.5)) ** 2 + (p.y - (ty + 0.5)) ** 2 > (gs.data.building.reach + 0.5) ** 2) return 'För långt bort';
+  const clan = p.clanId ? gs.clans.get(p.clanId) : null;
+  const st = gs.world.structureAt(tx, ty) ?? gs.world.floorAt(tx, ty);
+  const { problem, to, cost } = upgradeCheck(gs, p, clan, st);
+  if (problem) return problem;
+  const short = base.shortfall(clan, p, cost);
+  if (short) return short;
+  const paid = base.pay(clan, p, cost);
+  try {
+    gs.db.tx(() => {
+      applyUpgrade(gs, st, to);
+      gs.db.saveClan(clan);
+      players.persist(gs, p);
+    });
+  } catch (err) {
+    base.refund(clan, p, paid);
+    gs.log.error('[build] upgrade failed', err);
+    return 'Kunde inte uppgradera';
+  }
+  players.markMe(p);
+  clans.sendClan(gs, clan);
+  return null;
+}
+
+/** Upgrades every structure of kind `id` in the clan's base that the vault and your pockets can pay for. */
+export function upgradeAll(gs, p, id) {
+  const clan = p.clanId ? gs.clans.get(p.clanId) : null;
+  if (!clan) return 'Gå med i eller grunda en klan först';
+  const list = [...gs.structures.values()].filter((st) => st.clanId === clan.id && st.id === id && !st.dead);
+  if (!list.length) return 'Det finns inget sådant att förstärka';
+  let n = 0;
+  let first = null;
+  gs.db.tx(() => {
+    for (const st of list) {
+      const { problem, to, cost } = upgradeCheck(gs, p, clan, st);
+      if (problem) {
+        first ??= problem;
+        continue;
+      }
+      const short = base.shortfall(clan, p, cost);
+      if (short) {
+        first ??= short;
+        break;
+      }
+      base.pay(clan, p, cost);
+      applyUpgrade(gs, st, to);
+      n++;
+    }
+    if (n) {
+      gs.db.saveClan(clan);
+      players.persist(gs, p);
+    }
+  });
+  if (!n) return first ?? 'Inget kunde förstärkas';
+  players.markMe(p);
+  clans.sendClan(gs, clan);
+  gs.toast(p, `Förstärkte ${n} st.`, 'level');
+  return null;
+}
+
 // --- Tick -------------------------------------------------------------------------------------
 
 function turretDamage(gs, st) {
@@ -395,32 +485,41 @@ export function persistDamage(gs) {
   }
 }
 
+/** What a clan's base costs to keep: { structures, buildingLevels, workers } (upkeep.js). */
+export function upkeepCounts(gs, clan, structures = null) {
+  let n = structures;
+  if (n === null) {
+    n = 0;
+    for (const st of gs.structures.values()) if (st.clanId === clan.id && st.def.kind !== 'building') n++;
+  }
+  const levels = base.levelsOfClan(gs, clan);
+  return {
+    structures: n,
+    buildingLevels: Object.values(levels).reduce((s, v) => s + v, 0),
+    workers: clan.base?.workers?.length ?? 0,
+  };
+}
+
+/** Upkeep per day for a clan: { structures, buildings, workers, total }. */
+export function upkeepOf(gs, clan, structures = null) {
+  return upkeepPerDay(upkeepCounts(gs, clan, structures), upkeepRates(gs.rules));
+}
+
 /**
- * Hourly: each clan pays upkeep for its base from the vault; bases that
- * can't pay (and abandoned ones) slowly crumble.
+ * Hourly: each clan pays upkeep for its base from the vault (walls and the
+ * rest, building levels, workers' wages); bases that can't pay (and
+ * abandoned ones) slowly crumble, and unpaid workers stay home.
  */
 export function upkeep(gs) {
-  const per = gs.rules.upkeepPerStructure ?? {};
   const counts = new Map();
   for (const st of gs.structures.values()) {
-    if (st.def.kind === 'building') continue; // the camp's buildings cost no upkeep
+    if (st.def.kind === 'building') continue; // counted by level instead
     counts.set(st.clanId ?? 0, (counts.get(st.clanId ?? 0) ?? 0) + 1);
   }
   for (const clan of gs.clans.values()) {
-    const n = counts.get(clan.id) ?? 0;
-    if (!n) continue;
-    let short = false;
-    for (const [k, v] of Object.entries(per)) {
-      clan.upkeep[k] = (clan.upkeep[k] ?? 0) + (n * v) / 168;
-      const whole = Math.floor(clan.upkeep[k]);
-      if (whole <= 0) continue;
-      if ((clan.vault[k] ?? 0) >= whole) {
-        clan.vault[k] -= whole;
-        clan.upkeep[k] -= whole;
-      } else {
-        short = true;
-      }
-    }
+    const perDay = upkeepOf(gs, clan, counts.get(clan.id) ?? 0).total;
+    if (!Object.keys(perDay).length) continue;
+    const short = !chargeUpkeep(perDay, 1, clan.upkeep, [clan.vault]);
     if (short !== clan.unpaid) {
       clan.unpaid = short;
       const text = short ? 'Klanvalvet räcker inte till underhållet: basen börjar förfalla. Lägg trä och sten i valvet vid banéret.' : 'Underhållet är betalt igen.';

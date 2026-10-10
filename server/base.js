@@ -12,6 +12,7 @@ import { canDo } from '../src/net/rules.js';
 import * as players from './players.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
+import * as workers from './workers.js';
 
 const RES_SV = { essence: 'essens', scrap: 'skrot', wood: 'trä', stone: 'sten', gold: 'guld', shards: 'stjärnskärvor' };
 const FORGE_REACH = 3.4;
@@ -133,6 +134,7 @@ export function refund(clan, p, paid) {
 
 /** Buildings changed: new bonuses for every member online, the clan panel, and the sprite for onlookers. */
 export function changed(gs, clan, st = null) {
+  workers.sync(gs, clan); // a lodge built, moved or upgraded
   for (const id of clan.members.keys()) {
     const m = gs.byAccount.get(id);
     if (!m) continue;
@@ -153,6 +155,7 @@ export function request(gs, p, msg) {
   const id = String(msg.id ?? '');
   if (msg.op === 'upgrade') return upgrade(gs, p, clan, id);
   if (msg.op === 'well') return collectWell(gs, p, clan);
+  if (msg.op === 'hire' || msg.op === 'fire' || msg.op === 'role') return workers.request(gs, p, clan, msg);
   return 'Okänd begäran';
 }
 
@@ -279,6 +282,9 @@ export function use(gs, p, st) {
       break;
     case 'den':
       gs.send(p, { t: 'ui', panel: 'pals' });
+      break;
+    case 'lodge':
+      gs.send(p, { t: 'ui', panel: { name: 'clan', tab: 'workers' } });
       break;
     case 'well': {
       const problem = collectWell(gs, p, gs.clans.get(p.clanId));

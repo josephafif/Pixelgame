@@ -8,7 +8,7 @@
 
 import { h } from './dom.js';
 import { icon } from './icons.js';
-import { openModal, replaceModalBody } from './modal.js';
+import { openModal, replaceModalBody, askConfirm, showText, isDialogOpen } from './modal.js';
 import { weaponCard, weaponIconEl } from './weapon-card.js';
 import { statSheet } from '../game/stats.js';
 import { baseBonuses } from '../game/base.js';
@@ -97,10 +97,14 @@ export function open(game, app, arg = {}) {
     rerender();
   }
 
-  function salvage(dna) {
+  async function salvage(dna) {
     if (!dna || game.inLoadout(dna.id) || inv().favorites.includes(dna.id)) return;
     const value = salvageValue(dna);
-    if (!confirm(`Salvage ${dna.name.text} for ${value.scrap} scrap and ${value.essence} essence?`)) return;
+    const sure = await askConfirm({
+      title: 'Salvage weapon?', icon: 'scrap', ok: 'Salvage', danger: true,
+      text: `Salvage ${dna.name.text} for ${value.scrap} scrap and ${value.essence} essence?`,
+    });
+    if (!sure || !game.findWeapon(dna.id)) return;
     const list = visible(tab);
     const at = list.findIndex((w) => w.id === dna.id);
     game.salvage(dna.id);
@@ -211,7 +215,7 @@ export function open(game, app, arg = {}) {
               else await navigator.clipboard.writeText(code);
               game.toast('Weapon code copied');
             } catch {
-              prompt('Weapon code', code);
+              showText({ title: 'Weapon code', text: 'Copy this code to rebuild the weapon on any device.', value: code });
             }
           },
         }, 'Share code')));
@@ -230,8 +234,12 @@ export function open(game, app, arg = {}) {
       }, { scrap: 0, essence: 0 });
       return h('button', {
         disabled: !pick.length,
-        onclick: () => {
-          if (!confirm(`Salvage ${pick.length} weapons (${r.name} and below) for ${total.scrap} scrap and ${total.essence} essence?`)) return;
+        onclick: async () => {
+          const sure = await askConfirm({
+            title: 'Salvage weapons?', icon: 'scrap', ok: `Salvage ${pick.length}`, danger: true,
+            text: `Salvage ${pick.length} weapons (${r.name} and below) for ${total.scrap} scrap and ${total.essence} essence?`,
+          });
+          if (!sure) return;
           game.salvageMany(pick.map((d) => d.id));
           bulk = false;
           if (!game.findWeapon(selected)) selected = i.equipped;
@@ -373,7 +381,7 @@ export function open(game, app, arg = {}) {
   }
 
   function onKey(e) {
-    if (!document.querySelector('.inventory-panel')) return;
+    if (!document.querySelector('.inventory-panel') || isDialogOpen()) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const tabIds = TABS.map(([id]) => id);

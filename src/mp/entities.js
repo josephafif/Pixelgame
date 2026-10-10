@@ -4,7 +4,7 @@
 // packets arrive unevenly).
 
 import {
-  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, NPCF, HF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
+  ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, NPCF, HF, WF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
   byteToAngle, intToColor,
 } from '../net/protocol.js';
 import { TICK_RATE } from '../net/movement.js';
@@ -288,6 +288,18 @@ export function readHorse(v) {
   return {
     facing: f('facing') ? Math.PI : 0, breed: BREEDS[f('breed') - 1]?.id ?? BREEDS[0].id,
     moving: Boolean(flags & HF.MOVING), saddle: Boolean(flags & HF.SADDLE), owner: f('owner'), ref: f('ref'),
+  };
+}
+
+/** A clan's worker. */
+export function readWorker(v) {
+  const f = (n) => field(ET.WORKER, v, n);
+  const flags = f('flags');
+  return {
+    facing: byteToAngle(f('facing')), moving: Boolean(flags & WF.MOVING), hurt: Boolean(flags & WF.HURT),
+    angry: Boolean(flags & WF.ANGRY), idle: Boolean(flags & WF.IDLE),
+    carrying: flags & WF.WOOD ? 'wood' : flags & WF.STONE ? 'stone' : null, role: flags & WF.MINER ? 'stone' : 'wood',
+    clan: f('clan'), wid: f('wid'), hp: f('hp'), maxHp: f('maxHp'), anim: f('anim'),
   };
 }
 

@@ -9,7 +9,7 @@ export const CHUNK = 16;
 const SAFE_RADIUS = 16;
 // The camp plaza (stone floor) and the open ground around it where the
 // base buildings stand.
-const CAMP_RADIUS = 8.5;
+const CAMP_RADIUS = 8.75; // (room on the plaza for the Workers' Lodge too)
 const CAMP_CLEAR = 12;
 const LANDMARK_RADIUS = 22;
 // Lesser altars: one more boss to find in about half of the big world cells.
@@ -135,6 +135,9 @@ export class World {
     this.structures = new Map();
     this.floors = new Map();
     this.harvested = {};
+    // Where cut trees and rocks never grow back (the camp, a clan's claim):
+    // (tx, ty) → true. Saplings aren't drawn there either.
+    this.noRegrow = null;
     this.biomes = data.biomes;
     this.biomeById = data.byId.biomes;
     this.q = {
@@ -497,13 +500,18 @@ export class World {
         }
       }
     }
-    const chunk = { cx, cy, ground, block, biomeIdx, objects: [], canvas: null };
+    // cut: trees and rocks cut down here (tile index → [time, tile id]), drawn growing back.
+    const chunk = { cx, cy, ground, block, biomeIdx, objects: [], canvas: null, cut: new Map(), grown: '' };
     // Trees and rocks the player has cut down stay gone (until they regrow).
     for (let i = 0; i < block.length; i++) {
       if (!block[i] || LIQUID.has(block[i])) continue;
       const x = cx * CHUNK + (i % CHUNK);
       const y = cy * CHUNK + ((i / CHUNK) | 0);
-      if (this.harvested[`${x},${y}`]) block[i] = 0;
+      const entry = this.harvested[`${x},${y}`];
+      if (entry) {
+        block[i] = 0;
+        chunk.cut.set(i, entry);
+      }
     }
     this.#placeObjects(chunk);
     return chunk;
@@ -780,11 +788,14 @@ export class World {
 
   // --- Harvesting ------------------------------------------------------------------
 
-  #setBlock(tx, ty, id) {
+  #setBlock(tx, ty, id, cut = null) {
     const cx = Math.floor(tx / CHUNK);
     const cy = Math.floor(ty / CHUNK);
     const chunk = this.getChunk(cx, cy);
-    chunk.block[(ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK)] = id;
+    const i = (ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK);
+    chunk.block[i] = id;
+    if (cut) chunk.cut.set(i, cut);
+    else chunk.cut.delete(i);
     chunk.canvas = null; // re-render
   }
 
@@ -792,8 +803,9 @@ export class World {
   removeBlock(tx, ty, now = Date.now()) {
     const id = this.blockAt(tx, ty);
     if (!id || LIQUID.has(id)) return 0;
-    this.#setBlock(tx, ty, 0);
-    this.harvested[`${tx},${ty}`] = [now, id];
+    const entry = [now, id];
+    this.harvested[`${tx},${ty}`] = entry;
+    this.#setBlock(tx, ty, 0, entry);
     return id;
   }
 
@@ -803,6 +815,43 @@ export class World {
     if (!entry) return;
     delete this.harvested[`${tx},${ty}`];
     if (this.chunks.has(`${Math.floor(tx / CHUNK)},${Math.floor(ty / CHUNK)}`)) this.#setBlock(tx, ty, entry[1]);
+  }
+
+  /**
+   * How far a cut tree or rock has grown back: 0 (a stump or rubble) to 3
+   * (nearly grown), or -1 where the ground stays cleared. It grows in four
+   * steps over its regrow time (gathering.harvest → regrowMinutes).
+   */
+  growthStage(tx, ty, entry, now = Date.now()) {
+    if (this.noRegrow?.(tx, ty)) return -1;
+    const info = this.data.gathering?.harvest?.[BLOCKER_NAME[entry[1]]];
+    const total = (info?.regrowMinutes ?? 20) * 60000;
+    return Math.max(0, Math.min(3, Math.floor((4 * (now - entry[0])) / total)));
+  }
+
+  #growthSig(chunk, now, out = null) {
+    let sig = '';
+    for (const [i, entry] of chunk.cut) {
+      const stage = this.growthStage(chunk.cx * CHUNK + (i % CHUNK), chunk.cy * CHUNK + ((i / CHUNK) | 0), entry, now);
+      if (out && stage >= 0) out.push([i, entry[1], stage]);
+      sig += stage + 1;
+    }
+    return sig;
+  }
+
+  /** What grows on a chunk's cut tiles, to draw: [[tile index, tile id, stage]]. */
+  growthOf(chunk, now = Date.now()) {
+    const out = [];
+    chunk.grown = chunk.cut?.size ? this.#growthSig(chunk, now, out) : '';
+    return out;
+  }
+
+  /** Redraws the chunks whose saplings grew a step since they were drawn (call every few seconds). */
+  refreshGrowth(now = Date.now()) {
+    for (const chunk of this.chunks.values()) {
+      if (!chunk.canvas || !chunk.cut.size) continue;
+      if (this.#growthSig(chunk, now) !== chunk.grown) chunk.canvas = null;
+    }
   }
 
   /** Objects (chests, shrines, altars, camp) in chunks around a point. */

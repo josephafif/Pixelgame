@@ -15,7 +15,7 @@ import { Audio } from './audio/audio.js';
 import { Game } from './game/game.js';
 import { Hud } from './ui/hud.js';
 import { Panels } from './ui/panels.js';
-import { initModals, openModal, closeModal, isModalOpen, isModalLocked } from './ui/modal.js';
+import { initModals, openModal, closeModal, isModalOpen, isModalLocked, isDialogOpen, closeDialog, askConfirm } from './ui/modal.js';
 import { hardenBrowser, trapBackNavigation } from './pwa/harden.js';
 import { showDiscovery } from './ui/discovery.js';
 import { h, $ } from './ui/dom.js';
@@ -290,6 +290,10 @@ class App {
 
   /** Phone back button: close what's open, else open the menu; leave from the menu. */
   #onBack() {
+    if (isDialogOpen()) {
+      closeDialog(false);
+      return 'handled';
+    }
     if (isModalOpen()) {
       if (this.panels.open === 'menu') {
         this.game.saveNow();
@@ -465,7 +469,7 @@ class App {
 
   async applyUpdate() {
     if (!this.applyUpdateFn) return;
-    if (this.game?.boss && !confirm('Updating now restarts the boss fight. Update anyway?')) return;
+    if (this.game?.boss && !await askConfirm({ title: 'Update now?', text: 'Updating now restarts the boss fight. Update anyway?', ok: 'Update' })) return;
     $('#update-banner').setAttribute('hidden', '');
     this.game?.pause('update');
     await this.game?.saveNow();
@@ -512,7 +516,7 @@ class App {
   async importSave(file) {
     try {
       const imported = parseImport(await file.text());
-      if (!confirm('Replace your current progress with this save? (Your current save is kept as a backup.)')) return;
+      if (!await askConfirm({ title: 'Import save?', text: 'Replace your current progress with this save? (Your current save is kept as a backup.)', ok: 'Replace', danger: true })) return;
       await this.saveManager.replace(imported);
       location.reload();
     } catch (err) {
@@ -521,7 +525,7 @@ class App {
   }
 
   async resetSave() {
-    if (!confirm('Start a brand-new world? Export your save first if you want to keep it. (A backup of the current save is kept.)')) return;
+    if (!await askConfirm({ title: 'New world?', text: 'Start a brand-new world? Export your save first if you want to keep it. (A backup of the current save is kept.)', ok: 'New world', danger: true })) return;
     const fresh = createNewSave({ worldSeed: randomSeed(), appVersion: APP_VERSION });
     await this.saveManager.replace(fresh);
     location.reload();

@@ -74,6 +74,27 @@ export function refundFor(data, def) {
   return out;
 }
 
+/** The next tier a structure upgrades into (wood → stone → reinforced wall …), or null. */
+export function upgradeDef(data, def) {
+  return def?.upgradesTo ? structureDef(data, def.upgradesTo) : null;
+}
+
+/** Upgrading in place costs the new tier, less what the old one would give back. */
+export function upgradeCost(data, from, to) {
+  const back = refundFor(data, from);
+  const out = {};
+  for (const k of COST_KEYS) {
+    const n = (to.cost?.[k] ?? 0) - (back[k] ?? 0);
+    if (n > 0) out[k] = n;
+  }
+  return out;
+}
+
+/** Stone and iron structures throw stone chips (the rest wood splinters). */
+export function stony(id) {
+  return /^(stone|iron)/.test(id);
+}
+
 const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });
 
 /**
@@ -241,6 +262,62 @@ export class Construction {
     return refund;
   }
 
+  /** Why the structure at (tx, ty) (or `st`) can't be upgraded right now, or null. */
+  upgradeProblem(tx, ty, { reach = true, st = this.at(tx, ty) } = {}) {
+    const { data, save, player } = this.game;
+    if (!st) return 'Nothing to upgrade here';
+    const to = upgradeDef(data, st.def);
+    if (!to) return `${st.def.name} is as strong as it gets`;
+    const lock = structureLock(data, save, to);
+    if (lock) return `${to.name}: ${lock}`;
+    if (reach && dist2(player.x, player.y, st.x + 0.5, st.y + 0.5) > (data.building.reach + 0.5) ** 2) return 'Too far away';
+    const cost = upgradeCost(data, st.def, to);
+    if (!canAfford(save.resources, cost)) return shortfalls(save.resources, cost)[0];
+    return null;
+  }
+
+  /** Upgrades the structure at (tx, ty) (or `st`) to its next tier, in place and at full health. */
+  upgrade(tx, ty, { reach = true, quiet = false, st = this.at(tx, ty) } = {}) {
+    const reason = this.upgradeProblem(tx, ty, { reach, st });
+    if (reason) return { ok: false, reason };
+    const g = this.game;
+    const to = upgradeDef(g.data, st.def);
+    pay(g.save.resources, upgradeCost(g.data, st.def, to));
+    st.id = to.id;
+    st.def = to;
+    st.hp = to.hp;
+    st.rt.flash = 0.15;
+    this.damaged.delete(st);
+    if (!quiet) {
+      g.fx.emit(stony(to.id) ? 'stone' : 'wood', st.x + 0.5, st.y + 0.5, 8, 0.7, 2);
+      g.fx.emit('sparkle', st.x + 0.5, st.y + 0.2, 5, 0.5, 1.5);
+      g.audio.play('build', { throttle: 60 });
+      g.emit('structures');
+      g.requestSave();
+    }
+    return { ok: true, structure: st };
+  }
+
+  /**
+   * Upgrades every structure of type `id` you can afford (the camp panel's
+   * Fortify buttons). Returns how many were upgraded.
+   */
+  upgradeAll(id) {
+    const g = this.game;
+    let n = 0;
+    for (const st of [...this.list]) {
+      if (st.id !== id || st.dead) continue;
+      if (!this.upgrade(st.x, st.y, { reach: false, quiet: true, st }).ok) break;
+      n++;
+    }
+    if (n) {
+      g.audio.play('levelup');
+      g.emit('structures');
+      g.requestSave();
+    }
+    return n;
+  }
+
   #destroy(st, byEnemy) {
     const g = this.game;
     const i = this.list.indexOf(st);
@@ -254,7 +331,7 @@ export class Construction {
       const top = g.world.structureAt(st.x, st.y);
       if (top && !top.dead) this.#destroy(top, byEnemy);
     }
-    g.fx.emit(st.def.kind === 'wall' && st.id.startsWith('stone') ? 'stone' : 'wood', st.x + 0.5, st.y + 0.5, 12, 0.8, 2.5);
+    g.fx.emit(st.def.kind === 'wall' && stony(st.id) ? 'stone' : 'wood', st.x + 0.5, st.y + 0.5, 12, 0.8, 2.5);
     g.fx.emit('smoke', st.x + 0.5, st.y + 0.5, 6, 0.6, 1);
     if (byEnemy) {
       g.audio.play('break');
@@ -269,7 +346,7 @@ export class Construction {
     st.rt.flash = 0.12;
     this.lastHit = this.game.time;
     this.damaged.add(st);
-    this.game.fx.emit(st.id.startsWith('stone') ? 'stone' : 'wood', st.x + 0.5, st.y + 0.4, 2, 0.4, 1.5);
+    this.game.fx.emit(stony(st.id) ? 'stone' : 'wood', st.x + 0.5, st.y + 0.4, 2, 0.4, 1.5);
     if (st.hp <= 0) {
       this.#destroy(st, true);
       this.game.requestSave();
@@ -287,8 +364,8 @@ export class Construction {
     const g = this.game;
     if (!this.list.length) return;
     const t = g.time;
-    // Slow self-repair while nothing is attacking the camp.
-    if (this.damaged.size && t - this.lastHit > 8) {
+    // Slow self-repair while nothing is attacking the camp (and upkeep is paid).
+    if (this.damaged.size && t - this.lastHit > 8 && !g.save.base.unpaid) {
       const rate = g.data.building.repairPerSec ?? 0.02;
       for (const st of this.damaged) {
         st.hp = Math.min(st.def.hp, st.hp + st.def.hp * rate * dt);

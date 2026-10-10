@@ -201,7 +201,7 @@ export function updateProjectiles(game, dt) {
     }
 
     if (!remove && p.kind !== 'lob') {
-      if (p.owner === 'player' && game.markets?.npcs.length && game.hitNpcs({ kind: 'circle', x: p.x, y: p.y, r: p.r }, p.damage)) {
+      if (p.owner === 'player' && (game.markets?.npcs.length || game.workers?.length) && game.hitNpcs({ kind: 'circle', x: p.x, y: p.y, r: p.r }, p.damage)) {
         expire(game, p);
         remove = true;
       } else if (p.owner === 'player') {
