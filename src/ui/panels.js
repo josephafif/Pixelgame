@@ -8,6 +8,7 @@
 import { h } from './dom.js';
 import { icon } from './icons.js';
 import { openModal, closeModal, isModalOpen, isModalLocked } from './modal.js';
+import { openNews } from './news.js';
 import { isCraftingUnlocked } from '../weapons/crafting.js';
 import { buildingLevel } from '../game/base.js';
 import { BuildBar } from './build.js';
@@ -145,6 +146,7 @@ export class Panels {
       h('div.menu-grid',
         item('star', 'Loot odds', go('odds')),
         item('anvil', 'Weapon Workshop', () => this.app.openWorkshop()),
+        item('flag', "What's new", () => openNews()),
         item('gear', 'Settings & Save', go('settings'))),
       h('p.menu-foot', this.app.statusLine()));
     openModal({ title: 'Paused', body, className: 'menu-panel', onClose: () => { this.open = null; } });

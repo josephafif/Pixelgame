@@ -1230,3 +1230,29 @@ test('workers and the vault: hire at the lodge, put supplies in, see how long th
   await expect(vault.locator('.upkeep-lasts')).toContainText('last');
   expect(errors).toEqual([]);
 });
+
+test('the main menu presents the big update: a news card with a NEW badge and its panel', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/?debug=1');
+  await expect(page.locator('#title')).toBeVisible();
+  const card = page.locator('.news-card');
+  await expect(card).toBeVisible();
+  await expect(card.locator('.news-badge')).toBeVisible();
+  await card.click();
+  const panel = page.locator('.news-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('Prism Barrens');
+  await expect(panel).toContainText('Skyreach');
+  await expect(panel.locator('.news-chip.live').first()).toBeVisible();
+  // Switch language and back, then close: the badge is gone for good.
+  const before = await panel.locator('h2').textContent();
+  await panel.locator('.news-actions button').first().click();
+  await expect(page.locator('.news-panel h2')).not.toHaveText(before);
+  await page.locator('.news-panel .btn-primary').click();
+  await expect(page.locator('.news-panel')).toBeHidden();
+  await expect(card.locator('.news-badge')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('#title')).toBeVisible();
+  await expect(page.locator('.news-card .news-badge')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

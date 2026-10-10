@@ -18,6 +18,7 @@ import { Panels } from './ui/panels.js';
 import { initModals, openModal, closeModal, isModalOpen, isModalLocked, isDialogOpen, closeDialog, askConfirm } from './ui/modal.js';
 import { hardenBrowser, trapBackNavigation } from './pwa/harden.js';
 import { showDiscovery } from './ui/discovery.js';
+import { newsCard } from './ui/news.js';
 import { h, $ } from './ui/dom.js';
 import { hydrateIcons } from './ui/icons.js';
 import { registerServiceWorker, serviceWorkerSupported } from './pwa/register.js';
@@ -55,6 +56,11 @@ function acquireTabLock() {
       return new Promise(() => {}); // hold for the lifetime of the page
     });
   });
+}
+
+/** Running on this computer (development and tests), not on the published site? */
+function devHost() {
+  return ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
 }
 
 class App {
@@ -165,7 +171,7 @@ class App {
     this.#applyInputMode(this.input.mode);
     this.applySettings();
     this.#lifecycle();
-    if (new URLSearchParams(location.search).has('debug')) this.#exposeDebug();
+    if (new URLSearchParams(location.search).has('debug') && devHost()) this.#exposeDebug();
 
     progress('Ready', 1);
     this.#showTitle();
@@ -208,6 +214,8 @@ class App {
     $('#title-howto')?.addEventListener('click', () => this.#howToPlay());
     $('#title-multiplayer')?.addEventListener('click', () => this.#multiplayer());
     $('#title-workshop')?.addEventListener('click', () => this.openWorkshop());
+    // What the big update brings (a NEW badge until read).
+    $('#title .menu-list')?.after(newsCard());
     // Served by a game server (a friend's `npm run share` link) or opened from
     // an invitation: multiplayer first.
     if (document.querySelector('meta[name="pixelgame-server"]') || invite.get('join') || invite.get('server')) {
@@ -541,6 +549,8 @@ class App {
     location.reload();
   }
 
+  // (Only on your own machine: on the real site the game is never handed to
+  // scripts in the console, so cheat menus have nothing to hold on to.)
   #exposeDebug() {
     window.__pixelgame = { app: this, game: this.game, data: this.data };
     console.info('[debug] window.__pixelgame exposed');

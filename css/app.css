@@ -210,6 +210,43 @@ h1, h2, h3, h4 { font-weight: 700; letter-spacing: 1px; }
 }
 @keyframes rise { from { transform: translateY(12px); opacity: 0; } }
 
+/* News: a card under the main menu (NEW until read) and its panel. */
+.news-card {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  width: min(320px, 100%); padding: 10px 12px; text-align: left; white-space: normal;
+  background: linear-gradient(180deg, rgba(255, 210, 74, 0.14), rgba(255, 210, 74, 0.04));
+  box-shadow: inset 0 0 0 2px rgba(255, 210, 74, 0.45);
+}
+.news-card-title { display: flex; align-items: center; gap: 8px; color: var(--gold); font-size: 17px; }
+.news-card-text { color: var(--muted); font-size: 14px; line-height: 1.35; }
+.news-card-more { font-size: 13px; color: var(--gold); }
+.news-badge {
+  position: absolute; right: 8px; top: -9px; padding: 1px 7px; font-size: 11px; letter-spacing: 1px;
+  color: var(--ink); background: var(--gold); box-shadow: 0 0 0 2px var(--ink);
+  animation: news-pulse 1.6s ease-in-out infinite;
+}
+@keyframes news-pulse { 50% { transform: scale(1.12); } }
+.news-panel { width: min(640px, 100%); }
+.news-intro { margin: 0 0 12px; color: var(--muted); line-height: 1.45; }
+.news-section h3 { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; color: var(--gold); }
+.news-section ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.news-section li { display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }
+.news-chip {
+  flex: none; min-width: 64px; margin-top: 1px; padding: 1px 6px; text-align: center; font-size: 11px;
+  letter-spacing: 1px; text-transform: uppercase; color: var(--muted); box-shadow: inset 0 0 0 2px var(--line);
+}
+.news-chip.live { color: var(--ink); background: #7ad66a; box-shadow: none; }
+.news-section b { color: #fff3c4; }
+.news-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
+@media (max-height: 700px) {
+  .news-card { padding: 7px 10px; }
+  .news-card-text { display: none; }
+}
+@media (max-height: 520px) {
+  .news-card { width: min(520px, 100%); flex-direction: row; align-items: center; justify-content: space-between; }
+}
+@media (prefers-reduced-motion: reduce) { .news-badge { animation: none; } }
+
 /* ---------- HUD ---------- */
 
 .hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
