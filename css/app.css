@@ -1083,6 +1083,7 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 .lg.camp { background: #ffd24a; }
 .lg.boss { background: #ff6a2a; border-radius: 50%; }
 .lg.market { background: #ffd24a; outline: 2px solid #c8364a; }
+.lg.village { background: #e8dcc0; border-top: 4px solid #c8364a; box-sizing: border-box; }
 .lg.shrine { background: #7ae0ff; transform: rotate(45deg); }
 .lg.chest { background: #e0b040; }
 .lg.pin { background: #e8364a; border-radius: 50%; }

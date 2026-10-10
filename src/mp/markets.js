@@ -5,18 +5,12 @@
 // trade is checked there; the market panel gets its answers at once (the
 // server corrects them if it disagrees).
 
-import { marketLayout, weaponPrice, sellPrice } from '../game/markets.js';
-import { structureDef } from '../game/construction.js';
+import { marketLayout, weaponPrice, sellPrice, marketDef } from '../game/markets.js';
 import { tileKey } from '../game/world.js';
 
 const ACTIVATE = 46;
 const DEACTIVATE = 72;
 const NPC_HP = 60;
-
-const MARKET_DEFS = {
-  stall: { id: 'stall', name: 'Stall', kind: 'decor', hp: 999 },
-  crate: { id: 'crate', name: 'Crate', kind: 'decor', hp: 999 },
-};
 
 const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });
 
@@ -87,7 +81,7 @@ export class MpMarkets {
     const layout = marketLayout(m);
     const structures = [];
     for (const s of layout.structs) {
-      const def = MARKET_DEFS[s.id] ?? structureDef(g.data, s.id);
+      const def = marketDef(g.data, s.id);
       if (!def) continue;
       const st = { id: s.id, x: m.x + s.x, y: m.y + s.y, hp: def.hp, owner: 'market', marketId: m.id, color: m.color };
       hidden(st, 'def', def);

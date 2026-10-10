@@ -33,7 +33,7 @@ export function clearArea(gs, x0 = 110, y0 = 0.5, r = 6) {
 }
 
 // Spots for the camp buildings around a banner (2+ tiles apart, within reach of the middle).
-const SPOTS = { hearth: [-4, -3], forge: [0, -4], vault: [4, -3], library: [-4, 1], training: [4, 1], well: [-3, 4], waystone: [1, 4], den: [4, 4], lodge: [-1, 7] };
+const SPOTS = { hearth: [-4, -3], forge: [0, -4], vault: [4, -3], library: [-4, 1], training: [4, 1], well: [-3, 4], waystone: [1, 4], den: [4, 4], lodge: [-1, 6] };
 
 const quiet = { info() {}, debug() {}, warn() {}, error: (...a) => console.error(...a) };
 

@@ -110,7 +110,8 @@ test('markets stand on dry land, never on the sea or an island', () => {
       const m = w.marketForCell(mx, my);
       if (!m) continue;
       n++;
-      for (let a = 0; a < 12; a++) assert.equal(w.seaAt(m.x + Math.cos(a) * 11, m.y + Math.sin(a) * 11), SEA.LAND, m.id);
+      const rr = m.village ? m.r + 3 : 11; // villages are bigger
+      for (let a = 0; a < 12; a++) assert.equal(w.seaAt(m.x + Math.cos(a) * rr, m.y + Math.sin(a) * rr), SEA.LAND, m.id);
     }
   }
   assert.ok(n > 5);

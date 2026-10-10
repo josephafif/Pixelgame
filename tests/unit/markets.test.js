@@ -102,7 +102,7 @@ const sampleMarkets = () => {
   for (let mx = -8; mx <= 8 && found.size < 4; mx++) {
     for (let my = -8; my <= 8; my++) {
       const m = world.marketForCell(mx, my);
-      if (m && !found.has(m.layout)) found.set(m.layout, m);
+      if (m && !m.village && !found.has(m.layout)) found.set(m.layout, m);
     }
   }
   return { world, found };
@@ -118,7 +118,7 @@ test('markets are rare, deterministic and never close to camp or a boss', () => 
       cells++;
       const m = a.marketForCell(mx, my);
       assert.deepEqual(m, b.marketForCell(mx, my));
-      if (!m) continue;
+      if (!m || m.village) continue; // (villages share the cells: tested in villages.test.js)
       count++;
       if (m === a.firstMarket) continue; // the guaranteed one, checked below
       assert.ok(Math.hypot(m.x, m.y) > 150, 'far from camp');

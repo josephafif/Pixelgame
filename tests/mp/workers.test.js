@@ -145,3 +145,34 @@ test('workers: their wages are paid hourly from the vault; unpaid they stop; hur
     await t.close();
   }
 });
+
+test('villages: the server walks the villagers and sends them like market people', async () => {
+  const t = await testServer();
+  try {
+    const a = await t.bot('Vandrare');
+    const v = t.gs.world.firstVillage;
+    t.place(a, v.x + 0.5, v.y + 3.5);
+    await sleep(900);
+    const entry = t.gs.markets.get(v.id);
+    assert.ok(entry, 'the village woke up');
+    assert.ok(entry.npcs.filter((n) => n.role === 'villager').length >= 8, 'lots of villagers');
+    assert.ok([...a.known.values()].filter((k) => k.type === ET.NPC).length >= 8, 'they are sent in snapshots');
+    const start = entry.npcs.map((n) => [n.x, n.y]);
+    for (let i = 0; i < 30 * 20; i++) {
+      t.gs.time += 1 / 30;
+      const { update } = await import('../../server/markets.js');
+      update(t.gs, 1 / 30);
+    }
+    const moved = entry.npcs.filter((n, i) => Math.hypot(n.x - start[i][0], n.y - start[i][1]) > 1).length;
+    assert.ok(moved >= 4, `villagers walk about (${moved} moved)`);
+    // Nobody may build in a village.
+    const p = t.player(a);
+    const res = await a.request({ t: 'clan', op: 'create', name: 'Bybor', tag: 'BY' });
+    assert.equal(res.ok, true, res.error);
+    p.ch.level = 30;
+    const r2 = await a.request({ t: 'build', id: 'banner', x: Math.floor(v.x) + 2, y: Math.floor(v.y) + 6 });
+    assert.equal(r2.ok, false);
+  } finally {
+    await t.close();
+  }
+});

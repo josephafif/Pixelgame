@@ -289,6 +289,82 @@ function crate(g) {
   rect(g, 1, 22, 14, 2, O);
 }
 
+/** The village well: a stone ring with a little roof and a bucket. */
+function villageWell(g) {
+  rect(g, 1, 13, 14, 9, '#8d8a9e');
+  rect(g, 1, 13, 14, 2, '#b8bcc8');
+  rect(g, 3, 15, 10, 2, '#2a5a8a');
+  rect(g, 4, 15, 6, 1, '#5a9ad8');
+  g.fillStyle = '#6e6b80';
+  g.fillRect(1, 18, 14, 1);
+  g.fillRect(5, 19, 1, 3);
+  g.fillRect(10, 19, 1, 3);
+  rect(g, 0, 12, 16, 1, O);
+  rect(g, 0, 12, 1, 10, O);
+  rect(g, 15, 12, 1, 10, O);
+  rect(g, 0, 22, 16, 2, O);
+  // Posts and a peaked roof.
+  for (const x of [2, 13]) rect(g, x, 4, 1, 9, '#6b4a2a');
+  for (let j = 0; j < 4; j++) rect(g, 1 + j * 2, 4 - j, 14 - j * 4, 1, j % 2 ? '#8a2a32' : '#a8323a');
+  rect(g, 0, 5, 16, 1, O);
+  rect(g, 7, 6, 1, 5, '#c8a878');
+  rect(g, 6, 9, 3, 3, '#9a6a3c');
+  rect(g, 6, 9, 3, 1, '#c8945a');
+}
+
+/** A wooden bed with a blanket and a pillow. */
+function bed(g, tint = '#3f6fd8') {
+  rect(g, 2, 9, 12, 13, '#6b4a2a');
+  rect(g, 3, 10, 10, 3, '#f3ecdc');
+  rect(g, 3, 13, 10, 8, tint);
+  rect(g, 3, 13, 10, 1, '#ffffff');
+  rect(g, 1, 8, 14, 1, O);
+  rect(g, 1, 9, 1, 13, O);
+  rect(g, 14, 9, 1, 13, O);
+  rect(g, 1, 22, 14, 2, O);
+}
+
+/** A table with a candle and a bowl. */
+function table(g) {
+  rect(g, 2, 13, 12, 4, '#9a6a3c');
+  rect(g, 2, 13, 12, 1, '#c8945a');
+  rect(g, 3, 17, 2, 5, '#6b4a2a');
+  rect(g, 11, 17, 2, 5, '#6b4a2a');
+  rect(g, 4, 10, 1, 3, '#f3ecdc');
+  rect(g, 4, 9, 1, 1, '#ffd24a');
+  rect(g, 8, 11, 4, 2, '#c8a878');
+  rect(g, 1, 12, 14, 1, O);
+  rect(g, 1, 13, 1, 4, O);
+  rect(g, 14, 13, 1, 4, O);
+  rect(g, 2, 22, 4, 2, O);
+  rect(g, 10, 22, 4, 2, O);
+}
+
+/** A barrel with iron hoops. */
+function barrel(g) {
+  rect(g, 4, 9, 8, 13, '#9a6a3c');
+  rect(g, 4, 9, 2, 13, '#c8945a');
+  rect(g, 4, 11, 8, 1, '#4a4a5a');
+  rect(g, 4, 18, 8, 1, '#4a4a5a');
+  rect(g, 5, 8, 6, 1, '#6b4a2a');
+  rect(g, 4, 7, 8, 1, O);
+  rect(g, 3, 8, 1, 14, O);
+  rect(g, 12, 8, 1, 14, O);
+  rect(g, 3, 22, 10, 2, O);
+}
+
+/** A vegetable patch: rows of green sprouts in dark soil. */
+function crops(g) {
+  rect(g, 0, 0, 16, 16, '#5a3a22');
+  for (const y of [1, 6, 11]) {
+    rect(g, 0, y + 3, 16, 1, '#4a2e1a');
+    for (let x = 1; x < 16; x += 4) {
+      rect(g, x, y + 1, 2, 2, '#4fb04f');
+      rect(g, x + 1, y, 1, 1, '#7ac86a');
+    }
+  }
+}
+
 function woodFloor(g) {
   for (let row = 0; row < 4; row++) {
     const y = row * 4;
@@ -345,7 +421,7 @@ function ironSpikes(g, up) {
   }
 }
 
-const FLAT = new Set(['wood_floor', 'stone_floor', 'spikes', 'iron_spikes']);
+const FLAT = new Set(['wood_floor', 'stone_floor', 'spikes', 'iron_spikes', 'crops']);
 
 /** 16×24 sprite (or 16×16 for flat kinds) for a structure. */
 export function structureSprite(id, mask = 0, state = 0, tint = null) {
@@ -372,6 +448,11 @@ export function structureSprite(id, mask = 0, state = 0, tint = null) {
     case 'iron_spikes': ironSpikes(g, state); break;
     case 'stall': stall(g, tint ?? undefined); break;
     case 'crate': crate(g); break;
+    case 'village_well': villageWell(g); break;
+    case 'bed': bed(g, tint ?? undefined); break;
+    case 'table': table(g); break;
+    case 'barrel': barrel(g); break;
+    case 'crops': crops(g); break;
     default: rect(g, 2, 8, 12, 14, '#8d8a9e');
   }
   cache.set(key, c);

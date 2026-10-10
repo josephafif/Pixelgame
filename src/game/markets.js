@@ -13,6 +13,7 @@ import { structureDef, runTurret } from './construction.js';
 import { buyPrice, sellPrice, weaponValue, EPIC_CHANCE } from './economy.js';
 import { researchedComponents } from '../weapons/crafting.js';
 import { researchCost } from './base.js';
+import { villageLayout, villagerTarget } from './villages.js';
 
 const ACTIVATE = 46;
 const DEACTIVATE = 72;
@@ -27,15 +28,24 @@ const MERCHANT_NAMES = [
 ];
 const CLOAKS = ['#c8364a', '#e0a030', '#4fb04f', '#9a5cff', '#e86a2a', '#3fb0b0', '#b07a48', '#8d8a9e'];
 
-// Market-only structures (the rest reuse the camp's walls, gates, turrets).
-const MARKET_DEFS = {
+// Market- and village-only structures (the rest reuse the camp's walls,
+// floors, gates, turrets and torches).
+export const MARKET_DEFS = {
   stall: { id: 'stall', name: 'Stall', kind: 'decor', hp: 999 },
   crate: { id: 'crate', name: 'Crate', kind: 'decor', hp: 999 },
+  village_well: { id: 'village_well', name: 'Well', kind: 'decor', hp: 999 },
+  bed: { id: 'bed', name: 'Bed', kind: 'decor', hp: 999 },
+  table: { id: 'table', name: 'Table', kind: 'decor', hp: 999 },
+  barrel: { id: 'barrel', name: 'Barrel', kind: 'decor', hp: 999 },
+  crops: { id: 'crops', name: 'Vegetable patch', kind: 'floor', walkable: true, hp: 999 },
 };
 
-function defFor(data, id) {
+/** Definition of a market's (or village's) structure. */
+export function marketDef(data, id) {
   return MARKET_DEFS[id] ?? structureDef(data, id);
 }
+
+const defFor = marketDef;
 
 // --- Fristaden (multiplayer) -------------------------------------------------------------
 
@@ -57,6 +67,7 @@ export function townMarket(worldSeed) {
  * Pure and deterministic, so tests can check every layout.
  */
 export function marketLayout(m) {
+  if (m.village) return villageLayout(m);
   const rng = createRng(m.seed ^ 0x51a11);
   const wall = m.material === 'stone' ? 'stone_wall' : 'wood_wall';
   const floor = m.material === 'stone' ? 'stone_floor' : 'wood_floor';
@@ -255,6 +266,22 @@ export { sellPrice, weaponValue };
 
 const hidden = (obj, key, value) => Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: false });
 
+/**
+ * Someone (you, another villager's path) in the way: after a moment the
+ * villager steps onto its next waypoint instead of pushing forever.
+ */
+export function npcStuck(n, d, dt, t) {
+  if (d < (n.lastD ?? Infinity) - 0.01) n.stuckT = 0;
+  else n.stuckT = (n.stuckT ?? 0) + dt;
+  n.lastD = d;
+  if (n.stuckT > 2.5) {
+    n.x = t.x;
+    n.y = t.y;
+    n.stuckT = 0;
+    n.lastD = Infinity;
+  }
+}
+
 export class Markets {
   constructor(game) {
     this.game = game;
@@ -297,7 +324,9 @@ export class Markets {
         }
         if (!st.visited && d < entry.def.r + 1) {
           st.visited = true;
-          g.toast(`You found ${entry.def.name}! Merchants trade weapons and goods here.`, 'component');
+          g.toast(entry.def.village
+            ? `You found the village of ${entry.def.name}! Traders on the green sell weapons and goods.`
+            : `You found ${entry.def.name}! Merchants trade weapons and goods here.`, 'component');
           g.audio.play('chest');
           g.emit('map');
           g.requestSave();
@@ -315,7 +344,7 @@ export class Markets {
           st.rt.open = Math.max(0, Math.min(1, st.rt.open + (near ? dt : -dt) * 6));
         }
       }
-      for (const n of entry.npcs) this.#updateNpc(n, entry.def, dt, hostile);
+      for (const n of entry.npcs) this.#updateNpc(n, entry, dt, hostile);
     }
   }
 
@@ -332,18 +361,19 @@ export class Markets {
       hidden(st, 'def', def);
       hidden(st, 'rt', { cd: Math.random(), aim: -Math.PI / 2, flash: 0, trig: -9, open: 0 });
       // Never overwrite a player-built structure or block the world.
+      const layer = def.kind === 'floor' ? g.world.floors : g.world.structures;
       const key = tileKey(st.x, st.y);
-      if (g.world.structures.has(key)) continue;
-      g.world.structures.set(key, st);
+      if (layer.has(key)) continue;
+      layer.set(key, st);
       structures.push(st);
     }
     const npcs = layout.npcs.map((n, i) => ({
-      id: `${m.id}#${i}`, marketId: m.id, role: n.role, name: n.name, cloak: n.cloak,
+      id: `${m.id}#${i}`, marketId: m.id, role: n.role, name: n.name, cloak: n.cloak, home: n.home, route: null, wait: Math.random() * 4,
       x: cx + n.x + 0.5, y: cy + n.y + 0.5, homeX: cx + n.x + 0.5, homeY: cy + n.y + 0.5,
       r: 0.32, hp: NPC_HP, maxHp: NPC_HP, facing: Math.PI / 2, moving: false, walkT: 0,
       hurtFlash: 0, dead: false, wanderT: Math.random() * 3, tx: cx + n.x + 0.5, ty: cy + n.y + 0.5,
     }));
-    this.active.set(m.id, { def: m, structures, npcs });
+    this.active.set(m.id, { def: m, structures, npcs, layout });
     this.#refresh();
   }
 
@@ -351,8 +381,9 @@ export class Markets {
     const entry = this.active.get(id);
     if (!entry) return;
     for (const st of entry.structures) {
+      const layer = st.def.kind === 'floor' ? this.game.world.floors : this.game.world.structures;
       const key = tileKey(st.x, st.y);
-      if (this.game.world.structures.get(key) === st) this.game.world.structures.delete(key);
+      if (layer.get(key) === st) layer.delete(key);
     }
     this.active.delete(id);
     this.#refresh();
@@ -363,9 +394,10 @@ export class Markets {
     this.npcs = [...this.active.values()].flatMap((e) => e.npcs);
   }
 
-  #updateNpc(n, m, dt, hostile) {
+  #updateNpc(n, entry, dt, hostile) {
     const g = this.game;
     const p = g.player;
+    const m = entry.def;
     n.hurtFlash = Math.max(0, n.hurtFlash - dt);
     if (n.dead) return;
     const dx = p.x - n.x;
@@ -378,6 +410,16 @@ export class Markets {
       const d = Math.hypot(dx, dy) || 1;
       mx = -dx / d;
       my = -dy / d;
+      n.route = null;
+    } else if (n.role === 'villager' && m.village) {
+      // Villagers walk the paths between the houses and the green.
+      const t = villagerTarget(entry.layout, m, n, dt);
+      if (t) {
+        const d = Math.hypot(t.x - n.x, t.y - n.y) || 1;
+        mx = (t.x - n.x) / d;
+        my = (t.y - n.y) / d;
+        npcStuck(n, d, dt, t);
+      }
     } else if (n.role === 'villager') {
       n.wanderT -= dt;
       if (n.wanderT <= 0) {

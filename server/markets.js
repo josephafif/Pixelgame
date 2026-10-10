@@ -8,8 +8,8 @@
 // player) and their own standing with each market: hurt someone there and its
 // turrets turn on you, and nobody trades with you, for a few minutes.
 
-import { marketLayout, marketStock, weaponPrice, sellPrice, SELL_BUNDLES, TOWN_CELL } from '../src/game/markets.js';
-import { structureDef } from '../src/game/construction.js';
+import { marketLayout, marketStock, weaponPrice, sellPrice, SELL_BUNDLES, TOWN_CELL, marketDef, npcStuck } from '../src/game/markets.js';
+import { villagerTarget } from '../src/game/villages.js';
 import { tileKey, MARKET_CELL } from '../src/game/world.js';
 import { generateWeapon } from '../src/weapons/generator.js';
 import * as combat from './combat.js';
@@ -25,14 +25,7 @@ const NPC_HP = 60;
 const NPC_RESPAWN_S = 300;
 const TRADE_REACH = 3.2;
 
-const MARKET_DEFS = {
-  stall: { id: 'stall', name: 'Stall', kind: 'decor', hp: 999 },
-  crate: { id: 'crate', name: 'Crate', kind: 'decor', hp: 999 },
-};
-
-function defFor(data, id) {
-  return MARKET_DEFS[id] ?? structureDef(data, id);
-}
+const defFor = marketDef;
 
 /** The market cell (mx, my) a market belongs to (clients find it with world.marketForCell). */
 export function marketCell(m) {
@@ -87,11 +80,11 @@ function activate(gs, m) {
   }
   const { mx, my } = marketCell(m);
   const npcs = layout.npcs.map((n, i) => ({
-    eid: gs.newId(), idx: i, marketId: m.id, role: n.role, x: m.x + n.x + 0.5, y: m.y + n.y + 0.5,
+    eid: gs.newId(), idx: i, marketId: m.id, role: n.role, home: n.home, route: null, wait: Math.random() * 4, x: m.x + n.x + 0.5, y: m.y + n.y + 0.5,
     homeX: m.x + n.x + 0.5, homeY: m.y + n.y + 0.5, r: 0.32, hp: NPC_HP, maxHp: NPC_HP, facing: Math.PI / 2,
     moving: false, dead: false, respawnAt: 0, wanderT: Math.random() * 3, tx: m.x + n.x + 0.5, ty: m.y + n.y + 0.5, fleeT: 0, fleeFrom: null, hurtT: -9,
   }));
-  gs.markets.set(m.id, { def: m, mx, my, structures, npcs });
+  gs.markets.set(m.id, { def: m, mx, my, structures, npcs, layout });
 }
 
 function deactivate(gs, id) {
@@ -125,7 +118,9 @@ export function update(gs, dt) {
         const st = state(p, m.id);
         if (!st.visited && d < m.r + 1) {
           st.visited = true;
-          gs.toast(p, `Du hittade ${m.name}! Här handlar köpmän med vapen och varor.`, 'component');
+          gs.toast(p, m.village
+            ? `Du hittade byn ${m.name}! Handlarna på ängen säljer vapen och varor.`
+            : `Du hittade ${m.name}! Här handlar köpmän med vapen och varor.`, 'component');
           players.markMe(p);
         }
       }
@@ -195,7 +190,7 @@ function runTurret(gs, entry, st, dt, now) {
 function updateNpc(gs, entry, n, dt) {
   if (n.dead) {
     if (gs.time >= n.respawnAt) {
-      Object.assign(n, { dead: false, hp: NPC_HP, x: n.homeX, y: n.homeY, eid: gs.newId(), fleeT: 0 });
+      Object.assign(n, { dead: false, hp: NPC_HP, x: n.homeX, y: n.homeY, eid: gs.newId(), fleeT: 0, route: null });
     }
     return;
   }
@@ -209,6 +204,16 @@ function updateNpc(gs, entry, n, dt) {
       const d = Math.hypot(n.x - f.x, n.y - f.y) || 1;
       mx = (n.x - f.x) / d;
       my = (n.y - f.y) / d;
+    }
+    n.route = null;
+  } else if (n.role === 'villager' && m.village) {
+    // Villagers walk the paths between the houses and the green.
+    const t = villagerTarget(entry.layout, m, n, dt);
+    if (t) {
+      const d = Math.hypot(t.x - n.x, t.y - n.y) || 1;
+      mx = (t.x - n.x) / d;
+      my = (t.y - n.y) / d;
+      npcStuck(n, d, dt, t);
     }
   } else if (n.role === 'villager') {
     n.wanderT -= dt;

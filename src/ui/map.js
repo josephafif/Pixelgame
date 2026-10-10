@@ -78,7 +78,7 @@ export function open(game) {
   const pinBtn = h('button', { 'aria-pressed': 'false' }, icon('pin', 20), 'Pin');
   const legend = h('div.map-legend.small',
     h('span', h('i.lg.you'), 'You'), h('span', h('i.lg.camp'), 'Camp'), h('span', h('i.lg.boss'), 'Boss'),
-    h('span', h('i.lg.market'), 'Market'), h('span', h('i.lg.shrine'), 'Shrine'), h('span', h('i.lg.chest'), 'Chest'),
+    h('span', h('i.lg.market'), 'Market'), h('span', h('i.lg.village'), 'Village'), h('span', h('i.lg.shrine'), 'Shrine'), h('span', h('i.lg.chest'), 'Chest'),
     h('span', h('i.lg.pin'), 'Your pins'), h('span', h('i.lg.sea'), 'Sea'),
     save.horses?.owned.length ? h('span', h('i.lg.horse'), game.mp ? 'Hästar' : 'Horses') : null,
     game.mapMarkers ? h('span', h('i.lg.mate'), 'Klan') : null);
@@ -99,7 +99,7 @@ export function open(game) {
     for (const [id, st] of Object.entries(save.markets)) {
       if (id === 'town' || (!st.seen && !st.visited)) continue;
       const m = world.marketById(id);
-      if (m) out.push({ kind: 'market', x: m.x + 0.5, y: m.y + 0.5, color: m.color, label: m.name });
+      if (m) out.push({ kind: m.village ? 'village' : 'market', x: m.x + 0.5, y: m.y + 0.5, color: m.color, label: m.village ? `${m.name} (village)` : m.name });
     }
     // Shrines and unopened chests in explored areas that are in memory.
     for (const key of game.explored) {
@@ -225,6 +225,20 @@ export function open(game) {
             g.lineTo(x + r, y + r);
             g.stroke();
           }
+          break;
+        case 'village':
+          // A little house: a red roof over a pale wall.
+          g.fillStyle = '#e8dcc0';
+          g.fillRect(x - r + 1, y - 1, r * 2 - 2, r + 1);
+          g.strokeRect(x - r + 1, y - 1, r * 2 - 2, r + 1);
+          g.fillStyle = '#c8364a';
+          g.beginPath();
+          g.moveTo(x - r - 1, y);
+          g.lineTo(x, y - r - 1);
+          g.lineTo(x + r + 1, y);
+          g.closePath();
+          g.fill();
+          g.stroke();
           break;
         case 'market':
           g.fillStyle = '#ffd24a';

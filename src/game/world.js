@@ -4,6 +4,7 @@
 
 import { hashInts } from '../core/rng.js';
 import { fbm, tileHash, valueNoise } from './noise.js';
+import { villageLayout, VILLAGE_RADIUS, VILLAGE_NAMES } from './villages.js';
 
 export const CHUNK = 16;
 const SAFE_RADIUS = 16;
@@ -27,6 +28,9 @@ export const MARKET_CELL = 112;
 // (Fristaden's traders in multiplayer; the same number as TOWN_CELL in markets.js.)
 const TOWN_MARKET_CELL = 1 << 20;
 const MARKET_CHANCE = 0.1; // ~1 market per 10 cells (plus the guaranteed first one)
+// Villages share the market cells: about one cell in six has one (plus a first one near camp).
+const VILLAGE_CHANCE = 0.17;
+const VILLAGE_COLORS = ['#7aa84a', '#c8963a', '#5a8ad8', '#b07a48'];
 const MARKET_NAMES = [
   'Copperwind Bazaar', 'Lanternrest Market', 'Saltroad Post', 'Gilded Gate Exchange', 'Mossy Mile Post',
   "Crow's Rest Market", 'Emberline Bazaar', 'Stonebridge Exchange', "Wanderer's Rest", 'Duskhollow Market',
@@ -189,6 +193,39 @@ export class World {
     this.marketCache = new Map();
     const [fx, fy] = COMPASS[(start + 1) % 8];
     this.firstMarket = this.#makeMarket('m:first', Math.round(fx * 100), Math.round(fy * 100), hashInts(this.seed, 0xf125));
+    // And a first village a short walk away, in a cell of its own.
+    this.villageLayouts = new Map();
+    const marketCell = `${Math.floor(this.firstMarket.x / MARKET_CELL)},${Math.floor(this.firstMarket.y / MARKET_CELL)}`;
+    for (let k = 0; k < 8 && !this.firstVillage; k++) {
+      const [vx, vy] = COMPASS[(start + 4 + k) % 8];
+      const x = Math.round(vx * 78);
+      const y = Math.round(vy * 78);
+      const cell = `${Math.floor(x / MARKET_CELL)},${Math.floor(y / MARKET_CELL)}`;
+      if (cell === marketCell || this.#nearLandmark(x, y, LANDMARK_RADIUS + VILLAGE_RADIUS + 4)) continue;
+      this.firstVillage = this.#makeVillage('v:first', x, y, hashInts(this.seed, 0x7111));
+    }
+  }
+
+  #makeVillage(id, x, y, h) {
+    const biome = this.biomeAt(x, y);
+    const stone = ['highlands', 'snow', 'void', 'volcanic'].includes(biome.id) || ((h >>> 5) & 3) === 0;
+    return {
+      id, x, y, seed: h, village: true, layout: 'village', r: VILLAGE_RADIUS,
+      material: stone ? 'stone' : 'wood',
+      color: VILLAGE_COLORS[(h >>> 8) % VILLAGE_COLORS.length],
+      name: VILLAGE_NAMES[(h >>> 12) % VILLAGE_NAMES.length],
+      biome: biome.id,
+    };
+  }
+
+  /** A village's plan (houses, paths, people), worked out once. */
+  villageLayout(m) {
+    let layout = this.villageLayouts.get(m.id);
+    if (!layout) {
+      layout = villageLayout(m);
+      this.villageLayouts.set(m.id, layout);
+    }
+    return layout;
   }
 
   // --- Markets ----------------------------------------------------------------------
@@ -214,18 +251,30 @@ export class World {
     if (this.marketCache.has(key)) return this.marketCache.get(key);
     let m = null;
     const f = this.firstMarket;
+    const v = this.firstVillage;
     if (Math.floor(f.x / MARKET_CELL) === mx && Math.floor(f.y / MARKET_CELL) === my) {
       m = f;
+    } else if (v && Math.floor(v.x / MARKET_CELL) === mx && Math.floor(v.y / MARKET_CELL) === my) {
+      m = v;
     } else {
       const h = hashInts(this.seed, mx, my, 0x3a7e7);
-      if ((h % 1000) / 1000 < MARKET_CHANCE) {
-        const x = mx * MARKET_CELL + 20 + ((h >>> 10) % (MARKET_CELL - 40));
-        const y = my * MARKET_CELL + 20 + ((h >>> 20) % (MARKET_CELL - 40));
-        const farFromCamp = x * x + y * y > 150 * 150;
+      const roll = (h % 1000) / 1000;
+      if (roll < MARKET_CHANCE + VILLAGE_CHANCE) {
+        const village = roll >= MARKET_CHANCE;
+        // (Markets keep the spots they always had; villages, bigger, stay further from the cell's edges.)
+        const edge = village ? 24 : 20;
+        const x = mx * MARKET_CELL + edge + ((h >>> 10) % (MARKET_CELL - edge * 2));
+        const y = my * MARKET_CELL + edge + ((h >>> 20) % (MARKET_CELL - edge * 2));
+        const farFromCamp = x * x + y * y > (village ? 120 : 150) ** 2;
         const clear = !this.landmarks.some((lm) => (lm.x - x) ** 2 + (lm.y - y) ** 2 < 50 * 50);
-        // Markets stand on solid ground, never on a beach or an island.
-        const dry = clear && [[0, 0], ...COMPASS].every(([dx, dy]) => this.seaAt(x + dx * 12, y + dy * 12) === SEA.LAND);
-        if (farFromCamp && dry) m = this.#makeMarket(`m:${key}`, x, y, h);
+        // Markets and villages stand on solid ground, never on a beach or an island.
+        const dry = clear && (village
+          ? [0, 10, VILLAGE_RADIUS + 4].every((rr) => Array.from({ length: rr ? 16 : 1 }, (_, k) => k).every((k) => {
+            const a = (k / 16) * Math.PI * 2;
+            return this.seaAt(x + Math.cos(a) * rr, y + Math.sin(a) * rr) === SEA.LAND;
+          }))
+          : [[0, 0], ...COMPASS].every(([dx, dy]) => this.seaAt(x + dx * 12, y + dy * 12) === SEA.LAND));
+        if (farFromCamp && dry) m = village ? this.#makeVillage(`m:${key}`, x, y, h) : this.#makeMarket(`m:${key}`, x, y, h);
       }
     }
     this.marketCache.set(key, m);
@@ -324,10 +373,12 @@ export class World {
   /** Markets whose area comes within `range` tiles of (x, y). */
   marketsNear(x, y, range) {
     const out = [];
-    const m0x = Math.floor((x - range) / MARKET_CELL);
-    const m1x = Math.floor((x + range) / MARKET_CELL);
-    const m0y = Math.floor((y - range) / MARKET_CELL);
-    const m1y = Math.floor((y + range) / MARKET_CELL);
+    // A village's grounds can reach past its own cell (the first one sits on a cell's edge).
+    const reach = range + VILLAGE_RADIUS + 3;
+    const m0x = Math.floor((x - reach) / MARKET_CELL);
+    const m1x = Math.floor((x + reach) / MARKET_CELL);
+    const m0y = Math.floor((y - reach) / MARKET_CELL);
+    const m1y = Math.floor((y + reach) / MARKET_CELL);
     for (let my = m0y; my <= m1y; my++) {
       for (let mx = m0x; mx <= m1x; mx++) {
         const m = this.marketForCell(mx, my);
@@ -344,6 +395,7 @@ export class World {
 
   marketById(id) {
     if (id === 'm:first') return this.firstMarket;
+    if (id === 'v:first') return this.firstVillage ?? null;
     if (id === 'town') return this.town;
     const [mx, my] = id.slice(2).split(',').map(Number);
     return Number.isFinite(mx) && Number.isFinite(my) ? this.marketForCell(mx, my) : null;
@@ -471,8 +523,15 @@ export class World {
           if (sea === SEA.ISLE_BEACH && tileHash(s, x, y, 92) < 0.05 && !this.#nearLandmark(x, y, 6)) block[i] = T.PALM;
           continue;
         }
-        // Market grounds: paved inside, cleared around the walls.
+        // Market grounds: paved inside, cleared around the walls. A village keeps
+        // its grass, with dirt paths between the houses and the green.
         const market = markets.find((m) => (m.x - x) ** 2 + (m.y - y) ** 2 <= (m.r + 3) ** 2);
+        if (market?.village) {
+          const paths = this.villageLayout(market).paths;
+          const detail = fbm(s ^ 0x4444, x / 6, y / 6);
+          ground[i] = paths.has(`${x - market.x},${y - market.y}`) ? T.PATH : GROUND_BY_NAME[detail > this.q.detail ? b.alt : b.ground] ?? T.GRASS;
+          continue;
+        }
         if (market) {
           const inner = (market.x - x) ** 2 + (market.y - y) ** 2 <= (market.r - 0.5) ** 2;
           ground[i] = inner ? (market.material === 'stone' ? T.CAMP : T.PATH) : GROUND_BY_NAME[b.ground] ?? T.GRASS;
