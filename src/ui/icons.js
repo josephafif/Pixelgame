@@ -4,6 +4,7 @@
 
 import { scale2x } from '../render/hd.js';
 import { h } from './dom.js';
+import { ALL_RESOURCES } from '../game/resources.js';
 
 const O = '#0e0c18';
 
@@ -426,6 +427,51 @@ const ICONS = {
     ],
     pal: { o: O, y: '#ffd24a', Y: '#c9973f', w: '#fff8d8' },
   },
+  prismite: {
+    map: [
+      '....oo....',
+      '...ocwo...',
+      '..occwo...',
+      '.occcvoo..',
+      '.occvvwvo.',
+      'occvvvvvo.',
+      'ocvvvpvvo.',
+      '.ovvppvo..',
+      '..oppoo...',
+      '...oo.....',
+    ],
+    pal: { o: O, c: '#7ae8ff', w: '#e8fbff', v: '#a07aff', p: '#ffd27a' },
+  },
+  spores: {
+    map: [
+      '..........',
+      '...oooo...',
+      '..oggggo..',
+      '.ogwggggo.',
+      '.ogggggGo.',
+      '..oGGGGo..',
+      '...osso...',
+      '..o.ss.o..',
+      '.ow.ss.wo.',
+      '..o.oo.o..',
+    ],
+    pal: { o: O, g: '#9affc8', G: '#4ac88a', w: '#f0fff8', s: '#c8d8c0' },
+  },
+  aether: {
+    map: [
+      '....o.....',
+      '...owo....',
+      '..owaao...',
+      '.owaaaao..',
+      'owaaaabao.',
+      '.oaaabbo..',
+      '..oabbo...',
+      '...obo....',
+      '....o.....',
+      '..........',
+    ],
+    pal: { o: O, w: '#ffffff', a: '#d8ecff', b: '#8ab8f0' },
+  },
   pin: {
     map: [
       '..oooo..',
@@ -568,6 +614,7 @@ export function hydrateIcons(root = document) {
 /** Price tag: resource icon + amount, red when the player can't afford it. */
 export const RESOURCE_NAMES = {
   scrap: 'Scrap', essence: 'Essence', wood: 'Wood', stone: 'Stone', gold: 'Gold', shards: 'Star Shards',
+  prismite: 'Prismite', spores: 'Lumen Spores', aether: 'Aetherglass',
 };
 const RESOURCE_ICON = { gold: 'coin', shards: 'shard' };
 
@@ -582,7 +629,7 @@ export function costChip(kind, amount, have = Infinity) {
 
 /** Chips for every resource in a cost object ({ scrap, essence, wood, stone, gold, shards }). */
 export function costChips(cost, resources = {}) {
-  return ['gold', 'scrap', 'essence', 'wood', 'stone', 'shards']
+  return ALL_RESOURCES
     .filter((k) => cost?.[k])
     .map((k) => costChip(k, cost[k], resources[k] ?? 0));
 }

@@ -40,7 +40,7 @@ test('upgrades check level, boss and resources, then deduct the cost', () => {
   save.resources.essence = cost.essence + 5;
   assert.deepEqual(upgradeBlockers(data, save, 'forge'), []);
   assert.equal(upgradeBuilding(data, save, 'forge'), 1);
-  assert.deepEqual(save.resources, { scrap: 5, essence: 5, wood: 0, stone: 0, gold: 0, shards: 0 });
+  assert.deepEqual(save.resources, { scrap: 5, essence: 5, wood: 0, stone: 0, gold: 0, shards: 0, prismite: 0, spores: 0, aether: 0 });
   // Level 2 needs building materials too.
   save.player.level = 20;
   Object.assign(save.resources, { scrap: 9999, essence: 9999 });

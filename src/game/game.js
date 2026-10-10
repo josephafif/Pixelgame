@@ -5,7 +5,7 @@
 import { CONFIG } from '../config.js';
 import { hashInts } from '../core/rng.js';
 import { angleTo, dist2 } from '../core/math.js';
-import { World, CHUNK } from './world.js';
+import { World, CHUNK, legacyFromExplored } from './world.js';
 import { Fx } from './fx.js';
 import { computePlayerStats, xpToNext } from './stats.js';
 import {
@@ -62,7 +62,8 @@ export class Game {
     this.sync = sync;
     this.listeners = new Map();
 
-    this.world = new World(data, save.worldSeed);
+    // (Land you explored before the far lands came keeps its old look.)
+    this.world = new World(data, save.worldSeed, { gen: save.world.gen, legacy: legacyFromExplored(save.world.explored, save.world.genMarks) });
     this.world.harvested = save.world.harvested;
     // The camp's ground stays cleared: nothing grows back there.
     this.world.noRegrow = (tx, ty) => Math.hypot(tx, ty) <= this.buildRadius() + 1;
@@ -792,6 +793,17 @@ export class Game {
   }
 
   onEnemyKilled(e) {
+    // Crystal creatures burst into shards when they break.
+    const burst = e.def?.deathBurst;
+    if (burst) {
+      for (let i = 0; i < burst.count; i++) {
+        const a = (i / burst.count) * Math.PI * 2 + Math.random() * 0.4;
+        this.spawnProjectile({
+          x: e.x, y: e.y, angle: a, speed: burst.speed ?? 6, range: 3.5, size: 1, damage: e.dmg * (burst.damage ?? 0.5),
+          sprite: 'shard', owner: 'enemy', color: burst.color ?? e.color,
+        });
+      }
+    }
     this.save.player.kills += 1;
     this.addXp(e.xp);
     this.fx.emit('smoke', e.x, e.y, e.boss ? 30 : 6, e.r * 2, 2);
@@ -890,6 +902,9 @@ export class Game {
       case 'wood':
       case 'stone':
       case 'gold':
+      case 'prismite':
+      case 'spores':
+      case 'aether':
         r[it.kind] = (r[it.kind] ?? 0) + it.value;
         this.audio.play('pickup', { throttle: 60 });
         break;
@@ -1212,7 +1227,7 @@ export class Game {
     this.world.removeBlock(o.tx, o.ty);
     this.harvestDamage.delete(`${o.tx},${o.ty}`);
     const drops = rollDrops(o.info, direct ? 1 : currentPickaxe(this.data, this.save)?.yield ?? 1);
-    const color = { wood: '#b07a48', stone: '#b8bcc8', essence: '#7ae0ff', scrap: '#c8ccd8', shards: '#ffd24a' };
+    const color = { wood: '#b07a48', stone: '#b8bcc8', essence: '#7ae0ff', scrap: '#c8ccd8', shards: '#ffd24a', prismite: '#7ae8ff', spores: '#9affc8', aether: '#d8ecff' };
     for (const [kind, n] of Object.entries(drops)) {
       if (!n) continue;
       if (direct) this.save.resources[kind] = (this.save.resources[kind] ?? 0) + n;

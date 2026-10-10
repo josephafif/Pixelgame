@@ -112,7 +112,25 @@ function area(c, kind, o) {
 
 // --- The powers -----------------------------------------------------------------------------
 
+const PRISM_COLORS = ['#7ae8ff', '#c09aff', '#ffd27a'];
+
 const ACTIONS = {
+  /** Prism Split: a fan of prism bolts; strong rolls bounce on (as in single player). */
+  prismsplit(c, angle) {
+    const { gs, p, ab } = c;
+    const n = Math.max(3, Math.round(ab.count || 5));
+    const dmg = (weaponDamage(c) * ab.damage) / 100;
+    for (let i = 0; i < n; i++) {
+      const a = angle + (i / (n - 1) - 0.5) * 0.95;
+      spawnProjectile(gs, {
+        x: p.x, y: p.y - 0.2, angle: a, speed: 11, damage: dmg, range: 8, size: 2, sprite: 'bolt', owner: p.id,
+        element: ab.infuse ?? 'arcane', color: PRISM_COLORS[i % PRISM_COLORS.length], source: 'ability',
+        bounces: Math.max(0, n - 5), pierce: ab.twist === 'piercing' ? 1 : 0,
+      });
+    }
+    show(c, p.x, p.y, [emit('glint', p.x, p.y - 0.2, 10, 0.5, 2), snd('zap')]);
+  },
+
   meteor(c, angle) {
     const { gs, ab } = c;
     const { x, y } = aimPoint(c, angle, 5);

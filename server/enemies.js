@@ -24,6 +24,7 @@ export function spawnEnemy(gs, defId, x, y, { level = 1, elite = false, biome = 
   const data = gs.data;
   const def = data.byId.enemies.get(defId);
   if (!def) return null;
+  elite ||= Boolean(def.elite); // (always-elite kinds, as in single player)
   let el = 'physical';
   if (biome) {
     const nonPhysical = biome.elements.filter((e) => e !== 'physical');

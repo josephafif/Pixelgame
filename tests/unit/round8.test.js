@@ -87,8 +87,11 @@ test('forge options run from basic to best, and better picks cost more', () => {
 });
 
 test('eight bosses, each with a great altar; lesser altars dot the world', () => {
-  assert.equal(data.bosses.length, 8);
-  assert.equal(new Set(data.bosses.map((b) => b.biome)).size, 8, 'one boss per biome');
+  // (The far lands' bosses rise only at lesser altars in their own lands.)
+  const great = data.bosses.filter((b) => !b.far);
+  assert.equal(great.length, 8);
+  assert.equal(new Set(great.map((b) => b.biome)).size, 8, 'one boss per biome');
+  assert.ok(data.bosses.filter((b) => b.far).every((b) => data.byId.biomes.get(b.biome)?.far), 'far bosses live in the far lands');
   for (const seed of [1, 777, 12345]) {
     const w = new World(data, seed);
     assert.equal(w.greatAltars().length, 8);

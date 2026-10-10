@@ -8,7 +8,7 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-territories-1',
+  id: '2026-10-territories-2',
   title: { sv: 'Territorier och fraktioner', en: 'Territories and Factions' },
   teaser: {
     sv: 'Den största uppdateringen hittills är på väg: tre nya biomer, soldater, en strategikarta och fraktioner som för krig.',
@@ -29,9 +29,9 @@ export const NEWS = {
           en: '**Mireglass Fen**: a glowing swamp with healing fungi, poison clouds and the boss The Mireheart. Gather Lumen Spores.',
         },
         {
-          live: false,
-          sv: '**Prism Barrens**: en kristallöken där kristaller studsar skott. Bossen The Prism Warden, Prismite och förmågan Prism Split.',
-          en: '**Prism Barrens**: a crystal desert where crystals bounce shots. The boss The Prism Warden, Prismite and the Prism Split power.',
+          live: true,
+          sv: '**Prism Barrens**: en kristallöken långt ute (runt 350–400 rutor från lägret) där spegelkristaller studsar skott, även monstrens tillbaka mot dem själva. Shardlings, Refractors, Mirror Knights och bossen The Prism Warden med sina laserfält. Bryt Prismite, hitta Prism Lens för förmågan Prism Split, och bygg Prism Relay vid tornen.',
+          en: '**Prism Barrens**: a crystal desert far out (about 350–400 tiles from camp) where mirror crystals bounce shots, even monsters\' shots back at them. Shardlings, Refractors, Mirror Knights and the boss The Prism Warden with its laser fields. Mine Prismite, find the Prism Lens for the Prism Split power, and build a Prism Relay by your turrets.',
         },
         {
           live: false,

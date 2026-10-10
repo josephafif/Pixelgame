@@ -359,7 +359,11 @@ export class MpGame {
     this.worldSeed = w.seed;
     this.save.worldSeed = w.seed; // (market stock is drawn from the world's seed)
     this.save.worldSeed = w.seed;
-    this.world = new World(this.data, w.seed, { hideObjects: true, maxChunks: 220, townBuildings: Object.keys(TOWN_LEVELS), townMarket: townMarket(w.seed) });
+    this.world = new World(this.data, w.seed, {
+      hideObjects: true, maxChunks: 220, townBuildings: Object.keys(TOWN_LEVELS), townMarket: townMarket(w.seed),
+      // (An older server world: its clan bases keep their old land.)
+      gen: w.gen ?? 1, legacy: new Map(w.legacy ?? []),
+    });
     // Inside a clan's claim the ground stays cleared (the server never regrows it there).
     this.world.noRegrow = (tx, ty) => Boolean(claimAt(this.rules, this.claims, tx, ty));
     // Server objects (chests, shrines) join the world's own (town, altars).
@@ -1567,6 +1571,11 @@ export class MpGame {
       case 'text':
         this.fx.text(ev.x, ev.y, String(ev.text).slice(0, 40), String(ev.color ?? '#ffe890'), 1.2);
         break;
+      case 'glint':
+        // A shot glancing off a mirror crystal.
+        this.fx.emit('glint', ev.x, ev.y, 4, 0.3, 1.5, ['#e8fbff', '#7ae8ff', '#c09aff']);
+        this.audio.play('zap', { throttle: 120 });
+        break;
       case 'upgrade':
         this.fx.emit('sparkle', ev.x, ev.y - 0.3, 6, 0.5, 1.5);
         this.fx.add({ type: 'ring', x: ev.x, y: ev.y, r0: 0.2, r1: 0.9, color: '#7ae0ff', dur: 0.3 });
@@ -2212,7 +2221,7 @@ export class MpGame {
   }
 
   structureLock(def) {
-    const lock = mpStructureLock(def, this.save.player.level);
+    const lock = mpStructureLock(def, this.save.player.level, this.save.components);
     if (lock) return lock;
     if (def.kind === 'building' && this.clan?.base?.placed?.[def.building]) return 'Står redan i basen (riv den för att flytta den)';
     const claim = this.#claimHere();
@@ -2287,7 +2296,7 @@ export class MpGame {
     if (!st.clanId || st.clanId !== this.me?.clan?.id) return 'Det där är inte er klans';
     const info = this.upgradeInfo(tx, ty);
     if (!info) return `${st.def.name} går inte att förstärka mer`;
-    const lock = mpStructureLock(info.to, this.save.player.level);
+    const lock = mpStructureLock(info.to, this.save.player.level, this.save.components);
     if (lock) return `${info.to.name}: ${lock.toLowerCase()}`;
     if (dist2(this.player.x, this.player.y, tx + 0.5, ty + 0.5) > (this.data.building.reach + 0.5) ** 2) return 'För långt bort';
     const wallet = this.buildWallet({ kind: 'building' });

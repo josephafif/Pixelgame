@@ -482,12 +482,22 @@ export class Renderer {
           if (a.shape === 'line') {
             const x2 = this.#sx(a.x2);
             const y2 = this.#sy(a.y2);
-            v.strokeStyle = '#ff3a3a';
+            // A laser field glows in its own colour, a thin bright core over a wide haze.
+            v.strokeStyle = a.laser ? a.color : '#ff3a3a';
             v.lineWidth = a.r * T * 2;
             v.beginPath();
             v.moveTo(x, y);
             v.lineTo(x2, y2);
             v.stroke();
+            if (a.laser) {
+              v.globalAlpha = 0.5 + 0.5 * k;
+              v.strokeStyle = '#ffffff';
+              v.lineWidth = 1;
+              v.beginPath();
+              v.moveTo(x, y);
+              v.lineTo(x2, y2);
+              v.stroke();
+            }
             v.lineWidth = 1;
           } else {
             this.#circle(x, y, r, '#ff3a3a', null, 0.18 + 0.3 * k);
@@ -1020,7 +1030,7 @@ export class Renderer {
     const s = pickupSprite(kind, it.color);
     this.#shadow(x, y + 2, 2);
     v.drawImage(s, x - (s.width >> 1), y - s.height - 1 + bob);
-    if (it.kind === 'component') this.#glow(x, y - 4 + bob, it.color, 10);
+    if (it.kind === 'component' || it.kind === 'prismite' || it.kind === 'spores' || it.kind === 'aether') this.#glow(x, y - 4 + bob, it.color, 10);
     if (it.kind === 'mapscroll') {
       this.#glow(x, y - 4 + bob, '#ffe890', 12 + Math.sin(game.time * 4) * 2);
       if (Math.random() < 0.06) game.fx.emit('glint', it.x, it.y - 0.4, 1, 0.4, 0.6, ['#ffe890', '#ffffff']);
@@ -1801,7 +1811,7 @@ export class Renderer {
         }
         case 'line': {
           v.strokeStyle = s.color;
-          v.lineWidth = 2;
+          v.lineWidth = s.width ?? 2;
           v.beginPath();
           s.points.forEach(([px, py], i) => {
             let lx = this.#sx(px);

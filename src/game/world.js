@@ -51,19 +51,49 @@ const BOSS_DISTANCES = [150, 270, 390, 510, 630, 750, 870, 990];
 export const T = {
   GRASS: 1, FLOWERS: 2, MOSS: 3, SAND: 4, SAND2: 5, SNOW: 6, ICE: 7, ASH: 8, BASALT: 9,
   ROCKGRASS: 10, VOIDSTONE: 11, VOIDMOSS: 12, CAMP: 13, PATH: 14,
+  // Prism Barrens (far lands): pale crystal sand and glassy flats.
+  PRISMSAND: 15, PRISMGLASS: 16,
   WATER: 20, LAVA: 21, TREE: 22, PINE: 23, ROCK: 24, CACTUS: 25, CRYSTAL: 26,
   SEA: 27, DEEP: 28, PALM: 29, OBSIDIAN: 30, ORE: 31, STARSTONE: 32,
+  // Prism Barrens: crystal formations, and mirror crystals that bounce shots.
+  PRISM: 33, MIRROR: 34,
 };
+
+/**
+ * World generation version. 1: the original world. 2: the far lands (new
+ * biomes far out, see #farBiome). Old worlds are upgraded, but the places
+ * you had already seen keep their old land (World#legacy).
+ */
+export const WORLD_GEN = 2;
+/** The far lands begin this far from the camp. */
+export const FAR_MIN = 280;
+
+/**
+ * Single player: which explored chunks keep the land of an older world
+ * version (chunk key → version), from the save's explored list and its
+ * marks ([[version, n]]: the first n entries were seen in that version).
+ */
+export function legacyFromExplored(explored = [], marks = []) {
+  const out = new Map();
+  let from = 0;
+  for (const [gen, n] of marks) {
+    for (let i = from; i < Math.min(n, explored.length); i++) if (!out.has(explored[i])) out.set(explored[i], gen);
+    from = Math.max(from, n);
+  }
+  return out;
+}
 
 const GROUND_BY_NAME = {
   grass: T.GRASS, flowers: T.FLOWERS, moss: T.MOSS, sand: T.SAND, sand2: T.SAND2, snow: T.SNOW,
   ice: T.ICE, ash: T.ASH, basalt: T.BASALT, rockgrass: T.ROCKGRASS, voidstone: T.VOIDSTONE,
-  voidmoss: T.VOIDMOSS,
+  voidmoss: T.VOIDMOSS, prismsand: T.PRISMSAND, prismglass: T.PRISMGLASS,
 };
 const BLOCKER_BY_NAME = {
   tree: T.TREE, pine: T.PINE, rock: T.ROCK, cactus: T.CACTUS, crystal: T.CRYSTAL, palm: T.PALM,
-  obsidian: T.OBSIDIAN, ore: T.ORE, starstone: T.STARSTONE,
+  obsidian: T.OBSIDIAN, ore: T.ORE, starstone: T.STARSTONE, prism: T.PRISM, mirror: T.MIRROR,
 };
+/** Crystals that send shots off in a new direction instead of stopping them. */
+export const REFLECTS = new Set([T.MIRROR]);
 /** Blocker tile id → name used by game data (gathering.harvest). */
 export const BLOCKER_NAME = Object.fromEntries(Object.entries(BLOCKER_BY_NAME).map(([k, v]) => [v, k]));
 export const LIQUID = new Set([T.WATER, T.LAVA, T.SEA, T.DEEP]);
@@ -81,7 +111,7 @@ export const BRIDGEABLE = new Set([T.WATER, T.SEA]);
 export const PROP_SHAPE = new Map([
   [T.TREE, [0.3, 0.68]], [T.PINE, [0.28, 0.7]], [T.PALM, [0.26, 0.72]], [T.CACTUS, [0.3, 0.6]],
   [T.ROCK, [0.36, 0.58]], [T.ORE, [0.36, 0.58]], [T.OBSIDIAN, [0.36, 0.58]],
-  [T.CRYSTAL, [0.34, 0.6]], [T.STARSTONE, [0.34, 0.6]],
+  [T.CRYSTAL, [0.34, 0.6]], [T.STARSTONE, [0.34, 0.6]], [T.PRISM, [0.34, 0.6]], [T.MIRROR, [0.36, 0.58]],
 ]);
 
 /** Numeric key for a tile (fast Map lookups for structures). */
@@ -115,12 +145,17 @@ export class World {
    *   secretSeed — places chests, shrines, curiosities and treasure (the
    *     server keeps it to itself, so nobody can map the loot offline);
    *   hideObjects — leave those objects out (clients get them from the server);
-   *   maxChunks — how many chunks stay cached.
+   *   maxChunks — how many chunks stay cached;
+   *   gen — the world's generation version (WORLD_GEN for a new world);
+   *   legacy — chunk key → the version it was first seen in: newer far lands
+   *     never grow there (old saves and clan bases keep their land).
    */
   constructor(data, seed, opts = {}) {
     this.data = data;
     this.seed = seed >>> 0;
     this.objSeed = (opts.secretSeed ?? seed) >>> 0;
+    this.gen = opts.gen ?? WORLD_GEN;
+    this.legacy = opts.legacy ?? new Map();
     this.hideObjects = Boolean(opts.hideObjects);
     // In multiplayer nothing hidden may change the terrain (clients must
     // predict collisions without knowing the secret seed).
@@ -157,12 +192,19 @@ export class World {
       ocean: noiseThreshold(0.4),
       deep: noiseThreshold(0.22),
       isle: noiseThreshold(0.92),
+      // The far lands: about one part in seven of the land out there, split
+      // between the three kinds by a slower noise.
+      far: noiseThreshold(0.82),
+      farA: noiseThreshold(1 / 3),
+      farB: noiseThreshold(2 / 3),
     };
     // One great altar per boss, spread around the compass and far apart:
     // the first a good walk away, the rest deeper and deeper into the world.
     // The island boss may end up out at sea (its arena becomes an island).
     const start = hashInts(this.seed, 71) % 8;
-    this.landmarks = data.bosses.map((boss, i) => {
+    // (The far lands' bosses have no great altar: they rise at the lesser
+    // altars of their own lands, so no old arena ever moves.)
+    this.landmarks = data.bosses.filter((boss) => !boss.far).map((boss, i) => {
       const jitter = ((hashInts(this.seed, 72, i) % 1000) / 1000 - 0.5) * 0.5;
       const angle0 = ((start + i * 2 + (i >= 2 ? 1 : 0)) % 8) * (Math.PI / 4) + jitter;
       const dist = BOSS_DISTANCES[i] ?? 150 + 140 * i;
@@ -187,6 +229,9 @@ export class World {
         x: Math.round(Math.cos(angle) * r) + 0.5, y: Math.round(Math.sin(angle) * r) + 0.5,
       };
     });
+    // One sure region of each far land, in its own direction a long walk
+    // out (more grow here and there beyond it).
+    this.farRegions = this.#placeFarRegions(start);
     this.altarCache = new Map();
     this.siteCache = new Map();
     // One market is guaranteed within reach, in a direction no boss uses.
@@ -300,7 +345,7 @@ export class World {
         // The guardian belongs to the land around it.
         const biome = this.biomeAt(Math.floor(x), Math.floor(y));
         const local = this.data.bosses.filter((b) => b.biome === biome.id);
-        const list = local.length ? local : this.data.bosses;
+        const list = local.length ? local : this.data.bosses.filter((b) => !b.far);
         altar = { key: `a:c${key}`, x, y, bossId: list[(h >>> 4) % list.length].id, lesser: true };
       }
     }
@@ -411,6 +456,10 @@ export class World {
     }
     const sea = this.seaAt(Math.floor(x) + 0.5, Math.floor(y) + 0.5);
     if (sea === SEA.ISLE || sea === SEA.ISLE_BEACH) return this.biomeById.get('isles') ?? this.biomes[0];
+    if (this.gen >= 2 && d2 > FAR_MIN * FAR_MIN) {
+      const far = this.#farBiome(x, y, Math.sqrt(d2));
+      if (far) return far;
+    }
     const s = this.seed;
     const t = fbm(s ^ 0x1111, x / 80, y / 80);
     const m = fbm(s ^ 0x2222, x / 70, y / 70);
@@ -427,6 +476,59 @@ export class World {
     else if (m < q.dry) id = 'highlands';
     else id = 'plains';
     return this.biomeById.get(id) ?? this.biomes[0];
+  }
+
+  /**
+   * The far lands: Prism Barrens, Mireglass Fen and Skyreach grow in big
+   * regions far from the camp (null elsewhere). A kind that is newer than
+   * the world, or newer than where it would grow was first seen, doesn't.
+   */
+  #farBiome(x, y, dist) {
+    const s = this.seed;
+    const q = this.q;
+    let id = null;
+    for (const r of this.farRegions) {
+      const dx = x - r.x;
+      const dy = y - r.y;
+      const edge = r.r + (valueNoise(s ^ 0x6e72, x / 14, y / 14) - 0.5) * 18;
+      if (dx * dx + dy * dy < edge * edge) {
+        id = r.id;
+        break;
+      }
+    }
+    if (!id) {
+      const e = fbm(s ^ 0x6e6e, x / 170, y / 170) + Math.min(0.05, (dist - FAR_MIN) / 4000);
+      if (e < q.far) return null;
+      const k = fbm(s ^ 0x6e70, x / 360, y / 360);
+      id = k < q.farA ? 'prism' : k < q.farB ? 'fen' : 'skyreach';
+    }
+    const b = this.biomeById.get(id);
+    if (!b || (b.gen ?? 2) > this.gen) return null;
+    if (this.legacy.size) {
+      const seenIn = this.legacy.get(`${Math.floor(x / CHUNK)},${Math.floor(y / CHUNK)}`);
+      if (seenIn !== undefined && seenIn < (b.gen ?? 2)) return null;
+    }
+    return b;
+  }
+
+  /** The sure far-land regions: one of each kind, in directions of their own, on the mainland. */
+  #placeFarRegions(start) {
+    const out = [];
+    const kinds = ['prism', 'fen', 'skyreach'];
+    kinds.forEach((id, i) => {
+      const angle0 = ((start + 3 + i * 3) % 8) * (Math.PI / 4) + (((hashInts(this.seed, 0x6a1, i) % 1000) / 1000) - 0.5) * 0.4;
+      const dist = 350 + (hashInts(this.seed, 0x6a2, i) % 60);
+      let best = null;
+      for (let k = 0; k < 24 && !best; k++) {
+        const a = angle0 + Math.ceil(k / 2) * 0.12 * (k % 2 ? 1 : -1);
+        const x = Math.round(Math.cos(a) * dist);
+        const y = Math.round(Math.sin(a) * dist);
+        const clear = this.landmarks.every((lm) => (lm.x - x) ** 2 + (lm.y - y) ** 2 > (LANDMARK_RADIUS + 70) ** 2);
+        if (clear && this.#oceanValue(x, y) >= this.q.ocean + 0.03) best = { id, x, y, r: 46 };
+      }
+      if (best) out.push(best);
+    });
+    return out;
   }
 
   /**

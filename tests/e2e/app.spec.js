@@ -1256,3 +1256,41 @@ test('the main menu presents the big update: a news card with a NEW badge and it
   await expect(page.locator('.news-card .news-badge')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('Prism Barrens: the far land is there, Prismite shows up, the Warden lays laser fields', async ({ page }) => {
+  const errors = trackErrors(page);
+  await startGame(page);
+  const spot = await game(page, () => {
+    const g = window.__pixelgame.game;
+    const r = g.world.farRegions.find((x) => x.id === 'prism');
+    for (let d = 0; d < 20; d++) {
+      for (let a = 0; a < 16; a++) {
+        const x = Math.round(r.x + Math.cos((a / 16) * 6.283) * d);
+        const y = Math.round(r.y + Math.sin((a / 16) * 6.283) * d);
+        if (!g.world.blockAt(x, y)) {
+          g.player.x = x + 0.5;
+          g.player.y = y + 0.5;
+          g.player.invuln = 9999;
+          g.enemies.length = 0;
+          return { biome: g.world.biomeAt(x, y).id };
+        }
+      }
+    }
+    return null;
+  });
+  expect(spot.biome).toBe('prism');
+  // Prismite in the pack: it appears in the resource row.
+  await expect(page.locator('#res-prismite')).toBeHidden();
+  await game(page, () => { window.__pixelgame.game.save.resources.prismite = 7; });
+  await expect(page.locator('#res-prismite')).toHaveText('7');
+  await expect(page.locator('#res-prismite')).toBeVisible();
+  // The Warden's laser fields: glowing lines that fire a moment later.
+  await game(page, async () => {
+    const g = window.__pixelgame.game;
+    const { spawnBoss } = await import('/src/game/enemies.js');
+    g.godMode = true;
+    spawnBoss(g, 'prism_warden', g.player.x + 4, g.player.y - 2);
+  });
+  await expect.poll(() => game(page, () => window.__pixelgame.game.areas.filter((a) => a.laser).length), { timeout: 15000 }).toBeGreaterThan(2);
+  expect(errors).toEqual([]);
+});

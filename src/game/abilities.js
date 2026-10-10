@@ -74,7 +74,30 @@ function aimPoint(game, ab, angle, dist) {
   return { x: p.x + Math.cos(angle) * dist, y: p.y + Math.sin(angle) * dist };
 }
 
+/** Prism Split's colours (the prism's three faces). */
+const PRISM_COLORS = ['#7ae8ff', '#c09aff', '#ffd27a'];
+
 const ACTIONS = {
+  /**
+   * Prism Split: the strike splits into a fan of prism bolts; strong rolls
+   * (six or seven bolts) bounce on to the next enemy once or twice.
+   */
+  prismsplit(game, ab, angle) {
+    const p = game.player;
+    const n = Math.max(3, Math.round(ab.count || 5));
+    const dmg = (weaponDamage(game) * ab.damage) / 100;
+    const spread = 0.95;
+    for (let i = 0; i < n; i++) {
+      const a = angle + (i / (n - 1) - 0.5) * spread;
+      game.spawnProjectile({
+        x: p.x, y: p.y - 0.2, angle: a, speed: 11, range: 8, size: 2, damage: dmg, element: ab.infuse ?? 'arcane',
+        sprite: 'bolt', owner: 'player', source: 'ability', depth: 1, bounces: Math.max(0, n - 5),
+        pierce: ab.twist === 'piercing' ? 1 : 0, color: PRISM_COLORS[i % PRISM_COLORS.length],
+      });
+    }
+    game.fx.emit('glint', p.x, p.y - 0.2, 10, 0.5, 2, PRISM_COLORS);
+    game.audio.play('zap');
+  },
   meteor(game, ab, angle) {
     const { x, y } = aimPoint(game, ab, angle, 5);
     const color = game.data.byId.elements.get(ab.infuse)?.glow ?? '#ff8a2a';

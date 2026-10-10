@@ -257,6 +257,7 @@ export function readArea(v, rt, x = field(ET.AREA, v, 'x') / Q, y = field(ET.ARE
     lava: Boolean(extra & AF.LAVA),
     follow: Boolean(extra & AF.FOLLOW),
     shape: extra & AF.LINE ? 'line' : 'circle',
+    laser: Boolean(extra & AF.LASER),
     spin: (extra >> AF.SPIN_SHIFT) / 2 || undefined,
     owner: f('owner') ?? 0,
     x2: (f('x2') ?? 0) / Q,

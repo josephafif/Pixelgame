@@ -24,6 +24,9 @@ export const GROUND_STYLE = {
   [T.VOIDMOSS]: { base: '#3a2a52', dots: ['#4a3868', '#2e2044'], blades: '#5a3f7a' },
   [T.CAMP]: { base: '#8a7f70', bricks: '#6e6458', dots: ['#958a7a', '#7a7064'] },
   [T.PATH]: { base: '#b89a6a', dots: ['#a88a5a', '#c8aa7a'] },
+  // Prism Barrens: pale sand full of glints, and glassy flats.
+  [T.PRISMSAND]: { base: '#e6dff0', dots: ['#d6cce8', '#f6f2ff'], glints: ['#7ae8ff', '#ff9ad8', '#ffd27a'] },
+  [T.PRISMGLASS]: { base: '#c8e2ee', dots: ['#b4d6e6', '#e4f4fa'], cracks: '#9cc8de', glints: ['#ffffff'] },
 };
 
 function drawGround(ctx, style, rng) {
@@ -68,6 +71,13 @@ function drawGround(ctx, style, rng) {
       ctx.fillRect(x, y, 1, 1);
       y += 1;
       x += rng.int(-1, 1);
+    }
+  }
+  if (style.glints) {
+    for (let i = 0; i < 2; i++) {
+      if (!rng.chance(0.6)) continue;
+      ctx.fillStyle = rng.pick(style.glints);
+      ctx.fillRect(rng.int(1, 14), rng.int(1, 14), 1, 1);
     }
   }
   if (style.embers && rng.chance(0.5)) {
@@ -250,6 +260,44 @@ function drawBlocker(ctx, id, rng) {
       for (const [x, y] of [[5, 7], [9, 6], [10, 10], [6, 11], [8, 9]]) ctx.fillRect(x, y, 2, 1);
       ctx.fillStyle = '#e8e4d4';
       for (const [x, y] of [[6, 8], [10, 7], [8, 11]]) ctx.fillRect(x, y, 1, 1);
+      break;
+    }
+    case T.PRISM: {
+      // A cluster of clear crystal: cyan, violet and gold faces.
+      const shards = [[6, 1, 4, 14, '#7ae8ff', '#c8f6ff'], [10, 5, 3, 10, '#a07aff', '#d8c8ff'], [2, 7, 4, 8, '#ffd27a', '#fff0c8']];
+      for (const [x, y, w, h] of shards) {
+        ctx.fillStyle = '#161622';
+        ctx.fillRect(x - 1, y - 1, w + 2, h + 1);
+      }
+      for (const [x, y, w, h, c, l] of shards) {
+        ctx.fillStyle = c;
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = l;
+        ctx.fillRect(x, y, 1, h);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x + 1, y, 1, 1);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillRect(8, 4, 1, 3);
+      break;
+    }
+    case T.MIRROR: {
+      // A tall slab of mirror crystal: silver, with the sky in it.
+      ctx.fillStyle = '#161622';
+      ctx.fillRect(3, 0, 10, 16);
+      ctx.fillStyle = '#d8eef8';
+      ctx.fillRect(4, 1, 8, 14);
+      ctx.fillStyle = '#9ad0e8';
+      ctx.fillRect(4, 9, 8, 6);
+      ctx.fillStyle = '#7ab8d8';
+      ctx.fillRect(4, 13, 8, 2);
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 6; i++) ctx.fillRect(5 + i, 7 - i, 1, 2);
+      ctx.fillRect(10, 3, 1, 1);
+      ctx.fillStyle = '#c09aff';
+      ctx.fillRect(4, 1, 1, 14);
+      ctx.fillStyle = '#7ae8ff';
+      ctx.fillRect(11, 1, 1, 14);
       break;
     }
     case T.STARSTONE: {

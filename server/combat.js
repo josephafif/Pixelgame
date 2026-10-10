@@ -7,7 +7,7 @@ import { angleDiff, angleTo, segmentDist2 } from '../src/core/math.js';
 import { attackDuration, impactDelay, MELEE_PATTERNS } from '../src/render/weapon-anim.js';
 import { pvpBlock, inSafeZone } from '../src/net/rules.js';
 import { TICK_DT, TICK_RATE } from '../src/net/movement.js';
-import { T, CHUNK } from '../src/game/world.js';
+import { T, CHUNK, REFLECTS } from '../src/game/world.js';
 import * as players from './players.js';
 import * as loot from './loot.js';
 import * as building from './building.js';
@@ -19,7 +19,8 @@ import * as workers from './workers.js';
 import * as horses from './horses.js';
 
 const DEG = Math.PI / 180;
-const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE]);
+const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM]);
+const MAX_REFLECTIONS = 4;
 const PROJ_CAP = 1500;
 
 function elementGlow(gs, element) {
@@ -90,6 +91,17 @@ export function damageEnemy(gs, e, amount, opts = {}) {
 export function killEnemy(gs, e, killer) {
   if (e.dead) return;
   e.dead = true;
+  // Crystal creatures burst into shards when they break (as in single player).
+  const burst = e.def?.deathBurst;
+  if (burst) {
+    for (let i = 0; i < burst.count; i++) {
+      const a = (i / burst.count) * Math.PI * 2 + Math.random() * 0.4;
+      spawnProjectile(gs, {
+        x: e.x, y: e.y, angle: a, speed: burst.speed ?? 6, range: 3.5, size: 1, damage: e.dmg * (burst.damage ?? 0.5),
+        sprite: 'shard', enemy: e.id, color: burst.color ?? e.color,
+      });
+    }
+  }
   gs.event(e.x, e.y, { k: 'kill', id: e.id, x: e.x, y: e.y, boss: e.boss, r: e.r });
   loot.onEnemyKilled(gs, e, killer);
 }
@@ -332,7 +344,7 @@ function fireWeapon(gs, p, w, { x, y, angle, damage }) {
       x, y, angle: dir, speed: s.projectileSpeed || 10, damage: perShot, range: s.range, element: w.element,
       sprite: a.projectile, size: a.size ?? 2, owner: p.id, pierce: s.pierce ?? 0, knockback: s.knockback ?? 0,
       color: w.trail, kind: a.pattern === 'lob' ? 'lob' : a.pattern === 'boomerang' ? 'boomerang' : 'shot',
-      blast: a.blast ?? 1.5, source: 'weapon',
+      blast: a.blast ?? 1.5, source: 'weapon', bounces: w.bounces ?? 0,
     });
   }
 }
@@ -451,6 +463,9 @@ export function spawnProjectile(gs, o) {
     clanId: o.clanId ?? null, // a turret's clan: its shots fly over the clan's own walls
     kind: o.kind ?? 'shot',
     pierce: o.pierce ?? 0,
+    bounces: o.bounces ?? 0, // on to the next monster after a hit (Ricochet, Prism Split)
+    reflections: 0, // times a mirror crystal sent it off at an angle
+    turned: false, // a monster's shot turned by a mirror: now it hits monsters
     blast: o.blast ?? 1.5,
     status: o.status ?? null,
     knockback: o.knockback ?? 0,
@@ -510,6 +525,50 @@ function rebase(gs, pr) {
   pr.y0 = pr.y;
 }
 
+/** Bounces a shot off the crystal it flew into; a monster's shot turns on monsters. */
+function reflect(gs, pr, dt) {
+  const px = pr.x - pr.vx * dt;
+  const py = pr.y - pr.vy * dt;
+  const sideX = Math.floor(px) !== Math.floor(pr.x);
+  const sideY = Math.floor(py) !== Math.floor(pr.y);
+  if (sideX || !sideY) pr.vx = -pr.vx;
+  if (sideY || !sideX) pr.vy = -pr.vy;
+  pr.x = px;
+  pr.y = py;
+  pr.reflections += 1;
+  pr.damage *= 1.15;
+  pr.traveled = Math.max(0, pr.traveled - 2);
+  pr.hit.clear();
+  if (pr.enemy) {
+    pr.enemy = 0;
+    pr.turned = true;
+  }
+  rebase(gs, pr);
+  gs.event(pr.x, pr.y, { k: 'fx', fx: 'glint', x: pr.x, y: pr.y }, 20);
+}
+
+/** After a hit: off to the nearest monster it hasn't hit yet (Ricochet, Prism Split). */
+function bounceOn(gs, pr) {
+  let best = null;
+  let bestD = 25;
+  for (const e of gs.enemiesNear(pr.x, pr.y, 5)) {
+    if (e.dead || e.submerged || pr.hit.has(e.id)) continue;
+    const d = (e.x - pr.x) ** 2 + (e.y - pr.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  if (!best) return false;
+  const d = Math.sqrt(bestD) || 1;
+  pr.vx = ((best.x - pr.x) / d) * pr.speed;
+  pr.vy = ((best.y - pr.y) / d) * pr.speed;
+  pr.traveled = Math.max(0, pr.traveled - 3);
+  pr.bounces -= 1;
+  rebase(gs, pr);
+  return true;
+}
+
 /**
  * Shots from a clan's players and turrets fly over the clan's own walls and
  * turrets (as in single player); everyone else's shots hit them.
@@ -525,6 +584,7 @@ function shotBlocked(gs, x, y) {
   const tx = Math.floor(x);
   const ty = Math.floor(y);
   const b = gs.world.blockAt(tx, ty);
+  if (b && REFLECTS.has(b) && gs.world.propAt(x, y)) return { tx, ty, st: null, mirror: true };
   if (b && BLOCKS_SHOTS.has(b) && gs.world.propAt(x, y)) return { tx, ty, st: null };
   const st = gs.world.structureAt(tx, ty);
   if (st && !st.def.walkable) return { tx, ty, st };
@@ -576,6 +636,11 @@ export function updateProjectiles(gs, dt, now) {
       }
       if (pr.kind !== 'boomerang') {
         const block = shotBlocked(gs, pr.x, pr.y);
+        // Mirror crystals send shots off at an angle (as in single player).
+        if (block?.mirror && pr.reflections < MAX_REFLECTIONS) {
+          reflect(gs, pr, sdt);
+          continue;
+        }
         if (block && !(block.st && ownStructure(gs, pr, block.st))) {
           if (block.st && pr.owner) {
             const shooter = gs.players.get(pr.owner);
@@ -616,16 +681,31 @@ function projectileHits(gs, pr, now) {
     }
     if (pr.enemy) return true;
   }
-  if (pr.owner || pr.turret || pr.market) {
+  if (pr.owner || pr.turret || pr.market || pr.turned) {
     for (const e of gs.enemiesNear(pr.x, pr.y, 3)) {
       if (pr.hit.has(e.id)) continue;
       if ((e.x - pr.x) ** 2 + (e.y - pr.y) ** 2 > (rad + e.r) ** 2) continue;
+      // A Mirror Knight's shield sends some shots straight back.
+      if (e.def?.reflect && pr.owner && pr.kind === 'shot' && pr.source !== 'reflect' && Math.random() < e.def.reflect) {
+        pr.vx = -pr.vx;
+        pr.vy = -pr.vy;
+        pr.enemy = e.id;
+        pr.owner = 0;
+        pr.source = 'reflect';
+        pr.damage *= 0.6;
+        pr.traveled = Math.max(0, pr.traveled - 3);
+        pr.hit.clear();
+        rebase(gs, pr);
+        gs.event(e.x, e.y, { k: 'fx', fx: 'text', x: e.x, y: e.y - 1, text: 'REFLEKTERAD', color: '#e8fbff' }, 24);
+        return true;
+      }
       pr.hit.add(e.id);
       const shooter = gs.players.get(pr.owner) ?? null;
       damageEnemy(gs, e, pr.damage, {
         attacker: shooter, element: pr.element, canCrit: Boolean(shooter), depth: pr.source === 'weapon' ? 0 : 1,
         source: pr.turret ? 'turret' : pr.source, knockback: pr.knockback, fromX: pr.x - pr.vx, fromY: pr.y - pr.vy, status: pr.status,
       });
+      if (pr.bounces > 0 && pr.kind === 'shot' && bounceOn(gs, pr)) return true;
       if (pr.kind !== 'boomerang' && pr.hit.size > pr.pierce) return false;
     }
   }

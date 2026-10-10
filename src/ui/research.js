@@ -14,6 +14,7 @@ function unlockList(game, c) {
   for (const id of u.materials ?? []) parts.push(`Material: ${name('materials', id)}`);
   for (const id of u.effects ?? []) parts.push(`Effect: ${name('effects', id)}`);
   for (const id of u.abilities ?? []) parts.push(`Ability: ${name('abilities', id)}`);
+  for (const id of u.structures ?? []) parts.push(`Build: ${game.data.building?.structures?.find((s) => s.id === id)?.name ?? id}`);
   if (c.element) parts.push(`Forge element: ${game.data.byId.elements.get(c.element)?.name}`);
   return parts;
 }

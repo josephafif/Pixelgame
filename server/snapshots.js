@@ -68,6 +68,7 @@ function areaValues(gs, a) {
   if (a.lava) extra |= AF.LAVA;
   if (a.follow) extra |= AF.FOLLOW;
   if (a.shape === 'line') extra |= AF.LINE;
+  if (a.laser) extra |= AF.LASER;
   if (a.spin) extra |= Math.min(15, Math.round(a.spin * 2)) << AF.SPIN_SHIFT;
   return [quantize(a.x), quantize(a.y), quantize(a.r), Math.max(0, AREA_KINDS.indexOf(a.kind)), colorToInt(a.color), a.t0, Math.round(a.dur * TICK_RATE),
     extra, a.owner ?? 0, quantize(a.x2 ?? a.x), quantize(a.y2 ?? a.y)];

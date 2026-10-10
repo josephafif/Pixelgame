@@ -30,8 +30,31 @@ export function inBuildArea(data, save, tx, ty) {
   return Math.hypot(tx + 0.5 - 0.5, ty + 0.5 - 0.5) <= buildRadius(data, save);
 }
 
-/** Missing camp building levels for a structure, or null when unlocked. */
+/**
+ * A Prism Relay standing next to a turret: its numbers ({ damage, split }),
+ * or null. (Shared: the server's turrets use it too.)
+ */
+export function relayFor(world, st) {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const o = world.structureAt(st.x + dx, st.y + dy);
+      if (o?.def?.relay && (!st.clanId || o.clanId === st.clanId)) return o.def.relay;
+    }
+  }
+  return null;
+}
+
+/** Has the save researched this component (a blueprint)? */
+function knows(save, id) {
+  return Boolean(save.components?.[id]?.researched);
+}
+
+/** Missing camp building levels (or a blueprint) for a structure, or null when unlocked. */
 export function structureLock(data, save, def) {
+  if (def.blueprint && !knows(save, def.blueprint)) {
+    return `Needs the ${data.byId.components.get(def.blueprint)?.name ?? def.blueprint} (research it)`;
+  }
   for (const [id, level] of Object.entries(def.requires ?? {})) {
     if (buildingLevel(data, save, id) < level) {
       return `Needs ${buildingDef(data, id)?.name ?? id} level ${level}`;
@@ -141,15 +164,20 @@ export function runTurret(game, st, dt, { hostile = false, range = null } = {}) 
   const vx = best.vx ?? 0;
   const vy = best.vy ?? 0;
   const angle = Math.atan2(best.y + vy * lead - cy, best.x + vx * lead - cx);
+  // A Prism Relay next to the turret: harder hits, and two lighter shots fanning out.
+  const relay = hostile ? null : relayFor(game.world, st);
   const damage = hostile
     ? 8 + game.save.player.level * 3
-    : game.construction.turretDamage(st.def);
-  const proj = game.spawnProjectile({
-    x: cx, y: cy, angle, speed: spec.speed, damage, range: reach + 1,
-    size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, owner: hostile ? 'enemy' : 'turret',
-    element: spec.element ?? 'physical', color: spec.color, status: spec.status ?? null, depth: 1,
-  });
-  if (proj) proj.structure = st;
+    : game.construction.turretDamage(st.def) * (1 + (relay?.damage ?? 0));
+  const shots = [[0, 1], ...(relay?.split ? [[-0.2, 0.4], [0.2, 0.4]] : [])];
+  for (const [off, k] of shots) {
+    const proj = game.spawnProjectile({
+      x: cx, y: cy, angle: angle + off, speed: spec.speed, damage: damage * k, range: reach + 1,
+      size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, owner: hostile ? 'enemy' : 'turret',
+      element: spec.element ?? 'physical', color: off ? '#7ae8ff' : spec.color, status: spec.status ?? null, depth: 1,
+    });
+    if (proj) proj.structure = st;
+  }
   game.audio.play(spec.element === 'fire' ? 'whirl' : 'hit', { throttle: 120 });
 }
 

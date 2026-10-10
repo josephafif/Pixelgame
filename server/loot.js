@@ -387,6 +387,9 @@ function collect(gs, p, it) {
     case 'wood':
     case 'stone':
     case 'gold':
+    case 'prismite':
+    case 'spores':
+    case 'aether':
       r[it.kind] = (r[it.kind] ?? 0) + it.value;
       players.markMe(p);
       gs.event(p.x, p.y, { k: 'pick', id: p.id, kind: it.kind }, 12);

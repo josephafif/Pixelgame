@@ -358,6 +358,11 @@ Säkerheten kommer från att servern bestämmer.
   - Den egna väskan och de egna vapnen är fortfarande personliga.
 - **Klanvalvet** nås överallt på klanens mark. I panelen (B, fliken Valv)
   lägger du i 10, 100 eller allt med ett tryck.
+- **Fjärrländerna** (Prism Barrens, senare Mireglass Fen och Skyreach) finns i serverns värld från
+  världsversion 2 (`meta.worldGen`). En äldre värld uppgraderas när servern startar, men chunkarna
+  runt varje klanbas sparas i `meta.legacyChunks` och behåller sin gamla mark. Listan skickas till
+  klienterna i `welcome`, så alla ser samma värld. Speglar, studsande skott, Mirror Knight och
+  Prism Relay fungerar som i singleplayer, och servern bestämmer allt.
 - **Underhåll:** dras ur klanvalvet en gång i timmen: 5 trä och 5 sten per
   bygge och vecka, 10 skrot och 10 essens per byggnadsnivå och vecka, och varje
   arbetares lön (126 skrot och 84 essens i veckan). Allt går att ändra per server

@@ -193,6 +193,15 @@ export class Hud {
     e.scrap.textContent = s.scrap;
     if (e.wood) e.wood.textContent = s.wood;
     if (e.stone) e.stone.textContent = s.stone;
+    // The far lands' materials show up once you have some.
+    const res2 = this.game.save?.resources ?? {};
+    for (const k of ['prismite', 'spores', 'aether']) {
+      const el = (e[k] ??= $(`#res-${k}`));
+      if (!el) continue;
+      const n = Math.floor(res2[k] ?? 0);
+      el.textContent = n;
+      el.parentElement.toggleAttribute('hidden', n <= 0);
+    }
     // The resource bar lights up for a few seconds whenever something changes.
     const res = `${s.essence}|${s.scrap}|${s.wood}|${s.stone}`;
     if (res !== this.lastRes) {

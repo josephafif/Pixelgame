@@ -9,6 +9,7 @@ import { canAfford, pay, shortfalls } from '../src/game/base.js';
 import { upkeepPerDay, chargeUpkeep } from '../src/game/upkeep.js';
 import { inSafeZone, bannerProblem, claimAt, canDo } from '../src/net/rules.js';
 import { mpStructureLock } from '../src/net/mpbuild.js';
+import { relayFor } from '../src/game/construction.js';
 import { buildingOfStruct, BUILDING_SV, upkeepRates } from '../src/net/mpbase.js';
 import * as combat from './combat.js';
 import * as players from './players.js';
@@ -185,7 +186,7 @@ export function place(gs, p, defId, tx, ty) {
   const role = clan.members.get(p.accountId)?.role ?? 'member';
   if (inSafeZone(gs.rules, tx + 0.5, ty + 0.5)) return 'Man kan inte bygga i Fristaden';
   if ((p.x - (tx + 0.5)) ** 2 + (p.y - (ty + 0.5)) ** 2 > (gs.data.building.reach + 0.5) ** 2) return 'För långt bort';
-  const lock = mpStructureLock(def, p.ch.level);
+  const lock = mpStructureLock(def, p.ch.level, p.ch.extra.components);
   if (lock) return lock;
   const claims = gs.claims();
   if (def.id === 'banner') {
@@ -307,7 +308,7 @@ function upgradeCheck(gs, p, clan, st) {
   if (!canDo(role, 'build')) return { problem: 'Du får inte bygga här' };
   const to = upgradeDef(gs.data, st.def);
   if (!to) return { problem: `${st.def.name} går inte att förstärka mer` };
-  const lock = mpStructureLock(to, p.ch.level);
+  const lock = mpStructureLock(to, p.ch.level, p.ch.extra.components);
   if (lock) return { problem: `${to.name}: ${lock.toLowerCase()}` };
   if (st.rt.lastHit > gs.time - 10) return { problem: 'Inte medan basen anfalls' };
   return { to, cost: upgradeCost(gs.data, st.def, to) };
@@ -429,11 +430,16 @@ function runTurret(gs, st, dt, now) {
   rt.cd = spec.interval;
   const lead = Math.sqrt(bestD) / spec.speed;
   const angle = Math.atan2(best.y + (best.vy ?? 0) * lead - cy, best.x + (best.vx ?? 0) * lead - cx);
-  combat.spawnProjectile(gs, {
-    x: cx, y: cy, angle, speed: spec.speed, damage: turretDamage(gs, st), range: spec.range + 1,
-    size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, turret: st.sid, clanId: st.clanId, element: spec.element ?? 'physical',
-    color: spec.color, status: spec.status ?? null, kind: 'shot', source: 'turret',
-  });
+  // A Prism Relay of the clan next to it: harder hits and two lighter shots fanning out.
+  const relay = relayFor(gs.world, st);
+  const damage = turretDamage(gs, st) * (1 + (relay?.damage ?? 0));
+  for (const [off, k] of [[0, 1], ...(relay?.split ? [[-0.2, 0.4], [0.2, 0.4]] : [])]) {
+    combat.spawnProjectile(gs, {
+      x: cx, y: cy, angle: angle + off, speed: spec.speed, damage: damage * k, range: spec.range + 1,
+      size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, turret: st.sid, clanId: st.clanId, element: spec.element ?? 'physical',
+      color: off ? '#7ae8ff' : spec.color, status: spec.status ?? null, kind: 'shot', source: 'turret',
+    });
+  }
   gs.event(cx, cy, { k: 'turret', sid: st.sid, aim: angle }, 30);
 }
 

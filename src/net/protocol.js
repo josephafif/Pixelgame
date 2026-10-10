@@ -12,7 +12,7 @@
 
 import { Writer, Reader } from './codec.js';
 
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 export const MSG = { INPUT: 1, SNAPSHOT: 2 };
 
 /** Entity types in snapshots. */
@@ -53,7 +53,7 @@ export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FO
 /** Enemy animation states. */
 export const ESTATE = ['move', 'windup', 'charge', 'fade', 'cast', 'idle'];
 /** Pickup kinds. */
-export const PICKUP_KINDS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shard', 'heart', 'weapon', 'bag', 'egg', 'component', 'mapscroll'];
+export const PICKUP_KINDS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shard', 'heart', 'weapon', 'bag', 'egg', 'component', 'mapscroll', 'prismite', 'spores', 'aether'];
 /** Pal states on the wire. */
 export const PAL_STATES = ['follow', 'fight', 'gather', 'down'];
 /** Projectile sprites. */
@@ -64,7 +64,7 @@ export const AREA_KINDS = ['telegraph', 'hazard', 'cloud', 'quake', 'ring', 'por
  * An area's 'extra' field: a count (blades, orbs) in the low 4 bits, flags,
  * and how fast it spins (× 2) from bit 9.
  */
-export const AF = { COUNT: 15, BIG: 16, FLOWER: 32, LAVA: 64, FOLLOW: 128, LINE: 256, SPIN_SHIFT: 9 };
+export const AF = { COUNT: 15, BIG: 16, FLOWER: 32, LAVA: 64, FOLLOW: 128, LINE: 256, SPIN_SHIFT: 9, LASER: 8192 };
 /** Market people's flags. */
 export const NPCF = { MOVING: 1, HURT: 2 };
 /** Horse flags. */

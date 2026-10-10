@@ -3,6 +3,7 @@
 
 import { hashString } from '../core/rng.js';
 import { validateDna } from '../weapons/dna.js';
+import { WORLD_GEN } from '../game/world.js';
 
 export const SAVE_SCHEMA = 1;
 export const SAVE_KEY = 'save:main';
@@ -45,12 +46,14 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     player: { level: 1, xp: 0, hp: null, x: 0.5, y: 1.6, spawnX: 0.5, spawnY: 1.6, kills: 0, deaths: 0, playTime: 0, sailing: false },
     inventory: { equipped: null, secondary: null, activeSlot: 'main', bag: [], storage: [], bagSize: 24, storageSize: 120, favorites: [], unseen: [] },
     codex: { weapons: {}, modifiers: [], effects: [], abilities: [] },
-    resources: { scrap: 0, essence: 0, wood: 0, stone: 0, gold: 0, shards: 0 },
+    resources: { scrap: 0, essence: 0, wood: 0, stone: 0, gold: 0, shards: 0, prismite: 0, spores: 0, aether: 0 },
     components: {},
     bosses: { defeated: {} },
     // explored: chunk keys "cx,cy" you have seen (for the map); pins: your map markers.
     // altars: altars whose boss you have beaten (each altar can be beaten once).
-    world: { chests: [], shrines: [], harvested: {}, explored: [], pins: [], found: [], altars: [] },
+    // gen: the world's generation version; genMarks: [[version, n]] — the first n
+    // explored chunks were seen in that version (they keep their land).
+    world: { chests: [], shrines: [], harvested: {}, explored: [], pins: [], found: [], altars: [], gen: WORLD_GEN, genMarks: [] },
     // Per-market state: { visited, hostileUntil, stockPeriod, bought: [] }.
     markets: {},
     abilityState: { cooldowns: {} },
@@ -112,6 +115,16 @@ export function fillDefaults(save) {
   out.base.owed = { ...(save.base?.owed ?? {}) };
   out.base.workers = Array.isArray(save.base?.workers) ? save.base.workers.map((w) => ({ ...w })) : [];
   out.world.harvested = { ...(save.world?.harvested ?? {}) };
+  // An older world is upgraded to the new generation (the far lands), but
+  // everything you had already explored keeps the land it had.
+  const savedGen = Number.isInteger(save.world?.gen) ? save.world.gen : 1;
+  out.world.genMarks = Array.isArray(save.world?.genMarks) ? save.world.genMarks.map((m) => [...m]) : [];
+  if (savedGen < WORLD_GEN) {
+    out.world.genMarks.push([savedGen, (out.world.explored ?? []).length]);
+    out.world.gen = WORLD_GEN;
+  } else {
+    out.world.gen = savedGen;
+  }
   // Older saves: a boss you beat was beaten at its great altar.
   if (!Array.isArray(save.world?.altars)) out.world.altars = Object.keys(save.bosses?.defeated ?? {}).map((id) => `a:${id}`);
   out.pals.eggs = Array.isArray(save.pals?.eggs) ? save.pals.eggs.map((e) => ({ ...e })) : [];

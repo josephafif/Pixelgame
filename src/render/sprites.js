@@ -176,6 +176,28 @@ const MAPS = {
     '...ohhhho.ohhhho..',
     '...oooooo.oooooo..',
   ],
+  // The Prism Warden: a floating crystal guardian with a burning gold core.
+  prism: [
+    '........oo........',
+    '.......ohho.......',
+    '......ohrrvo......',
+    '.....ohrrrvvo.....',
+    '....ohrrrrrvvo....',
+    '....orrreerrvo....',
+    '.....orrrrrvo.....',
+    '..o...orrrro...o..',
+    '.oho.oorrrroo.ovo.',
+    'ohhoohrrrrrrvoovvo',
+    '.oo.ohrrRRrrvo.oo.',
+    '....ohrrRRrrvo....',
+    '....ohrryyrrvo....',
+    '....ohrrRRrrvo....',
+    '.....ohrrrrvo.....',
+    '......ohrrvo......',
+    '.......orro.......',
+    '........oo........',
+    '..g..........g....',
+  ],
   // Sand Wyrm: a segmented worm rearing out of a sand mound.
   wyrm: [
     '......oooooo......',
@@ -479,6 +501,29 @@ const MAPS = {
     'okkkkko',
     '.ooooo.',
   ],
+  // The far lands' materials (G: the pickup's colour).
+  prismite: [
+    '..o..',
+    '.oGo.',
+    'oGwGo',
+    'oGGgo',
+    'oGggo',
+    '.ooo.',
+  ],
+  spores: [
+    '.ooo.',
+    'oGwGo',
+    'oGGgo',
+    '.ogo.',
+    '.o.o.',
+  ],
+  aether: [
+    '..o..',
+    '.owo.',
+    'oGwGo',
+    '.oGo.',
+    '..o..',
+  ],
   // A torn old map (a rare find: it shows a new part of the world).
   mapscroll: [
     '.oooooooo.',
@@ -584,6 +629,7 @@ const BOSS_SHAPES = {
   thornmother: 'thorn',
   sand_wyrm: 'wyrm',
   tide_leviathan: 'leviathan',
+  prism_warden: 'prism',
 };
 
 export function bossSprites(bossId, color) {
@@ -600,6 +646,7 @@ export function bossSprites(bossId, color) {
     if (shape === 'thorn') Object.assign(pal, { h: '#7a5232', H: '#4a3018', e: '#ffe45c', y: '#ff7ad8', g: '#c8f59a', t: '#e8e0c8' });
     if (shape === 'lich') Object.assign(pal, { h: '#e8e4d4', H: '#a8a090', e: '#ff4040', g: '#ffd24a', t: '#161622' });
     if (shape === 'leviathan') Object.assign(pal, { h: '#bfe8ff', g: '#7ad8ff', e: '#ffe45c', w: '#e8f8ff', W: '#3a78c8' });
+    if (shape === 'prism') Object.assign(pal, { h: '#e8fbff', r: '#9ae8ff', R: '#5ab0d0', v: '#c09aff', y: '#ffd27a', e: '#ffffff', g: '#ffd27a' });
     const base = spriteFromMap(MAPS[shape], pal);
     const right = scaled(base, 2);
     return { right, left: flipped(right), flash: silhouette(right) };

@@ -2,7 +2,7 @@
 // send what they want to do; everything that happens is decided here.
 
 import { randomBytes } from 'node:crypto';
-import { World, CHUNK, tileKey } from '../src/game/world.js';
+import { World, CHUNK, tileKey, WORLD_GEN } from '../src/game/world.js';
 import { TICK_RATE, TICK_DT, TICK_MS } from '../src/net/movement.js';
 import { parseRaidWindow, raidState, inSafeZone } from '../src/net/rules.js';
 import { structureDef } from '../src/game/construction.js';
@@ -94,9 +94,11 @@ export class GameServer {
     // The world seed is public (clients generate the terrain themselves);
     // the secret seed places loot and is never sent.
     let seed = Number(db.meta('worldSeed'));
-    if (!db.meta('worldSeed')) {
+    const brandNew = !db.meta('worldSeed');
+    if (brandNew) {
       seed = config.worldSeed ?? randomBytes(4).readUInt32BE(0);
       db.setMeta('worldSeed', seed);
+      db.setMeta('worldGen', WORLD_GEN);
     }
     let secret = Number(db.meta('secretSeed'));
     if (!db.meta('secretSeed')) {
@@ -105,7 +107,11 @@ export class GameServer {
     }
     if (!db.meta('guestSecret')) db.setMeta('guestSecret', randomBytes(32).toString('hex'));
     this.worldSeed = seed >>> 0;
-    this.world = new World(data, this.worldSeed, { secretSeed: secret >>> 0, maxChunks: 900, townBuildings: Object.keys(TOWN_LEVELS), townMarket: townMarket(this.worldSeed) });
+    this.#upgradeWorldGen(db);
+    this.world = new World(data, this.worldSeed, {
+      secretSeed: secret >>> 0, maxChunks: 900, townBuildings: Object.keys(TOWN_LEVELS), townMarket: townMarket(this.worldSeed),
+      gen: this.worldGen, legacy: this.legacy,
+    });
 
     // Harvested trees/rocks, spent altars, opened chests.
     for (const h of db.loadHarvested()) this.world.harvested[`${h.x},${h.y}`] = [h.at, h.tile];
@@ -119,6 +125,33 @@ export class GameServer {
     building.loadStructures(this);
     // Workers hired at the clans' lodges.
     workers.syncAll(this);
+  }
+
+  /**
+   * An older world gets the far lands too, but no clan base may end up in
+   * new land: the chunks around every claim and structure keep the land
+   * they had (saved, and sent to every client with the welcome).
+   */
+  #upgradeWorldGen(db) {
+    let gen = Number(db.meta('worldGen') ?? 1) || 1;
+    const legacy = new Map(JSON.parse(db.meta('legacyChunks') ?? '[]'));
+    if (gen < WORLD_GEN) {
+      const reach = (this.rules?.claimRadius ?? 16) + 16;
+      for (const st of db.loadStructures()) {
+        const r = st.id === 'banner' ? reach : 0;
+        for (let cy = Math.floor((st.y - r) / CHUNK); cy <= Math.floor((st.y + r) / CHUNK); cy++) {
+          for (let cx = Math.floor((st.x - r) / CHUNK); cx <= Math.floor((st.x + r) / CHUNK); cx++) {
+            const key = `${cx},${cy}`;
+            if (!legacy.has(key)) legacy.set(key, gen);
+          }
+        }
+      }
+      db.setMeta('legacyChunks', JSON.stringify([...legacy]));
+      db.setMeta('worldGen', WORLD_GEN);
+      gen = WORLD_GEN;
+    }
+    this.worldGen = gen;
+    this.legacy = legacy;
   }
 
   newId() {

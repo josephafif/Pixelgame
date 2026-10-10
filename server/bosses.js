@@ -6,6 +6,8 @@
 import * as combat from './combat.js';
 import { applyPlayerStatus } from './players.js';
 import { spawnEnemy } from './enemies.js';
+import { segmentDist2 } from '../src/core/math.js';
+import { laserField, LASER_WIDTH } from '../src/game/lasers.js';
 
 const FX_RADIUS = 34;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -98,6 +100,21 @@ function pattern(gs, b, p, name) {
     if (!b.dead && gs.enemies.has(b.id)) fn();
   });
   switch (name) {
+    case 'lasers': {
+      // Laser fields around one of the fighters (as in single player).
+      const t = someone(gs, b, p);
+      for (const beam of laserField(t.x, t.y, b.phase)) {
+        warn(gs, b, { shape: 'line', laser: true, x: beam.x, y: beam.y, x2: beam.x2, y2: beam.y2, r: LASER_WIDTH, dur: beam.delay, color: beam.color }, () => {
+          fx(gs, beam.x, beam.y, [add({ type: 'line', points: [[beam.x, beam.y], [beam.x2, beam.y2]], color: beam.color, dur: 0.25, width: 4 }), snd('zap', { throttle: 80 })]);
+          for (const o of gs.playersNear((beam.x + beam.x2) / 2, (beam.y + beam.y2) / 2, 15)) {
+            if (o.dead || segmentDist2(o.x, o.y, beam.x, beam.y, beam.x2, beam.y2) > (LASER_WIDTH + o.r) ** 2) continue;
+            combat.hurtPlayer(gs, o, b.dmg * 1.2, { element: b.element, fromX: b.x, fromY: b.y });
+          }
+        });
+      }
+      fx(gs, b.x, b.y, [snd('hum')]);
+      return b.phase === 2 ? 3.2 : 2.6;
+    }
     case 'ring': {
       const waves = b.phase === 2 ? 3 : 2;
       for (let w = 0; w < waves; w++) {

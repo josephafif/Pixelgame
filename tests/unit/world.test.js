@@ -27,7 +27,7 @@ test('the camp is open ground with every base building, and every boss has an ar
     const cy = Math.floor(b.y / CHUNK);
     assert.ok(world.getChunk(cx, cy).objects.some((o) => o.type === 'building' && o.buildingId === b.id), b.id);
   }
-  assert.equal(world.landmarks.length, data.bosses.length);
+  assert.equal(world.landmarks.length, data.bosses.filter((b) => !b.far).length);
   for (const lm of world.landmarks) {
     const cx = Math.floor(lm.x / CHUNK);
     const cy = Math.floor(lm.y / CHUNK);

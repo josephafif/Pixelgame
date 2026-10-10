@@ -15,6 +15,7 @@ const COLORS = {
   [T.WATER]: '#3f7fd0', [T.LAVA]: '#ff6a2a', [T.TREE]: '#2f6e2c', [T.PINE]: '#2a5a3a', [T.ROCK]: '#8d8a9e',
   [T.CACTUS]: '#5f9a40', [T.CRYSTAL]: '#9a5cff', [T.SEA]: '#2f8fc4', [T.DEEP]: '#1d4e8c', [T.PALM]: '#3f9a44',
   [T.OBSIDIAN]: '#3a2a52', [T.ORE]: '#9a7a5a', [T.STARSTONE]: '#ffd24a',
+  [T.PRISMSAND]: '#e2dbee', [T.PRISMGLASS]: '#c4dfec', [T.PRISM]: '#7ae8ff', [T.MIRROR]: '#e8fbff',
 };
 
 // Chunk images (1 px per tile), kept for the session.
@@ -23,7 +24,7 @@ const chunkImages = new Map();
 const chunkColors = new Map();
 const BIOME_COLORS = {
   plains: '#4f9a44', forest: '#3c7437', desert: '#e3c886', snow: '#eef4fa', volcanic: '#4a4450',
-  highlands: '#6e8f5a', void: '#3a2a52', isles: '#5fb050',
+  highlands: '#6e8f5a', void: '#3a2a52', isles: '#5fb050', prism: '#e2dbee', fen: '#2f6a62', skyreach: '#c8d8ec',
 };
 const FAR_ZOOM = 1.25;
 

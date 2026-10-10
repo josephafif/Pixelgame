@@ -231,6 +231,36 @@ Kod: `src/game/sailing.js` (båtar, sjösättning, landstigning), `World#seaAt` 
 `src/game/world.js` (hav och öar), `src/render/boats.js` (grafik), hajar och sjöormar i
 `src/game/enemies.js`.
 
+## Fjärrländerna: tre nya biomer
+
+Långt ute, mer än 280 rutor från lägret, växer **fjärrländerna**. Varje värld har en säker region
+av varje sort cirka 350–400 rutor ut, åt olika håll, och fler regioner här och där längre ut.
+Planen och designen finns i [`docs/EXPANSION.md`](docs/EXPANSION.md).
+
+**Prism Barrens** (ute nu) är en kristallöken med blek, glittrande sand och glasslätter.
+
+- **Spegelkristaller** studsar skott och energiattacker. Skottet blir lite starkare för varje
+  studs, upp till fyra gånger. Skjut runt hörn, eller låt ett monsters skott studsa tillbaka: då
+  träffar det monster i stället för dig.
+- **Prismakristaller** (Steel Pickaxe) och spegelkristaller (Mythril) ger **Prismite**, fjärrländernas
+  första material. Det syns i resursraden när du har något.
+- Fiender: **Shardling** (små kristallkrypare i flock som spricker i skärvor när de dör),
+  **Refractor** (svävande prisma som skjuter på avstånd) och elitfienden **Mirror Knight**, vars
+  spegelsköld skickar en del av dina skott tillbaka.
+- Bossen **The Prism Warden** dyker upp vid de mindre altarna i Prism Barrens. Den lägger
+  **laserfält**: glödande linjer över arenan som avfyras efter ett ögonblick. Ställ dig i en lucka.
+  Den har också spegelbilder, ringar och spiraler av skott. Den släpper minst episka vapen och
+  bosskärnan Prism Heart.
+- **Prism Lens** (i Prism Barrens) och Prism Heart lär smedjan förmågan **Prism Split**: slaget
+  delar sig i en solfjäder av prismabultar, och de bästa varianterna studsar vidare till nästa
+  fiende.
+- **Prism Relay** (ritningen *Blueprint: Prism Relay*, forskas fram i biblioteket) är en tornmodul.
+  Ställ den intill ett torn, så slår tornet 25 % hårdare och skjuter tre skott.
+
+Gamla världar får fjärrländerna, men allt du redan har utforskat ser ut precis som förut. I
+multiplayer behåller marken runt varje klanbas sitt gamla utseende. Mireglass Fen och Skyreach
+kommer härnäst.
+
 ## Hästar
 
 Flockar med **vilda hästar** (två till fyra) betar här och där i världen, ungefär en per hundra
@@ -317,7 +347,11 @@ När bossen är död tystnar altaret, och för att slåss igen måste du hitta e
 | **Sand Wyrm** | Sunscar Desert | Dyker ned i sanden och bryter upp under dig (spring från den mullrande cirkeln), skalv som rullar ut i ringar, sandspott |
 | **Tide Leviathan** | Sunken Isles | Vattenväggar sveper över ön (hitta luckan), gejsrar under fötterna och virvlar som drar in dig |
 
-De nya bossarna har egna boss-kärnor till Forge (Bone Crown, Heartwood, Wyrm Fang, Tide Pearl).
+Fjärrländerna har egna bossar som bara dyker upp vid de mindre altarna i sitt land:
+**The Prism Warden** i Prism Barrens (laserfält, spegelbilder, ringar och spiraler).
+
+De nya bossarna har egna boss-kärnor till Forge (Bone Crown, Heartwood, Wyrm Fang, Tide Pearl,
+Prism Heart).
 Bossar släpper alltid ett vapen, minst sällsynt (rare), med 30 % chans till episkt och 3 % till
 legendariskt.
 
@@ -497,6 +531,7 @@ blinkande "!" innan den rusar). Grafiken finns i `src/render/creatures.js` och b
 | Stormpeaks | **Harpy** (dyker), **Stone Golem** (tung laddning), Bat, Skeleton |
 | Voidreach | **Void Eye** (svävar och skjuter), **Shade** (bleknar bort och dyker upp bakom dig), Wisp, Bat |
 | Sunken Isles | **Reef Crab** (går i sidled och nyper), Slime, Bat |
+| Prism Barrens | **Shardling** (flock, spricker i skärvor), **Refractor** (prisma som skjuter), **Mirror Knight** (elit, kastar tillbaka skott) |
 
 Elementvarianter färgas i elementets färg men behåller en ton av sin egen, så de går att känna
 igen. Hur många som dyker upp tillsammans styrs av `group` (vargar kommer 2–4 åt gången, golems
@@ -617,6 +652,13 @@ I multiplayer går servern med byborna; alla ser samma by. Logik: `src/game/vill
 
 ## Gränssnitt och animationer
 
+- **Rik grafik** (Settings → Graphics, *Rich* som standard): djupare och mjukare mark med stora
+  ljusa och mörka fläckar, mörkare skogsbotten under och mellan träden, fransiga kanter där två
+  sorters mark möts, skum och ljusare grunt vatten vid stränderna, glöd runt lava och fylligare
+  träd, granar, palmer och stenblock med kontur, ljus och slagskugga. Kronorna når in i rutan
+  ovanför, så skogen sluter sig, och en svag vinjett ramar in bilden. Allt ritas en gång per chunk
+  (`src/render/terrain-rich.js`), så det kostar inget per bildruta. Kollision och regler är
+  desamma. *Classic* ger det gamla utseendet.
 - **Pixelgränssnitt:** typsnittet Pixelify Sans (OFL, ligger i `fonts/` så det fungerar offline;
   siffran 5 är omritad eftersom originalet var lätt att förväxla med 8 och S),
   pixelramar som 9-slice-SVG:er och egna pixelikoner (`src/ui/icons.js`), inga emoji.

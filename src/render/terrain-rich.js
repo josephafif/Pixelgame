@@ -28,6 +28,8 @@ const RICH_GROUND = {
   [T.SNOW]: { base: '#e6eef6', tones: ['#d8e2ee', '#f2f6fb', '#dfe8f2'], pebbles: ['#c4d2e2'] },
   [T.ASH]: { base: '#45404b', tones: ['#3d3843', '#504a56', '#3a3540'], embers: '#ff7a3a' },
   [T.VOIDMOSS]: { base: '#36284c', tones: ['#2f2242', '#3f3058', '#33264a'], tuft: ['#55407a', '#261c38'] },
+  [T.PRISMSAND]: { base: '#e2dbee', tones: ['#d6cde8', '#ece6f6', '#dcd4ec'], pebbles: ['#c4b8dc'], glints: ['#7ae8ff', '#ff9ad8', '#ffd27a'] },
+  [T.PRISMGLASS]: { base: '#c4dfec', tones: ['#b6d6e6', '#d4eaf4', '#bcdaea'], ripples: '#a6cce0', glints: ['#ffffff', '#7ae8ff'] },
 };
 
 function drawRichGround(ctx, style, rng) {
@@ -87,6 +89,13 @@ function drawRichGround(ctx, style, rng) {
     ctx.fillStyle = style.ripples;
     for (let i = 0; i < 3; i++) ctx.fillRect(rng.int(0, 8), rng.int(2, 14), rng.int(4, 8), 1);
   }
+  if (style.glints) {
+    for (let i = 0; i < 2; i++) {
+      if (!rng.chance(0.6)) continue;
+      ctx.fillStyle = rng.pick(style.glints);
+      ctx.fillRect(rng.int(1, 14), rng.int(1, 14), 1, 1);
+    }
+  }
   if (style.embers && rng.chance(0.5)) {
     ctx.fillStyle = style.embers;
     ctx.fillRect(rng.int(1, 14), rng.int(1, 14), 1, 1);
@@ -114,15 +123,15 @@ function groundColor(id) {
 }
 
 /** Ground kinds that blend into each other at their edges (not paving or the camp). */
-const FRAYS = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ICE, T.ASH, T.BASALT, T.VOIDSTONE, T.VOIDMOSS, T.PATH]);
+const FRAYS = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ICE, T.ASH, T.BASALT, T.VOIDSTONE, T.VOIDMOSS, T.PATH, T.PRISMSAND, T.PRISMGLASS]);
 /** Grass and its kin count as one ground (they already look alike). */
 const FAMILY = { [T.FLOWERS]: T.GRASS, [T.MOSS]: T.GRASS };
 
 /** Pale grounds (shade shows strongly on them). */
-const LIGHT = new Set([T.SNOW, T.ICE, T.SAND, T.SAND2]);
+const LIGHT = new Set([T.SNOW, T.ICE, T.SAND, T.SAND2, T.PRISMSAND, T.PRISMGLASS]);
 
 /** Grounds that get the big light and dark patches (natural ground, not paving). */
-const PATCHY = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ASH, T.VOIDMOSS, T.VOIDSTONE, T.BASALT]);
+const PATCHY = new Set([T.GRASS, T.FLOWERS, T.MOSS, T.ROCKGRASS, T.SAND, T.SAND2, T.SNOW, T.ASH, T.VOIDMOSS, T.VOIDSTONE, T.BASALT, T.PRISMSAND]);
 
 // Smooth value noise over world pixels (a few tiles per bump), for the patches.
 function lattice(seed, x, y) {
@@ -146,7 +155,7 @@ function vnoise(seed, x, y) {
 // --- Upright things: trees, boulders and the rest ------------------------------------------
 
 /** Tiles drawn standing up (with a shadow), in row order, over the ground. */
-const UPRIGHT = new Set([T.TREE, T.PINE, T.PALM, T.ROCK, T.CACTUS, T.CRYSTAL, T.OBSIDIAN, T.ORE, T.STARSTONE]);
+const UPRIGHT = new Set([T.TREE, T.PINE, T.PALM, T.ROCK, T.CACTUS, T.CRYSTAL, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM, T.MIRROR]);
 /** How far (in tiles) a tile's shading reaches its neighbours. */
 const SHADES = new Set([T.TREE, T.PINE, T.PALM, T.ROCK, T.ORE, T.OBSIDIAN]);
 

@@ -26,6 +26,7 @@ export const HOOK_ACTIONS = new Set([
 
 export const ABILITY_ACTIONS = new Set([
   'meteor', 'blink', 'blackhole', 'clone', 'quake', 'phoenix', 'storm', 'frostnova', 'bladering', 'timewarp',
+  'prismsplit',
 ]);
 
 export const WEAPON_STATS = new Set([

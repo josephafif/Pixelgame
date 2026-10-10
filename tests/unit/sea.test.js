@@ -97,7 +97,8 @@ test('every boss has its own shape, patterns and a tip', () => {
     assert.ok(b.patterns.length >= 4, b.id);
     assert.ok(b.tip, `${b.id} has a tip`);
     sigs.add([...new Set(b.patterns)].sort().join(','));
-    assert.equal(b.drop.minRarity, 'rare', 'boss drops are not guaranteed epics');
+    // (The far lands' bosses are harder, and their drops a step better.)
+    assert.equal(b.drop.minRarity, b.far ? 'epic' : 'rare', 'boss drops are not guaranteed epics');
   }
   assert.equal(sigs.size, data.bosses.length, 'no two bosses fight the same way');
 });

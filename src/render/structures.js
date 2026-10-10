@@ -234,6 +234,24 @@ function torch(g) {
   rect(g, 6, 22, 4, 2, O);
 }
 
+/** A Prism Relay: a crystal on a stone plinth, humming with light. */
+function prismRelay(g) {
+  // Plinth.
+  rect(g, 2, 17, 12, 7, O);
+  rect(g, 3, 18, 10, 5, '#8a8a96');
+  rect(g, 3, 18, 10, 1, '#b0b0bc');
+  rect(g, 3, 22, 10, 1, '#5d5a6e');
+  // The crystal.
+  rect(g, 5, 2, 6, 16, O);
+  rect(g, 4, 6, 8, 10, O);
+  rect(g, 6, 3, 4, 14, '#7ae8ff');
+  rect(g, 5, 7, 6, 8, '#7ae8ff');
+  rect(g, 6, 3, 1, 14, '#e8fbff');
+  rect(g, 9, 6, 2, 9, '#c09aff');
+  rect(g, 7, 9, 2, 3, '#ffd27a');
+  rect(g, 7, 4, 1, 1, '#ffffff');
+}
+
 function banner(g) {
   rect(g, 2, 1, 2, 22, '#8a5a33');
   rect(g, 2, 1, 1, 22, '#b07a48');
@@ -441,6 +459,7 @@ export function structureSprite(id, mask = 0, state = 0, tint = null) {
     case 'ballista': ballistaBase(g); break;
     case 'flame_turret': turretBase(g, true); break;
     case 'torch': torch(g); break;
+    case 'prism_relay': prismRelay(g); break;
     case 'banner': banner(g); break;
     case 'wood_floor': woodFloor(g); break;
     case 'stone_floor': stoneFloor(g); break;

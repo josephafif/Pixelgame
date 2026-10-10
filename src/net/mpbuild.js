@@ -25,6 +25,7 @@ const MP_OVERRIDES = {
   iron_gate: { mpLevel: 8, name: 'Järngrind', desc: 'Järnbeslagen grind. Öppnas bara för din klan och tål mycket mer.' },
   ballista: { mpLevel: 10, name: 'Ballista', desc: 'Tung pilkastare: lång räckvidd och hårda träffar.' },
   iron_spikes: { mpLevel: 7, name: 'Järnspikar', desc: 'Vassare och starkare spikar, perfekt vid grindarna.' },
+  prism_relay: { mpLevel: 12, name: 'Prismarelä', desc: 'Ställ det intill ett torn: tornet slår 25 % hårdare och skjuter tre skott.' },
 };
 
 /** Structure definitions as used in multiplayer. */
@@ -45,7 +46,8 @@ export function mpGameData(data) {
   return { ...data, building: { ...data.building, structures: mpStructureDefs(data), maxStructures: 400 } };
 }
 
-/** Level lock text for a structure, or null. */
-export function mpStructureLock(def, level) {
+/** Level (or blueprint) lock text for a structure, or null. `components`: the character's found components. */
+export function mpStructureLock(def, level, components = {}) {
+  if (def.blueprint && !components?.[def.blueprint]?.researched) return 'Kräver ritningen (forska fram den i biblioteket)';
   return def.mpLevel && level < def.mpLevel ? `Kräver nivå ${def.mpLevel}` : null;
 }

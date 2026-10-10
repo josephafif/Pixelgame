@@ -1,7 +1,8 @@
 // Enemies: spawning around the player, simple readable AI per behaviour,
 // elemental variants per biome, elites, and multi-phase bosses.
 
-import { dist2, normalize, angleTo } from '../core/math.js';
+import { dist2, normalize, angleTo, segmentDist2 } from '../core/math.js';
+import { laserField, LASER_WIDTH } from './lasers.js';
 import { tickStatuses } from './status.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
 import { creatureSprites, hasCreature } from '../render/creatures.js';
@@ -36,6 +37,8 @@ function scaleFor(level) {
 export function spawnEnemy(game, defId, x, y, { level = 1, element = null, elite = false, biome = null } = {}) {
   const def = game.data.byId.enemies.get(defId);
   if (!def) return null;
+  // Some kinds are always elites (the Mirror Knight).
+  elite ||= Boolean(def.elite);
   let el = element;
   if (!el && biome) {
     const nonPhysical = biome.elements.filter((e) => e !== 'physical');
@@ -598,6 +601,24 @@ function bossPattern(game, b, pattern) {
   const speed = b.phase === 2 ? 7 : 6;
   const color = b.color;
   switch (pattern) {
+    case 'lasers': {
+      // Laser fields: glowing lines across the arena, then they fire. Stand in a gap.
+      for (const beam of laserField(p.x, p.y, b.phase)) {
+        game.spawnArea('telegraph', {
+          owner: 'enemy', shape: 'line', laser: true, x: beam.x, y: beam.y, x2: beam.x2, y2: beam.y2, r: LASER_WIDTH, dur: beam.delay, color: beam.color,
+          onEnd: () => {
+            if (b.dead) return;
+            game.fx.add({ type: 'line', points: [[beam.x, beam.y], [beam.x2, beam.y2]], color: beam.color, dur: 0.25, width: 4 });
+            game.audio.play('zap', { throttle: 80 });
+            if (segmentDist2(p.x, p.y, beam.x, beam.y, beam.x2, beam.y2) <= (LASER_WIDTH + p.r) ** 2) {
+              game.hurtPlayer(b.dmg * 1.2, { element: b.element, fromX: b.x, fromY: b.y });
+            }
+          },
+        });
+      }
+      game.audio.play('hum');
+      return b.phase === 2 ? 3.2 : 2.6;
+    }
     case 'ring': {
       const waves = b.phase === 2 ? 3 : 2;
       for (let w = 0; w < waves; w++) {

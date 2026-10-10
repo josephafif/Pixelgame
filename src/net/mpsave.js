@@ -9,7 +9,8 @@
 
 import { baseBonuses } from '../game/base.js';
 
-export const MP_RESOURCE_KEYS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shards'];
+import { FAR_RESOURCES } from '../game/resources.js';
+export const MP_RESOURCE_KEYS = ['essence', 'scrap', 'wood', 'stone', 'gold', 'shards', ...FAR_RESOURCES];
 
 export function emptyPals() {
   return { eggs: [], owned: [], active: null, mode: 'fight', nextId: 1 };
