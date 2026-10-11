@@ -2,6 +2,9 @@
 // "+3 WOOD"). Drawing text into the low-res game buffer keeps it crisp and
 // on the pixel grid.
 
+import { createCanvas, ctx2d } from './canvas.js';
+import { noHd } from './hd.js';
+
 const GLYPHS = {
   0: ['111', '101', '101', '101', '111'],
   1: ['010', '110', '010', '010', '111'],
@@ -50,10 +53,8 @@ export function textWidth(text) {
   return text.length * 4 - 1;
 }
 
-/** Draws `text` with a 1px dark outline at integer game-pixel coords. */
-export function drawPixelText(ctx, text, x, y, color, outline = '#161622') {
-  x = Math.round(x - textWidth(text) / 2);
-  y = Math.round(y);
+/** Paints `text` (outlined) into `ctx` with its top-left glyph at (x, y). */
+function paint(ctx, text, x, y, color, outline) {
   for (const pass of [0, 1]) {
     ctx.fillStyle = pass ? color : outline;
     let cx = x;
@@ -71,4 +72,32 @@ export function drawPixelText(ctx, text, x, y, color, outline = '#161622') {
       cx += 4;
     }
   }
+}
+
+// Each text is painted once into a little canvas and then drawn in one go:
+// damage numbers, names and loot labels on screen every frame would
+// otherwise be hundreds of tiny rectangles each.
+const sprites = new Map();
+const MAX_SPRITES = 400;
+
+function textSprite(text, color, outline) {
+  const key = `${text}\u0000${color}\u0000${outline}`;
+  let c = sprites.get(key);
+  if (c) return c;
+  if (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined') return null;
+  c = createCanvas(textWidth(text) + 2, 7);
+  paint(ctx2d(c), text, 1, 1, color, outline);
+  noHd(c); // (kept exactly as drawn: crisp, like the rest of the text)
+  if (sprites.size >= MAX_SPRITES) sprites.delete(sprites.keys().next().value);
+  sprites.set(key, c);
+  return c;
+}
+
+/** Draws `text` with a 1px dark outline at integer game-pixel coords. */
+export function drawPixelText(ctx, text, x, y, color, outline = '#161622') {
+  x = Math.round(x - textWidth(text) / 2);
+  y = Math.round(y);
+  const c = textSprite(String(text), color, outline);
+  if (c) ctx.drawImage(c, x - 1, y - 1);
+  else paint(ctx, text, x, y, color, outline);
 }

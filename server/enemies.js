@@ -10,7 +10,8 @@ import { mixHex } from '../src/weapons/visuals.js';
 import * as combat from './combat.js';
 import { updateBoss, expireClones } from './bosses.js';
 import { scaryLights, shunLight, litBy } from '../src/game/lights.js';
-import { spawnFactor, darknessAt, hourAt } from '../src/game/daynight.js';
+import { darknessAt, hourAt } from '../src/game/daynight.js';
+import { wildTarget, seaTarget, sightOf } from '../src/game/wilds.js';
 
 const LEASH = 1.8;
 const DESPAWN_DIST = 42;
@@ -317,7 +318,7 @@ function goToward(gs, e, tx, ty, speed) {
 // --- Behaviour -------------------------------------------------------------------------------
 
 function pickTarget(gs, e) {
-  const sight = e.def.sight ?? 7;
+  const sight = sightOf(e.def);
   let t = e.target ? gs.players.get(e.target) : null;
   const sea = Boolean(e.def.sea);
   if (t && (t.dead || inSafeZone(gs.rules, t.x, t.y) || (sea && !t.sailing))) t = null;
@@ -766,7 +767,7 @@ function spawnAtSea(gs, p) {
     sea++;
     if (e.kind === 'serpent') serpents++;
   }
-  if (sea >= Math.round(Math.min(6, 2 + Math.floor(wl / 2)))) return;
+  if (sea >= seaTarget(wl)) return;
   for (let attempt = 0; attempt < 6; attempt++) {
     const a = Math.random() * Math.PI * 2;
     const d = 11 + Math.random() * 5;
@@ -797,9 +798,9 @@ export function spawn(gs) {
   const claims = gs.claims();
   const baseR2 = (gs.rules.claimRadius + 4) ** 2;
   const inBase = (x, y) => claims.some((c) => (x - c.x) ** 2 + (y - c.y) ** 2 <= baseR2);
-  // Fewer by day, many more at night (src/game/daynight.js); never in a fire's light.
+  // Fewer by day, more at night (src/game/wilds.js); never in a fire's light.
   const now = Date.now();
-  const night = spawnFactor(darknessAt(hourAt(now)));
+  const darkness = darknessAt(hourAt(now));
   const lights = scaryLights(gs.world, now);
   for (const p of gs.players.values()) {
     if (p.dead || p.asleep || inSafeZone(gs.rules, p.x, p.y)) continue;
@@ -813,7 +814,8 @@ export function spawn(gs) {
     for (const e of gs.enemiesNear(p.x, p.y, 20)) if (!e.boss) alive++;
     for (const o of gs.playersNear(p.x, p.y, 20)) if (o !== p && !o.dead) others++;
     // Groups share the monsters around them (a bit more than alone, not double).
-    const target = Math.round(Math.min(22, 5 + wl * 1.6) * (1 + others * 0.35) * night);
+    const here = gs.world.biomeAt(Math.floor(p.x), Math.floor(p.y));
+    const target = wildTarget({ worldLevel: wl, others, darkness, biome: here });
     if (alive >= target) continue;
     for (let attempt = 0; attempt < 6; attempt++) {
       const a = Math.random() * Math.PI * 2;

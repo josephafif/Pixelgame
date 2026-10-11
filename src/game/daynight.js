@@ -42,9 +42,9 @@ export function glowAt(hour) {
   return Math.max(near(18.8), near(5.8));
 }
 
-/** How many monsters roam compared with the day's: fewer by day, many more at night. */
+/** How many monsters roam (wilds.js): fewer by day, more at night. */
 export function spawnFactor(darkness) {
-  return 0.65 + 0.95 * darkness;
+  return 0.7 + 0.55 * darkness;
 }
 
 /** 'day', 'dusk', 'night' or 'dawn'. */

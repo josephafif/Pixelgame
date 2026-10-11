@@ -8,17 +8,38 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-forests-light-1',
+  id: '2026-10-combat-feel-1',
   title: { sv: 'Fjärrländerna', en: 'The Far Lands' },
   teaser: {
-    sv: 'Nytt: levande skogar, dag och natt med varmt ljus från facklor och eldar, och skog som du kan röja för gott. Dessutom tre nya biomer långt ute.',
-    en: 'New: living forests, day and night with the warm light of torches and fires, and forests you can clear for good. And three new biomes far out.',
+    sv: 'Nytt: laddslag som i Minecraft, färre monster, mindre lagg, levande skogar och dag och natt med varmt ljus från facklor och eldar.',
+    en: 'New: charged blows as in Minecraft, fewer monsters, less lag, living forests, and day and night with the warm light of torches and fires.',
   },
   intro: {
     sv: 'Utforska långt ut, möt nya bossar, hitta ritningar och bygg upp basen. Allt finns i både singleplayer och multiplayer.',
     en: 'Explore far out, meet new bosses, find blueprints and build up your base. All of it in single player and multiplayer alike.',
   },
   sections: [
+    {
+      icon: 'sword',
+      title: { sv: 'Strid och spelkänsla', en: 'Combat and feel' },
+      items: [
+        {
+          live: true,
+          sv: '**Laddslag** (som i Minecraft): svärd, hammare, piskor och spjut kan slå så ofta du vill, men slaget tar full skada först när vapnet laddats upp igen (en liten mätare under dig). Ett snabbt slag till tar mindre, och bara ett fullt laddat slag kan bli kritiskt, knuffa och sätta igång vapnets effekter. Håller du inne knappen slår du fulla slag i vapnets takt.',
+          en: '**Charged blows** (as in Minecraft): swords, hammers, whips and spears swing as often as you like, but a blow only lands in full once the weapon has wound up again (a little bar under you). A quick extra swing hits softer, and only a fully wound blow can crit, knock back and set off the weapon\'s effects. Hold the button to swing full blows at the weapon\'s pace.',
+        },
+        {
+          live: true,
+          sv: '**Färre monster** i alla biomer, både på dagen och på natten (Prism Barrens har ännu färre), och de märker dig först när du kommer ganska nära.',
+          en: '**Fewer monsters** in every biome, by day and by night (the Prism Barrens even fewer), and they only notice you when you come fairly close.',
+        },
+        {
+          live: true,
+          sv: '**Mindre lagg**: kristallfälten i Prism Barrens, siffror och namn i världen, och när monster dör och tappar loot. Meddelanden är mindre och ligger i högerkanten i stället för mitt i bilden, huvudmenyn passar alla skärmar (även telefon på sidan), och en ny version installeras direkt när du startar spelet i stället för att fråga varje gång.',
+          en: '**Less lag**: the crystal fields of the Prism Barrens, numbers and names in the world, and when monsters die and drop loot. Notices are smaller and sit at the right edge instead of the middle of the view, the main menu fits every screen (a phone on its side too), and a new version installs as you start the game instead of asking every time.',
+        },
+      ],
+    },
     {
       icon: 'wood',
       title: { sv: 'Skog, ljus och natt', en: 'Forests, light and night' },
@@ -171,13 +192,14 @@ export function openNews({ onClose } = {}) {
   show();
 }
 
-/** The main menu's news card: the headline, a teaser and a NEW badge until read. */
+/** The main menu's news card: the headline, a teaser and a NEW badge until read (then just a quiet button). */
 export function newsCard({ onOpen } = {}) {
   const t = UI[lang];
-  const card = h('button.news-card', {
+  const card = h(`button.news-card${newsSeen() ? '.seen' : ''}`, {
     type: 'button',
     onclick: () => {
       card.querySelector('.news-badge')?.remove();
+      card.classList.add('seen');
       onOpen?.();
       openNews();
     },

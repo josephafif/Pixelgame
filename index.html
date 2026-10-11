@@ -37,9 +37,11 @@
 
   <div id="title" class="title-screen" hidden>
     <div class="title-card main-menu">
-      <img src="icons/icon-192.png" width="96" height="96" alt="" class="pixel title-logo">
-      <h1 class="title-text">Pixelgame<small>Infinite Arsenal</small></h1>
-      <p class="tagline">Every weapon is one of a kind.</p>
+      <div class="title-head">
+        <img src="icons/icon-192.png" width="96" height="96" alt="" class="pixel title-logo">
+        <h1 class="title-text">Pixelgame<small>Infinite Arsenal</small></h1>
+        <p class="tagline">Every weapon is one of a kind.</p>
+      </div>
       <nav class="menu-list" aria-label="Main menu">
         <button id="title-play" class="btn-primary big" autofocus>Play</button>
         <p id="title-save" class="save-line small muted" hidden></p>
@@ -50,8 +52,10 @@
         <button id="title-howto"><i data-icon="book" data-size="20"></i>How to play</button>
         <button id="title-install" hidden><i data-icon="home" data-size="20"></i>Install app</button>
       </nav>
-      <p id="title-ios" class="small" hidden>Install: tap Share → “Add to Home Screen”.</p>
-      <p id="title-status" class="small muted"></p>
+      <div class="title-foot">
+        <p id="title-ios" class="small" hidden>Install: tap Share → “Add to Home Screen”.</p>
+        <p id="title-status" class="small muted"></p>
+      </div>
     </div>
   </div>
 

@@ -15,7 +15,7 @@ import { renderChunkRich, vignetteFor } from './terrain-rich.js';
 import { LEAP_TIME } from '../net/movement.js';
 import { boatSprite } from './boats.js';
 import { horseSprite, HORSE_W, HORSE_H } from './horses.js';
-import { CHUNK, PROP_SHAPE, tileKey, T as TILE } from '../game/world.js';
+import { CHUNK, PROP_SHAPE, tileKey } from '../game/world.js';
 import { playerSprites, objectSprite, pickupSprite, tintedSprite } from './sprites.js';
 import { weaponSprite, weaponIcon } from './weapon-sprite.js';
 import { weaponPose } from './weapon-anim.js';
@@ -34,7 +34,8 @@ import { workerSprites, axeSprite, carrySprite } from './workers-art.js';
 import { installHd, uninstallHd, hdFrame } from './hd.js';
 
 const T = TILE_PX;
-const T_LAVA = TILE.LAVA;
+// The most glowing-tile lights drawn in a frame (lighting.js).
+const MAX_TILE_LIGHTS = 36;
 const shadeCache = new Map();
 /** A lighter shade of a colour (cached; used for serpent scales). */
 function shadeColor(hex) {
@@ -613,6 +614,7 @@ export class Renderer {
       }
     }
     this.#drawReticle(game);
+    this.#drawCharge(game);
     if (game.interactTarget) {
       const o = game.interactTarget;
       const x = this.#sx(o.x);
@@ -636,9 +638,10 @@ export class Renderer {
     const tx1 = Math.floor((this.cx + this.W) / T) + 2;
     const ty0 = Math.floor(this.cy / T) - 1;
     const ty1 = Math.floor((this.cy + this.H) / T) + 3;
-    // (Glowing tiles in view are gathered on the way: lava, lumen caps, crystals.)
-    const tileLights = [];
-    this.tileLights = tileLights;
+    // (Glowing tiles in view are gathered on the way: lava, lumen caps,
+    // crystals. Neighbours share one light per few tiles, or a field of
+    // crystals would mean hundreds of lights a frame.)
+    const cells = new Map();
     for (let cy = Math.floor(ty0 / CHUNK); cy <= Math.floor(ty1 / CHUNK); cy++) {
       for (let cx = Math.floor(tx0 / CHUNK); cx <= Math.floor(tx1 / CHUNK); cx++) {
         const chunk = world.chunks.get(`${cx},${cy}`);
@@ -653,9 +656,16 @@ export class Renderer {
             const b = chunk.block[i];
             if (!b) continue;
             const TL = TILE_LIGHTS.get(b);
-            // (Lava lies in sheets: one light for every few tiles, a bit bigger.)
-            if (TL && (b !== T_LAVA || (tx + ty * 2) % 3 === 0)) {
-              tileLights.push({ sx: this.#sx(tx + 0.5), sy: this.#sy(ty + 0.5), r: b === T_LAVA ? TL.r * 1.4 : TL.r, color: TL.color, seed: tx * 7 + ty * 13 });
+            if (TL) {
+              const ck = ((tx >> 2) + 32768) * 16777216 + ((ty >> 2) + 32768) * 256 + b;
+              const c = cells.get(ck);
+              if (c) {
+                c.x += tx;
+                c.y += ty;
+                c.n++;
+              } else {
+                cells.set(ck, { x: tx, y: ty, n: 1, TL });
+              }
             }
             if (!UPRIGHT.has(b)) continue;
             list.push({ y: ty + (PROP_SHAPE.get(b)?.[1] ?? 0.6), kind: 'upright', o: { x: tx + 0.5, y: ty + 0.5 }, tx, ty, b, chunk, i });
@@ -663,6 +673,21 @@ export class Renderer {
         }
       }
     }
+    // One light per cell of glowing tiles, a little bigger the more there are
+    // (and never more than MAX_TILE_LIGHTS: the ones nearest the middle).
+    const tileLights = [];
+    for (const c of cells.values()) {
+      const x = c.x / c.n + 0.5;
+      const y = c.y / c.n + 0.5;
+      tileLights.push({ sx: this.#sx(x), sy: this.#sy(y), r: c.TL.r * (1 + 0.16 * Math.min(c.n - 1, 6)), color: c.TL.color, seed: x * 7 + y * 13, k: c.TL.k ?? 0.6 });
+    }
+    if (tileLights.length > MAX_TILE_LIGHTS) {
+      const mx = this.W / 2;
+      const my = this.H / 2;
+      tileLights.sort((a, b) => (a.sx - mx) ** 2 + (a.sy - my) ** 2 - (b.sx - mx) ** 2 - (b.sy - my) ** 2);
+      tileLights.length = MAX_TILE_LIGHTS;
+    }
+    this.tileLights = tileLights;
     this.#sway(game);
   }
 
@@ -693,6 +718,23 @@ export class Renderer {
     }
     if (!lights.length && darkness <= 0.01 && glow <= 0.01) return;
     this.lighting.draw(this.v, { W, H, R: this.R, T, lights, darkness, glow, time: game.time });
+  }
+
+  /**
+   * Under you, while your melee weapon winds up again after a swing: a little
+   * bar that fills (charge.js). A swing before it is full hits softly.
+   */
+  #drawCharge(game) {
+    const f = game.meleeCharge;
+    const p = game.player;
+    if (f == null || f >= 1 || p.dead) return;
+    const v = this.v;
+    const x = Math.round(this.#sx(p.x)) - 7;
+    const y = Math.round(this.#sy(p.y)) + 4;
+    v.fillStyle = 'rgba(22, 22, 34, 0.8)';
+    v.fillRect(x - 1, y - 1, 16, 4);
+    v.fillStyle = f >= 0.9 ? '#ffe890' : '#c8c8d8';
+    v.fillRect(x, y, Math.max(1, Math.round(14 * f)), 2);
   }
 
   /** Whoever walks through a tree sets its crown swaying. */

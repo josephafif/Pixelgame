@@ -374,12 +374,15 @@ function applyFrame(gs, p, f, now) {
   const aim = byteToAngle(f.aim);
   p.facing = aim;
   if (!(f.buttons & BTN.ATTACK)) p.suppressAttack = false;
+  // A new press may swing a melee weapon before it has wound up again (src/game/charge.js).
+  const fresh = (f.buttons & BTN.ATTACK) !== 0 && !p.attackWasDown;
+  p.attackWasDown = (f.buttons & BTN.ATTACK) !== 0;
   if (f.buttons & BTN.INTERACT) {
     if (interact(gs, p, now)) p.suppressAttack = true;
   }
   if ((f.buttons & BTN.ATTACK) && !p.suppressAttack) {
     if (p.inv.activeSlot === 'tool') toolSwing(gs, p, aim, now);
-    else if (heldWeapon(p)) combat.tryAttack(gs, p, aim, f.target, now);
+    else if (heldWeapon(p)) combat.tryAttack(gs, p, aim, f.target, now, fresh);
   }
   if (f.buttons & BTN.ABILITY && p.inv.activeSlot !== 'tool') abilities.cast(gs, p, aim, f.target, now);
 }

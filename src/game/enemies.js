@@ -6,7 +6,7 @@ import { laserField, LASER_WIDTH, windWave } from './lasers.js';
 import { tickStatuses } from './status.js';
 import { T } from './world.js';
 import { shunLight, litBy } from './lights.js';
-import { spawnFactor } from './daynight.js';
+import { wildTarget, seaTarget, sightOf } from './wilds.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
 import { creatureSprites, hasCreature } from '../render/creatures.js';
 import { mixHex } from '../weapons/visuals.js';
@@ -215,7 +215,7 @@ function steer(game, e, nx, ny) {
 /** Updates alert state: see the player, lose them, alert the pack. */
 function perceive(game, e, d) {
   const p = game.player;
-  const sight = e.def.sight ?? 7;
+  const sight = sightOf(e.def);
   const provoked = (e.alertUntil ?? 0) > game.time;
   if (p.dead) {
     e.alert = false;
@@ -1432,7 +1432,7 @@ function spawnAtSea(game) {
   const p = game.player;
   const wl = game.world.worldLevel(p.x, p.y);
   const sea = game.enemies.filter((e) => !e.dead && e.def.sea);
-  const target = Math.round(Math.min(6, 2 + Math.floor(wl / 2)) * game.quality.enemyFactor);
+  const target = Math.round(seaTarget(wl) * game.quality.enemyFactor);
   if (sea.length >= target) return;
   const serpents = sea.filter((e) => e.kind === 'serpent').length;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -1475,9 +1475,10 @@ export function updateSpawner(game, dt) {
   const wl = game.world.worldLevel(p.x, p.y);
   const bossActive = Boolean(game.boss);
   const quality = game.quality.enemyFactor;
-  // Fewer by day, many more at night (daynight.js).
-  const night = spawnFactor(game.darkness ?? 0);
-  const target = Math.round(Math.min(26, 5 + wl * 2 + Math.floor(game.save.player.level / 2)) * quality * night * (bossActive ? 0.3 : 1));
+  // A few around you: fewer by day, more at night, fewer in some biomes (wilds.js).
+  const biomeHere = game.world.biomeAt(Math.floor(p.x), Math.floor(p.y));
+  const wild = wildTarget({ worldLevel: wl, playerLevel: game.save.player.level, darkness: game.darkness ?? 0, biome: biomeHere });
+  const target = Math.round(wild * quality * (bossActive ? 0.3 : 1));
   const lights = game.scaryLights?.() ?? [];
   const alive = game.enemies.filter((e) => !e.dead && !e.boss).length;
   if (alive >= target) return;

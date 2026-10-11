@@ -478,11 +478,31 @@ class App {
   // --- Updates --------------------------------------------------------------------------
 
   #onUpdateReady(apply) {
+    // Just started and not playing yet: take the new version at once instead
+    // of asking every time the app opens. (Once a minute at most, so a version
+    // that will not take over can never loop.)
+    if (!this.started && performance.now() < 30_000 && this.#mayAutoUpdate()) {
+      this.applyUpdateFn = apply;
+      apply();
+      setTimeout(() => location.reload(), 4000);
+      return;
+    }
     this.updateReady = true;
     this.applyUpdateFn = apply;
     const banner = $('#update-banner');
     banner.removeAttribute('hidden');
     $('#btn-menu')?.classList.add('badge');
+  }
+
+  #mayAutoUpdate() {
+    try {
+      const last = Number(sessionStorage.getItem('pg-auto-update')) || 0;
+      if (Date.now() - last < 60_000) return false;
+      sessionStorage.setItem('pg-auto-update', String(Date.now()));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async applyUpdate() {

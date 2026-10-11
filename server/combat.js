@@ -5,6 +5,7 @@
 
 import { angleDiff, angleTo, segmentDist2 } from '../src/core/math.js';
 import { attackDuration, impactDelay, MELEE_PATTERNS } from '../src/render/weapon-anim.js';
+import { FULL_AT, swingGap, chargeOf, chargeMult, maySwing } from '../src/game/charge.js';
 import { pvpBlock, inSafeZone } from '../src/net/rules.js';
 import { TICK_DT, TICK_RATE } from '../src/net/movement.js';
 import { T, CHUNK, REFLECTS, PLANTS } from '../src/game/world.js';
@@ -217,18 +218,36 @@ export function weaponDamage(p) {
   return p.weapon.stats.damage * (1 + p.stats.attackPower / 100);
 }
 
-export function tryAttack(gs, p, aim, targetId, now) {
+/**
+ * A player's attack. `fresh`: a new press, so a melee weapon may swing before
+ * it has wound up again, for less (src/game/charge.js); a held button swings
+ * at full charge only.
+ */
+export function tryAttack(gs, p, aim, targetId, now, fresh = false) {
   const w = players.heldWeapon(p);
   if (!w || p.attackCd > 0 || p.dead) return false;
   const aspd = w.stats.attackSpeed * p.stats.attackSpeedMult;
   const pattern = w.attack.pattern;
-  p.attackCd = 1 / aspd;
+  const full = 1 / aspd;
+  let power = 1;
+  if (MELEE_PATTERNS.has(pattern)) {
+    const since = gs.time - (p.swungAt ?? -99);
+    if (!maySwing(since, full, fresh)) return false;
+    power = chargeOf(since, full);
+    p.swungAt = gs.time;
+    p.attackCd = swingGap(full);
+  } else {
+    p.attackCd = full;
+  }
+  const strong = power >= FULL_AT;
   const angle = aimAt(gs, p, aim, targetId, w.stats.range + 3.5);
   p.facing = angle;
   p.anim = (p.anim + 1) & 255;
+  if (strong) p.blows = ((p.blows ?? 0) + 1) & 255;
+  const blows = p.blows ?? 0;
   const dir = p.guard;
   if (pattern === 'swing' || pattern === 'lash' || pattern === 'slam') p.guard = -dir;
-  let mult = 1;
+  let mult = chargeMult(power);
   for (const h of w.hooks.attack) if (h.do === 'sprintBonus' && p.sprinting) mult *= 1 + h.pct / 100;
   const damage = weaponDamage(p) * mult;
   const dur = attackDuration(pattern, aspd);
@@ -236,35 +255,40 @@ export function tryAttack(gs, p, aim, targetId, now) {
   const view = p.lastView + Math.round(delay * TICK_RATE);
   const strike = () => {
     if (p.dead || players.heldWeapon(p) !== w) return;
-    executePattern(gs, p, w, { angle, damage, view });
+    executePattern(gs, p, w, { angle, damage, view, strong });
+    // A weak (half-wound) blow sets off nothing more.
+    if (!strong) return;
     abilities.ascendStrike(gs, p, angle);
     for (const h of w.hooks.attack) runAttackHook(gs, p, w, h, angle, damage);
-    for (const h of w.hooks.nth) if (p.anim % h.n === 0) runAttackHook(gs, p, w, h, angle, damage);
+    for (const h of w.hooks.nth) if (blows % h.n === 0) runAttackHook(gs, p, w, h, angle, damage);
   };
   if (delay > 0.01) gs.schedule(delay, strike);
   else strike();
   return true;
 }
 
-function executePattern(gs, p, w, { angle, damage, view }) {
+function executePattern(gs, p, w, { angle, damage, view, strong = true }) {
   const a = w.attack;
   const range = w.stats.range;
   const x = p.x;
   const y = p.y;
+  // A weak (half-wound) blow neither crits nor knocks back much.
+  const knockback = w.stats.knockback * (strong ? 1 : 0.3);
+  const crit = strong;
   switch (a.pattern) {
     case 'swing':
-      meleeArc(gs, p, { x, y, angle, range, half: ((a.arc ?? 120) * DEG) / 2, damage, view, knockback: w.stats.knockback });
+      meleeArc(gs, p, { x, y, angle, range, half: ((a.arc ?? 120) * DEG) / 2, damage, view, knockback, crit });
       break;
     case 'lash':
-      meleeArc(gs, p, { x, y, angle, range, half: ((a.arc ?? 60) * DEG) / 2, damage, view, knockback: w.stats.knockback });
+      meleeArc(gs, p, { x, y, angle, range, half: ((a.arc ?? 60) * DEG) / 2, damage, view, knockback, crit });
       break;
     case 'thrust':
-      meleeLine(gs, p, { x, y, angle, range, width: a.width ?? 0.7, damage, view, knockback: w.stats.knockback });
+      meleeLine(gs, p, { x, y, angle, range, width: a.width ?? 0.7, damage, view, knockback, crit });
       break;
     case 'slam': {
       const cx = x + Math.cos(angle) * range * 0.6;
       const cy = y + Math.sin(angle) * range * 0.6;
-      meleeRadius(gs, p, { x: cx, y: cy, r: a.radius ?? 1.6, damage, view, knockback: w.stats.knockback });
+      meleeRadius(gs, p, { x: cx, y: cy, r: a.radius ?? 1.6, damage, view, knockback, crit });
       break;
     }
     default:
@@ -319,17 +343,17 @@ export function meleeArc(gs, p, { x, y, angle, range, half, damage, view, knockb
   });
 }
 
-function meleeLine(gs, p, { x, y, angle, range, width, damage, view, knockback }) {
+function meleeLine(gs, p, { x, y, angle, range, width, damage, view, knockback, crit = true }) {
   const ex = x + Math.cos(angle) * range;
   const ey = y + Math.sin(angle) * range;
-  meleeHits(gs, p, { x, y, reach: range, damage, view, knockback }, (px, py, r) => {
+  meleeHits(gs, p, { x, y, reach: range, damage, view, knockback, crit }, (px, py, r) => {
     const rr = width / 2 + r;
     return segmentDist2(px, py, x, y, ex, ey) <= rr * rr;
   });
 }
 
-function meleeRadius(gs, p, { x, y, r, damage, view, knockback }) {
-  meleeHits(gs, p, { x, y, reach: r, damage, view, knockback }, (px, py, er) => (px - x) ** 2 + (py - y) ** 2 <= (r + er) ** 2);
+function meleeRadius(gs, p, { x, y, r, damage, view, knockback, crit = true }) {
+  meleeHits(gs, p, { x, y, reach: r, damage, view, knockback, crit }, (px, py, er) => (px - x) ** 2 + (py - y) ** 2 <= (r + er) ** 2);
 }
 
 function fireWeapon(gs, p, w, { x, y, angle, damage }) {

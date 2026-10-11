@@ -7,6 +7,7 @@
 // lights are, then each light adds its colour on top.
 
 import { createCanvas, ctx2d } from './canvas.js';
+import { noHd } from './hd.js';
 
 const COLORS = {
   warm: [255, 168, 78], gold: [255, 212, 110], lava: [255, 104, 40], lumen: [110, 255, 200],
@@ -60,6 +61,9 @@ function flicker(L, t) {
   return 1 + 0.02 * Math.sin(t * 1.6 + s);
 }
 
+/** The dark's resolution: canvas pixels per game pixel. */
+const DARK_SCALE = 0.5;
+
 /** How far the dark reaches past a light's radius: the light fades out over this much more. */
 const REACH = 1.45;
 
@@ -69,10 +73,10 @@ export class Lighting {
   }
 
   /**
-   * Draws the light over the view `v` (W × H game pixels, at R buffer pixels
-   * each). `lights`: [{ sx, sy (screen pixels), r (tiles), color, seed, k }].
+   * Draws the light over the view `v` (W × H game pixels). `lights`:
+   * [{ sx, sy (screen pixels), r (tiles), color, seed, k }].
    */
-  draw(v, { W, H, R, T, lights, darkness, glow, time }) {
+  draw(v, { W, H, T, lights, darkness, glow, time }) {
     // Dusk and dawn: a warm red over everything.
     if (glow > 0.01) {
       v.globalCompositeOperation = 'source-over';
@@ -80,10 +84,13 @@ export class Lighting {
       v.fillRect(0, 0, W, H);
     }
     if (darkness > 0.01) {
-      const cw = Math.ceil(W * R);
-      const ch = Math.ceil(H * R);
+      // The dark is soft, so it is drawn small (half a game pixel per pixel)
+      // and stretched smoothly over the view: far less to fill each frame.
+      const S = DARK_SCALE;
+      const cw = Math.ceil(W * S);
+      const ch = Math.ceil(H * S);
       if (!this.canvas || this.canvas.width !== cw || this.canvas.height !== ch) {
-        this.canvas = createCanvas(cw, ch);
+        this.canvas = noHd(createCanvas(cw, ch));
       }
       const g = ctx2d(this.canvas);
       g.setTransform(1, 0, 0, 1, 0, 0);
@@ -93,7 +100,7 @@ export class Lighting {
       // A soft moonlit blue: dark enough for the lights to matter, never pitch black.
       g.fillStyle = `rgba(16, 22, 54, ${(0.6 * darkness).toFixed(3)})`;
       g.fillRect(0, 0, cw, ch);
-      g.setTransform(R, 0, 0, R, 0, 0);
+      g.setTransform(S, 0, 0, S, 0, 0);
       g.globalCompositeOperation = 'destination-out';
       const hs = holeSprite();
       for (const L of lights) {
@@ -103,7 +110,10 @@ export class Lighting {
       }
       g.globalAlpha = 1;
       g.globalCompositeOperation = 'source-over';
+      const smooth = v.imageSmoothingEnabled;
+      v.imageSmoothingEnabled = true;
       v.drawImage(this.canvas, 0, 0, W, H);
+      v.imageSmoothingEnabled = smooth;
     }
     // Every light adds its colour: faint by day, warm and strong at night.
     v.globalCompositeOperation = 'lighter';

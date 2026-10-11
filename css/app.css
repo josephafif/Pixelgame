@@ -173,40 +173,69 @@ h1, h2, h3, h4 { font-weight: 700; letter-spacing: 1px; }
 #splash-bar { height: 100%; width: 0; background: linear-gradient(var(--brass-light), var(--brass)); transition: width 0.2s; }
 .splash.error #splash-text { color: #ff8a8a; max-width: 80vw; text-align: center; }
 
+/* The main menu fits any screen: sizes follow the screen's height (dvh, so a
+   phone's browser bars count), it goes side by side on a landscape phone, and
+   if it is ever still too tall it scrolls (margin: auto centres it without
+   cutting off the top). */
 .title-screen {
+  --vh: 1vh;
   position: fixed; inset: 0; z-index: 20;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; overflow-y: auto; overscroll-behavior: contain;
   background: radial-gradient(circle at 50% 45%, rgba(18, 16, 29, 0.35), rgba(8, 6, 14, 0.8));
-  padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
+  padding: calc(12px + var(--safe-t)) calc(16px + var(--safe-r)) calc(12px + var(--safe-b)) calc(16px + var(--safe-l));
 }
+@supports (height: 1dvh) { .title-screen { --vh: 1dvh; } }
 .title-card {
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  padding: 22px 30px; max-width: 440px; width: 100%; text-align: center;
+  margin: auto;
+  display: flex; flex-direction: column; align-items: center; gap: clamp(6px, calc(var(--vh) * 1.4), 12px);
+  padding: clamp(12px, calc(var(--vh) * 2.6), 22px) clamp(14px, 4vw, 30px); max-width: 440px; width: 100%; text-align: center;
   animation: rise 0.4s ease-out;
 }
-.tagline { margin: 0; color: var(--muted); font-size: 18px; }
+.title-head, .title-foot { display: flex; flex-direction: column; align-items: center; gap: clamp(4px, var(--vh), 10px); }
+.title-foot:not(:has(:not([hidden]):not(:empty))) { display: none; }
+.title-foot p { margin: 0; }
+.title-logo { width: clamp(44px, calc(var(--vh) * 10), 96px); height: auto; }
+.title-card h1 { font-size: clamp(26px, calc(var(--vh) * 5), 40px); }
+.title-card h1 small { font-size: clamp(11px, calc(var(--vh) * 1.9), 16px); letter-spacing: clamp(3px, calc(var(--vh) * 0.7), 6px); }
+.tagline { margin: 0; color: var(--muted); font-size: clamp(14px, calc(var(--vh) * 2.2), 18px); }
 /* Main menu: one column of big, equal-width buttons. */
-.menu-list { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: min(320px, 100%); }
-.menu-list button { justify-content: center; gap: 10px; min-height: 50px; font-size: 18px; position: relative; }
-.menu-list .btn-primary { min-height: 60px; font-size: 22px; }
+.menu-list { display: flex; flex-direction: column; align-items: stretch; gap: clamp(5px, var(--vh), 8px); width: min(320px, 100%); }
+.menu-list button { justify-content: center; gap: 10px; min-height: clamp(38px, calc(var(--vh) * 5.8), 50px); font-size: clamp(15px, calc(var(--vh) * 2.2), 18px); position: relative; }
+.menu-list .btn-primary { min-height: clamp(46px, calc(var(--vh) * 7.2), 60px); font-size: clamp(18px, calc(var(--vh) * 2.8), 22px); }
 .menu-list .soon {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   padding: 0 6px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
   color: var(--ink); background: var(--gold); box-shadow: 0 0 0 2px var(--ink);
 }
 .save-line { margin: -2px 0 2px; }
-@media (max-height: 700px) {
-  .title-logo { width: 64px; height: 64px; }
-  .title-card { gap: 8px; padding: 14px 20px; }
-  .menu-list button { min-height: 44px; font-size: 16px; }
-  .menu-list .btn-primary { min-height: 52px; font-size: 20px; }
+@media (max-height: 880px) {
+  .tagline { display: none; }
 }
-@media (max-height: 520px) {
-  .title-logo, .tagline { display: none; }
-  .title-card h1 { font-size: 28px; }
-  .menu-list { display: grid; grid-template-columns: 1fr 1fr; width: min(520px, 100%); }
+@media (orientation: portrait) and (max-height: 620px) {
+  .title-logo { display: none; }
+}
+/* A phone on its side: the title and the news on the left, the menu on the right. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .title-card {
+    display: grid; max-width: min(880px, 100%);
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    grid-template-areas: "head menu" "news menu" "foot menu";
+    grid-template-rows: auto auto 1fr;
+    align-items: center; column-gap: clamp(12px, 3vw, 28px); row-gap: 8px;
+  }
+  .title-head { grid-area: head; }
+  .title-logo { width: clamp(40px, calc(var(--vh) * 14), 72px); }
+  .menu-list { grid-area: menu; display: grid; grid-template-columns: 1fr 1fr; width: 100%; align-self: center; }
   .menu-list .btn-primary, .menu-list .save-line { grid-column: 1 / -1; }
   .menu-list .soon { position: static; transform: none; }
+  .news-card { grid-area: news; width: 100%; }
+  .title-foot { grid-area: foot; align-self: start; }
+}
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 760px) {
+  .menu-list button { gap: 6px; padding-left: 6px; padding-right: 6px; }
+  .menu-list button .icon { display: none; }
+  .menu-list .btn-primary .icon { display: inline-block; }
+  .news-card-more { display: none; }
 }
 @keyframes rise { from { transform: translateY(12px); opacity: 0; } }
 
@@ -238,12 +267,16 @@ h1, h2, h3, h4 { font-weight: 700; letter-spacing: 1px; }
 .news-chip.live { color: var(--ink); background: #7ad66a; box-shadow: none; }
 .news-section b { color: #fff3c4; }
 .news-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
-@media (max-height: 700px) {
+/* Once read, the card is just a quiet way back to the news. */
+.news-card.seen { background: none; box-shadow: inset 0 0 0 2px var(--line); flex-direction: row; align-items: center; justify-content: space-between; padding: 7px 12px; }
+.news-card.seen .news-card-title { color: var(--text, #e8e4f4); font-size: 15px; }
+.news-card.seen .news-card-text { display: none; }
+@media (max-height: 880px) {
   .news-card { padding: 7px 10px; }
   .news-card-text { display: none; }
 }
-@media (max-height: 520px) {
-  .news-card { width: min(520px, 100%); flex-direction: row; align-items: center; justify-content: space-between; }
+@media (max-height: 560px) {
+  .news-card { flex-direction: row; align-items: center; justify-content: space-between; }
 }
 @media (prefers-reduced-motion: reduce) { .news-badge { animation: none; } }
 
@@ -320,22 +353,23 @@ body.offline .net { color: #ffb070; }
 .boss-bar .fill { height: 100%; background: linear-gradient(#ffd060 0 30%, #ff7a2a 30% 80%, #b8231a 80%); transition: width 0.15s; }
 
 .interact-hint {
-  position: absolute; left: 50%; bottom: calc(33% + var(--safe-b)); transform: translateX(-50%);
-  display: flex; align-items: center; gap: 8px; padding: 2px 12px;
-  font-size: 16px; font-weight: 500; white-space: nowrap;
+  position: absolute; left: 50%; bottom: calc(100px + var(--safe-b)); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; padding: 1px 10px;
+  font-size: 14px; font-weight: 500; white-space: nowrap;
   border: 6px solid transparent; border-image: var(--frame-plate) 3 fill / 6px / 0 stretch;
   animation: bob 1.2s ease-in-out infinite;
 }
 @keyframes bob { 50% { transform: translate(-50%, -3px); } }
 
+/* Notices: small, at the right edge under the menu buttons, never over the middle of the view. */
 .toasts {
-  position: fixed; z-index: 45; pointer-events: none; top: calc(112px + var(--safe-t)); left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(92vw, 540px);
+  position: fixed; z-index: 45; pointer-events: none; top: calc(128px + var(--safe-t)); right: calc(10px + var(--safe-r));
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; width: min(34vw, 300px);
 }
 /* While a panel is open, toasts move to the bottom edge so they never cover its title or close button. */
-body:has(#overlay-root .backdrop) .toasts { top: auto; bottom: calc(8px + var(--safe-b)); flex-direction: column-reverse; }
+body:has(#overlay-root .backdrop) .toasts { top: auto; bottom: calc(8px + var(--safe-b)); right: 50%; transform: translateX(50%); align-items: center; flex-direction: column-reverse; }
 .toast {
-  border-image-source: var(--frame-toast); padding: 4px 14px; font-size: 15px; text-align: center;
+  border-image-source: var(--frame-toast); padding: 2px 10px; font-size: 13px; line-height: 1.3; text-align: left; opacity: 0.94;
   animation: toast-in 0.22s steps(4); transition: opacity 0.4s, transform 0.4s;
 }
 .toast.out { opacity: 0; transform: translateY(-8px); }
@@ -617,9 +651,10 @@ body[data-input="touch"] .hslot { width: 50px; height: 50px; }
   .res-row .res { gap: 2px; }
   .res-row.lit { opacity: 1; }
   body:not(.offline) .net { display: none; }
-  .toasts { top: calc(70px + var(--safe-t)); width: min(82vw, 340px); gap: 3px; }
-  .toast { font-size: 12px; line-height: 1.25; padding: 1px 8px; border-width: 4px; border-image-width: 4px; }
-  .interact-hint { font-size: 13px; padding: 0 8px; border-width: 4px; border-image-width: 4px; }
+  .toasts { top: calc(72px + var(--safe-t)); width: min(62vw, 240px); gap: 3px; }
+  .toast { font-size: 11px; line-height: 1.25; padding: 1px 6px; border-width: 4px; border-image-width: 4px; }
+  .interact-hint { font-size: 12px; padding: 0 8px; border-width: 4px; border-image-width: 4px; }
+  body[data-input="touch"] .interact-hint { bottom: calc(33% + var(--safe-b)); }
   .boss-bar { top: calc(44px + var(--safe-t)); width: 70vw; font-size: 12px; }
   .boss-bar .bar { height: 12px; }
   body[data-input="touch"] .hslot { width: 44px; height: 44px; }
@@ -627,10 +662,11 @@ body[data-input="touch"] .hslot { width: 50px; height: 50px; }
 }
 @media (max-height: 520px) {
   :root { --btn: 68px; }
-  .interact-hint { bottom: calc(40% + var(--safe-b)); }
+  /* Between the stick and the buttons, under you rather than on you. */
+  .interact-hint, body[data-input="touch"] .interact-hint { bottom: calc(10px + var(--safe-b)); }
   /* Landscape phones: the dock and the resource line side by side. */
   .hud-right { flex-direction: row-reverse; align-items: center; }
-  .toasts { top: calc(50px + var(--safe-t)); }
+  .toasts { top: calc(48px + var(--safe-t)); width: min(34vw, 260px); }
 }
 @media (max-width: 380px) { :root { --btn: 72px; } }
 

@@ -9,6 +9,18 @@ import { pickaxeSprite } from '../render/structures.js';
 import { currentPickaxe } from '../game/gathering.js';
 import { icon } from './icons.js';
 
+
+/** Writes text only when it changed (the HUD is updated ten times a second). */
+function txt(el, v) {
+  const t = String(v);
+  if (el.textContent !== t) el.textContent = t;
+}
+
+/** Sets a style only when it changed. */
+function css(el, prop, v) {
+  if (el.style.getPropertyValue(prop) !== v) el.style.setProperty(prop, v);
+}
+
 export class Hud {
   constructor(game) {
     this.game = game;
@@ -202,22 +214,22 @@ export class Hud {
   update(s) {
     const e = this.el;
     const hpFrac = s.hp / s.maxHp;
-    e.hpFill.style.width = `${100 * hpFrac}%`;
-    e.hpText.textContent = `${s.hp} / ${s.maxHp}`;
+    css(e.hpFill, 'width', `${(100 * hpFrac).toFixed(1)}%`);
+    txt(e.hpText, `${s.hp} / ${s.maxHp}`);
     e.hpBar.classList.toggle('low', hpFrac < 0.3 && !s.dead);
-    e.level.textContent = s.level;
-    e.xpFill.style.width = `${Math.min(100, (100 * s.xp) / s.xpNext)}%`;
-    e.essence.textContent = s.essence;
-    e.scrap.textContent = s.scrap;
-    if (e.wood) e.wood.textContent = s.wood;
-    if (e.stone) e.stone.textContent = s.stone;
+    txt(e.level, s.level);
+    css(e.xpFill, 'width', `${Math.min(100, (100 * s.xp) / s.xpNext).toFixed(1)}%`);
+    txt(e.essence, s.essence);
+    txt(e.scrap, s.scrap);
+    if (e.wood) txt(e.wood, s.wood);
+    if (e.stone) txt(e.stone, s.stone);
     // The far lands' materials show up once you have some.
     const res2 = this.game.save?.resources ?? {};
     for (const k of ['prismite', 'spores', 'aether']) {
       const el = (e[k] ??= $(`#res-${k}`));
       if (!el) continue;
       const n = Math.floor(res2[k] ?? 0);
-      el.textContent = n;
+      txt(el, n);
       el.parentElement.toggleAttribute('hidden', n <= 0);
     }
     // The resource bar lights up for a few seconds whenever something changes.
@@ -235,9 +247,9 @@ export class Hud {
       const frac = s.ability.ready ? 0 : s.ability.left / s.ability.total;
       for (const [el, cd] of [[e.ability, e.abilityCd], [e.abilitySlot, e.abilitySlotCd]]) {
         if (!el) continue;
-        el.style.setProperty('--cd', `${Math.round(frac * 360)}deg`);
+        css(el, '--cd', `${Math.round(frac * 360)}deg`);
         el.classList.toggle('ready', s.ability.ready);
-        cd.textContent = s.ability.ready ? '' : Math.ceil(s.ability.left);
+        txt(cd, s.ability.ready ? '' : Math.ceil(s.ability.left));
       }
     }
     // Gale Step: shown once you have learnt it.
@@ -246,17 +258,17 @@ export class Hud {
       el.toggleAttribute('hidden', !s.dash);
       if (s.dash) {
         const ready = s.dash.left <= 0;
-        el.style.setProperty('--cd', `${Math.round((ready ? 0 : s.dash.left / s.dash.total) * 360)}deg`);
+        css(el, '--cd', `${Math.round((ready ? 0 : s.dash.left / s.dash.total) * 360)}deg`);
         el.classList.toggle('ready', ready);
-        cd.textContent = ready ? '' : Math.ceil(s.dash.left);
+        txt(cd, ready ? '' : Math.ceil(s.dash.left));
       }
     }
     if (s.boss) {
-      e.bossName.textContent = `${s.boss.name}${s.boss.phase === 2 ? ' — ENRAGED' : ''}`;
-      e.bossFill.style.width = `${(100 * Math.max(0, s.boss.hp)) / s.boss.maxHp}%`;
+      txt(e.bossName, `${s.boss.name}${s.boss.phase === 2 ? ' — ENRAGED' : ''}`);
+      css(e.bossFill, 'width', `${((100 * Math.max(0, s.boss.hp)) / s.boss.maxHp).toFixed(1)}%`);
     }
     if (this.game.save.settings.showFps) {
-      e.fps.textContent = `${s.fps} fps · ${this.game.qualityLevel}`;
+      txt(e.fps, `${s.fps} fps · ${this.game.qualityLevel}`);
       e.fps.removeAttribute('hidden');
     } else {
       e.fps.setAttribute('hidden', '');
@@ -265,8 +277,8 @@ export class Hud {
     if (s.compass && s.compass.dist > 18) {
       const arrows = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'];
       const dir = arrows[((Math.round(s.compass.angle / (Math.PI / 4)) % 8) + 8) % 8];
-      e.compass.textContent = `${dir} ${s.compass.name} · ${Math.round(s.compass.dist)}m`;
-      e.compass.style.color = s.compass.color;
+      txt(e.compass, `${dir} ${s.compass.name} · ${Math.round(s.compass.dist)}m`);
+      css(e.compass, 'color', s.compass.color);
       e.compass.removeAttribute('hidden');
     } else {
       e.compass.setAttribute('hidden', '');
@@ -304,7 +316,7 @@ export class Hud {
     box.append(t);
     // Too many: older plain notices give way before important ones (finds,
     // bosses, loot). The newest notice always shows: it answers what you just did.
-    while (box.children.length > (compact ? 2 : 4)) {
+    while (box.children.length > (compact ? 2 : 3)) {
       const older = [...box.children].filter((c) => c !== t);
       const plain = older.find((c) => c.classList.contains('toast-info') || c.classList.contains('toast-warn'));
       (plain ?? older[0]).remove();

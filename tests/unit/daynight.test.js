@@ -26,7 +26,7 @@ test('a day goes round: morning, dusk, night, dawn', () => {
 
 test('fewer monsters by day, more at night', () => {
   assert.ok(spawnFactor(0) < 1);
-  assert.ok(spawnFactor(1) > 1.4);
+  assert.ok(spawnFactor(1) > 1.1 && spawnFactor(1) > spawnFactor(0));
 });
 
 test('a new game starts in the morning', () => {
@@ -69,4 +69,19 @@ test('the camp\'s hearth and forge light up the night in single player', () => {
   assert.ok(fires.some((f) => f.r >= 6), 'the hearth');
   assert.ok(fires.every((f) => f.scare && Number.isFinite(f.x) && Number.isFinite(f.y)));
   assert.equal(campLights(data, () => 0).length, 0, 'no buildings, no fires');
+});
+
+test('a few monsters roam, more at night, fewer in the Prism Barrens, and they see less far', async () => {
+  const { wildTarget, seaTarget, sightOf, SIGHT_SCALE } = await import('../../src/game/wilds.js');
+  const day = wildTarget({ worldLevel: 1, playerLevel: 1, darkness: 0 });
+  const night = wildTarget({ worldLevel: 1, playerLevel: 1, darkness: 1 });
+  assert.ok(day >= 1 && day <= 3, `a quiet start (${day})`);
+  assert.ok(night > day, 'more at night');
+  const far = wildTarget({ worldLevel: 20, playerLevel: 60, darkness: 1 });
+  assert.ok(far <= 13, `never a swarm, even far out at night (${far})`);
+  const prism = data.byId.biomes.get('prism');
+  assert.ok(wildTarget({ worldLevel: 20, playerLevel: 60, darkness: 1, biome: prism }) < far, 'the Prism Barrens have fewer');
+  assert.ok(wildTarget({ worldLevel: 5, others: 3 }) < 2 * wildTarget({ worldLevel: 5 }) + 1, 'groups: a few more, never double');
+  assert.ok(seaTarget(30) <= 4);
+  assert.ok(SIGHT_SCALE < 1 && Math.abs(sightOf({ sight: 10 }) - 10 * SIGHT_SCALE) < 1e-9);
 });

@@ -16,6 +16,7 @@ import { canAfford, shortfalls, baseBonuses } from '../game/base.js';
 import { salvageValue } from '../game/loot.js';
 import { angleTo, dist2 } from '../core/math.js';
 import { attackDuration, impactDelay, MELEE_PATTERNS } from '../render/weapon-anim.js';
+import { FULL_AT, swingGap, chargeOf, maySwing } from '../game/charge.js';
 import {
   ET, SF, CMD, BTN, encodeInput, decodeSnapshot, angleToByte,
 } from '../net/protocol.js';
@@ -361,8 +362,8 @@ export class MpGame {
   #dayNight() {
     const phase = phaseOf(this.hour);
     if (this.dayPhase && phase !== this.dayPhase) {
-      if (phase === 'dusk') this.toast('Solen går ner. På natten är monstren fler, men de skyr facklor och eld.', 'info');
-      else if (phase === 'dawn') this.toast('Gryningen kommer: monstren blir färre.', 'info');
+      if (phase === 'dusk') this.toast('Natten faller. Monstren skyr facklor och eld.', 'info');
+      else if (phase === 'dawn') this.toast('Gryning: färre monster ute.', 'info');
     }
     this.dayPhase = phase;
   }
@@ -969,7 +970,10 @@ export class MpGame {
       this.fx.emit('dust', p.x, p.y + 0.3, 1, 0.2, 0.5);
     }
     if (!p.attackAnim) p.facing = aim;
-    if ((buttons & BTN.ATTACK) && !this.suppressAttack) this.#predictAttack(aim);
+    // A new press may swing a melee weapon before it has wound up again (charge.js), as on the server.
+    const fresh = (buttons & BTN.ATTACK) !== 0 && !this.attackWasDown;
+    this.attackWasDown = (buttons & BTN.ATTACK) !== 0;
+    if ((buttons & BTN.ATTACK) && !this.suppressAttack) this.#predictAttack(aim, fresh);
   }
 
   /** Auto-aim, like single player: the nearest monster or hostile player in reach. */
@@ -1008,8 +1012,16 @@ export class MpGame {
     return p.facing;
   }
 
+  /** How wound up your melee weapon is (0 … 1), or null (charge.js). */
+  get meleeCharge() {
+    const w = this.heldWeapon;
+    if (!w || this.handsEmpty || this.toolActive || !MELEE_PATTERNS.has(w.attack.pattern)) return null;
+    const full = 1 / (w.stats.attackSpeed * (this.pstats.attackSpeedMult ?? 1));
+    return chargeOf(this.time - (this.player.swungAt ?? -99), full);
+  }
+
   /** Shows your attack right away (the server decides what it hits). */
-  #predictAttack(aim) {
+  #predictAttack(aim, fresh = false) {
     const p = this.player;
     if (this.toolActive) {
       if (p.toolCd > 0) return;
@@ -1024,7 +1036,17 @@ export class MpGame {
     if (!w || p.attackCd > 0) return;
     const aspd = w.stats.attackSpeed * (this.pstats.attackSpeedMult ?? 1);
     const pattern = w.attack.pattern;
-    p.attackCd = 1 / aspd;
+    const full = 1 / aspd;
+    let strong = true;
+    if (MELEE_PATTERNS.has(pattern)) {
+      const since = this.time - (p.swungAt ?? -99);
+      if (!maySwing(since, full, fresh)) return;
+      strong = chargeOf(since, full) >= FULL_AT;
+      p.swungAt = this.time;
+      p.attackCd = swingGap(full);
+    } else {
+      p.attackCd = full;
+    }
     p.facing = aim;
     const dir = p.guard;
     if (pattern === 'swing' || pattern === 'lash' || pattern === 'slam') p.guard = -dir;
@@ -1033,26 +1055,28 @@ export class MpGame {
     const delay = MELEE_PATTERNS.has(pattern) ? impactDelay(pattern, dur) : 0;
     this.schedule(delay, () => {
       if (p.dead) return;
-      this.#attackVisual(w, p.x, p.y, aim, dir, true);
+      this.#attackVisual(w, p.x, p.y, aim, dir, true, !strong);
       this.audio.weapon(w.dna.sound);
     });
   }
 
   /** The look of an attack (slashes, thrusts, slams, shots). */
-  #attackVisual(w, x, y, angle, dir, mine) {
+  #attackVisual(w, x, y, angle, dir, mine, weak = false) {
     const a = w.attack;
     const range = w.stats.range;
     const color = w.trail;
     const blade = w.dna.visual.palette.blade;
+    // A weak (half-wound) blow shows as a faint slash (charge.js).
+    const ghost = weak;
     switch (a.pattern) {
       case 'swing':
-        this.fx.add({ type: 'slash', x, y, angle, dir, arc: (a.arc ?? 120) * DEG, r: range, color, core: blade[0], dur: 0.2 });
+        this.fx.add({ type: 'slash', x, y, angle, dir, arc: (a.arc ?? 120) * DEG, r: range, color, core: blade[0], dur: 0.2, ghost });
         break;
       case 'lash':
-        this.fx.add({ type: 'whip', x, y, angle, dir, r: range, color: blade[1], tip: color, dur: 0.22 });
+        this.fx.add({ type: 'whip', x, y, angle, dir, r: range, color: blade[1], tip: color, dur: 0.22, ghost });
         break;
       case 'thrust':
-        this.fx.add({ type: 'thrust', x, y, angle, r: range, color, core: blade[0], dur: 0.16 });
+        this.fx.add({ type: 'thrust', x, y, angle, r: range, color, core: blade[0], dur: 0.16, ghost });
         break;
       case 'slam': {
         const radius = a.radius ?? 1.6;
@@ -1060,8 +1084,8 @@ export class MpGame {
         const cy = y + Math.sin(angle) * range * 0.6;
         this.fx.add({ type: 'ring', x: cx, y: cy, r0: 0.3, r1: radius, color, dur: 0.3, fill: true });
         this.fx.add({ type: 'cracks', x: cx, y: cy, r: radius, color: '#161622', dur: 0.6, seed: Math.random() * 1000 });
-        this.fx.emit('dust', cx, cy, 14, radius, 2.5);
-        if (mine) this.shake = Math.max(this.shake, 0.2);
+        this.fx.emit('dust', cx, cy, weak ? 5 : 14, radius, 2.5);
+        if (mine && !weak) this.shake = Math.max(this.shake, 0.2);
         break;
       }
       default:

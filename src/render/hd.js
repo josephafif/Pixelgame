@@ -7,7 +7,7 @@
 const cache = new WeakMap();
 const MAX_PIXELS = 160 * 160; // bigger canvases (world chunks) are drawn as they are
 const MIN_USES = 3; // canvases drawn only once or twice (temporary ones) are left alone
-const PER_FRAME = 24; // conversions per frame, so a screenful of new sprites never stutters
+const PER_FRAME = 8; // conversions per frame, so a screenful of new sprites never stutters (on a phone too)
 
 let budget = PER_FRAME;
 
@@ -121,6 +121,12 @@ export function scaleNx(canvas, factor = 2) {
   const pixels = factor === 3 ? scale3xPixels(data, w, h) : scale2xPixels(data, w, h);
   out.getContext('2d').putImageData(new ImageData(pixels, w * factor, h * factor), 0, 0);
   return out;
+}
+
+/** Marks a canvas that changes all the time (never given a smoothed copy). */
+export function noHd(canvas) {
+  cache.set(canvas, { uses: -1e9, hd: null, factor: 0, w: canvas.width, h: canvas.height });
+  return canvas;
 }
 
 /** A 2× smoothed copy of a canvas. */

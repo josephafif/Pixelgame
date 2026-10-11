@@ -11,6 +11,7 @@ import { spawnProjectile } from './projectiles.js';
 import { spawnArea } from './areas.js';
 import { killEnemy } from './enemies.js';
 import { attackDuration, impactDelay, MELEE_PATTERNS } from '../render/weapon-anim.js';
+import { FULL_AT, swingGap, chargeOf, chargeMult, maySwing } from './charge.js';
 
 const DEG = Math.PI / 180;
 // Hooks that may still run on damage caused by other hooks (depth >= 1).
@@ -228,18 +229,19 @@ export function hurtPlayer(game, amount, { element = 'physical', fromX, fromY, s
 
 // --- Attacks -------------------------------------------------------------------
 
-function hitMeleeTargets(game, targets, damage, attack, origin) {
+// (A blow struck before the weapon wound up again neither crits nor knocks back much: charge.js.)
+function hitMeleeTargets(game, targets, damage, attack, origin, strong = true) {
   const w = game.weapon;
   for (const e of targets) {
     dealDamage(game, e, damage, {
-      element: w.element, canCrit: true, depth: 0, source: 'weapon', melee: true,
-      knockback: w.stats.knockback, fromX: origin.x, fromY: origin.y,
+      element: w.element, canCrit: strong, depth: 0, source: 'weapon', melee: true,
+      knockback: w.stats.knockback * (strong ? 1 : 0.3), fromX: origin.x, fromY: origin.y,
     });
   }
   return targets.length;
 }
 
-function meleeArc(game, x, y, angle, range, arcDeg, damage) {
+function meleeArc(game, x, y, angle, range, arcDeg, damage, strong = true) {
   const half = (arcDeg * DEG) / 2;
   const targets = game.enemies.filter((e) => {
     if (e.dead) return false;
@@ -249,10 +251,10 @@ function meleeArc(game, x, y, angle, range, arcDeg, damage) {
     return Math.abs(angleDiff(angle, angleTo(x, y, e.x, e.y))) <= half + Math.atan2(e.r, d);
   });
   game.hitNpcs?.({ kind: 'arc', x, y, angle, range, half }, damage);
-  return hitMeleeTargets(game, targets, damage, null, { x, y });
+  return hitMeleeTargets(game, targets, damage, null, { x, y }, strong);
 }
 
-function meleeLine(game, x, y, angle, range, width, damage) {
+function meleeLine(game, x, y, angle, range, width, damage, strong = true) {
   const ex = x + Math.cos(angle) * range;
   const ey = y + Math.sin(angle) * range;
   const targets = game.enemies.filter((e) => {
@@ -261,7 +263,7 @@ function meleeLine(game, x, y, angle, range, width, damage) {
     return segmentDist2(e.x, e.y, x, y, ex, ey) <= rr * rr;
   });
   game.hitNpcs?.({ kind: 'line', x, y, ex, ey, width }, damage);
-  return hitMeleeTargets(game, targets, damage, null, { x, y });
+  return hitMeleeTargets(game, targets, damage, null, { x, y }, strong);
 }
 
 /** Fires the weapon's projectile pattern. */
@@ -299,35 +301,37 @@ export function fireWeaponProjectiles(game, { x, y, angle, damage, echo = false 
 }
 
 /** Executes the archetype's base attack pattern. */
-export function executePattern(game, { x, y, angle, damage, echo = false, dir = 1 }) {
+export function executePattern(game, { x, y, angle, damage, echo = false, dir = 1, strong = true }) {
   const w = game.weapon;
   const a = w.attack;
   const range = w.stats.range;
   const color = w.trail;
   const blade = w.dna.visual.palette.blade;
+  // A weak (half-wound) blow shows as a faint slash.
+  const ghost = echo || !strong;
   switch (a.pattern) {
     case 'swing':
-      meleeArc(game, x, y, angle, range, a.arc ?? 120, damage);
-      game.fx.add({ type: 'slash', x, y, angle, dir, arc: (a.arc ?? 120) * DEG, r: range, color, core: blade[0], dur: 0.2, ghost: echo });
+      meleeArc(game, x, y, angle, range, a.arc ?? 120, damage, strong);
+      game.fx.add({ type: 'slash', x, y, angle, dir, arc: (a.arc ?? 120) * DEG, r: range, color, core: blade[0], dur: 0.2, ghost });
       break;
     case 'lash':
-      meleeArc(game, x, y, angle, range, a.arc ?? 60, damage);
-      game.fx.add({ type: 'whip', x, y, angle, dir, r: range, color: blade[1], tip: color, dur: 0.22, ghost: echo });
+      meleeArc(game, x, y, angle, range, a.arc ?? 60, damage, strong);
+      game.fx.add({ type: 'whip', x, y, angle, dir, r: range, color: blade[1], tip: color, dur: 0.22, ghost });
       break;
     case 'thrust':
-      meleeLine(game, x, y, angle, range, a.width ?? 0.7, damage);
-      game.fx.add({ type: 'thrust', x, y, angle, r: range, color, core: blade[0], dur: 0.16, ghost: echo });
+      meleeLine(game, x, y, angle, range, a.width ?? 0.7, damage, strong);
+      game.fx.add({ type: 'thrust', x, y, angle, r: range, color, core: blade[0], dur: 0.16, ghost });
       break;
     case 'slam': {
       const radius = a.radius ?? 1.6;
       const cx = x + Math.cos(angle) * range * 0.6;
       const cy = y + Math.sin(angle) * range * 0.6;
       const targets = enemiesInRadius(game, cx, cy, radius);
-      hitMeleeTargets(game, targets, damage, null, { x: cx, y: cy });
+      hitMeleeTargets(game, targets, damage, null, { x: cx, y: cy }, strong);
       game.fx.add({ type: 'ring', x: cx, y: cy, r0: 0.3, r1: radius, color, dur: 0.3, fill: true });
       game.fx.add({ type: 'cracks', x: cx, y: cy, r: radius, color: '#161622', dur: 0.6, seed: Math.random() * 1000 });
-      game.fx.emit('dust', cx, cy, 14, radius, 2.5);
-      game.shake = Math.max(game.shake, 0.28);
+      game.fx.emit('dust', cx, cy, strong ? 14 : 5, radius, 2.5);
+      if (strong) game.shake = Math.max(game.shake, 0.28);
       break;
     }
     default:
@@ -335,14 +339,37 @@ export function executePattern(game, { x, y, angle, damage, echo = false, dir = 
   }
 }
 
-/** Attempts a player attack in direction `angle`. Returns true if it fired. */
-export function tryAttack(game, angle) {
+/** How wound up your melee weapon is (0 … 1), or null when you hold no melee weapon (charge.js). */
+export function meleeCharge(game) {
+  const w = game.weapon;
+  if (!w || game.handsEmpty || game.toolActive || !MELEE_PATTERNS.has(w.attack.pattern)) return null;
+  const full = 1 / (w.stats.attackSpeed * game.pstats.attackSpeedMult);
+  return chargeOf(game.time - (game.player.swungAt ?? -99), full);
+}
+
+/**
+ * Attempts a player attack in direction `angle`. Returns true if it fired.
+ * `fresh`: a new press (melee weapons may then swing before they have wound
+ * up again, for less: charge.js); a held button swings at full charge only.
+ */
+export function tryAttack(game, angle, { fresh = false } = {}) {
   const p = game.player;
   const w = game.weapon;
   if (!w || p.attackCd > 0 || p.dead) return false;
   const aspd = w.stats.attackSpeed * game.pstats.attackSpeedMult;
   const pattern = w.attack.pattern;
-  p.attackCd = 1 / aspd;
+  const full = 1 / aspd;
+  let power = 1;
+  if (MELEE_PATTERNS.has(pattern)) {
+    const since = game.time - (p.swungAt ?? -99);
+    if (!maySwing(since, full, fresh)) return false;
+    power = chargeOf(since, full);
+    p.swungAt = game.time;
+    p.attackCd = swingGap(full);
+  } else {
+    p.attackCd = full;
+  }
+  const strong = power >= FULL_AT;
   p.facing = angle;
   // Swings alternate sides for a combo rhythm; the weapon rests where it ended.
   const dir = p.guard ?? 1;
@@ -350,12 +377,12 @@ export function tryAttack(game, angle) {
   const dur = attackDuration(pattern, aspd);
   const anim = { t: 0, dur, angle, pattern, dir };
   p.attackAnim = anim;
-  p.attackCount += 1;
+  if (strong) p.attackCount += 1;
   const count = p.attackCount;
 
-  let mult = 1;
+  let mult = chargeMult(power);
   for (const h of w.hooks.attack) if (h.do === 'sprintBonus' && p.sprinting) mult *= 1 + h.pct / 100;
-  for (const h of w.hooks.attack) if (h.do === 'blink') phaseStrike(game, h, angle);
+  if (strong) for (const h of w.hooks.attack) if (h.do === 'blink') phaseStrike(game, h, angle);
   const damage = weaponDamage(game) * mult;
 
   // Damage lands on the animation's impact frame, re-aimed at the target if
@@ -365,12 +392,14 @@ export function tryAttack(game, angle) {
     let a = angle;
     if (game.target && !game.target.dead) a = Math.atan2(game.target.y - p.y, game.target.x - p.x);
     anim.angle = a;
-    executePattern(game, { x: p.x, y: p.y, angle: a, damage, dir });
+    executePattern(game, { x: p.x, y: p.y, angle: a, damage, dir, strong });
+    game.audio.weapon(w.dna.sound);
+    // A weak (half-wound) blow sets off nothing more.
+    if (!strong) return;
     // Ascension: every strike also sends out a shockwave.
     if (game.ascend && game.ascend.until > game.time) game.ascend.strike(a);
     for (const h of w.hooks.attack) runAttackHook(game, h, a, damage);
     for (const h of w.hooks.nth) if (count % h.n === 0) runAttackHook(game, h, a, damage);
-    game.audio.weapon(w.dna.sound);
   };
   const delay = MELEE_PATTERNS.has(pattern) ? impactDelay(pattern, dur) : 0;
   if (delay > 0.01) game.schedule(delay, strike);

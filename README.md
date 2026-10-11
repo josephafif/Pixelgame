@@ -179,6 +179,21 @@ Tryck på platsen du redan håller (samma siffra eller samma ruta i hotbaren) f�
 undan** den. Då håller du ingenting: attackknappen blir en hand som bara används för att prata,
 öppna och plocka upp, så du slår inte någon av misstag (bra på marknader).
 
+## Laddslag
+
+Närstridsvapen (svärd, yxor, hammare, piskor och spjut) laddas som i Minecraft
+(`src/game/charge.js`, samma i singleplayer och på servern). Du kan slå så ofta du vill, men ett
+slag tar full skada först när vapnet laddats upp igen efter förra slaget (vapnets attackhastighet).
+En liten mätare under dig fylls medan det laddas.
+
+- Ett nytt tryck slår direkt efter en kort paus, men tar bara 10–100 % av skadan
+  (0,1 + 0,9 × laddning²). Att spamma ger alltid mindre skada per sekund än att vänta.
+- Bara ett fullt laddat slag (minst 90 %) kan bli kritiskt, knuffa ordentligt och sätta igång
+  vapnets effekter vid anfall.
+- Håller du inne knappen slår du bara fulla slag, i vapnets takt.
+
+Vapen som skjuter (stavar, bågar och liknande) laddas inte: de skjuter i sin takt som förut.
+
 ## Marknader
 
 Ute i världen finns sällsynta, befästa **marknader** (ungefär en per tio 112×112-rutors
@@ -212,6 +227,9 @@ Logik: `src/game/markets.js`; placering: `World#marketForCell` i `src/game/world
   Solnedgången färgar allt rött och på natten blir det mörkt, men facklor, lägerelden, smedjan,
   eldturrets, Sunfire Obelisk, lava, lumensvampar och kristaller lyser varmt runt sig
   (`src/render/lighting.js`), och du har själv ett litet sken omkring dig.
+- **Monstren är få**: några stycken runt dig på dagen och lite fler på natten
+  (`src/game/wilds.js`, samma i singleplayer och på servern). Prism Barrens har ännu färre. De
+  märker dig först när du kommer ganska nära (60 % av deras syn i speldatan).
 - **På natten strövar fler monster omkring**, på dagen färre. Monstren **skyr ljuset** från
   facklor och eld (`src/game/lights.js`): de föds aldrig i det och flyr ut ur det om de hamnar
   där. Bossar bryr sig inte. I multiplayer följer dygnet serverns klocka, så alla har samma tid.

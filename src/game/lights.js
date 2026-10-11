@@ -18,14 +18,14 @@ export const STRUCTURE_LIGHTS = {
   b_forge: { r: 4, color: 'warm', scare: true },
 };
 
-/** Tiles that glow (never scary): radius and colour. */
+/** Tiles that glow (never scary): radius, colour and strength (k). */
 export const TILE_LIGHTS = new Map([
-  [T.LAVA, { r: 1.7, color: 'lava' }],
-  [T.LUMENCAP, { r: 2.4, color: 'lumen' }],
-  [T.CRYSTAL, { r: 1.8, color: 'violet' }],
-  [T.PRISM, { r: 1.8, color: 'cyan' }],
-  [T.AETHERCRYSTAL, { r: 1.8, color: 'pale' }],
-  [T.STARSTONE, { r: 1.5, color: 'gold' }],
+  [T.LAVA, { r: 2.2, color: 'lava', k: 0.8 }],
+  [T.LUMENCAP, { r: 2.4, color: 'lumen', k: 0.6 }],
+  [T.CRYSTAL, { r: 1.8, color: 'violet', k: 0.55 }],
+  [T.PRISM, { r: 1.6, color: 'cyan', k: 0.35 }],
+  [T.AETHERCRYSTAL, { r: 1.8, color: 'pale', k: 0.4 }],
+  [T.STARSTONE, { r: 1.5, color: 'gold', k: 0.55 }],
 ]);
 
 /** The camp's own fires in single player: the hearth (with its fire) and the forge. */

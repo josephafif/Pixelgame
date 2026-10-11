@@ -11,7 +11,7 @@ import { inShape } from './workers.js';
 import { Fx } from './fx.js';
 import { computePlayerStats, xpToNext } from './stats.js';
 import {
-  compileWeapon, dealDamage, hurtPlayer, healPlayer, tryAttack, acquireTarget, weaponDamage, explosion,
+  compileWeapon, dealDamage, hurtPlayer, healPlayer, tryAttack, acquireTarget, weaponDamage, explosion, meleeCharge,
 } from './combat.js';
 import { spawnProjectile, updateProjectiles } from './projectiles.js';
 import { spawnArea, updateAreas, projectileSlowAt } from './areas.js';
@@ -439,6 +439,11 @@ export class Game {
   }
 
   /** True while the pickaxe is in hand. */
+  /** How wound up your melee weapon is (0 … 1), or null (charge.js). */
+  get meleeCharge() {
+    return meleeCharge(this);
+  }
+
   get toolActive() {
     return this.activeSlot === 'tool' && Boolean(currentPickaxe(this.data, this.save));
   }
@@ -2022,6 +2027,9 @@ export class Game {
     if (!p.attackAnim) p.facing = aim;
 
     if (!sample.attack) this.suppressAttack = false;
+    // A new press may swing a melee weapon before it has wound up again (charge.js).
+    const freshAttack = sample.attack && !this.attackWasDown;
+    this.attackWasDown = sample.attack;
     if (this.build.active) {
       this.#updateBuildGhost(sample);
     } else if (this.toolActive) {
@@ -2032,7 +2040,7 @@ export class Game {
         this.#swingPickaxe(h);
       }
     } else if (sample.attack && !this.suppressAttack && !this.handsEmpty) {
-      tryAttack(this, aim);
+      tryAttack(this, aim, { fresh: freshAttack });
     }
     p.swapT = Math.max(0, (p.swapT ?? 0) - dt);
 
@@ -2071,8 +2079,8 @@ export class Game {
     w.clock = (w.clock ?? clockAt(START_HOUR)) + dt * 1000;
     const phase = phaseOf(this.hour);
     if (this.dayPhase && phase !== this.dayPhase) {
-      if (phase === 'dusk') this.toast('The sun is setting. At night more monsters roam, but they shun torches and fire.', 'info');
-      else if (phase === 'dawn') this.toast('Dawn breaks: the monsters grow fewer.', 'info');
+      if (phase === 'dusk') this.toast('Night falls. Monsters shun torches and fire.', 'info');
+      else if (phase === 'dawn') this.toast('Dawn: fewer monsters about.', 'info');
     }
     this.dayPhase = phase;
   }
@@ -2093,11 +2101,11 @@ export class Game {
       if (c === 'interact' || c === 'interact-or-attack') {
         // At sea, attacking a monster in reach never takes you ashore (Use still does).
         if (this.#fightingAtSea(c, sample)) {
-          if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample));
+          if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample), { fresh: true });
           continue;
         }
         if (this.interact()) this.suppressAttack = true;
-        else if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample));
+        else if (c === 'interact-or-attack' && !this.handsEmpty) tryAttack(this, this.#aim(sample), { fresh: true });
       } else if (c === 'ability') {
         if (!this.toolActive && !this.handsEmpty) castAbility(this, this.#aim(sample));
       } else if (c === 'dash') {
