@@ -10,7 +10,7 @@ import {
 } from '../../src/game/army.js';
 import {
   territoryAt, outpostFor, outpostLayout, defendersFor, monsterPower, outpostLevel, abstractBattle, stepCapture,
-  frontier, defenseFactor, incomeFor, territoryKey, outpostDormant,
+  frontier, defenseFactor, incomeFor, territoryKey, outpostDormant, regionAt, regionOutline, regionsIn, HOME_REGION,
 } from '../../src/game/territory.js';
 import { createWorker } from '../../src/game/workers.js';
 import { upkeepPerDay } from '../../src/game/upkeep.js';
@@ -18,7 +18,7 @@ import { loadData } from './helpers.js';
 
 const data = loadData();
 
-test('territories: squares centred on the camp, an outpost on dry land in most, the same every time', () => {
+test('territories: the world in cells centred on the camp, an outpost on dry land in most, the same every time', () => {
   assert.deepEqual(territoryAt(data, 0, 0), { tx: 0, ty: 0 });
   assert.deepEqual(territoryAt(data, 47, -47), { tx: 0, ty: 0 });
   assert.deepEqual(territoryAt(data, 49, 0), { tx: 1, ty: 0 });
@@ -140,4 +140,51 @@ test('far away, a soldier marches straight to its post (no fights there)', () =>
   for (let i = 0; i < 10; i++) stepSoldier(s, ctx, 1);
   assert.ok(s.ghost && s.x > 30 && s.x < 40 && s.y === 0, `marched ${s.x}`);
   assert.equal(territoryKey(1, -2), '1,-2');
+});
+
+test('close to you, a soldier sent far walks there leg by leg (and never loses its place)', () => {
+  const w = new World(data, 7);
+  const start = w.findFreeSpot(300.5, 300.5, 0.3, 'pal');
+  const s = makeSoldier(createWorker({ id: 3, role: 'infantry' }, start, { hp: 150 }));
+  const goal = w.findFreeSpot(start.x + 90, start.y, 0.3, 'pal');
+  const ctx = {
+    world: w, time: 0, stats: () => soldierStats(data, { role: 'infantry', gear: 3, rank: 0 }), post: () => goal,
+    stance: () => 'balanced', foes: () => [], hit: () => {}, shoot: () => {}, live: () => true,
+  };
+  for (let i = 0; i < 400; i++) {
+    stepSoldier(s, ctx, 0.1);
+    assert.ok(Number.isFinite(s.x) && Number.isFinite(s.y), `step ${i}: ${s.x}, ${s.y}`);
+  }
+  assert.ok(s.x > start.x + 30, `on its way (${Math.round(s.x - start.x)} tiles)`);
+});
+
+test('territories on the map: the land around each outpost (no squares), borders where neighbours meet, the camp its own', () => {
+  const w = new World(data, 42);
+  assert.equal(regionAt(w, data, 0.5, 0.5), HOME_REGION);
+  // Worked out a few at a time when asked to (the strategy map does that).
+  const fresh = new World(data, 43);
+  const first = regionsIn(fresh, data, -200, -200, 200, 200, { budget: { n: 0 } });
+  assert.ok(first.pending && first.list.every((r) => r.home));
+  const { list, pending } = regionsIn(w, data, -200, -200, 200, 200);
+  assert.ok(!pending && list.length > 10);
+  let wild = 0;
+  for (const site of list) {
+    if (site.home) continue;
+    assert.equal(regionAt(w, data, site.x, site.y)?.key, site.key, 'the flag stands on its own land');
+    // The border: just inside is its land, just outside is not.
+    const pts = regionOutline(w, data, site);
+    assert.ok(pts.length >= 40);
+    for (const [x, y] of pts.filter((_, i) => i % 7 === 0)) {
+      const d = Math.hypot(x - site.x, y - site.y);
+      const ix = site.x + ((x - site.x) * (d - 1)) / d;
+      const iy = site.y + ((y - site.y) * (d - 1)) / d;
+      assert.equal(regionAt(w, data, ix, iy)?.key, site.key);
+      const ox = site.x + ((x - site.x) * (d + 1)) / d;
+      const oy = site.y + ((y - site.y) * (d + 1)) / d;
+      const out = regionAt(w, data, ox, oy);
+      assert.notEqual(out?.key, site.key);
+      if (!out) wild++;
+    }
+  }
+  assert.ok(wild > 0, 'open land between some of them');
 });

@@ -53,6 +53,11 @@ export function factionIdOf(owner) {
   return isFactionRef(owner) ? owner.slice(2) : null;
 }
 
+/** A Swedish name's genitive: Järnlegionen → Järnlegionens (a name ending in s stays as it is). */
+export function genitiveSv(name) {
+  return /[sxz]$/i.test(name) ? name : `${name}s`;
+}
+
 function cheb(a, b) {
   return Math.max(Math.abs(a.tx - b.tx), Math.abs(a.ty - b.ty));
 }
@@ -143,8 +148,8 @@ export function troopPower(data, faction, tier, count, site) {
  *   defense(key, site) → power of a non-faction owner's defence there (or of the monsters guarding a neutral one),
  *   allowed(key, factionId, kind) → may it march there at all (never your camp, never a dormant outpost …),
  *   live(key, site) → is a player near (then the caller fights it out for real: realAttack),
- *   realAttack(army, site) → spawn the army's troops by the outpost,
- *   taken(key, factionId, fromOwner), lost(key, factionId, toOwner), plunder(owner, pct, faction),
+ *   realAttack(army, site) → the army's troops come for the flag (spawned there, or the ones already walking),
+ *   taken(key, factionId, fromOwner, army), lost(key, factionId, toOwner), plunder(owner, pct, faction),
  *   told(text) → a message for the player(s) (optional).
  */
 export function stepFactions(state, ctx, dt) {
@@ -252,6 +257,8 @@ function marchArmies(state, ctx, cfg, dt) {
       state.armies = state.armies.filter((a) => a !== army);
       continue;
     }
+    // Close to a player the army walks for real: the caller moves it (and says when it arrives: armyArrives).
+    if (army.live) continue;
     const dx = site.x - army.x;
     const dy = site.y - army.y;
     const d = Math.hypot(dx, dy);
@@ -266,16 +273,25 @@ function marchArmies(state, ctx, cfg, dt) {
   }
 }
 
+/** An army that walked for real (close to a player) reached its target. */
+export function armyArrives(state, ctx, army) {
+  state.armies = state.armies.filter((a) => a !== army);
+  const site = siteOf(ctx, army.to);
+  if (site && factionById(state, army.faction)?.alive) arrive(state, ctx, factionConfig(ctx.data), army, site);
+}
+
 function arrive(state, ctx, cfg, army, site) {
   const f = factionById(state, army.faction);
   const key = army.to;
   if (!ctx.allowed(key, f.id, army.kind)) {
     returnHome(state, cfg, army);
+    ctx.told?.({ kind: 'home', faction: f, key, army });
     return;
   }
   const theirs = state.owned[key];
   if (theirs?.faction === f.id) {
     theirs.garrison = Math.min(cfg.tiers[theirs.tier].garrison + 2, theirs.garrison + army.troops);
+    ctx.told?.({ kind: 'joined', faction: f, key, army });
     return;
   }
   const other = theirs ? null : ctx.ownerOf(key);
@@ -291,7 +307,7 @@ function arrive(state, ctx, cfg, army, site) {
   const res = abstractBattle(attack, defense, ctx.rng);
   if (!res.win) {
     if (theirs) theirs.garrison = Math.max(1, Math.round(theirs.garrison * (1 - res.defenderLoss)));
-    ctx.told?.({ kind: 'repelled', faction: f, key, owner: other });
+    ctx.told?.({ kind: 'repelled', faction: f, key, owner: other, army });
     return;
   }
   const left = Math.max(1, Math.round(army.troops * (1 - res.attackerLoss)));
@@ -304,13 +320,13 @@ function arrive(state, ctx, cfg, army, site) {
     if (f.personality === 'raider') {
       ctx.plunder(other, cfg.plunderPct, f);
       ctx.lost(key, f.id, null);
-      ctx.told?.({ kind: 'plundered', faction: f, key, owner: other });
+      ctx.told?.({ kind: 'plundered', faction: f, key, owner: other, army });
       return;
     }
     ctx.lost(key, f.id, factionRef(f.id));
   }
   state.owned[key] = { faction: f.id, tier: 'camp', garrison: Math.min(cfg.tiers.camp.garrison + 1, left), since: Date.now() };
-  ctx.taken(key, f.id, other ?? (theirs ? factionRef(theirs.faction) : null));
+  ctx.taken(key, f.id, other ?? (theirs ? factionRef(theirs.faction) : null), army);
 }
 
 function returnHome(state, cfg, army) {

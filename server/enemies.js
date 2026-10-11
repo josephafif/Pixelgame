@@ -399,6 +399,19 @@ function behave(gs, e, dt) {
     return;
   }
   if (!p) {
+    if (e.march) {
+      // On the march with its faction's army (army.js): straight on towards where it is headed.
+      if ((e.march.x - e.x) ** 2 + (e.march.y - e.y) ** 2 > 2.25) {
+        goToward(gs, e, e.march.x, e.march.y, e.speed * (e.slowMult ?? 1) * 0.7);
+        e.state = 'move';
+      } else {
+        e.vx = e.vy = 0;
+        e.state = 'idle';
+      }
+      e.homeX = e.x;
+      e.homeY = e.y;
+      return;
+    }
     wander(gs, e, dt);
     return;
   }
@@ -673,7 +686,8 @@ export function update(gs, dt) {
     const near = gs.nearestPlayer(e.x, e.y, e.boss ? 45 : DESPAWN_DIST);
     // Out of everyone's sight (and reach), a monster rests: nobody can see
     // it, and thinking for it would only cost time every tick.
-    const resting = !e.boss && (!near || (near.x - e.x) ** 2 + (near.y - e.y) ** 2 > REST_DIST * REST_DIST);
+    // (A faction's army on the march walks on: someone may be watching it come.)
+    const resting = !e.boss && !e.march && (!near || (near.x - e.x) ** 2 + (near.y - e.y) ** 2 > REST_DIST * REST_DIST);
     if (resting) {
       e.vx = e.vy = 0;
     } else if (e.stunned) {

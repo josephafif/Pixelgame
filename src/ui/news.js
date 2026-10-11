@@ -8,15 +8,15 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-territories-5',
+  id: '2026-10-territories-6',
   title: { sv: 'Territorier och fraktioner', en: 'Territories and Factions' },
   teaser: {
-    sv: 'Den största uppdateringen hittills är på väg: tre nya biomer, soldater, en strategikarta och fraktioner som för krig.',
-    en: 'The biggest update yet is on its way: three new biomes, soldiers, a strategy map and factions at war.',
+    sv: 'Den största uppdateringen hittills är här: tre nya biomer, soldater, en strategikarta och fraktioner som för krig.',
+    en: 'The biggest update yet is here: three new biomes, soldiers, a strategy map and factions at war.',
   },
   intro: {
-    sv: 'Utforska, hitta ritningar, bygg upp basen, träna en armé och ta över världen, ett territorium i taget. Delarna kommer en i taget, i både singleplayer och multiplayer.',
-    en: 'Explore, find blueprints, build up your base, train an army and take the world, one territory at a time. The parts land one by one, in single player and multiplayer alike.',
+    sv: 'Utforska, hitta ritningar, bygg upp basen, träna en armé och ta över världen, ett territorium i taget. Allt finns i både singleplayer och multiplayer.',
+    en: 'Explore, find blueprints, build up your base, train an army and take the world, one territory at a time. All of it in single player and multiplayer alike.',
   },
   sections: [
     {
@@ -51,18 +51,18 @@ export const NEWS = {
         },
         {
           live: true,
-          sv: '**Strategikartan** (N): världen i rutor ovanifrån. Välj en trupp och en ruta: anfall, försvara, patrullera eller flytta dit. Eller följ mig, håll och retirera, med en hållning från defensiv till aggressiv.',
-          en: '**The strategy map** (N): the world from above in squares. Pick a squad and a square: attack, defend, patrol or move there. Or follow me, hold and retreat, with a stance from defensive to aggressive.',
+          sv: '**Strategikartan** (N): den riktiga kartan över det ni utforskat, med territorierna som områden runt utposterna, era soldater där de är och arméer på marsch. Välj en trupp och peka på kartan: anfall, försvara, patrullera eller flytta dit. Eller följ mig, håll och retirera, med en hållning från defensiv till aggressiv. Striderna sker ute i världen, där ni ser dem.',
+          en: '**The strategy map** (N): the real map of what you have explored, with the territories as the land around their outposts, your soldiers where they are and armies on the march. Pick a squad and point at the map: attack, defend, patrol or move there. Or follow me, hold and retreat, with a stance from defensive to aggressive. The fighting happens out in the world, where you see it.',
         },
         {
           live: true,
-          sv: '**Territorier**: varje ruta har en utpost med palissad och flagga. Besegra väktarna och håll flaggan, så är den er och ger inkomst varje timme. Monster gör motanfall, en lång front är svår att hålla, och det ni förlorar kan ni ta tillbaka. I multiplayer tar klaner territorier av varandra.',
-          en: '**Territories**: every square has an outpost with a palisade and a flag. Beat its guards and hold the flag, and it is yours and pays every hour. Monsters counterattack, a long front is hard to hold, and what you lose you can take back. In multiplayer, clans take territory from each other.',
+          sv: '**Territorier**: utposter med palissad och flagga står ute i världen, och marken runt varje utpost hör till den. Besegra väktarna och håll flaggan, så är den er och ger inkomst varje timme. Monster gör motanfall, en lång front är svår att hålla, och det ni förlorar kan ni ta tillbaka. I multiplayer tar klaner territorier av varandra.',
+          en: '**Territories**: outposts with a palisade and a flag stand out in the world, and the land around each belongs to it. Beat its guards and hold the flag, and it is yours and pays every hour. Monsters counterattack, a long front is hard to hold, and what you lose you can take back. In multiplayer, clans take territory from each other.',
         },
         {
-          live: false,
-          sv: '**NPC-fraktioner**: läger, fästen och högkvarter med egna arméer. De försvarar sig, expanderar och anfaller varandra, och dig.',
-          en: '**NPC factions**: camps, strongholds and headquarters with armies of their own. They defend, expand and attack each other, and you.',
+          live: true,
+          sv: '**NPC-fraktioner**: tre till fem fraktioner, som Järnlegionen och Askförbundet, med läger, fästen (med torn) och högkvarter (stenvallar och fyra torn) och egna trupper. Var och en har en personlighet (försvarare, expansionist, plundrare eller strateg) och en egen list. De växer, förstärker, expanderar och anfaller varandra, och dig. Nära dig marscherar deras arméer på riktigt genom landskapet: stoppa dem på vägen eller håll flaggan. Ta ett högkvarter så får fraktionen det svårt.',
+          en: '**NPC factions**: three to five factions, such as the Iron Legion and the Ash Covenant, with camps, strongholds (with towers) and headquarters (stone ramparts and four towers) and troops of their own. Each has a personality (defender, expansionist, raider or strategist) and its own cunning. They grow, reinforce, expand and attack each other, and you. Close to you their armies march across the land for real: stop them on the way or hold the flag. Take a headquarters and the faction struggles.',
         },
       ],
     },

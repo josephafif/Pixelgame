@@ -464,6 +464,7 @@ export function spawnProjectile(gs, o) {
     enemy: o.enemy ?? 0,
     turret: o.turret ?? 0,
     market: o.market ?? null, // a market turret's shot
+    outpost: o.outpost ?? null, // a faction tower's shot (its outpost)
     clanId: o.clanId ?? null, // a turret's clan: its shots fly over the clan's own walls
     kind: o.kind ?? 'shot',
     pierce: o.pierce ?? 0,
@@ -579,6 +580,7 @@ function bounceOn(gs, pr) {
  */
 function ownStructure(gs, pr, st) {
   if (pr.market) return st.marketId === pr.market;
+  if (pr.outpost) return st.outpost === pr.outpost; // a faction's tower shoots over its own walls
   if (!st.clanId) return false;
   const clanId = pr.turret ? pr.clanId : pr.owner ? gs.players.get(pr.owner)?.clanId : null;
   return clanId === st.clanId;

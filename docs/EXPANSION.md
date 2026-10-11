@@ -12,7 +12,7 @@ på väg.
 | 3 | Mireglass Fen och Skyreach (hästhopp mellan öar) | klar |
 | 4 | Sällsyntare ritningar, de bästa bara från svåra bossar | klar |
 | 5 | Soldater, trupper, strategikartan och territorier | klar |
-| 6 | NPC-fraktioner med baser och strategisk AI | planerad |
+| 6 | NPC-fraktioner med baser och strategisk AI | klar |
 | 7 | Integration, gamla sparfiler, prestanda och dokumentation | planerad |
 
 Före planen kom också: fuskskydd (inget `window.__pixelgame` på den publicerade sidan),
@@ -97,9 +97,12 @@ fler hästflockar som syns på kartan, och dyrare byggen och underhåll.
 
 ### 2.5 Territorier (fas 5)
 
-- Världen delas i **territorier** i ett rutnät (96×96 rutor). Varje territorium har en
-  **utpost** på en bestämd, torr plats: en liten skans av block med flagga, palissad och
-  port.
+- **Utposter** står på bestämda, torra platser ute i världen: en liten skans med flagga,
+  palissad och port. Ett **territorium** är marken runt en utpost: inom ungefär 46 rutor
+  från flaggan och närmare den än någon annan utpost (lägret har sitt eget). På kartan är
+  territorierna alltså områden på den riktiga kartan, inga rutor.
+- För att hitta utposterna snabbt delas världen internt i celler (96×96 rutor, centrerade
+  på lägret) med högst en utpost var. Cellen ger territoriets nyckel (`'tx,ty'`).
 - Ägare: ingen (neutral), spelaren (SP), en klan (MP) eller en fraktion.
 - **Erövring:** besegra försvararna och håll flaggan tills mätaren är full, utan fiender i
   närheten. Att bara klicka på kartan räcker inte.
@@ -113,25 +116,32 @@ fler hästflockar som syns på kartan, och dyrare byggen och underhåll.
 - Tre till fem fraktioner per värld. Var och en har ett högkvarter i ett eget territorium,
   en **personlighet** (försvarare, expansionist, plundrare eller strateg) och en
   **AI-kvalitet**.
-- Baserna har tre nivåer: **läger**, **regionalt fäste** och **högkvarter**. De byggs av
-  vanliga block och har murar, portar och torn.
+- Baserna har tre nivåer: **läger** (palissad), **fäste** (två torn) och **högkvarter**
+  (stenvallar och fyra torn). Tornen skjuter på den som kommer nära. Varje bas har en
+  garnison av fraktionens egna trupper (krigare, bågskyttar och en kapten i fästen och
+  högkvarter), i fraktionens färg.
 - **Strategisk AI** körs med fasta intervall (inte varje bildruta). Den bedömer hot, väljer
   mål (försvara, expandera, plundra, anfalla), samlar trupper, skickar dem längs
   territoriernas grannskap och omvärderar efteråt.
-- **Två nivåer av simulering:** nära en spelare strider soldaterna på riktigt i världen.
-  Långt bort avgörs striderna abstrakt, med samma styrkevärden (hälsa, skada,
-  befästningar). Resultaten blir därför jämförbara.
+- **Två nivåer av simulering:** nära en spelare strider soldaterna på riktigt i världen,
+  och en fraktions armé som kommer inom ungefär 56 rutor kliver ut i världen och
+  marscherar på riktigt mot sitt mål (den går att stoppa på vägen). Långt bort marscherar
+  arméerna som en helhet och striderna avgörs abstrakt, med samma styrkevärden (hälsa,
+  skada, befästningar). Resultaten blir därför jämförbara.
 - **Spärrar:** gränser för hur många territorier en fraktion kan ha, hur långt den når och
   hur mycket den kan bygga upp. När spelaren är borta simuleras högst några timmar, och
   fraktionerna kan inte ta spelarens läger.
 
 ### 2.7 Strategikartan (fas 5–6)
 
-- En egen panel (tangent **N**, och en knapp i menyn) med territorierna ovanifrån: ägare i
-  färg, utposter, trupper och kända fiendearméer, gränser och status (kontrollerat,
-  neutralt, omstritt, under attack).
-- Markera trupper och klicka på ett territorium eller en plats för att ge order. Panelen
-  visar vart gruppen är på väg, vad den gör och varför den inte kan lyda.
+- En egen panel (tangent **N**, och en knapp i menyn) med **den riktiga kartan** (det
+  man har utforskat, ritat som världskartan) och territorierna som områden på den: ägare i
+  färg, gränser, utposter och baser, era soldater där de är, trupperna och kända
+  fiendearméer på marsch, och status (ert, neutralt, tas just nu, under attack).
+- Kartan är till för överblick och order: dra för att panorera, zooma med hjul eller två
+  fingrar. Välj en trupp och peka på kartan: anfall, försvara eller patrullera en utpost,
+  eller flytta dit. Striderna sker ute i världen, där man ser dem. Panelen visar vad
+  gruppen gör och varför den inte kan lyda.
 
 ### 2.8 Multiplayer
 
@@ -158,38 +168,43 @@ fler hästflockar som syns på kartan, och dyrare byggen och underhåll.
 
 ```js
 save.world.gen = 2;                    // världsversion
-save.world.legacyExplored = 1234;      // de första N utforskade chunkarna behåller sin gamla biom
-save.base.workers = [{ id, role, level, xp, gear, trainingTo, trainUntil }];
+save.base.workers = [{ id, role, gear, rank, xp, trainingTo, trainUntil }]; // soldater har en soldatroll
 save.army = {
-  squads: [{ id, name, members: [workerId], order: { kind, x, y, territory, route }, stance }],
+  squads: [{ id, name, members: [workerId], order: { kind, key?, x, y }, stance }],
   nextSquad: 1,
 };
 save.territories = {
-  owned: { 'tx,ty': { since, garrison: [workerId], capture: 0 } },
-  factions: { [factionId]: { territories: ['tx,ty'], strength, gold, mood, plan } },
-  armies: [{ id, faction, from, to, at, strength, units }],
-  clock: 0, // strategisk tid som har simulerats
+  owned: { 'tx,ty': { since } }, capture: { 'tx,ty': 0..1 }, cleared: { 'tx,ty': until },
+  incomeAt, raidT,
 };
-save.blueprints = { found: { [id]: count }, firstKills: { [bossId]: true } };
+save.factions = {
+  list: [{ id, name, sv, color, personality, quality, hq: 'tx,ty', bank, alive, hqLost }],
+  owned: { 'tx,ty': { faction, tier: 'camp'|'stronghold'|'hq', garrison, since } },
+  armies: [{ id, faction, kind, from, to, troops, x, y }], nextArmy, aiT, lastAt,
+};
 ```
 
 ### Multiplayer (servern)
 
-- `meta`: `worldGen`, `legacyChunks`.
-- `territories` (tabell): `key, owner_kind ('clan'|'faction'), owner_id, since, state (json)`.
-- `factions` (tabell): `id, state (json)`.
-- Klanens soldater ligger i `clan.base.workers` (samma register som arbetarna).
-  Trupperna ligger i `clan.base.squads`.
+- `meta 'territories'`: klanernas territorier `[[key, { owner, since, cleared }]]`.
+- `meta 'factions'`: fraktionernas tillstånd (som `save.factions`).
+- Klanens soldater ligger i `clan.base.workers` (samma register som arbetarna) och
+  trupperna i `clan.base.army`.
+- `{ t: 'terr', list, factions, armies }` till alla: vem som håller vad (en fraktions mark
+  har ägaren `'f:<id>'` och basens nivå), fraktionerna och deras arméer.
 
 ### Territorium (delat, deterministiskt)
 
 ```js
-territoryFor(world, tx, ty) → { key: 'tx,ty', x, y /* utpostens mitt */, tier, terrain, neighbours }
+outpostFor(world, data, tx, ty) → { key: 'tx,ty', tx, ty, fx, fy, x, y /* flaggan */, tier, biome } | null
+regionAt(world, data, x, y)     → utposten (eller lägret) vars mark rutan ligger på, eller null
+regionOutline(world, data, site) → gränsen som en polygon av världspunkter
 ```
 
 ### Fraktion
 
 ```js
-{ id, name, color, personality: 'defender'|'expansionist'|'raider'|'strategist', quality: 1..3,
-  hq: 'tx,ty', bases: { 'tx,ty': 'camp'|'stronghold'|'hq' } }
+{ id, name, sv, color, personality: 'defender'|'expansionist'|'raider'|'strategist', quality: 1..3,
+  hq: 'tx,ty', bank, alive }
+// Baserna står i state.owned: { 'tx,ty': { faction, tier: 'camp'|'stronghold'|'hq', garrison } }
 ```

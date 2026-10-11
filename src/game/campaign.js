@@ -18,19 +18,21 @@ import {
   squadHealth, stanceParams, STANCES, ORDER_NAMES, roleTitle,
 } from './army.js';
 import {
-  territoryConfig, territoryAt, territoryKey, parseKey, outpostFor, outpostLayout, defendersFor, outpostLevel,
-  monsterPower, abstractBattle, stepCapture, incomeFor, frontier, defenseFactor, placeOutpost, removeOutpost,
+  territoryConfig, territoryAt, parseKey, outpostFor, outpostLayout, defendersFor, outpostLevel,
+  monsterPower, abstractBattle, stepCapture, incomeFor, frontier, defenseFactor, placeOutpost, removeOutpost, regionsIn, regionAt,
 } from './territory.js';
 import { buildingDef, buildingLevel, canAfford, pay, shortfalls } from './base.js';
 import { spawnEnemy } from './enemies.js';
 import { runTurret } from './construction.js';
 import {
   createFactions, factionAt, factionById, troopsFor, troopPower, stepFactions, loseToOthers, takeFor, factionConfig,
-  factionSquares, visibleArmies,
+  factionSquares, visibleArmies, armyArrives,
 } from './factions.js';
 import { dealDamage } from './combat.js';
 
 const LIVE = 64; // soldiers within this of you fight for real
+const ARMY_LIVE = 56; // a faction's army closer than this walks the land for real
+const ARMY_GONE = 84;
 const ACTIVATE = 70; // outposts closer than this stand in the world
 const DEACTIVATE = 92;
 const CLEARED_FOR = 12 * 60 * 1000; // beaten guards stay away this long (ms)
@@ -70,6 +72,9 @@ export class Campaign {
       for (const key of Object.keys(game.save.factions.owned)) if (this.isOwned(key)) delete game.save.factions.owned[key];
     }
     game.save.factions.armies ??= [];
+    // (Armies walk for real only while you are near: after a load they march on as a whole.)
+    for (const a of game.save.factions.armies) for (const k of ['live', 'best', 'bestAt', 'restUntil']) delete a[k];
+    this.marching = new Map(); // army id → its troops (enemies) walking the land
     this.fctx = this.#factionCtx();
     this.#catchUp();
   }
@@ -121,14 +126,25 @@ export class Campaign {
         const f = factionById(this.factions, army.faction);
         const entry = this.active.get(site.key);
         if (!f || !entry) return;
-        this.#spawnTroops(entry, f, troopsFor(f, 'camp', army.troops), { raid: true });
+        const walking = this.#troopsOf(army);
+        if (walking.length) {
+          // The ones that marched here go for the flag.
+          const flag = entry.structures.find((st) => st.id === 'outpost_flag') ?? null;
+          for (const e of walking) Object.assign(e, { army: null, march: null, raid: site.key, siege: flag, homeX: site.x, homeY: site.y });
+          this.marching.delete(army.id);
+        } else {
+          this.#spawnTroops(entry, f, troopsFor(f, 'camp', army.troops), { raid: true });
+        }
         this.alerts.set(site.key, g.time + 60);
         g.toast(`${f.name} attacks your outpost ${this.#where(site)}! Hold the flag.`, 'boss');
         g.audio.play('boss');
       },
-      taken: (key, fid, from) => {
+      taken: (key, fid, from, army) => {
+        const entry = this.active.get(key);
+        if (entry) this.#garrisonTaken(entry, factionById(this.factions, fid), army);
         this.#setFlag(key);
         if (from?.kind === 'player') g.toast(`${factionById(this.factions, fid)?.name ?? 'A faction'} took your outpost ${this.#where(this.site(key))}.`, 'warn');
+        else if (entry) g.toast(`${factionById(this.factions, fid)?.name ?? 'A faction'} took the outpost ${this.#where(entry.site)}.`, 'info');
         this.#changed();
       },
       lost: (key, fid, to) => {
@@ -151,6 +167,21 @@ export class Campaign {
         g.toast(`${f.name} plundered your outpost${got.length ? ` and made off with ${got.join(', ')} from the Vault` : ''}.`, 'warn');
       },
       told: (e) => {
+        // Troops that walked here and are done: beaten back, or home again, or inside their own walls.
+        if (e.army && ['repelled', 'home', 'joined', 'plundered'].includes(e.kind)) {
+          const entry = e.kind === 'joined' ? this.active.get(e.key) : null;
+          for (const t of this.#troopsOf(e.army)) {
+            if (entry) {
+              Object.assign(t, { army: null, march: null, outpost: e.key, homeX: entry.site.x, homeY: entry.site.y });
+              entry.defenders.push(t);
+            } else {
+              g.fx.emit('smoke', t.x, t.y, 6, 0.4, 1);
+              t.dead = t.vanished = true;
+            }
+          }
+          this.marching.delete(e.army.id);
+          if (e.kind === 'repelled' && this.active.has(e.key) && !e.owner) g.toast(`${e.faction.name} attacked the outpost ${this.#where(this.site(e.key))} and was beaten back.`, 'info');
+        }
         if (e.kind === 'march' && e.target?.kind === 'player') {
           g.toast(`${e.faction.name} is marching on one of your outposts. Check the strategy map (N).`, 'warn');
         } else if (e.kind === 'repelled' && e.owner?.kind === 'player') {
@@ -335,6 +366,8 @@ export class Campaign {
     if (this.checkT <= 0) {
       this.checkT = 0.5;
       this.#outposts();
+      this.#armies();
+      this.#landHere();
     }
     this.#stepSoldiers(dt);
     this.#capture(dt);
@@ -502,6 +535,22 @@ export class Campaign {
     }
   }
 
+  /** Stepping onto a faction's land (or back onto yours) is worth a word. */
+  #landHere() {
+    const p = this.game.player;
+    const region = regionAt(this.game.world, this.data, p.x, p.y);
+    const owner = !region ? null : region.home || this.isOwned(region.key) ? 'me' : this.factionAt(region.key)?.id ?? null;
+    if (owner === this.landOwner) return;
+    const before = this.landOwner;
+    this.landOwner = owner;
+    if (before === undefined) return;
+    const f = owner && owner !== 'me' ? factionById(this.factions, owner) : null;
+    if (f) {
+      const base = this.factions.owned[region.key]?.tier;
+      this.game.toast(`You enter the land of ${f.name}${base === 'hq' ? ', by their headquarters' : ''}. Their troops guard it.`, 'warn');
+    }
+  }
+
   /** The faction holding a square, or null. */
   factionAt(key) {
     return factionAt(this.factions, key);
@@ -585,12 +634,139 @@ export class Campaign {
     removeOutpost(this.game.world, entry.structures);
     // Guards left standing go back to their posts (they are there when you come back).
     if (!keepTroops) for (const e of entry.defenders) if (!e.dead) e.dead = e.vanished = true;
+    if (!keepTroops) {
+      // Raiders still at it: a faction's fight goes on as a whole (an army right by the flag); monsters give up.
+      const raiders = this.game.enemies.filter((e) => !e.dead && e.raid === key);
+      const byFaction = new Map();
+      for (const e of raiders) {
+        e.dead = e.vanished = true;
+        if (e.faction && factionById(this.factions, e.faction)?.alive) byFaction.set(e.faction, (byFaction.get(e.faction) ?? 0) + 1);
+      }
+      for (const [fid, n] of byFaction) {
+        const f = factionById(this.factions, fid);
+        this.factions.armies.push({ id: this.factions.nextArmy++, faction: fid, kind: 'attack', from: f.hq, to: key, troops: n, x: entry.site.x, y: entry.site.y });
+      }
+    }
     this.active.delete(key);
     this.#refresh();
   }
 
   #refresh() {
     this.structures = [...this.active.values()].flatMap((e) => e.structures);
+  }
+
+  // --- The factions' armies close to you: on the march for real -------------------------------------------
+
+  #troopsOf(army) {
+    return (this.marching.get(army.id) ?? []).filter((e) => !e.dead && e.army === army.id);
+  }
+
+  #armies() {
+    const g = this.game;
+    const p = g.player;
+    for (const army of [...this.factions.armies]) {
+      const f = factionById(this.factions, army.faction);
+      const site = this.site(army.to);
+      if (!f || !site) continue;
+      if (!army.live) {
+        if (!p.dead && dist2(army, p) < ARMY_LIVE * ARMY_LIVE && (army.restUntil ?? 0) < g.time) this.#muster(army, f, site);
+        continue;
+      }
+      const all = this.marching.get(army.id) ?? [];
+      const troops = this.#troopsOf(army);
+      if (!troops.length) {
+        // Beaten in the field (by you or your soldiers): the army is no more.
+        this.factions.armies = this.factions.armies.filter((a) => a !== army);
+        this.marching.delete(army.id);
+        if (all.some((e) => e.dead && !e.vanished)) {
+          g.toast(`You routed an army of ${f.name}!`, 'legendary');
+          this.#changed();
+        }
+        continue;
+      }
+      const c = { x: troops.reduce((a, e) => a + e.x, 0) / troops.length, y: troops.reduce((a, e) => a + e.y, 0) / troops.length };
+      army.x = c.x;
+      army.y = c.y;
+      army.troops = troops.length;
+      const left = Math.hypot(site.x - c.x, site.y - c.y);
+      if (dist2(c, p) > ARMY_GONE * ARMY_GONE || p.dead) {
+        this.#dismiss(army, troops);
+        continue;
+      }
+      // Stuck (water, cliffs): it goes on as a whole for a while.
+      if (left < (army.best ?? Infinity) - 1) {
+        army.best = left;
+        army.bestAt = g.time;
+      } else if (g.time - (army.bestAt ?? g.time) > 20) {
+        this.#dismiss(army, troops);
+        army.restUntil = g.time + 45;
+        continue;
+      }
+      if (left < 9) {
+        delete army.live;
+        armyArrives(this.factions, this.fctx, army);
+        // Whoever is still marching for it now (the fight was decided) goes away.
+        for (const e of this.#troopsOf(army)) e.dead = e.vanished = true;
+        this.marching.delete(army.id);
+      }
+    }
+  }
+
+  /** An army comes close: its troops stand where it is and walk on to its target. */
+  #muster(army, f, site) {
+    const g = this.game;
+    const level = Math.max(outpostLevel(site), 1);
+    const target = { x: site.x, y: site.y + 7 };
+    // Just setting out from its own walls: out through the gate.
+    const from = this.site(army.from);
+    const at = from && dist2(from, army) < 36 ? { x: from.x, y: from.y + 6 } : army;
+    const list = [];
+    troopsFor(f, 'camp', army.troops).forEach((d, i) => {
+      const spot = g.world.findFreeSpot(at.x + (i % 3) - 1, at.y + Math.floor(i / 3) - 1, 0.45, 'enemy', null);
+      if (!spot || dist2(spot, at) > 8 * 8) return;
+      const e = spawnEnemy(g, d.kind, spot.x, spot.y, { level, elite: d.elite });
+      if (!e) return;
+      Object.assign(e, { army: army.id, faction: f.id, march: target, homeX: spot.x, homeY: spot.y });
+      list.push(e);
+    });
+    if (!list.length) {
+      army.restUntil = g.time + 30;
+      return;
+    }
+    army.live = true;
+    army.best = Infinity;
+    army.bestAt = g.time;
+    this.marching.set(army.id, list);
+    const mine = this.isOwned(army.to);
+    g.toast(mine
+      ? `An army of ${f.name} (${list.length}) is marching on your outpost ${this.#where(site)}! Stop it on the way, or hold the flag.`
+      : `An army of ${f.name} (${list.length}) is on the march nearby.`, mine ? 'boss' : 'info');
+  }
+
+  /** The army goes on as a whole (you went away). */
+  #dismiss(army, troops) {
+    for (const e of troops) e.dead = e.vanished = true;
+    delete army.live;
+    army.troops = troops.length;
+    this.marching.delete(army.id);
+  }
+
+  /** A faction took an outpost close to you: the old guards are gone, its troops hold the flag. */
+  #garrisonTaken(entry, f, army) {
+    const g = this.game;
+    for (const e of entry.defenders) {
+      if (e.dead || e.faction === f?.id) continue;
+      g.fx.emit('smoke', e.x, e.y, 6, 0.4, 1);
+      e.dead = e.vanished = true;
+    }
+    entry.defenders = entry.defenders.filter((e) => !e.dead);
+    const walking = army ? this.#troopsOf(army) : [];
+    for (const e of walking) {
+      Object.assign(e, { army: null, march: null, outpost: entry.site.key, homeX: entry.site.x, homeY: entry.site.y });
+      entry.defenders.push(e);
+    }
+    if (army) this.marching.delete(army.id);
+    if (!entry.defenders.length && f) this.#spawnTroops(entry, f, troopsFor(f, 'camp', this.factions.owned[entry.site.key]?.garrison ?? 3));
   }
 
   #setFlag(key) {
@@ -865,28 +1041,31 @@ export class Campaign {
 
   // --- For the strategy map -----------------------------------------------------------------------------
 
-  /** Territories around a square: [{ key, tx, ty, site, owner, status, capture, tier }]. */
-  territoriesAround(tx0, ty0, radius) {
-    const out = [];
+  /**
+   * The territories whose land reaches into the box (world tiles) for the
+   * strategy map: { list: [{ key, x, y, site, home, owner, status, capture,
+   * tier, color, ownerName, base }], pending } (see territory.js: regionsIn).
+   */
+  territoriesIn(box, budget = null) {
+    const { list, pending } = regionsIn(this.game.world, this.data, box.x0, box.y0, box.x1, box.y1, { budget });
     const now = this.game.time;
-    for (let ty = ty0 - radius; ty <= ty0 + radius; ty++) {
-      for (let tx = tx0 - radius; tx <= tx0 + radius; tx++) {
-        const key = territoryKey(tx, ty);
-        const home = tx === 0 && ty === 0;
-        const site = home ? null : outpostFor(this.game.world, this.data, tx, ty);
+    return {
+      pending,
+      list: list.map((site) => {
+        const key = site.key;
+        const home = Boolean(site.home);
         const owned = home || this.isOwned(key);
         const capture = this.terr.capture[key] ?? 0;
         const attacked = (this.alerts.get(key) ?? 0) > now;
         const fe = this.factions.owned[key];
         const f = fe ? factionById(this.factions, fe.faction) : null;
-        const status = home ? 'home' : !site ? 'empty' : attacked && owned ? 'attacked' : owned ? 'own' : f ? 'foreign' : capture > 0 ? 'contested' : 'neutral';
-        out.push({
-          key, tx, ty, site, home, owner: owned ? 'me' : f ? f.id : null, status, capture, tier: site?.tier ?? 0,
-          color: f?.color, ownerName: f ? `${f.name}, ${this.data.factions?.tiers?.[fe.tier]?.name?.toLowerCase() ?? fe.tier}` : null, base: fe?.tier ?? null,
-        });
-      }
-    }
-    return out;
+        const status = home ? 'home' : attacked && owned ? 'attacked' : owned ? 'own' : f ? 'foreign' : capture > 0 ? 'contested' : 'neutral';
+        return {
+          key, x: site.x, y: site.y, site: home ? null : site, home, owner: owned ? 'me' : f ? f.id : null, status, capture, tier: site.tier ?? 0,
+          color: f?.color, ownerName: f?.name ?? null, base: fe?.tier ?? null,
+        };
+      }),
+    };
   }
 
   /** The factions you know of (and how strong they are), and their armies close to your land or you. */
@@ -895,13 +1074,21 @@ export class Campaign {
     return {
       list: this.factions.list.map((f) => ({
         id: f.id, name: f.name, color: f.color, personality: f.personality, quality: f.quality, alive: f.alive,
-        squares: factionSquares(this.factions, f.id).length, hq: f.hq,
+        squares: factionSquares(this.factions, f.id).length, hq: f.hq, at: this.#factionSeat(f),
       })),
       armies: visibleArmies(this.factions, this.data, near).map((a) => {
         const f = factionById(this.factions, a.faction);
-        return { x: a.x, y: a.y, to: a.to, troops: a.troops, color: f?.color, name: f?.name, toMe: this.isOwned(a.to) };
+        const to = this.site(a.to);
+        return { id: a.id, x: a.x, y: a.y, to: a.to, toX: to?.x ?? a.x, toY: to?.y ?? a.y, troops: a.troops, color: f?.color, name: f?.name, toMe: this.isOwned(a.to) };
       }),
     };
+  }
+
+  /** Where a faction sits on the map: its headquarters (or, without it, any land it holds). */
+  #factionSeat(f) {
+    const key = this.factions.owned[f.hq]?.faction === f.id ? f.hq : factionSquares(this.factions, f.id)[0];
+    const site = key ? this.site(key) : null;
+    return site ? { x: site.x, y: site.y } : null;
   }
 
   /** The squads for the map and the panel. */

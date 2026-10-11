@@ -514,15 +514,27 @@ test('the army in multiplayer: train soldiers, a squad on the strategy map (N), 
   await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.workers.filter((w) => w.role === 'infantry').length)).toBe(1);
   await a.page.keyboard.press('Escape');
   // An outpost: its palisade and flag stand on the client too; it turns to the clan's colour when taken.
-  const { outpostFor } = await import('../../src/game/territory.js');
+  const { outpostFor, outpostDormant } = await import('../../src/game/territory.js');
   const army = await import('../../server/army.js');
-  const site = outpostFor(srv.gs.world, srv.gs.data, 2, 0) ?? outpostFor(srv.gs.world, srv.gs.data, 2, 1);
+  // (An outpost no faction holds, and not by another test's clan base: that one would lie dormant.)
+  const fx = army.factions(srv.gs);
+  const cells = [[2, 0], [2, 1], [2, -1], [-2, 0], [0, 2], [0, -2], [-2, 1], [-2, -1], [1, 2], [-1, -2], [3, 0], [-3, 0]];
+  const site = cells.map(([x, y]) => outpostFor(srv.gs.world, srv.gs.data, x, y))
+    .find((s) => s && !fx.owned[s.key] && !outpostDormant(s, srv.gs.claims(), srv.gs.rules.claimRadius));
   await a.page.evaluate(([x, y]) => window.__pixelgame.game.chat(`/tp ${x} ${y}`), [site.x + 1, site.y + 2]);
   await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.outposts.structures.filter((s) => s.id === 'palisade').length)).toBeGreaterThan(10);
   srv.gs.terr.map.set(site.key, { owner: clan.id, since: Date.now(), capture: 1, cleared: 0, by: null, attackedUntil: 0 });
   srv.gs.terr.dirty = true;
   await expect.poll(() => a.page.evaluate((k) => window.__pixelgame.game.outposts.squares.get(k)?.owner ?? null, site.key)).toBe(clan.id);
-  await expect.poll(() => a.page.evaluate(() => window.__pixelgame.game.outposts.structures.find((s) => s.id === 'outpost_flag')?.color)).toBe(army.clanColor(clan.id));
+  await expect.poll(() => a.page.evaluate((k) => window.__pixelgame.game.outposts.active.get(k)?.structures.find((s) => s.id === 'outpost_flag')?.color, site.key)).toBe(army.clanColor(clan.id));
+  // The strategy map: the real map with the clan's land on it, and the world's factions.
+  await a.page.keyboard.press('KeyN');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('.faction-row')).toHaveCount(fx.list.length);
+  const map = panel.locator('canvas.strategy-map');
+  const box = await map.boundingBox();
+  await map.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(panel.locator('.strategy-cell')).toContainText('Ert territorium');
   expect(a.errors).toEqual([]);
   await a.ctx.close();
 });

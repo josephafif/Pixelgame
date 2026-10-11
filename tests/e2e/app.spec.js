@@ -1458,6 +1458,17 @@ test('army: train soldiers, form a squad on the strategy map, and take an outpos
   await page.screenshot({ path: 'test-results/outpost.png' });
   await page.keyboard.press('KeyN');
   await expect(panel).toBeVisible();
+  // The strategy map is the real map: pick the squad, then the outpost's land: yours to defend or patrol.
+  await panel.locator('.squad-card button.link').first().click();
+  const map = panel.locator('canvas.strategy-map');
+  const box = await map.boundingBox();
+  await map.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(panel.locator('.strategy-cell')).toContainText('Your territory');
+  await panel.locator('.strategy-cell button', { hasText: 'Patrol' }).click();
+  await expect.poll(() => game(page, () => window.__pixelgame.game.save.army.squads[0].order.kind)).toBe('patrol');
+  // Anywhere else: just move there.
+  await map.click({ position: { x: 12, y: 12 } });
+  await expect(panel.locator('.strategy-cell button', { hasText: 'Move here' })).toBeVisible();
   await page.screenshot({ path: 'test-results/strategy.png' });
   expect(errors).toEqual([]);
 });

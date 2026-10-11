@@ -1,10 +1,15 @@
-// Territories: the world is cut into squares (data.army.territory.size
-// tiles across, centred so the camp sits in the middle of its own). Every
-// square with dry land has an outpost on a fixed spot: a palisade with a
-// gap to walk in and a flag in the middle. Beat its defenders and hold the
-// flag to take it; it pays a little every hour and your squads can hold it.
-// A long front is harder to hold. Pure functions, shared by single player
-// and the server.
+// Territories: the land around the outposts. Every outpost stands on a
+// fixed spot (a palisade with a gap to walk in and a flag in the middle),
+// and its territory is the land around it: within regionRadius of the flag
+// and closer to it than to any other outpost (the camp has its own). On the
+// map they are areas of the real world, not squares. Beat an outpost's
+// defenders and hold the flag to take it; it pays a little every hour and
+// your squads can hold it. A long front is harder to hold.
+//
+// To find the outposts quickly the world is cut into cells
+// (data.army.territory.size tiles across, centred on the camp) with at most
+// one outpost each, somewhere inside; a territory's key is its cell's.
+// Pure functions, shared by single player and the server.
 
 import { hashInts } from '../core/rng.js';
 import { LIQUID, T, SEA, LANDMARK_RADIUS, tileKey } from './world.js';
@@ -12,7 +17,7 @@ import { structureDef } from './construction.js';
 
 export const TERRITORY_DEFAULTS = {
   size: 96, captureSeconds: 20, captureRadius: 4.5, incomePerTier: { scrap: 5, essence: 3 }, frontierPenaltyPct: 6,
-  raidEveryMinutes: 20, maxOwned: 16,
+  raidEveryMinutes: 20, maxOwned: 16, regionRadius: 46, homeRadius: 40,
 };
 
 /** The palisade, its flag: structures only outposts have (never in the build menu). */
@@ -266,4 +271,125 @@ export function territoryStatus(entry, mine) {
   if (!entry?.owner) return entry?.capture > 0 ? 'contested' : 'neutral';
   if (entry.attackedUntil > (entry.now ?? 0)) return 'attacked';
   return entry.owner === mine ? 'own' : 'foreign';
+}
+
+// --- Regions: the land each outpost holds, on the real map ----------------------------------------
+
+/** The camp as a region of its own (it has no outpost). */
+export const HOME_REGION = Object.freeze({ key: '0,0', tx: 0, ty: 0, x: 0.5, y: 0.5, home: true });
+
+/** A little wobble so borders follow no ruler: 0.84 … 1 of the radius, by direction. */
+function wobble(site, a) {
+  const h = hashInts(Math.round(site.x), Math.round(site.y), 0x5e9);
+  const p1 = ((h & 255) / 255) * Math.PI * 2;
+  const p2 = (((h >>> 8) & 255) / 255) * Math.PI * 2;
+  return 0.92 + 0.05 * Math.sin(3 * a + p1) + 0.03 * Math.sin(5 * a + p2);
+}
+
+function reach(data, site, a) {
+  const cfg = territoryConfig(data);
+  return (site.home ? cfg.homeRadius : cfg.regionRadius) * wobble(site, a);
+}
+
+const UNKNOWN = Symbol('unknown');
+
+/** A cell's outpost, the camp's region for (0, 0); UNKNOWN when it is not worked out yet and `budget` ({ n }) is spent. */
+function regionOf(world, data, tx, ty, budget) {
+  if (tx === 0 && ty === 0) return HOME_REGION;
+  if (budget && !siteCache.get(world)?.has(territoryKey(tx, ty))) {
+    if (budget.n <= 0) return UNKNOWN;
+    budget.n--;
+  }
+  return outpostFor(world, data, tx, ty);
+}
+
+/** The outposts (and the camp) of the cells within `ring` of (tx, ty); null if some are not worked out yet (`budget`). */
+function regionsNear(world, data, tx, ty, ring, budget = null) {
+  const out = [];
+  for (let y = ty - ring; y <= ty + ring; y++) {
+    for (let x = tx - ring; x <= tx + ring; x++) {
+      const s = regionOf(world, data, x, y, budget);
+      if (s === UNKNOWN) return null;
+      if (s) out.push(s);
+    }
+  }
+  return out;
+}
+
+/**
+ * Whose land is the tile (x, y) on: the territory (its outpost, or the
+ * camp's HOME_REGION) or null (the wild between them).
+ */
+export function regionAt(world, data, x, y) {
+  const { tx, ty } = territoryAt(data, x, y);
+  let best = null;
+  let bestD = Infinity;
+  for (const s of regionsNear(world, data, tx, ty, 1)) {
+    const d = (s.x - x) ** 2 + (s.y - y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = s;
+    }
+  }
+  if (!best || Math.sqrt(bestD) > reach(data, best, Math.atan2(y - best.y, x - best.x))) return null;
+  return best;
+}
+
+const outlineCache = new WeakMap();
+
+/**
+ * A territory's border as a polygon of world points [[x, y], …]: its reach
+ * from the flag in every direction, cut where a neighbour's land begins.
+ * With a `budget` ({ n }: outposts it may still work out) it may give null:
+ * ask again later.
+ */
+export function regionOutline(world, data, site, { steps = 56, budget = null } = {}) {
+  let cache = outlineCache.get(world);
+  if (!cache) outlineCache.set(world, (cache = new Map()));
+  const ck = `${site.key}|${steps}`;
+  if (cache.has(ck)) return cache.get(ck);
+  const near = regionsNear(world, data, site.tx, site.ty, 2, budget);
+  if (!near) return null;
+  const others = near.filter((s) => s.key !== site.key);
+  const pts = [];
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    let t = reach(data, site, a);
+    for (const o of others) {
+      const dx = o.x - site.x;
+      const dy = o.y - site.y;
+      const dot = ux * dx + uy * dy;
+      if (dot > 0) t = Math.min(t, (dx * dx + dy * dy) / (2 * dot));
+    }
+    pts.push([site.x + ux * t, site.y + uy * t]);
+  }
+  cache.set(ck, pts);
+  return pts;
+}
+
+/**
+ * The territories (outposts, and the camp) whose land may reach into the
+ * box x0..x1, y0..y1: { list, pending } (pending: some cells are still to
+ * be worked out, `budget` ran out: ask again).
+ */
+export function regionsIn(world, data, x0, y0, x1, y1, { maxCells = 26, budget = null } = {}) {
+  const r = territoryConfig(data).regionRadius;
+  const a = territoryAt(data, x0 - r, y0 - r);
+  const b = territoryAt(data, x1 + r, y1 + r);
+  // Zoomed far out: only the cells around the middle.
+  const mx = Math.round((a.tx + b.tx) / 2);
+  const my = Math.round((a.ty + b.ty) / 2);
+  const half = Math.floor(maxCells / 2);
+  const list = [];
+  let pending = false;
+  for (let ty = Math.max(a.ty, my - half); ty <= Math.min(b.ty, my + half); ty++) {
+    for (let tx = Math.max(a.tx, mx - half); tx <= Math.min(b.tx, mx + half); tx++) {
+      const s = regionOf(world, data, tx, ty, budget);
+      if (s === UNKNOWN) pending = true;
+      else if (s) list.push(s);
+    }
+  }
+  return { list, pending };
 }

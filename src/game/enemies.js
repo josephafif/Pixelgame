@@ -11,6 +11,7 @@ import { mixHex } from '../weapons/visuals.js';
 
 let nextId = 1;
 const DESPAWN_DIST = 34;
+const SLEEP_DIST = 40;
 // Enemies give up the chase once you are this many times their sight away.
 const LEASH = 1.8;
 const PACK_RADIUS = 4;
@@ -266,7 +267,7 @@ function soldierFoe(game, e, dt) {
   const b = e.brawl;
   if (b && !b.dead && !b.ghost && (b.x - e.x) ** 2 + (b.y - e.y) ** 2 < 14 * 14) return b;
   e.brawl = null;
-  if (!(e.outpost || e.raid) || !game.campaign) return null;
+  if (!(e.outpost || e.raid || e.army) || !game.campaign) return null;
   e.brawlScanT = (e.brawlScanT ?? 0) - dt;
   if (e.brawlScanT > 0) return null;
   e.brawlScanT = 0.5;
@@ -360,6 +361,20 @@ function updateBehaviour(game, e, dt) {
         e.vx = s.x * speed * 0.8;
         e.vy = s.y * speed * 0.8;
       }
+    } else if (e.march) {
+      // On the march with its army (campaign.js): straight on towards where it is headed.
+      const mx = e.march.x - e.x;
+      const my = e.march.y - e.y;
+      const md = Math.hypot(mx, my);
+      if (md > 1.5) {
+        const s = steer(game, e, mx / md, my / md);
+        e.vx = s.x * speed * 0.7;
+        e.vy = s.y * speed * 0.7;
+      } else {
+        e.vx = e.vy = 0;
+      }
+      e.homeX = e.x;
+      e.homeY = e.y;
     } else {
       const w = wander(game, e, dt);
       e.vx = w.x;
@@ -1369,6 +1384,8 @@ export function updateEnemies(game, dt) {
   const p = game.player;
   for (const e of list) {
     if (e.dead) continue;
+    // An outpost's guards far from you (and from any fight) stand still: nothing to see there.
+    if (e.outpost && !e.alert && !e.brawl && dist2(e.x, e.y, p.x, p.y) > SLEEP_DIST * SLEEP_DIST) continue;
     tickStatuses(game, e, dt);
     if (e.dead) continue;
     // A Mire Troll mends in the bog: lure it out onto firm ground.
@@ -1468,7 +1485,8 @@ export function updateEnemies(game, dt) {
   // Remove dead and far-away enemies.
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
-    const far = !e.boss && dist2(e.x, e.y, p.x, p.y) > DESPAWN_DIST * DESPAWN_DIST;
+    // (An outpost's guards, raiders and marching armies are the campaign's to send away.)
+    const far = !e.boss && !(e.outpost || e.raid || e.army) && dist2(e.x, e.y, p.x, p.y) > DESPAWN_DIST * DESPAWN_DIST;
     if (e.dead || far) list.splice(i, 1);
   }
 }
@@ -1522,7 +1540,7 @@ export function updateSpawner(game, dt) {
   const bossActive = Boolean(game.boss);
   const quality = game.quality.enemyFactor;
   const target = Math.round(Math.min(26, 5 + wl * 2 + Math.floor(game.save.player.level / 2)) * quality * (bossActive ? 0.3 : 1));
-  const alive = game.enemies.filter((e) => !e.dead && !e.boss).length;
+  const alive = game.enemies.filter((e) => !e.dead && !e.boss && !(e.outpost || e.raid || e.army)).length;
   if (alive >= target) return;
   for (let attempt = 0; attempt < 6; attempt++) {
     const a = Math.random() * Math.PI * 2;

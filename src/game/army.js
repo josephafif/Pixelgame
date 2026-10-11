@@ -372,8 +372,8 @@ export function stepSoldier(s, ctx, dt) {
   if (far > LEG + 4) {
     gx = s.x + ((gx - s.x) / far) * LEG;
     gy = s.y + ((gy - s.y) / far) * LEG;
-    // A whole leg ahead: aim for a leg's end only once, so the way isn't planned every step.
-    if (!(Math.hypot((s.legX ?? Infinity) - s.x, (s.legY ?? Infinity) - s.y) > 3)) {
+    // A whole leg ahead: aim for a leg's end only once (until it is reached), so the way isn't planned every step.
+    if (!Number.isFinite(s.legX) || Math.hypot(s.legX - s.x, s.legY - s.y) <= 3) {
       const spot = ctx.world.findFreeSpot?.(gx, gy, s.r, 'pal', { x: gx, y: gy }) ?? { x: gx, y: gy };
       s.legX = spot.x;
       s.legY = spot.y;

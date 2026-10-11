@@ -32,7 +32,8 @@ import { BREED_BY_ID, describeHorse, HORSE_MODE } from '../game/horses.js';
 import { MpMarkets } from './markets.js';
 import { MpOutposts } from './outposts.js';
 import { roleDef, isSoldier, gearUpgrade, trainProblem, problemSv, ORDER_NAMES_SV } from '../game/army.js';
-import { territoryConfig, territoryAt, outpostFor } from '../game/territory.js';
+import { territoryConfig, outpostFor, regionsIn } from '../game/territory.js';
+import { isFactionRef } from '../game/factions.js';
 import { workerLook } from '../game/workers.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
 import { POI, isPoi, poiFound, chunksAround } from '../game/discoveries.js';
@@ -492,8 +493,8 @@ export class MpGame {
         this.emit('claims');
         break;
       case 'terr':
-        this.outposts.setSquares(msg.list);
-        this.emit('army');
+        // (The strategy map redraws on its own; its lists only when who holds what changed.)
+        if (this.outposts.setSquares(msg.list, msg)) this.emit('army');
         break;
       case 'squads':
         this.squadPos = new Map(msg.list.map((q) => [q.id, q]));
@@ -1903,8 +1904,12 @@ export class MpGame {
 
   // --- The army and the territories (server/army.js; the strategy map, ui/strategy.js) ------
 
-  /** What the strategy map shows: the squares around (tx, ty), your clan's squads, soldiers and recruits. */
-  strategyView(tx, ty, radius) {
+  /**
+   * What the strategy map shows: the territories reaching into `box` (world
+   * tiles; null for none), your clan's squads, soldiers and recruits, and
+   * the factions with their armies on the march.
+   */
+  strategyView(box = null, budget = null) {
     const data = this.data;
     const clan = this.clan;
     const mine = clan?.id ?? null;
@@ -1915,18 +1920,24 @@ export class MpGame {
       const r = roleDef(data, id);
       return r ? r.sv ?? r.name : id === 'wood' ? 'Skogshuggare' : 'Gruvarbetare';
     };
-    const territories = [];
-    for (let y = ty - radius; radius >= 0 && y <= ty + radius; y++) {
-      for (let x = tx - radius; x <= tx + radius; x++) {
-        const key = `${x},${y}`;
-        const home = x === 0 && y === 0;
-        const site = home || !this.world ? null : outpostFor(this.world, data, x, y);
-        const sq = this.outposts.squares.get(key);
+    const sqs = this.outposts.squares;
+    const territories = { list: [], pending: false };
+    if (box && this.world) {
+      const found = regionsIn(this.world, data, box.x0, box.y0, box.x1, box.y1, { budget });
+      territories.pending = found.pending;
+      territories.list = found.list.map((site) => {
+        const key = site.key;
+        const home = Boolean(site.home);
+        const sq = sqs.get(key);
         const owner = sq?.owner ?? null;
-        const status = home ? 'home' : !site ? 'empty' : sq?.att && owner === mine ? 'attacked'
+        const faction = isFactionRef(owner);
+        const status = home ? 'home' : sq?.att && owner === mine ? 'attacked'
           : owner ? (owner === mine ? 'own' : 'foreign') : sq?.cap > 0 ? 'contested' : 'neutral';
-        territories.push({ key, tx: x, ty: y, site, home, owner, ownerName: sq?.tag ? `[${sq.tag}]` : null, color: sq?.color, status, capture: sq?.cap ?? 0, tier: site?.tier ?? 0 });
-      }
+        return {
+          key, x: site.x, y: site.y, site: home ? null : site, home, owner, status, capture: sq?.cap ?? 0, tier: site.tier ?? 0,
+          color: sq?.color, ownerName: faction ? sq.tag : sq?.tag ? `[${sq.tag}]` : null, base: faction ? sq.base ?? 'camp' : null,
+        };
+      });
     }
     const squadOfId = (id) => army.squads.find((q) => q.members.includes(id))?.id ?? 0;
     const pos = (id) => {
@@ -1955,9 +1966,16 @@ export class MpGame {
       };
     });
     const recruits = roster.filter((r) => !isSoldier(data, r.role) && !r.trainingTo).map((r) => ({ id: r.id, name: workerLook(mine, r.id).name, role: r.role, roleName: roleName(r.role) }));
+    // Your soldiers where they are (the ones close by from the snapshots, the rest from the squads' marches).
+    const troops = [...near.values()].filter((w) => isSoldier(data, w.role) && !w.dead).map((w) => ({ x: w.x, y: w.y, squad: squadOfId(w.id), role: w.role }));
+    for (const q of army.squads) {
+      const at = this.squadPos.get(q.id);
+      if (!at?.n || troops.some((t) => t.squad === q.id)) continue;
+      for (let i = 0; i < at.n; i++) troops.push({ x: at.x + ((i % 3) - 1) * 0.8, y: at.y + (Math.floor(i / 3) - 0.5) * 0.8, squad: q.id });
+    }
     return {
-      lang: 'sv', size: territoryConfig(data).size, here: territoryAt(data, this.player.x, this.player.y), player: { x: this.player.x, y: this.player.y },
-      territories, squads, soldiers, recruits, roles: data.army?.roles ?? [], barracks: army.barracks,
+      lang: 'sv', player: { x: this.player.x, y: this.player.y, facing: this.player.facing },
+      territories, troops, squads, soldiers, recruits, roles: data.army?.roles ?? [], barracks: army.barracks, factions: this.#factionsView(),
       canCreateSquad: Boolean(clan) && army.squads.length < (data.army?.squads?.max ?? 4),
       gear: (s) => {
         const g = gearUpgrade(data, roster.find((r) => r.id === s.id) ?? {}, { forge: army.forge });
@@ -1968,6 +1986,29 @@ export class MpGame {
         const p = trainProblem(data, roster, roster.find((r) => r.id === id), role, { training: army.training });
         return p ? problemSv(p) : null;
       },
+    };
+  }
+
+  /** The factions (from the server) and their armies close to you or your clan's land. */
+  #factionsView() {
+    const o = this.outposts;
+    const mine = this.clan?.id ?? null;
+    const near = [{ x: this.player.x, y: this.player.y }];
+    for (const [key, sq] of o.squares) {
+      if (sq.owner !== mine || !mine) continue;
+      const [tx, ty] = key.split(',').map(Number);
+      const site = this.world ? outpostFor(this.world, this.data, tx, ty) : null;
+      if (site) near.push(site);
+    }
+    const range = 2.5 * territoryConfig(this.data).size;
+    return {
+      list: o.factions,
+      armies: o.armies
+        .filter((a) => near.some((n) => Math.hypot(n.x - a.x, n.y - a.y) < range))
+        .map((a) => {
+          const f = o.factionById(a.f);
+          return { ...a, color: f?.color, name: f?.name, toMe: Boolean(mine) && o.squares.get(a.to)?.owner === mine };
+        }),
     };
   }
 

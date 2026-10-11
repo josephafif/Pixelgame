@@ -72,6 +72,8 @@ export function loadConfig(overrides = {}, source = globalThis.process?.env ?? {
     maxEnemies: num('MAX_ENEMIES', 500),
     // Territories' outposts and their guards (server/army.js).
     outposts: bool('OUTPOSTS', true),
+    // NPC factions with their bases and armies (they need the outposts).
+    factions: bool('FACTIONS', true),
     logLevel: env.LOG_LEVEL || 'info',
     ...overrides,
     rules,

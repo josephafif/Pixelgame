@@ -14,6 +14,10 @@
 //   vault every hour.
 // - Outposts near players stand in the world (palisade and flag); the
 //   clients place them too, the same way (src/mp/outposts.js).
+// - NPC factions (src/game/factions.js) hold land too: their bases are
+//   outposts with their troops (and towers), their strategic AI runs here
+//   for everyone and is saved in meta 'factions'. Their armies march as a
+//   whole far from players; close to one they walk the land for real.
 
 import {
   isSoldier, roleDef, roleTitle, trainProblem, startTraining, finishTraining, gearUpgrade, soldierStats, soldierPower,
@@ -24,6 +28,10 @@ import {
   territoryConfig, territoryAt, parseKey, outpostFor, defendersFor, outpostLevel, monsterPower, abstractBattle,
   stepCapture, incomeFor, frontier, defenseFactor, placeOutpost, removeOutpost, outpostDormant,
 } from '../src/game/territory.js';
+import {
+  createFactions, factionById, troopsFor, troopPower, stepFactions, loseToOthers, takeFor, factionConfig, factionSquares,
+  armyArrives, factionRef, genitiveSv,
+} from '../src/game/factions.js';
 import { canDo } from '../src/net/rules.js';
 import { workerStats } from '../src/game/workers.js';
 import * as base from './base.js';
@@ -38,6 +46,8 @@ const DEACTIVATE = 92;
 const CLEARED_FOR = 12 * 60 * 1000;
 const HOUR = 3600 * 1000;
 const NEUTRAL_COLOR = '#b8b8c8';
+const ARMY_LIVE = 56; // a faction's army closer than this to a player walks the land for real
+const ARMY_GONE = 84;
 const CLAN_COLORS = ['#3fa86a', '#3f6fd8', '#c8364a', '#e0a030', '#9a5cff', '#3fb0b0', '#e86a2a', '#ff7ad8'];
 
 function dist2(a, b) {
@@ -134,13 +144,28 @@ export function update(gs, dt) {
   const t = state(gs);
   // (A server can do without outposts: config.outposts = false.)
   const on = gs.config?.outposts !== false;
+  const fx = on && gs.config?.factions !== false ? factions(gs) : null;
   t.checkT -= dt;
   if (t.checkT <= 0 && on) {
     t.checkT = 0.5;
     outposts(gs);
+    if (fx) liveArmies(gs);
   }
   stepSoldiers(gs, dt);
   if (on) capture(gs, dt);
+  if (fx) {
+    stepFactions(fx, factionCtx(gs), dt);
+    towers(gs, dt);
+    t.factionT = (t.factionT ?? 0) - dt;
+    if (t.factionT <= 0) {
+      t.factionT = 2;
+      fx.lastAt = Date.now();
+      asleep(gs);
+      // Armies on the march show on everyone's map.
+      if (fx.armies.length || t.hadArmies) t.dirty = true;
+      t.hadArmies = fx.armies.length > 0;
+    }
+  }
   t.slowT -= dt;
   if (t.slowT <= 0) {
     t.slowT = 1;
@@ -165,22 +190,54 @@ export function update(gs, dt) {
   if (t.saveT <= 0) {
     t.saveT = 20;
     save(gs);
+    if (fx) saveFactions(gs);
   }
 }
 
-/** Every square someone holds or is taking, for the clients' maps: { t: 'terr', list }. */
+/**
+ * Every territory someone holds or is taking, for the clients' maps:
+ * { t: 'terr', list, factions, armies } (a faction's land has owner 'f:<id>'
+ * and its base's tier).
+ */
 export function territoryPayload(gs) {
   const list = [];
+  const fx = gs.factions;
   for (const [key, e] of state(gs).map) {
     const attacked = e.attackedUntil > gs.time;
     if (!e.owner && !(e.capture > 0) && !attacked) continue;
+    if (!e.owner && fx?.owned[key]) continue; // (sent below, with the faction)
     const clan = e.owner ? gs.clans.get(e.owner) : null;
     list.push({
       key, owner: e.owner, tag: clan?.tag ?? null, color: e.owner ? clanColor(e.owner) : null,
       cap: Math.round((e.capture ?? 0) * 100) / 100, by: e.by ?? null, att: attacked ? 1 : 0,
     });
   }
-  return { t: 'terr', list };
+  if (!fx) return { t: 'terr', list };
+  for (const [key, fe] of Object.entries(fx.owned)) {
+    const f = factionById(fx, fe.faction);
+    const e = state(gs).map.get(key);
+    list.push({
+      key, owner: factionRef(fe.faction), tag: f?.sv ?? f?.name ?? '?', color: f?.color ?? '#c8364a', base: fe.tier,
+      cap: Math.round((e?.capture ?? 0) * 100) / 100, by: e?.by ?? null, att: 0,
+    });
+  }
+  return {
+    t: 'terr', list,
+    factions: fx.list.map((f) => {
+      const seat = factionSeat(gs, f);
+      return {
+        id: f.id, name: f.sv ?? f.name, color: f.color, personality: f.personality, quality: f.quality, alive: f.alive,
+        squares: factionSquares(fx, f.id).length, at: seat,
+      };
+    }),
+    armies: fx.armies.map((a) => {
+      const to = site(gs, a.to);
+      return {
+        id: a.id, f: a.faction, x: Math.round(a.x * 10) / 10, y: Math.round(a.y * 10) / 10, to: a.to,
+        toX: to?.x ?? a.x, toY: to?.y ?? a.y, troops: a.troops,
+      };
+    }),
+  };
 }
 
 /** Where a clan's squads are and what they do, for its members' maps (every second while it has some). */
@@ -350,7 +407,7 @@ export function soldierFoe(gs, e, dt) {
   const b = e.brawl ? gs.workers?.get(e.brawl) : null;
   if (b && !b.dead && !b.ghost && dist2(b, e) < 14 * 14) return b;
   e.brawl = 0;
-  if (!(e.outpost || e.raid) || !gs.workers?.size) return null;
+  if (!(e.outpost || e.raid || e.army) || !gs.workers?.size) return null;
   e.brawlScanT = (e.brawlScanT ?? 0) - dt;
   if (e.brawlScanT > 0) return null;
   e.brawlScanT = 0.5;
@@ -404,24 +461,73 @@ function outposts(gs) {
   }
   for (const key of want) if (!t.active.has(key)) activate(gs, site(gs, key));
   for (const [key, a] of t.active) {
-    if (want.has(key)) continue;
+    if (want.has(key)) {
+      if (a.tier !== tierOf(gs, key)) {
+        // A base that grew (or changed hands) is built anew.
+        deactivate(gs, key, { keepTroops: true });
+        activate(gs, a.site);
+      }
+      continue;
+    }
     let near = false;
     for (const p of gs.playersNear(a.site.x, a.site.y, DEACTIVATE)) if (p) near = true;
     if (!near || dormant(a.site)) deactivate(gs, key);
   }
 }
 
+/** The base a faction keeps on a square ('camp' for everyone else's outposts). */
+function tierOf(gs, key) {
+  return gs.factions?.owned[key]?.tier ?? 'camp';
+}
+
+function factionAt(gs, key) {
+  const fe = gs.factions?.owned[key];
+  return fe ? factionById(gs.factions, fe.faction) : null;
+}
+
 function flagColor(gs, key) {
-  const owner = entry(gs, key).owner;
-  return owner ? clanColor(owner) : NEUTRAL_COLOR;
+  const owner = state(gs).map.get(key)?.owner;
+  if (owner) return clanColor(owner);
+  return factionAt(gs, key)?.color ?? NEUTRAL_COLOR;
 }
 
 function activate(gs, s) {
-  const structures = placeOutpost(gs.world, gs.data, s, flagColor(gs, s.key));
-  const a = { site: s, structures, defenders: [] };
+  const tier = tierOf(gs, s.key);
+  const structures = placeOutpost(gs.world, gs.data, s, flagColor(gs, s.key), tier);
+  const a = { site: s, structures, defenders: [], tier };
   state(gs).active.set(s.key, a);
   const e = entry(gs, s.key);
-  if (!e.owner && !(e.cleared > Date.now())) spawnDefenders(gs, a);
+  const f = factionAt(gs, s.key);
+  if (f) {
+    // A faction's base: its garrison (still standing from before, or anew).
+    const alive = [...gs.enemies.values()].filter((m) => !m.dead && m.outpost === s.key && m.faction === f.id);
+    if (alive.length) a.defenders = alive;
+    else spawnTroops(gs, a, f, troopsFor(f, tier, gs.factions.owned[s.key].garrison));
+  } else if (!e.owner && !(e.cleared > Date.now())) {
+    spawnDefenders(gs, a);
+  }
+}
+
+/** A faction's troops at an outpost: its garrison, or (raid) an army coming for the flag. */
+function spawnTroops(gs, a, f, list, { raid = false } = {}) {
+  const s = a.site;
+  const level = Math.max(outpostLevel(s), 1);
+  const a0 = Math.random() * Math.PI * 2;
+  list.forEach((d, i) => {
+    const ang = (i / 7) * Math.PI * 2;
+    const x = raid ? s.x + Math.cos(a0) * 14 + (i % 3) : s.x + Math.cos(ang) * 2;
+    const y = raid ? s.y + Math.sin(a0) * 14 + Math.floor(i / 3) : s.y + Math.sin(ang) * 2;
+    const spot = gs.world.findFreeSpot(x, y, 0.45, 'enemy', null);
+    if (!spot) return;
+    const m = enemies.spawnEnemy(gs, d.kind, spot.x, spot.y, { level, elite: d.elite });
+    if (!m) return;
+    Object.assign(m, { faction: f.id, homeX: s.x, homeY: s.y, keep: true });
+    if (raid) m.raid = s.key;
+    else {
+      m.outpost = s.key;
+      a.defenders.push(m);
+    }
+  });
 }
 
 function spawnDefenders(gs, a) {
@@ -441,18 +547,31 @@ function spawnDefenders(gs, a) {
   });
 }
 
-function deactivate(gs, key) {
+function vanish(gs, m) {
+  m.dead = true;
+  m.vanished = true;
+  gs.enemies.delete(m.id);
+}
+
+function deactivate(gs, key, { keepTroops = false } = {}) {
   const t = state(gs);
   const a = t.active.get(key);
   if (!a) return;
   removeOutpost(gs.world, a.structures);
-  for (const e of a.defenders) {
-    if (e.dead) continue;
-    e.dead = true;
-    e.vanished = true;
-    gs.enemies.delete(e.id);
-  }
   t.active.delete(key);
+  if (keepTroops) return;
+  for (const e of a.defenders) if (!e.dead) vanish(gs, e);
+  // Raiders still at it: a faction's fight goes on as a whole (an army right by the flag); monsters give up.
+  const byFaction = new Map();
+  for (const m of [...gs.enemies.values()]) {
+    if (m.dead || m.raid !== key) continue;
+    vanish(gs, m);
+    if (m.faction && factionById(gs.factions, m.faction)?.alive) byFaction.set(m.faction, (byFaction.get(m.faction) ?? 0) + 1);
+  }
+  for (const [fid, n] of byFaction) {
+    const f = factionById(gs.factions, fid);
+    gs.factions.armies.push({ id: gs.factions.nextArmy++, faction: fid, kind: 'attack', from: f.hq, to: key, troops: n, x: a.site.x, y: a.site.y });
+  }
 }
 
 function setFlag(gs, key) {
@@ -474,7 +593,12 @@ function capture(gs, dt) {
   for (const [key, a] of t.active) {
     const s = a.site;
     const e = entry(gs, key);
-    if (a.defenders.length && a.defenders.every((d) => d.dead && !d.vanished)) {
+    const fe = gs.factions?.owned[key];
+    const f = fe ? factionById(gs.factions, fe.faction) : null;
+    if (f) {
+      // A faction's garrison is what still stands.
+      if (a.defenders.length) fe.garrison = a.defenders.filter((d) => !d.dead).length;
+    } else if (a.defenders.length && a.defenders.every((d) => d.dead && !d.vanished)) {
       a.defenders = [];
       e.cleared = Date.now() + CLEARED_FOR;
       changed(gs);
@@ -485,14 +609,49 @@ function capture(gs, dt) {
       if (!w.dead && !w.ghost && isSoldier(gs.data, w.role) && dist2(w, s) < R * R) here.add(w.clanId);
     }
     let monsters = false;
-    for (const m of gs.enemiesNear(s.x, s.y, 7)) if (!m.dead && !m.submerged && dist2(m, s) < 49) monsters = true;
+    const troops = new Set(); // factions with troops by the flag
+    for (const m of gs.enemiesNear(s.x, s.y, 7)) {
+      if (m.dead || m.submerged || dist2(m, s) >= 49) continue;
+      monsters = true;
+      if (m.faction && factionById(gs.factions, m.faction)?.alive) troops.add(m.faction);
+    }
     const before = e.capture ?? 0;
-    if (e.owner) {
+    if (f) {
+      // A faction's base: its troops by the flag hold it; with them gone, a clan standing there alone takes it.
+      const list = [...here];
+      const hold = troops.has(f.id);
+      if (list.length === 1 && !hold) {
+        if (e.by !== list[0]) {
+          e.by = list[0];
+          e.capture = 0;
+        }
+        e.capture = stepCapture(e.capture, { friendly: true, hostile: false, dt, seconds: cfg.captureSeconds });
+      } else if (!list.length) {
+        e.capture = stepCapture(before, { friendly: false, hostile: hold, dt, seconds: cfg.captureSeconds });
+        if (e.capture <= 0) e.by = null;
+      }
+      if (e.capture >= 1 && e.by) {
+        const clan = gs.clans.get(e.by);
+        if (clan && ownedBy(gs, clan.id).length < cfg.maxOwned) {
+          loseToOthers(gs.factions, key);
+          take(gs, key, clan.id, fe.tier === 'hq'
+            ? `[${clan.tag}] tog ${genitiveSv(f.sv ?? f.name)} högkvarter! Deras arméer får det svårt nu.`
+            : `[${clan.tag}] tog ett ${fe.tier === 'stronghold' ? 'fäste' : 'läger'} från ${f.sv ?? f.name}!`);
+          saveFactions(gs);
+        } else {
+          take(gs, key, e.by);
+        }
+      }
+    } else if (e.owner) {
       const others = [...here].filter((c) => c !== e.owner);
       const hostile = monsters || (others.length > 0 && raidable(gs, e.owner));
       e.capture = stepCapture(before, { friendly: here.has(e.owner), hostile, dt, seconds: cfg.captureSeconds });
       if (hostile && !here.has(e.owner)) e.attackedUntil = gs.time + 3;
-      if (e.capture <= 0) lose(gs, key, others.length === 1 ? others[0] : null);
+      if (e.capture <= 0) {
+        // Whoever stands at the flag takes it: a faction's troops, another clan, or monsters (then nobody holds it).
+        if (troops.size && !others.length) factionTakes(gs, key, [...troops][0]);
+        else lose(gs, key, others.length === 1 ? others[0] : null);
+      }
     } else {
       const list = [...here];
       if (list.length === 1 && !monsters) {
@@ -511,7 +670,7 @@ function capture(gs, dt) {
   }
 }
 
-function take(gs, key, clanId) {
+function take(gs, key, clanId, text = null) {
   const clan = gs.clans.get(clanId);
   const e = entry(gs, key);
   if (!clan) return;
@@ -532,7 +691,7 @@ function take(gs, key, clanId) {
   const s = site(gs, key);
   if (s) gs.event(s.x, s.y, { k: 'fx', fx: 'levelup', x: s.x, y: s.y - 1 }, 40);
   const pay = Object.entries(incomeFor(gs.data, s?.tier ?? 1)).map(([k, n]) => `${n} ${{ scrap: 'skrot', essence: 'essens', wood: 'trä', stone: 'sten' }[k] ?? k}`).join(', ');
-  toClan(gs, clan, `[${clan.tag}] tog utposten! Den ger ${pay} i timmen till valvet.`, 'legendary');
+  toClan(gs, clan, text ? `${text} Den ger ${pay} i timmen till valvet.` : `[${clan.tag}] tog utposten! Den ger ${pay} i timmen till valvet.`, 'legendary');
   gs.log?.info?.(`[army] ${clan.tag} took ${key}`);
   changed(gs);
   save(gs);
@@ -598,6 +757,26 @@ function abstract(gs, clan) {
     if (!members.length || !members.every((w) => w.ghost && dist2(w, s) < 36)) continue;
     let defense;
     let foe = null;
+    const fe = gs.factions?.owned[o.key];
+    const ff = fe ? factionById(gs.factions, fe.faction) : null;
+    if (ff) {
+      // A faction's base: its garrison (and walls) against the squad.
+      const res = abstractBattle(power(gs, clan, members), troopPower(gs.data, ff, fe.tier, fe.garrison, s) * 1.25);
+      losses(gs, members, res.attackerLoss * 0.6);
+      if (res.win && members.some((w) => !w.dead)) {
+        loseToOthers(gs.factions, o.key);
+        take(gs, o.key, clan.id, `${squad.name} tog ${fe.tier === 'hq' ? 'högkvarteret' : 'en bas'} från ${ff.sv ?? ff.name}!`);
+        squad.order = { kind: 'defend', key: o.key, x: s.x, y: s.y };
+        saveFactions(gs);
+      } else {
+        fe.garrison = Math.max(1, Math.round(fe.garrison * (1 - res.defenderLoss)));
+        squad.order = { kind: 'retreat' };
+        toClan(gs, clan, `${squad.name} slogs tillbaka av ${ff.sv ?? ff.name} och vänder hem.`, 'warn');
+      }
+      clan.dirty = true;
+      clans.sendClan(gs, clan);
+      continue;
+    }
     if (e.owner) {
       foe = gs.clans.get(e.owner);
       if (!foe || !raidable(gs, e.owner)) {
@@ -710,6 +889,353 @@ function income(gs, clan, now = Date.now()) {
   clan.dirty = true;
   gs.db.saveClan(clan);
   clans.sendClan(gs, clan);
+}
+
+// --- NPC factions ----------------------------------------------------------------------------------
+
+/** The world's factions (made once, saved in meta 'factions'), never on a clan's land. */
+export function factions(gs) {
+  if (gs.factions) return gs.factions;
+  let st = null;
+  try {
+    st = JSON.parse(gs.db.meta('factions') ?? 'null');
+  } catch (err) {
+    gs.log?.warn?.('[army] factions unreadable', err.message);
+  }
+  if (!st?.list) {
+    st = createFactions(gs.world, gs.data);
+    const claims = gs.claims();
+    for (const key of Object.keys(st.owned)) {
+      const s = site(gs, key);
+      if (state(gs).map.get(key)?.owner || !s || outpostDormant(s, claims, gs.rules.claimRadius)) delete st.owned[key];
+    }
+  }
+  st.armies ??= [];
+  // (Armies walk for real only while someone is near: after a restart they march on as a whole.)
+  for (const a of st.armies) for (const k of ['live', 'best', 'bestAt', 'restUntil']) delete a[k];
+  gs.factions = st;
+  gs.marching = new Map(); // army id → its troops walking the land
+  catchUp(gs);
+  return st;
+}
+
+function saveFactions(gs) {
+  const st = gs.factions;
+  if (!st) return;
+  const armies = st.armies.map(({ live, best, bestAt, restUntil, ...a }) => a);
+  gs.db.setMeta('factions', JSON.stringify({ ...st, armies, lastAt: Date.now() }));
+}
+
+/** While the server was down the factions went on (a few hours at most, all of it far from everyone). */
+function catchUp(gs, now = Date.now()) {
+  const st = gs.factions;
+  if (st.lastAt) {
+    const seconds = Math.min(factionConfig(gs.data).catchUpHours * 3600, Math.max(0, (now - st.lastAt) / 1000));
+    const ctx = { ...factionCtx(gs), live: () => false, told: () => {} };
+    for (let t = 0; t < seconds; t += 6) stepFactions(st, ctx, 6);
+  }
+  st.lastAt = now;
+}
+
+/** Where a faction sits on the map: its headquarters (or, without it, any land it holds). */
+function factionSeat(gs, f) {
+  const fx = gs.factions;
+  const key = fx.owned[f.hq]?.faction === f.id ? f.hq : factionSquares(fx, f.id)[0];
+  const s = key ? site(gs, key) : null;
+  return s ? { x: s.x, y: s.y } : null;
+}
+
+function everyone(gs, text, kind = 'info') {
+  for (const p of gs.players.values()) if (p.conn) gs.toast(p, text, kind);
+}
+
+function nameOf(f) {
+  return f?.sv ?? f?.name ?? 'En fraktion';
+}
+
+/** What the factions' AI needs to know about the clans and the land (src/game/factions.js). */
+function factionCtx(gs) {
+  if (gs.fctx) return gs.fctx;
+  const st = () => gs.factions;
+  gs.fctx = {
+    world: gs.world, data: gs.data, rng: Math.random,
+    ownerOf: (key) => {
+      const owner = state(gs).map.get(key)?.owner;
+      return owner ? { kind: 'clan', id: owner } : null;
+    },
+    defense: (key, s) => {
+      const e = state(gs).map.get(key);
+      if (e?.owner) {
+        const clan = gs.clans.get(e.owner);
+        const owned = ownedBy(gs, e.owner);
+        return ((clan ? power(gs, clan, garrison(gs, clan, key)) : 0) + 15 * s.tier) * defenseFactor(gs.data, owned.length, frontier(owned));
+      }
+      if (e?.cleared > Date.now()) return 5;
+      return monsterPower(gs.data, defendersFor(gs.data, s), outpostLevel(s));
+    },
+    // Never the camp, never an outpost in a clan's base, never a clan whose base can't be raided right now.
+    allowed: (key) => {
+      if (key === '0,0') return false;
+      const s = site(gs, key);
+      // (The claims once per tick: the AI asks about many squares at once.)
+      if (gs.fclaimsTick !== gs.tick) {
+        gs.fclaims = gs.claims();
+        gs.fclaimsTick = gs.tick;
+      }
+      if (!s || outpostDormant(s, gs.fclaims, gs.rules.claimRadius)) return false;
+      const owner = state(gs).map.get(key)?.owner;
+      return !owner || raidable(gs, owner);
+    },
+    live: (key) => state(gs).active.has(key),
+    realAttack: (army, s) => {
+      const f = factionById(st(), army.faction);
+      const a = state(gs).active.get(s.key);
+      if (!f || !a) return;
+      const walking = troopsOf(gs, army);
+      if (walking.length) {
+        for (const m of walking) Object.assign(m, { army: 0, march: null, raid: s.key, homeX: s.x, homeY: s.y });
+        gs.marching.delete(army.id);
+      } else {
+        spawnTroops(gs, a, f, troopsFor(f, 'camp', army.troops), { raid: true });
+      }
+      const e = entry(gs, s.key);
+      e.attackedUntil = gs.time + 60;
+      changed(gs);
+      const clan = e.owner ? gs.clans.get(e.owner) : null;
+      if (clan) toClan(gs, clan, `${nameOf(f)} anfaller en av era utposter! Håll flaggan.`, 'boss');
+    },
+    taken: (key, fid, from, army) => {
+      const f = factionById(st(), fid);
+      const a = state(gs).active.get(key);
+      if (a) garrisonTaken(gs, a, f, army);
+      setFlag(gs, key);
+      const clan = from?.kind === 'clan' ? gs.clans.get(from.id) : null;
+      if (clan) toClan(gs, clan, `${nameOf(f)} tog en av era utposter! Ta tillbaka den på strategikartan (N).`, 'warn');
+      changed(gs);
+    },
+    lost: (key) => {
+      const e = state(gs).map.get(key);
+      if (!e?.owner) return;
+      Object.assign(e, { owner: null, capture: 0, by: null, cleared: 0 });
+      setFlag(gs, key);
+      changed(gs);
+      save(gs);
+    },
+    plunder: (owner, pct, f) => {
+      const clan = owner?.kind === 'clan' ? gs.clans.get(owner.id) : null;
+      if (!clan) return;
+      const got = [];
+      const names = { scrap: 'skrot', essence: 'essens', wood: 'trä', stone: 'sten' };
+      for (const k of Object.keys(names)) {
+        const n = Math.floor((clan.vault[k] ?? 0) * pct / 100);
+        if (n > 0) {
+          clan.vault[k] -= n;
+          got.push(`${n} ${names[k]}`);
+        }
+      }
+      clan.dirty = true;
+      gs.db.saveClan(clan);
+      clans.sendClan(gs, clan);
+      toClan(gs, clan, `${nameOf(f)} plundrade en av era utposter${got.length ? ` och tog ${got.join(', ')} ur valvet` : ''}.`, 'warn');
+    },
+    told: (e) => {
+      // Troops that walked here and are done: beaten back, home again, or inside their own walls.
+      if (e.army && ['repelled', 'home', 'joined', 'plundered'].includes(e.kind)) {
+        const a = e.kind === 'joined' ? state(gs).active.get(e.key) : null;
+        for (const m of troopsOf(gs, e.army)) {
+          if (a) {
+            Object.assign(m, { army: 0, march: null, outpost: e.key, homeX: a.site.x, homeY: a.site.y });
+            a.defenders.push(m);
+          } else {
+            vanish(gs, m);
+          }
+        }
+        gs.marching.delete(e.army.id);
+      }
+      const clan = e.owner?.kind === 'clan' ? gs.clans.get(e.owner.id) : e.target?.kind === 'clan' ? gs.clans.get(e.target.id) : null;
+      if (e.kind === 'march' && clan) toClan(gs, clan, `${nameOf(e.faction)} marscherar mot en av era utposter. Se strategikartan (N).`, 'warn');
+      else if (e.kind === 'repelled' && clan) toClan(gs, clan, `Er utpost höll mot ${nameOf(e.faction)}.`, 'info');
+      else if (e.kind === 'gone') everyone(gs, `${nameOf(e.faction)} har fallit: fraktionen håller ingen mark längre.`, 'legendary');
+      if (['rival', 'gone', 'repelled', 'plundered'].includes(e.kind)) changed(gs);
+    },
+  };
+  return gs.fctx;
+}
+
+function troopsOf(gs, army) {
+  return (gs.marching?.get(army.id) ?? []).filter((m) => !m.dead && m.army === army.id);
+}
+
+function playerNear(gs, at, r) {
+  for (const p of gs.playersNear(at.x, at.y, r)) if (!p.dead) return p;
+  return null;
+}
+
+/** The factions' armies close to players walk the land for real; far from everyone they march as a whole. */
+function liveArmies(gs) {
+  const st = gs.factions;
+  for (const army of [...st.armies]) {
+    const f = factionById(st, army.faction);
+    const s = site(gs, army.to);
+    if (!f || !s) continue;
+    if (!army.live) {
+      if ((army.restUntil ?? 0) < gs.time && playerNear(gs, army, ARMY_LIVE)) muster(gs, army, f, s);
+      continue;
+    }
+    const all = gs.marching.get(army.id) ?? [];
+    const troops = troopsOf(gs, army);
+    if (!troops.length) {
+      // Beaten in the field: the army is no more.
+      st.armies = st.armies.filter((a) => a !== army);
+      gs.marching.delete(army.id);
+      if (all.some((m) => m.dead && !m.vanished)) {
+        for (const p of gs.playersNear(army.x, army.y, ARMY_GONE)) if (p.conn) gs.toast(p, `${genitiveSv(nameOf(f))} armé är slagen!`, 'legendary');
+      }
+      changed(gs);
+      continue;
+    }
+    army.x = troops.reduce((a, m) => a + m.x, 0) / troops.length;
+    army.y = troops.reduce((a, m) => a + m.y, 0) / troops.length;
+    army.troops = troops.length;
+    if (!playerNear(gs, army, ARMY_GONE)) {
+      dismiss(gs, army, troops);
+      continue;
+    }
+    const left = Math.hypot(s.x - army.x, s.y - army.y);
+    // Stuck (water, cliffs): it goes on as a whole for a while.
+    if (left < (army.best ?? Infinity) - 1) {
+      army.best = left;
+      army.bestAt = gs.time;
+    } else if (gs.time - (army.bestAt ?? gs.time) > 20) {
+      dismiss(gs, army, troops);
+      army.restUntil = gs.time + 45;
+      continue;
+    }
+    if (left < 9) {
+      delete army.live;
+      armyArrives(st, factionCtx(gs), army);
+      for (const m of troopsOf(gs, army)) vanish(gs, m);
+      gs.marching.delete(army.id);
+      changed(gs);
+    }
+  }
+}
+
+/** An army comes close to someone: its troops stand where it is and walk on to its target. */
+function muster(gs, army, f, s) {
+  const level = Math.max(outpostLevel(s), 1);
+  const target = { x: s.x, y: s.y + 7 };
+  // Just setting out from its own walls: out through the gate.
+  const from = site(gs, army.from);
+  const at = from && dist2(from, army) < 36 ? { x: from.x, y: from.y + 6 } : army;
+  const list = [];
+  troopsFor(f, 'camp', army.troops).forEach((d, i) => {
+    const spot = gs.world.findFreeSpot(at.x + (i % 3) - 1, at.y + Math.floor(i / 3) - 1, 0.45, 'enemy', null);
+    if (!spot || dist2(spot, at) > 64) return;
+    const m = enemies.spawnEnemy(gs, d.kind, spot.x, spot.y, { level, elite: d.elite });
+    if (!m) return;
+    Object.assign(m, { army: army.id, faction: f.id, march: target, homeX: spot.x, homeY: spot.y, keep: true });
+    list.push(m);
+  });
+  if (!list.length) {
+    army.restUntil = gs.time + 30;
+    return;
+  }
+  army.live = true;
+  army.best = Infinity;
+  army.bestAt = gs.time;
+  gs.marching.set(army.id, list);
+  const owner = state(gs).map.get(army.to)?.owner;
+  const text = `${genitiveSv(nameOf(f))} armé (${list.length}) är på marsch i närheten.`;
+  for (const p of gs.playersNear(army.x, army.y, ARMY_LIVE + 10)) {
+    if (!p.conn) continue;
+    if (owner && p.clanId === owner) gs.toast(p, `${genitiveSv(nameOf(f))} armé (${list.length}) marscherar mot er utpost! Stoppa den på vägen eller håll flaggan.`, 'boss');
+    else gs.toast(p, text, 'info');
+  }
+}
+
+/** Nobody near any more: the army goes on as a whole. */
+function dismiss(gs, army, troops) {
+  for (const m of troops) vanish(gs, m);
+  delete army.live;
+  army.troops = troops.length;
+  gs.marching.delete(army.id);
+}
+
+/** A faction took an outpost someone stands by: the old guards are gone, its troops hold the flag. */
+function garrisonTaken(gs, a, f, army) {
+  for (const m of a.defenders) if (!m.dead && m.faction !== f?.id) vanish(gs, m);
+  a.defenders = a.defenders.filter((m) => !m.dead);
+  for (const m of army ? troopsOf(gs, army) : []) {
+    Object.assign(m, { army: 0, march: null, outpost: a.site.key, homeX: a.site.x, homeY: a.site.y });
+    a.defenders.push(m);
+  }
+  if (army) gs.marching.delete(army.id);
+  if (!a.defenders.length && f) spawnTroops(gs, a, f, troopsFor(f, 'camp', gs.factions.owned[a.site.key]?.garrison ?? 3));
+}
+
+/** A faction's troops held a clan's flag: the outpost is theirs now. */
+function factionTakes(gs, key, fid) {
+  const f = factionById(gs.factions, fid);
+  const e = entry(gs, key);
+  const old = e.owner ? gs.clans.get(e.owner) : null;
+  Object.assign(e, { owner: null, capture: 0, by: null, cleared: 0 });
+  takeFor(gs.factions, gs.data, key, fid);
+  const a = state(gs).active.get(key);
+  if (a) {
+    for (const m of gs.enemiesNear(a.site.x, a.site.y, 9)) {
+      if (m.dead || m.faction !== fid) continue;
+      Object.assign(m, { raid: null, army: 0, march: null, outpost: key, homeX: a.site.x, homeY: a.site.y });
+      a.defenders.push(m);
+    }
+  }
+  setFlag(gs, key);
+  if (old) toClan(gs, old, `${nameOf(f)} tog en av era utposter! Ta tillbaka den på strategikartan (N).`, 'warn');
+  changed(gs);
+  save(gs);
+  saveFactions(gs);
+}
+
+/** A faction's towers shoot at whoever comes close. */
+function towers(gs, dt) {
+  for (const [key, a] of state(gs).active) {
+    const f = factionAt(gs, key);
+    if (!f) continue;
+    for (const st of a.structures) {
+      const spec = st.def.turret;
+      if (st.def.kind !== 'turret' || !spec) continue;
+      const rt = st.rt;
+      rt.cd -= dt;
+      if (rt.cd > 0) continue;
+      const cx = st.x + 0.5;
+      const cy = st.y + 0.3;
+      const p = gs.nearestPlayer(cx, cy, spec.range);
+      if (!p) continue;
+      rt.cd = spec.interval;
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      const lead = d / spec.speed;
+      const angle = Math.atan2(p.y + (p.vy ?? 0) * lead - cy, p.x + (p.vx ?? 0) * lead - cx);
+      const level = gs.world.worldLevel(st.x, st.y);
+      combat.spawnProjectile(gs, {
+        x: cx, y: cy, angle, speed: spec.speed, damage: spec.damage * (1 + 0.25 * (level - 1)), range: d + 2,
+        size: spec.sprite === 'orb' ? 3 : 2, sprite: spec.sprite, enemy: -1, outpost: key, element: spec.element ?? 'physical',
+        color: spec.color, status: spec.status ?? null, kind: 'shot', source: 'turret',
+      });
+      gs.event(cx, cy, { k: 'mturret', x: st.x, y: st.y, aim: angle }, 30);
+    }
+  }
+}
+
+/** A faction's land inside a clan's base (a banner went up by it) is theirs no more. */
+function asleep(gs) {
+  const claims = gs.claims();
+  for (const key of Object.keys(gs.factions.owned)) {
+    const s = site(gs, key);
+    if (!s || outpostDormant(s, claims, gs.rules.claimRadius)) {
+      loseToOthers(gs.factions, key);
+      changed(gs);
+    }
+  }
 }
 
 // --- Requests ---------------------------------------------------------------------------------------

@@ -36,7 +36,6 @@ import { Markets } from './markets.js';
 import { Workforce } from './workforce.js';
 import { Campaign } from './campaign.js';
 import { roleDef, isSoldier, squadOf, barracksCap } from './army.js';
-import { territoryConfig, territoryAt } from './territory.js';
 import { currentBoat, buildBoat, boatMode, findLaunch, findLanding } from './sailing.js';
 import { slideMove, groundEffect, tryLeap, dash, quantizeAxis, LEAP_TIME, DASH_TIME } from '../net/movement.js';
 import { hasSkill, beaconOf, dashCooldown, GALE_STEP } from './skills.js';
@@ -1452,8 +1451,11 @@ export class Game {
 
   // --- The army and the territories (campaign.js; the strategy map, ui/strategy.js) ----------
 
-  /** What the strategy map shows: the squares around (tx, ty), squads, soldiers and recruits. */
-  strategyView(tx, ty, radius) {
+  /**
+   * What the strategy map shows: the territories reaching into `box` (world
+   * tiles; null for none), squads, soldiers and recruits.
+   */
+  strategyView(box = null, budget = null) {
     const c = this.campaign;
     const data = this.data;
     const roster = this.save.base.workers;
@@ -1470,8 +1472,9 @@ export class Game {
     });
     const recruits = roster.filter((r) => !isSoldier(data, r.role) && !r.trainingTo).map((r) => ({ id: r.id, name: look(r.id)?.name ?? '?', role: r.role, roleName: roleName(r.role) }));
     return {
-      lang: 'en', size: territoryConfig(data).size, here: territoryAt(data, this.player.x, this.player.y), player: { x: this.player.x, y: this.player.y },
-      territories: radius >= 0 ? c.territoriesAround(tx, ty, radius) : [],
+      lang: 'en', player: { x: this.player.x, y: this.player.y, facing: this.player.facing },
+      territories: box ? c.territoriesIn(box, budget) : { list: [], pending: false },
+      troops: c.soldiers().filter((s) => !s.dead).map((s) => ({ x: s.x, y: s.y, squad: squadOf(c.army, s.id)?.id ?? 0, role: s.role })),
       squads: c.squadsView(), soldiers, recruits, roles: data.army?.roles ?? [], factions: c.factionsView(),
       barracks: { used: this.workforce.soldierCount(), cap: barracksCap(data, c.levels().training) },
       canCreateSquad: c.army.squads.length < (data.army?.squads?.max ?? 4),

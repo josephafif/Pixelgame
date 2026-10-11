@@ -123,8 +123,8 @@ test('a squad marches to an outpost far from you and takes it in one fight', () 
   run(game, 120);
   assert.ok(game.campaign.isOwned(site.key), `taken (${game.toasts.join(' | ')})`);
   assert.equal(game.campaign.army.squads[0].order.kind, 'defend', 'they stay to hold it');
-  // The map knows.
-  const view = game.campaign.territoriesAround(site.tx, site.ty, 0)[0];
+  // The map knows: the land around that outpost is yours.
+  const view = game.campaign.territoriesIn({ x0: site.x - 1, y0: site.y - 1, x1: site.x + 1, y1: site.y + 1 }).list.find((c) => c.key === site.key);
   assert.equal(view.status, 'own');
 });
 
@@ -217,4 +217,88 @@ test('factions: an army comes for your outpost while you are away and takes it',
   for (let i = 0; i < 400 && game.campaign.isOwned(mine); i++) run(game, 3, 3);
   assert.equal(game.campaign.isOwned(mine), false, 'lost');
   assert.ok(game.toasts.some((t) => /took your outpost|plundered/.test(t)), game.toasts.slice(-5).join(' | '));
+});
+
+test('factions: an army close to you marches for real; beat its troops and it is gone; it takes an outpost before your eyes', () => {
+  const save = campSave();
+  const game = stubGame(save);
+  const st = save.factions;
+  const f = st.list[0];
+  // A neutral outpost (a cell next to the faction's headquarters), you by it.
+  const [hx, hy] = f.hq.split(',').map(Number);
+  let key = null;
+  for (const [x, y] of [[hx + 1, hy], [hx - 1, hy], [hx, hy + 1], [hx, hy - 1], [hx + 1, hy + 1], [hx - 1, hy - 1]]) {
+    const k = `${x},${y}`;
+    if (!st.owned[k] && k !== '0,0' && game.campaign.site(k)) key = k;
+  }
+  assert.ok(key);
+  const site = game.campaign.site(key);
+  const spot = game.world.findFreeSpot(site.x, site.y + 20, 0.4);
+  Object.assign(game.player, { x: spot.x, y: spot.y });
+  const army = { id: 900, faction: f.id, kind: 'expand', from: f.hq, to: key, troops: 4, x: spot.x + 12, y: spot.y };
+  st.armies.push(army);
+  run(game, 1);
+  const troops = () => game.enemies.filter((e) => e.army === 900 && !e.dead);
+  assert.equal(troops().length, 4, 'its troops stand in the world');
+  assert.ok(troops().every((e) => e.faction === f.id && e.march), 'on the march');
+  assert.ok(game.toasts.some((t) => /on the march nearby/.test(t)));
+  // You go far away: it marches on as a whole.
+  Object.assign(game.player, { x: spot.x + 600, y: spot.y });
+  run(game, 1);
+  assert.equal(troops().length, 0);
+  assert.ok(st.armies.includes(army) && !army.live);
+  // Back again: there it is; beat every one of them and the army is no more.
+  Object.assign(game.player, { x: spot.x, y: spot.y });
+  army.x = spot.x + 12;
+  army.y = spot.y;
+  run(game, 1);
+  assert.equal(troops().length, 4);
+  for (const e of troops()) e.dead = true;
+  run(game, 1);
+  assert.ok(!st.armies.includes(army), 'routed');
+  assert.ok(game.toasts.some((t) => /routed an army/.test(t)));
+  // A strong army that reaches the outpost takes it: its troops hold the flag now.
+  game.enemies = game.enemies.filter((e) => !e.dead);
+  const big = { id: 901, faction: f.id, kind: 'expand', from: f.hq, to: key, troops: 8, x: spot.x + 6, y: spot.y };
+  st.armies.push(big);
+  run(game, 1);
+  for (const e of game.enemies.filter((x) => x.army === 901)) Object.assign(e, { x: site.x + (Math.random() - 0.5) * 3, y: site.y + 6 });
+  const rng = Math.random;
+  Math.random = () => 0.99;
+  try {
+    run(game, 1);
+  } finally {
+    Math.random = rng;
+  }
+  assert.equal(st.owned[key]?.faction, f.id, game.toasts.slice(-3).join(' | '));
+  const guards = game.enemies.filter((e) => !e.dead && e.outpost === key);
+  assert.ok(guards.length >= 1 && guards.every((e) => e.faction === f.id), 'the old guards are gone, its troops hold it');
+});
+
+test('older saves load: before the army (no army, territories or factions) and before the factions', () => {
+  // From before the update: the factions are made for the world, the rest gets its defaults.
+  const older = createNewSave({ worldSeed: 99 });
+  for (const k of ['army', 'territories', 'factions']) delete older[k];
+  delete older.world.gen;
+  const up = fillDefaults(JSON.parse(JSON.stringify(older)));
+  const g1 = stubGame(up);
+  assert.deepEqual(up.army.squads, []);
+  assert.deepEqual(up.territories.owned, {});
+  assert.ok(up.factions.list.length >= 3 && up.factions.list.length <= 5);
+  assert.equal(up.factions.owned['0,0'], undefined);
+  assert.ok(g1.campaign.factionsView().list.length >= 3);
+  // From the soldiers update: you already hold land where a faction would stand; it stays yours.
+  const fresh = stubGame(campSave());
+  const hq = fresh.save.factions.list[0].hq;
+  const mid = campSave();
+  delete mid.factions;
+  mid.territories.owned[hq] = { since: 1 };
+  const g2 = stubGame(fillDefaults(JSON.parse(JSON.stringify(mid))));
+  assert.ok(g2.campaign.isOwned(hq), 'still yours');
+  assert.equal(g2.save.factions.owned[hq], undefined, 'no faction on it');
+  // Armies saved mid-march march on as a whole (nothing of their walk is kept).
+  const marching = JSON.parse(JSON.stringify(g2.save));
+  marching.factions.armies = [{ id: 5, faction: marching.factions.list[0].id, kind: 'expand', from: hq, to: hq, troops: 3, x: 1, y: 1, live: true, restUntil: 1e9, best: 2, bestAt: 3 }];
+  const g3 = stubGame(fillDefaults(marching));
+  assert.deepEqual(Object.keys(g3.save.factions.armies[0]).sort(), ['faction', 'from', 'id', 'kind', 'to', 'troops', 'x', 'y']);
 });
