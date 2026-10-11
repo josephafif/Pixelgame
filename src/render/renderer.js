@@ -671,7 +671,8 @@ export class Renderer {
     const darkness = game.darkness ?? 0;
     const glow = glowAt(game.hour ?? 12);
     const lights = this.tileLights ?? [];
-    const near = (sx, sy, r) => sx > -r * T && sy > -r * T && sx < W + r * T && sy < H + r * T;
+    // (A light fades out well past its radius, so one just off screen still reaches in.)
+    const near = (sx, sy, r) => sx > -r * T * 1.5 && sy > -r * T * 1.5 && sx < W + r * T * 1.5 && sy < H + r * T * 1.5;
     for (const st of game.structuresForDraw()) {
       const L = STRUCTURE_LIGHTS[st.id];
       if (!L || st.dead) continue;
@@ -687,7 +688,7 @@ export class Renderer {
     if (darkness > 0.01) {
       // A little light around you (and the others) to see by.
       const p = game.player;
-      if (!p.dead) lights.push({ sx: this.#sx(p.x), sy: this.#sy(p.y) - 6, r: 3.4, color: 'you', k: 0.85 });
+      if (!p.dead) lights.push({ sx: this.#sx(p.x), sy: this.#sy(p.y) - 6, r: 3.8, color: 'you', k: 0.9 });
       for (const o of game.others ?? []) if (!o.dead) lights.push({ sx: this.#sx(o.x), sy: this.#sy(o.y) - 6, r: 2.8, color: 'you', k: 0.7 });
     }
     if (!lights.length && darkness <= 0.01 && glow <= 0.01) return;

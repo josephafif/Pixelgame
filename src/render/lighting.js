@@ -1,7 +1,8 @@
 // Light and dark over the world. By day only a soft warm glow around fires,
-// lava and glowing stones; at dusk and dawn a red warmth; at night a deep
-// blue dark with pools of light around torches, camp fires, lava, lumen caps
-// and crystals, and a little light around you. Drawn once a frame over the
+// lava and glowing stones; at dusk and dawn a red warmth; at night a soft
+// moonlit blue with pools of light around torches, camp fires, lava, lumen
+// caps and crystals (fading gently into the dark, no hard edges), and a
+// little light around you. Drawn once a frame over the
 // world (under the HUD): the dark is a layer with holes cut where the
 // lights are, then each light adds its colour on top.
 
@@ -15,17 +16,30 @@ const COLORS = {
 let hole = null;
 const glows = new Map();
 
-/** A soft white disc (alpha 1 in the middle, 0 at the rim): what each light cuts out of the dark. */
+const SIZE = 128;
+
+/**
+ * A soft disc that fades smoothly from the middle to nothing at the rim (no
+ * edge you can see): `inner` is its strength in the middle.
+ */
+function softDisc(r, g, b, inner) {
+  const c = createCanvas(SIZE, SIZE);
+  const x = ctx2d(c);
+  const h = SIZE / 2;
+  const grad = x.createRadialGradient(h, h, 0, h, h, h);
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    const k = (1 - t * t) ** 2; // flat in the middle, a long gentle tail
+    grad.addColorStop(t, `rgba(${r},${g},${b},${(inner * k).toFixed(3)})`);
+  }
+  x.fillStyle = grad;
+  x.fillRect(0, 0, SIZE, SIZE);
+  return c;
+}
+
+/** What each light cuts out of the dark. */
 function holeSprite() {
-  if (hole) return hole;
-  hole = createCanvas(64, 64);
-  const g = ctx2d(hole);
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.45, 'rgba(255,255,255,0.85)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
+  hole ??= softDisc(255, 255, 255, 1);
   return hole;
 }
 
@@ -33,25 +47,21 @@ function holeSprite() {
 function glowSprite(name) {
   let c = glows.get(name);
   if (c) return c;
-  const [r, gg, b] = COLORS[name] ?? COLORS.warm;
-  c = createCanvas(64, 64);
-  const g = ctx2d(c);
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, `rgba(${r},${gg},${b},0.9)`);
-  grad.addColorStop(0.35, `rgba(${r},${gg},${b},0.42)`);
-  grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
+  const [r, g, b] = COLORS[name] ?? COLORS.warm;
+  c = softDisc(r, g, b, 0.75);
   glows.set(name, c);
   return c;
 }
 
-/** How a light breathes: fires flicker, stones pulse slowly. */
+/** How a light breathes: fires flicker softly, stones pulse slowly. */
 function flicker(L, t) {
   const s = L.seed ?? 0;
-  if (L.color === 'warm' || L.color === 'lava' || L.color === 'gold') return 1 + 0.07 * Math.sin(t * 9 + s) + 0.04 * Math.sin(t * 23 + s * 1.7);
-  return 1 + 0.05 * Math.sin(t * 2 + s);
+  if (L.color === 'warm' || L.color === 'lava' || L.color === 'gold') return 1 + 0.028 * Math.sin(t * 5.2 + s) + 0.014 * Math.sin(t * 11.3 + s * 1.7);
+  return 1 + 0.02 * Math.sin(t * 1.6 + s);
 }
+
+/** How far the dark reaches past a light's radius: the light fades out over this much more. */
+const REACH = 1.45;
 
 export class Lighting {
   constructor() {
@@ -80,13 +90,14 @@ export class Lighting {
       g.globalCompositeOperation = 'source-over';
       g.globalAlpha = 1;
       g.clearRect(0, 0, cw, ch);
-      g.fillStyle = `rgba(10, 14, 38, ${(0.8 * darkness).toFixed(3)})`;
+      // A soft moonlit blue: dark enough for the lights to matter, never pitch black.
+      g.fillStyle = `rgba(16, 22, 54, ${(0.6 * darkness).toFixed(3)})`;
       g.fillRect(0, 0, cw, ch);
       g.setTransform(R, 0, 0, R, 0, 0);
       g.globalCompositeOperation = 'destination-out';
       const hs = holeSprite();
       for (const L of lights) {
-        const rad = L.r * T * flicker(L, time);
+        const rad = L.r * T * REACH * (1 + (flicker(L, time) - 1) * 0.5);
         g.globalAlpha = Math.min(1, L.k ?? 1);
         g.drawImage(hs, L.sx - rad, L.sy - rad, rad * 2, rad * 2);
       }
@@ -96,11 +107,11 @@ export class Lighting {
     }
     // Every light adds its colour: faint by day, warm and strong at night.
     v.globalCompositeOperation = 'lighter';
-    const base = 0.1 + 0.34 * darkness;
+    const base = 0.08 + 0.22 * darkness;
     for (const L of lights) {
       if (L.color === 'you') continue;
       const f = flicker(L, time);
-      const rad = L.r * T * 0.85 * f;
+      const rad = L.r * T * 1.05 * (1 + (f - 1) * 0.5);
       v.globalAlpha = Math.min(1, base * (L.k ?? 1) * f);
       v.drawImage(glowSprite(L.color), L.sx - rad, L.sy - rad, rad * 2, rad * 2);
     }
