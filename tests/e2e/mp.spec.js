@@ -34,7 +34,10 @@ async function giveBase(p, levels) {
   const level = p.ch.level;
   p.ch.level = 30;
   Object.assign(p.ch.resources, { wood: 99999, stone: 99999, scrap: 99999, essence: 99999 });
-  if (building.place(gs, p, 'banner', at.x, at.y)) throw new Error('no banner');
+  // (Nobody in the way: a monster passing by would block the banner.)
+  for (const e of [...gs.enemiesNear(at.x, at.y, 10)]) gs.enemies.delete(e.id);
+  const problem = building.place(gs, p, 'banner', at.x, at.y);
+  if (problem) throw new Error(`no banner: ${problem}`);
   const spots = [[-4, -3], [0, -4], [4, -3], [-4, 1], [4, 1], [-3, 4], [1, 4], [4, 4]];
   Object.keys(levels).forEach((id, i) => {
     const problem = building.place(gs, p, `b_${id}`, at.x + spots[i][0], at.y + spots[i][1]);
@@ -280,6 +283,8 @@ test('sailing in multiplayer: set sail at the shore and sail smoothly (predicted
       const y = Math.floor(Math.sin((k / 64) * Math.PI * 2) * r);
       if (w.blockAt(x, y) || !w.isFree(x + 0.5, y + 0.5, 0.32)) continue;
       if (w.blockAt(x + 1, y) !== T.SEA || !SAILABLE.has(w.blockAt(x + 3, y)) || !w.isFree(x + 1.5, y + 0.5, 0.32, 'boat')) continue;
+      // (Nothing else to use right there, like a pile of bones.)
+      if (w.objectsNear(x, y).some((o) => (o.x - x) ** 2 + (o.y - y) ** 2 < 6 * 6)) continue;
       shore = { x: x + 0.5, y: y + 0.5 };
     }
   }

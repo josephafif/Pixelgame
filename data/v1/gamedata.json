@@ -1272,7 +1272,7 @@
       { "id": "ash_covenant", "name": "The Ash Covenant", "sv": "Askförbundet", "color": "#e86a2a", "personality": "raider" },
       { "id": "silver_wardens", "name": "The Silver Wardens", "sv": "Silverväktarna", "color": "#9fb4d8", "personality": "defender" },
       { "id": "night_court", "name": "The Night Court", "sv": "Nattens hov", "color": "#9a5cff", "personality": "strategist" },
-      { "id": "greenwood_band", "name": "The Greenwood Band", "sv": "Gröna bandet", "color": "#4fb04f", "personality": "raider" }
+      { "id": "greenwood_band", "name": "The Greenwood Band", "sv": "Gröna bandet", "color": "#2fb8a8", "personality": "raider" }
     ],
     "tiers": {
       "camp": { "name": "Camp", "sv": "Läger", "garrison": 3, "income": 1 },
@@ -1365,9 +1365,9 @@
     { "id": "night_court_warrior", "name": "Night Court Warrior", "look": "legionary", "faction": "night_court", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#9a5cff" },
     { "id": "night_court_archer", "name": "Night Court Archer", "look": "marksman", "faction": "night_court", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#9a5cff" },
     { "id": "night_court_captain", "name": "Night Court Captain", "look": "warlord", "faction": "night_court", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#9a5cff" },
-    { "id": "greenwood_band_warrior", "name": "Greenwood Band Warrior", "look": "legionary", "faction": "greenwood_band", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#4fb04f" },
-    { "id": "greenwood_band_archer", "name": "Greenwood Band Archer", "look": "marksman", "faction": "greenwood_band", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#4fb04f" },
-    { "id": "greenwood_band_captain", "name": "Greenwood Band Captain", "look": "warlord", "faction": "greenwood_band", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#4fb04f" }
+    { "id": "greenwood_band_warrior", "name": "Greenwood Band Warrior", "look": "legionary", "faction": "greenwood_band", "hp": 60, "damage": 11, "speed": 2.0, "size": 0.7, "sight": 9, "behavior": "chase", "xp": 14, "weight": 0, "color": "#2fb8a8" },
+    { "id": "greenwood_band_archer", "name": "Greenwood Band Archer", "look": "marksman", "faction": "greenwood_band", "hp": 44, "damage": 9, "speed": 1.9, "size": 0.7, "sight": 10, "behavior": "ranged", "range": 6, "projSpeed": 7, "xp": 14, "weight": 0, "color": "#2fb8a8" },
+    { "id": "greenwood_band_captain", "name": "Greenwood Band Captain", "look": "warlord", "faction": "greenwood_band", "elite": true, "hp": 120, "damage": 16, "speed": 2.0, "size": 0.85, "sight": 10, "behavior": "charger", "windup": 0.6, "dash": 4, "dashTime": 0.45, "trigger": 4, "cooldown": 3.2, "group": [1, 1], "xp": 50, "weight": 0, "color": "#2fb8a8" }
   ],
   "bosses": [
     { "id": "inferno_titan", "name": "Inferno Titan", "biome": "volcanic", "element": "fire", "hp": 1600, "damage": 22, "speed": 1.4, "size": 2.2, "xp": 420, "patterns": ["meteors", "charge", "slam", "ring", "meteors", "summon"], "trail": "fire", "tip": "Meteors fall where you stand, and its charge leaves the ground burning.", "color": "#ff6a2a", "drop": { "component": "inferno_core", "minRarity": "rare", "theme": "fire" } },

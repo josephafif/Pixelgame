@@ -114,6 +114,19 @@ export function createFactions(world, data) {
   return state;
 }
 
+/** A saved world's factions take their names and colours from the game's data (they may have changed since). */
+export function refreshFactions(state, data) {
+  const pool = new Map(factionConfig(data).pool.map((d) => [d.id, d]));
+  for (const f of state?.list ?? []) {
+    const def = pool.get(f.id);
+    if (!def) continue;
+    f.name = def.name;
+    f.sv = def.sv ?? def.name;
+    f.color = def.color;
+  }
+  return state;
+}
+
 export function factionById(state, id) {
   return state?.list.find((f) => f.id === id) ?? null;
 }

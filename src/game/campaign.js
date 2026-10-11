@@ -26,7 +26,7 @@ import { spawnEnemy } from './enemies.js';
 import { runTurret } from './construction.js';
 import {
   createFactions, factionAt, factionById, troopsFor, troopPower, stepFactions, loseToOthers, takeFor, factionConfig,
-  factionSquares, visibleArmies, armyArrives,
+  factionSquares, visibleArmies, armyArrives, refreshFactions,
 } from './factions.js';
 import { dealDamage } from './combat.js';
 
@@ -72,6 +72,7 @@ export class Campaign {
       for (const key of Object.keys(game.save.factions.owned)) if (this.isOwned(key)) delete game.save.factions.owned[key];
     }
     game.save.factions.armies ??= [];
+    refreshFactions(game.save.factions, game.data);
     // (Armies walk for real only while you are near: after a load they march on as a whole.)
     for (const a of game.save.factions.armies) for (const k of ['live', 'best', 'bestAt', 'restUntil']) delete a[k];
     this.marching = new Map(); // army id → its troops (enemies) walking the land

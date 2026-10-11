@@ -195,8 +195,9 @@ export function open(game) {
         g.fillRect(x - 12, y - r - 8, 24 * c.capture, 3);
       }
       if (z >= 2 && (c.status === 'foreign' || c.home)) {
+        // (Above the flag: below it is where you and your squads stand.)
         const label = c.home ? t().home : `${c.ownerName ?? ''}${c.base ? ` · ${t().tiers[c.base] ?? c.base}` : ''}`;
-        text(g, label, x, y + r + 18, c.home ? HOME : '#f3ecdc');
+        text(g, label, x, y - r - (c.capture > 0 && c.capture < 1 ? 14 : 6), c.home ? HOME : '#f3ecdc');
       }
     }
     // The factions' armies on the march (near you or your land), and where they head.

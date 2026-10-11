@@ -30,7 +30,7 @@ import {
 } from '../src/game/territory.js';
 import {
   createFactions, factionById, troopsFor, troopPower, stepFactions, loseToOthers, takeFor, factionConfig, factionSquares,
-  armyArrives, factionRef, genitiveSv,
+  armyArrives, factionRef, genitiveSv, refreshFactions,
 } from '../src/game/factions.js';
 import { canDo } from '../src/net/rules.js';
 import { workerStats } from '../src/game/workers.js';
@@ -48,7 +48,8 @@ const HOUR = 3600 * 1000;
 const NEUTRAL_COLOR = '#b8b8c8';
 const ARMY_LIVE = 56; // a faction's army closer than this to a player walks the land for real
 const ARMY_GONE = 84;
-const CLAN_COLORS = ['#3fa86a', '#3f6fd8', '#c8364a', '#e0a030', '#9a5cff', '#3fb0b0', '#e86a2a', '#ff7ad8'];
+// (No green: on the strategy map green is your own land.)
+const CLAN_COLORS = ['#c08040', '#3f6fd8', '#c8364a', '#e0a030', '#9a5cff', '#60c8f0', '#e86a2a', '#ff7ad8'];
 
 function dist2(a, b) {
   return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
@@ -911,6 +912,7 @@ export function factions(gs) {
     }
   }
   st.armies ??= [];
+  refreshFactions(st, gs.data);
   // (Armies walk for real only while someone is near: after a restart they march on as a whole.)
   for (const a of st.armies) for (const k of ['live', 'best', 'bestAt', 'restUntil']) delete a[k];
   gs.factions = st;

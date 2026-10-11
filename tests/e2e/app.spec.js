@@ -1366,7 +1366,13 @@ test('Mireglass Fen and Skyreach: the bog sickens you, the bosses fight, and Gal
     g.player.facing = 0;
     return { x: g.player.x, y: g.player.y };
   });
-  await page.keyboard.press('KeyV');
+  // (Towards open ground: over the island's edge there is nowhere to land.)
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('KeyV');
+    await page.waitForTimeout(150);
+    if (await game(page, () => (window.__pixelgame.game.dashState?.left ?? 0) > 0)) break;
+    await game(page, (k) => { window.__pixelgame.game.player.facing = (k * Math.PI) / 4; }, i + 1);
+  }
   await expect.poll(() => game(page, () => window.__pixelgame.game.dashState?.left ?? 0)).toBeGreaterThan(0);
   const after = await game(page, () => ({ x: window.__pixelgame.game.player.x, y: window.__pixelgame.game.player.y }));
   expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeGreaterThan(0.5);

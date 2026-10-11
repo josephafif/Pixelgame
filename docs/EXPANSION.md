@@ -13,7 +13,15 @@ på väg.
 | 4 | Sällsyntare ritningar, de bästa bara från svåra bossar | klar |
 | 5 | Soldater, trupper, strategikartan och territorier | klar |
 | 6 | NPC-fraktioner med baser och strategisk AI | klar |
-| 7 | Integration, gamla sparfiler, prestanda och dokumentation | planerad |
+| 7 | Integration, gamla sparfiler, prestanda och dokumentation | klar |
+
+Fas 7 i korthet: sparfiler från före uppdateringen (utan armé, territorier eller
+fraktioner) och från soldatuppdateringen laddas utan att något går förlorat, och
+fraktionerna tar aldrig mark som spelaren redan håller. Sparade fraktioner får namn och färg
+från spelets data. På servern kostar fraktionerna ungefär en millisekund extra per tick med
+åtta spelare vid deras baser och flera arméer på marsch (budgeten är 33 ms); i singleplayer
+tar en uppdatering under en millisekund även vid ett högkvarter med en armé i närheten.
+Utposternas vakter långt ifrån spelaren står still och räknas inte mot de vilda monstren.
 
 Före planen kom också: fuskskydd (inget `window.__pixelgame` på den publicerade sidan),
 fler hästflockar som syns på kartan, och dyrare byggen och underhåll.

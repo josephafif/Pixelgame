@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { World } from '../../src/game/world.js';
 import {
-  createFactions, stepFactions, factionSquares, troopsFor, troopPower, factionConfig, loseToOthers, takeFor, factionById,
+  createFactions, stepFactions, factionSquares, troopsFor, troopPower, factionConfig, loseToOthers, takeFor, factionById, refreshFactions,
 } from '../../src/game/factions.js';
 import { parseKey, outpostFor, monsterPower, defendersFor, outpostLevel } from '../../src/game/territory.js';
 import { createRng } from '../../src/core/rng.js';
@@ -134,4 +134,15 @@ test('you take a faction\'s headquarters: it is theirs no more; with no land lef
   assert.ok(events.includes('gone'));
   takeFor(st, data, hq, st.list[1].id);
   assert.equal(st.owned[hq].faction, st.list[1].id);
+});
+
+test('a saved world\'s factions take their names and colours from the game\'s data', () => {
+  const w = new World(data, 42);
+  const st = JSON.parse(JSON.stringify(createFactions(w, data)));
+  st.list[0].color = '#000000';
+  st.list[0].sv = 'Gammalt namn';
+  refreshFactions(st, data);
+  const def = data.factions.pool.find((d) => d.id === st.list[0].id);
+  assert.equal(st.list[0].color, def.color);
+  assert.equal(st.list[0].sv, def.sv);
 });
