@@ -2,6 +2,10 @@
 // replies, binary snapshots, and a running estimate of the round trip.
 
 import { PROTOCOL_VERSION, MSG } from '../net/protocol.js';
+import { BUILD } from '../net/build.js';
+
+/** Said when the server's rules aren't the game's (one of them was just updated). */
+export const VERSION_MISMATCH = 'Servern och spelet har olika versioner. Ladda om sidan. Har servern precis uppdaterats tar det någon minut innan den är klar.';
 
 export class Connection {
   /**
@@ -44,7 +48,7 @@ export class Connection {
       arm();
       ws.onopen = () => {
         this.open = true;
-        this.sendJson({ t: 'auth', v: PROTOCOL_VERSION, token });
+        this.sendJson({ t: 'auth', v: PROTOCOL_VERSION, b: BUILD, token });
       };
       ws.onmessage = (e) => {
         if (typeof e.data !== 'string') {
@@ -57,6 +61,13 @@ export class Connection {
         try {
           msg = JSON.parse(e.data);
         } catch {
+          return;
+        }
+        if (msg.t === 'welcome' && msg.server?.build !== BUILD) {
+          // A server with other rules (an older one): never play there.
+          clearTimeout(timeout);
+          this.kickReason = VERSION_MISMATCH;
+          ws.close();
           return;
         }
         if (msg.t === 'welcome') {

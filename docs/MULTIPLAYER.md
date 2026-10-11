@@ -489,9 +489,15 @@ Tabeller:
 
 ### Versioner
 
-- Klienten och servern har ett gemensamt protokollnummer.
-- Om servern har ett nyare nummer använder klienten PWA:ns befintliga
-  uppdateringsflöde ("Ny version, ladda om") innan den ansluter.
+- **Multiplayer får alltid samma uppdateringar som singleplayer.** Spelets regler (`src/game`,
+  `src/net`, `server`, `data` …) är samma kod för båda, och servern byggs om från samma gren
+  som spelet vid varje push (Cloudflare, se MULTIPLAYER-SETUP.md).
+- Klienten och servern har ett gemensamt protokollnummer, och dessutom ett fingeravtryck av
+  reglerna (`src/net/build.js`, skrivs av `npm run build`). Servern släpper bara in ett spel med
+  samma fingeravtryck, och spelet ansluter bara till en server med samma. Multiplayer kan alltså
+  aldrig köras med andra regler än singleplayer: under de minuter då bara den ena hunnit
+  uppdateras står servern som "Annan version", tills båda är klara.
+- Ett spel som är äldre än servern ombeds ladda om, och en ny version installeras när spelet startas.
 - Vapnens DNA sparas med `GENERATOR_VERSION`, som redan i dag.
 
 ---

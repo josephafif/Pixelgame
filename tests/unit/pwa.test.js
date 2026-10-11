@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildManifest } from '../../scripts/build-precache.mjs';
+import { buildManifest, buildInfo } from '../../scripts/build-precache.mjs';
 import { ROOT, readJson } from './helpers.js';
 
 test('web app manifest has everything needed to install', () => {
@@ -24,6 +24,11 @@ test('precache manifest is up to date with the app files', () => {
   const built = buildManifest();
   const committed = readFileSync(join(ROOT, 'precache-manifest.js'), 'utf8');
   assert.equal(committed, built.source, 'run `npm run build` after changing app files');
+});
+
+test('the rules fingerprint (src/net/build.js) is up to date, so server and game match', () => {
+  const committed = readFileSync(join(ROOT, 'src/net/build.js'), 'utf8');
+  assert.equal(committed, buildInfo().source, 'run `npm run build` after changing the game\'s rules');
 });
 
 test('every app module and asset is precached, so the app loads offline', () => {

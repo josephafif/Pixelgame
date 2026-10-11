@@ -100,6 +100,23 @@ test('movement is server-side: flooding inputs gives no speed', async () => {
   }
 });
 
+test('a game with other rules than the server never plays there (multiplayer always matches single player)', async () => {
+  const { Bot } = await import('./bot.js');
+  const { BUILD } = await import('../../src/net/build.js');
+  const t = await testServer();
+  try {
+    const ok = await t.bot('Samma');
+    assert.equal(ok.welcome.server.build, BUILD, 'the server says which rules it plays by');
+    const old = new Bot(t.url, { name: 'Gammal' });
+    old.build = 'old-rules';
+    await assert.rejects(old.connect(), 'refused');
+    assert.ok(old.json.some((m) => m.t === 'kick' && m.reason === 'update'), 'told to update');
+    assert.ok(!old.welcome, 'never let in');
+  } finally {
+    await t.close();
+  }
+});
+
 test('garbage gets you kicked', async () => {
   const t = await testServer();
   try {

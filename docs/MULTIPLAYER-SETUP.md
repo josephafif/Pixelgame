@@ -91,7 +91,8 @@ millisekunder när någon ansluter. Du behöver ingen server och inget betalkort
      - *Deploy command:* `npx wrangler deploy`
      - Grenen är `ccr-416322ef-rg7mbc`, som är repots enda gren.
      Tryck på **Create and deploy** och vänta ett par minuter. Sedan uppdateras servern vid
-     varje push. Frågar Cloudflare efter en *workers.dev-subdomän*, välj vad du vill, till
+     varje push, samtidigt som spelet. Det är viktigt: spelet ansluter bara till en server med
+     samma regler (`src/net/build.js`), så en server som inte uppdateras står som "Annan version". Frågar Cloudflare efter en *workers.dev-subdomän*, välj vad du vill, till
      exempel ditt namn.
    - **Med terminal:** kör `npx wrangler login` och sedan `npm run cloud:deploy`.
 3. Cloudflare visar adressen, till exempel `https://pixelgame.ditt-namn.workers.dev`. Öppna

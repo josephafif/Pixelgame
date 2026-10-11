@@ -2,6 +2,7 @@
 // and routing to the game. Anything malformed gets the connection closed.
 
 import { PROTOCOL_VERSION, decodeInput, MSG } from '../src/net/protocol.js';
+import { BUILD } from '../src/net/build.js';
 import { TICK_RATE } from '../src/net/movement.js';
 import { playerNameProblem, passwordProblem, describeRaidWindow } from '../src/net/rules.js';
 import { AuthError, hashPassword } from './auth.js';
@@ -123,6 +124,8 @@ export function serverInfo(gs, auth, config) {
   return {
     name: config.serverName,
     protocol: PROTOCOL_VERSION,
+    // The fingerprint of the game's rules: only a game with the same plays here.
+    build: BUILD,
     players: online,
     maxPlayers: config.maxPlayers,
     guests: auth.allowGuests,
@@ -142,7 +145,7 @@ export function serverInfo(gs, auth, config) {
 
 /**
  * Wires one WebSocket. First message must be
- *   { t: 'auth', v: PROTOCOL_VERSION, token }   (token 'guest' asks for a guest identity)
+ *   { t: 'auth', v: PROTOCOL_VERSION, b: BUILD, token }   (token 'guest' asks for a guest identity)
  * then, for a brand-new account, { t: 'create', name }.
  */
 export function handleConnection(gs, auth, config, ws, req, perIp) {
@@ -210,8 +213,10 @@ export function handleConnection(gs, auth, config, ws, req, perIp) {
 
   const onAuth = async (msg) => {
     if (msg.t !== 'auth') return conn.kick('Logga in först');
-    if (msg.v !== PROTOCOL_VERSION) {
-      conn.sendJson({ t: 'kick', reason: 'update', need: PROTOCOL_VERSION });
+    // The same protocol and the same rules as the server, or no game: multiplayer
+    // never runs on other rules than single player (src/net/build.js).
+    if (msg.v !== PROTOCOL_VERSION || msg.b !== BUILD) {
+      conn.sendJson({ t: 'kick', reason: 'update', need: PROTOCOL_VERSION, build: BUILD });
       return conn.kick('Spelet har uppdaterats: ladda om sidan');
     }
     let token = msg.token;

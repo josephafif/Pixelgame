@@ -3,6 +3,7 @@
 
 import WebSocket from 'ws';
 import { encodeInput, decodeSnapshot, PROTOCOL_VERSION } from '../../src/net/protocol.js';
+import { BUILD } from '../../src/net/build.js';
 
 export class Bot {
   constructor(url, { token = 'guest', name = null, password = undefined, headers = undefined, nameDelay = 0 } = {}) {
@@ -26,7 +27,7 @@ export class Bot {
       const ws = new WebSocket(this.url, { headers: this.headers });
       this.ws = ws;
       ws.binaryType = 'arraybuffer';
-      ws.on('open', () => ws.send(JSON.stringify({ t: 'auth', v: PROTOCOL_VERSION, token: this.token })));
+      ws.on('open', () => ws.send(JSON.stringify({ t: 'auth', v: PROTOCOL_VERSION, b: this.build ?? BUILD, token: this.token })));
       ws.on('message', (data, isBinary) => {
         if (isBinary) {
           const snap = decodeSnapshot(data, this.known);

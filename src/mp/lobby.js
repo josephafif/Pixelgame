@@ -7,6 +7,8 @@ import { h, clear, $ } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { openModal, closeModal, replaceModalBody, askConfirm } from '../ui/modal.js';
 import { PROTOCOL_VERSION } from '../net/protocol.js';
+import { BUILD } from '../net/build.js';
+import { VERSION_MISMATCH } from './connection.js';
 import { MpAuth, configuredServers, customServers, addServer, removeServer, infoUrl, sameOriginServer, loginWithPassword } from './auth.js';
 import {
   registryEnabled, listServers, findServer, normalizeCode, serverUrlFrom, serverKey, recentCodes, rememberCode,
@@ -183,9 +185,9 @@ export function openLobby(app, { message = null, joinCode = null, serverUrl = nu
     const status = offline ? h('span.muted', 'Inte igång just nu')
       : !info ? h('span.muted', 'Kollar…')
         : !info.ok ? h('span.warn', 'Svarar inte')
-          : info.protocol !== PROTOCOL_VERSION ? h('span.warn', 'Annan version')
+          : info.protocol !== PROTOCOL_VERSION || info.build !== BUILD ? h('span.warn', 'Annan version')
             : h('span', `${info.players}/${info.maxPlayers} spelare · ${info.ping} ms`);
-    const ready = !offline && info?.ok && info.protocol === PROTOCOL_VERSION;
+    const ready = !offline && info?.ok && info.protocol === PROTOCOL_VERSION && info.build === BUILD;
     // Your account's login token only ever goes to the official server: anyone can host the others.
     const accountOk = ready && s.official && info.supabase && auth.configured;
     const loggedIn = Boolean(auth.session);
@@ -515,7 +517,7 @@ export async function startMultiplayer(app) {
   connectingModal(join.server.name);
   game.on('disconnect', (info) => {
     const reason = info.reason || 'Anslutningen till servern bröts.';
-    if (reason === 'update' || /uppdaterats/.test(reason)) failModal('Ny version', 'Spelet har uppdaterats. Ladda om sidan för att fortsätta.');
+    if (reason === 'update' || /uppdaterats/.test(reason)) failModal('Ny version', VERSION_MISMATCH);
     else failModal('Frånkopplad', reason);
   });
   const last = {};
