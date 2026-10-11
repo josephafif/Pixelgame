@@ -17,7 +17,6 @@ import * as markets from './markets.js';
 import * as building from './building.js';
 import * as clans from './clans.js';
 import * as base from './base.js';
-import * as army from './army.js';
 
 const NO_FORGE = 'Gå till en smedja: i Fristaden (upp till sällsynta vapen) eller i er bas';
 
@@ -92,8 +91,6 @@ export function handle(gs, p, msg) {
       return markets.request(gs, p, msg);
     case 'base':
       return base.request(gs, p, msg);
-    case 'army':
-      return army.request(gs, p, msg);
     case 'recall':
       return players.recall(gs, p, msg.op === 'back' ? 'back' : 'go');
     case 'move':

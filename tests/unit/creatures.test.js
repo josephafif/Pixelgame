@@ -26,10 +26,8 @@ function checkFrames(kind) {
 
 test('every land monster is animated: several walk (or idle) frames, one size, full palette', () => {
   for (const e of land) {
-    // (Faction troops share a look: legionary, marksman, warlord.)
-    const look = e.look ?? e.id;
-    assert.ok(hasCreature(look), `${e.id} has animated frames`);
-    const def = checkFrames(look);
+    assert.ok(hasCreature(e.id), `${e.id} has animated frames`);
+    const def = checkFrames(e.id);
     const moving = def.walk ?? def.idle;
     assert.ok(moving.length >= 2, `${e.id} actually moves`);
   }

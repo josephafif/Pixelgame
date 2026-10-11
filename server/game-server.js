@@ -10,6 +10,7 @@ import { TOWN_LEVELS } from '../src/net/mpbase.js';
 import { townMarket } from '../src/game/markets.js';
 import { isPoi } from '../src/game/discoveries.js';
 import { regrowMinutes } from '../src/game/gathering.js';
+import { backToWork } from '../src/game/workers.js';
 import * as players from './players.js';
 import * as combat from './combat.js';
 import * as enemies from './enemies.js';
@@ -21,7 +22,6 @@ import * as pals from './pals.js';
 import * as horses from './horses.js';
 import * as markets from './markets.js';
 import * as workers from './workers.js';
-import * as army from './army.js';
 import { sendSnapshots } from './snapshots.js';
 import { SpatialGrid, PAD } from './grid.js';
 
@@ -121,6 +121,13 @@ export class GameServer {
 
     // Clans and their bases.
     this.clans = new Map(db.loadClans().map((c) => [c.id, c]));
+    // The army is no longer in the game: soldiers go back to work, squads and the territories' clock go.
+    for (const c of this.clans.values()) {
+      const b = c.base ?? {};
+      const army = ['army', 'raidT', 'terrIncomeAt'].filter((k) => k in b);
+      for (const k of army) delete b[k];
+      if (backToWork(b.workers) || army.length) c.dirty = true;
+    }
     this.memberOf = new Map();
     for (const c of this.clans.values()) for (const id of c.members.keys()) this.memberOf.set(id, c.id);
     this.structures = new Map(); // sid → structure
@@ -257,7 +264,6 @@ export class GameServer {
     building.update(this, TICK_DT, now);
     markets.update(this, TICK_DT);
     workers.update(this, TICK_DT);
-    army.update(this, TICK_DT);
     this.#recordHistory();
     prof.mark('world');
     sendSnapshots(this, now);

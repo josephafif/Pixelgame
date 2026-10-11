@@ -374,33 +374,7 @@ Säkerheten kommer från att servern bestämmer.
   utanför strid, skyddar mot gyttjan från nivå 2, och `{ t: 'base', op: 'tonic' }` brygger en
   Lumen Tonic av dina egna Lumen Spores.
 - Protokollversion 13 (nya rutor, `PF.DASH`, `BTN.DASH`): äldre klienter ombeds ladda om.
-- **Soldater och trupper** (`server/army.js`, reglerna i `src/game/army.js`): klanens arbetare
-  tränas till soldater vid klanens träningsplats (`{ t: 'army', op: 'train', id, role }`), får
-  utrustning (`op: 'gear'`) och sätts i trupper (`squad-create`, `assign`, `order`, `stance`,
-  `squad-disband`). Bara de som får bygga (officerare och uppåt) leder armén. Soldaterna skickas
-  som arbetare i ögonblicksbilderna, med sin roll (`WORKER_ROLE_IDS`); var trupperna är och hur de
-  mår skickas till klanen varje sekund (`{ t: 'squads' }`). Nära spelare går och strider de på
-  riktigt; långt från alla avgörs striderna i ett slag med samma siffror.
-- **Territorier** ägs av klaner eller NPC-fraktioner. Ett territorium är marken runt en utpost
-  (`regionAt` i `src/game/territory.js`); nyckeln är utpostens cell. Servern har ett tillstånd
-  per territorium (sparat i `meta.territories`) och skickar alla ägda och omstridda till alla
-  (`{ t: 'terr', list, factions, armies }`, högst en gång i sekunden). En flagga tas av en klan
-  som står vid den utan andra klaner och utan monster; en annan klans territorium kan bara tas
-  medan den klanens bas går att raida. Varje territorium betalar klanvalvet varje timme. Utposterna (palissad och flagga) placeras likadant på servern och hos klienterna
-  (`placeOutpost` i `src/game/territory.js`). En utpost i (eller precis vid) en klans mark ligger
-  vilande: ingen palissad, inga väktare, inget att ta. Soldaternas lön (`upkeepPerSoldier`) ingår i
-  underhållet. `OUTPOSTS=false` stänger av utposterna på en server.
-- Protokollversion 14 (arbetarnas roll i ögonblicksbilderna).
-- **NPC-fraktioner** (`src/game/factions.js`, servern i `server/army.js`): skapas en gång per
-  värld och sparas i `meta.factions`. Deras mark har ägaren `'f:<id>'` och basens nivå
-  (`camp`, `stronghold`, `hq`) i `terr`; klienterna bygger baserna likadant (torn och
-  stenvallar). Garnisonerna är fraktionens egna monster (`e.faction`), tornen skjuter på
-  spelare. Den strategiska AI:n tänker var tolfte sekund. Arméer långt från alla marscherar
-  som en helhet; inom ungefär 56 rutor från en spelare kliver de ut i världen och går på
-  riktigt (`e.army`, `e.march`), och slås de ut är armén borta. En klans territorium anfalls
-  bara medan klanens bas går att raida. En klan som står ensam vid en fraktions flagga, utan
-  fraktionens trupper där, tar basen. `FACTIONS=false` (eller `OUTPOSTS=false`) stänger av
-  fraktionerna.
+- Protokollversion 15: armén (soldater, trupper, territorier och fraktioner) är borttagen igen. Klaner som hade soldater får tillbaka dem som arbetare när servern startar.
 - **Underhåll:** dras ur klanvalvet en gång i timmen: 5 trä och 5 sten per
   bygge och vecka, 10 skrot och 10 essens per byggnadsnivå och vecka, och varje
   arbetares lön (126 skrot och 84 essens i veckan). Allt går att ändra per server

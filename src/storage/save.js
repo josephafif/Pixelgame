@@ -4,6 +4,7 @@
 import { hashString } from '../core/rng.js';
 import { validateDna } from '../weapons/dna.js';
 import { WORLD_GEN } from '../game/world.js';
+import { backToWork } from '../game/workers.js';
 
 export const SAVE_SCHEMA = 1;
 export const SAVE_KEY = 'save:main';
@@ -67,9 +68,6 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     pals: { eggs: [], owned: [], active: null, mode: 'fight', nextId: 1 },
     // Horses you tamed (where each one is), the one you ride, and wild ones taken from herds.
     horses: { owned: [], riding: null, taken: {}, nextId: 1 },
-    // Squads of soldiers (campaign.js) and the territories you hold.
-    army: { squads: [], nextSquad: 1 },
-    territories: { owned: {}, capture: {}, cleared: {}, incomeAt: null, raidT: null },
     flags: { tutorialSeen: false, craftingAnnounced: false },
     sync: { lastSyncedRev: 0, accountId: null },
   };
@@ -107,7 +105,7 @@ function structuredCloneSafe(v) {
 export function fillDefaults(save) {
   const def = createNewSave({ worldSeed: save.worldSeed ?? 1, now: save.createdAt ?? Date.now() });
   const out = { ...def, ...save };
-  for (const key of ['player', 'inventory', 'codex', 'resources', 'bosses', 'world', 'abilityState', 'counters', 'flags', 'sync', 'base', 'tools', 'pals', 'horses', 'army', 'territories']) {
+  for (const key of ['player', 'inventory', 'codex', 'resources', 'bosses', 'world', 'abilityState', 'counters', 'flags', 'sync', 'base', 'tools', 'pals', 'horses']) {
     out[key] = { ...def[key], ...(save[key] ?? {}) };
   }
   out.settings = { ...DEFAULT_SETTINGS, ...(save.settings ?? {}) };
@@ -134,8 +132,9 @@ export function fillDefaults(save) {
   out.pals.owned = Array.isArray(save.pals?.owned) ? save.pals.owned.map((pal) => ({ ...pal })) : [];
   out.horses.owned = Array.isArray(save.horses?.owned) ? save.horses.owned.map((h) => ({ ...h })) : [];
   out.horses.taken = { ...(save.horses?.taken ?? {}) };
-  out.army.squads = Array.isArray(save.army?.squads) ? save.army.squads.map((sq) => ({ ...sq, members: [...(sq.members ?? [])], order: { ...(sq.order ?? { kind: 'retreat' }) } })) : [];
-  for (const k of ['owned', 'capture', 'cleared']) out.territories[k] = { ...(save.territories?.[k] ?? {}) };
+  // The army (soldiers, squads, territories and factions) is no longer in the game.
+  backToWork(out.base.workers);
+  for (const k of ['army', 'territories', 'factions']) delete out[k];
   return out;
 }
 

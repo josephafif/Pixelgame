@@ -30,10 +30,6 @@ import {
 } from './entities.js';
 import { BREED_BY_ID, describeHorse, HORSE_MODE } from '../game/horses.js';
 import { MpMarkets } from './markets.js';
-import { MpOutposts } from './outposts.js';
-import { roleDef, isSoldier, gearUpgrade, trainProblem, problemSv, ORDER_NAMES_SV } from '../game/army.js';
-import { territoryConfig, outpostFor, regionsIn } from '../game/territory.js';
-import { isFactionRef } from '../game/factions.js';
 import { workerLook } from '../game/workers.js';
 import { palStats, palSpecies, findPal, PAL_MODES } from '../game/pals.js';
 import { POI, isPoi, poiFound, chunksAround } from '../game/discoveries.js';
@@ -120,9 +116,6 @@ export class MpGame {
     this.frameMs = 16;
     this.godMode = false;
     this.markets = new MpMarkets(this);
-    // Outposts and who holds which territory (src/mp/outposts.js).
-    this.outposts = new MpOutposts(this);
-    this.squadPos = new Map(); // squad id → { x, y, hp, fight, march, soldiers }
     this.build = { active: false, selected: 'banner', tool: 'place', ghost: null, reason: null, hover: null, hoverAt: -99, painting: false, lastTile: null };
     this.player = {
       x: 0.5, y: 2.6, r: PLAYER_RADIUS, vx: 0, vy: 0, kx: 0, ky: 0, facing: 0, hp: 1, maxHp: 100, dead: false,
@@ -492,18 +485,10 @@ export class MpGame {
         for (const chunk of this.world?.chunks.values() ?? []) if (chunk.cut.size) chunk.canvas = null;
         this.emit('claims');
         break;
-      case 'terr':
-        // (The strategy map redraws on its own; its lists only when who holds what changed.)
-        if (this.outposts.setSquares(msg.list, msg)) this.emit('army');
-        break;
-      case 'squads':
-        this.squadPos = new Map(msg.list.map((q) => [q.id, q]));
-        break;
       case 'clan':
         this.clan = msg.id ? msg : null;
         this.syncBase();
         this.emit('clan', this.clan);
-        this.emit('army');
         // The base's buildings decide what the pals and forge panels offer.
         this.emit('pals');
         this.emit('base');
@@ -1164,7 +1149,6 @@ export class MpGame {
     this.#drainEvents();
     this.#updateGates(dt);
     this.markets.update(dt);
-    this.outposts.update(dt);
     for (const st of this.structById.values()) if (st.rt.flash > 0) st.rt.flash -= dt;
     // Interaction hints and build preview.
     this.interactT = (this.interactT ?? 0) - dt;
@@ -1896,127 +1880,7 @@ export class MpGame {
 
   structuresForDraw() {
     const mine = [...this.structById.values()];
-    const markets = this.markets.structures;
-    const outposts = this.outposts.structures;
-    if (!markets.length && !outposts.length) return mine;
-    return mine.concat(markets, outposts);
-  }
-
-  // --- The army and the territories (server/army.js; the strategy map, ui/strategy.js) ------
-
-  /**
-   * What the strategy map shows: the territories reaching into `box` (world
-   * tiles; null for none), your clan's squads, soldiers and recruits, and
-   * the factions with their armies on the march.
-   */
-  strategyView(box = null, budget = null) {
-    const data = this.data;
-    const clan = this.clan;
-    const mine = clan?.id ?? null;
-    const army = clan?.army ?? { squads: [], barracks: { used: 0, cap: 0 }, training: 0, forge: 0, owned: [] };
-    const roster = clan?.workers ?? [];
-    const near = new Map(this.workers.filter((w) => w.clanId === mine).map((w) => [w.id, w]));
-    const roleName = (id) => {
-      const r = roleDef(data, id);
-      return r ? r.sv ?? r.name : id === 'wood' ? 'Skogshuggare' : 'Gruvarbetare';
-    };
-    const sqs = this.outposts.squares;
-    const territories = { list: [], pending: false };
-    if (box && this.world) {
-      const found = regionsIn(this.world, data, box.x0, box.y0, box.x1, box.y1, { budget });
-      territories.pending = found.pending;
-      territories.list = found.list.map((site) => {
-        const key = site.key;
-        const home = Boolean(site.home);
-        const sq = sqs.get(key);
-        const owner = sq?.owner ?? null;
-        const faction = isFactionRef(owner);
-        const status = home ? 'home' : sq?.att && owner === mine ? 'attacked'
-          : owner ? (owner === mine ? 'own' : 'foreign') : sq?.cap > 0 ? 'contested' : 'neutral';
-        return {
-          key, x: site.x, y: site.y, site: home ? null : site, home, owner, status, capture: sq?.cap ?? 0, tier: site.tier ?? 0,
-          color: sq?.color, ownerName: faction ? sq.tag : sq?.tag ? `[${sq.tag}]` : null, base: faction ? sq.base ?? 'camp' : null,
-        };
-      });
-    }
-    const squadOfId = (id) => army.squads.find((q) => q.members.includes(id))?.id ?? 0;
-    const pos = (id) => {
-      for (const q of this.squadPos.values()) for (const [sid, hp, max] of q.soldiers ?? []) if (sid === id) return { hp, max };
-      const w = near.get(id);
-      return w ? { hp: w.hp, max: w.maxHp } : null;
-    };
-    const squads = army.squads.map((q) => {
-      const at = this.squadPos.get(q.id);
-      const members = roster.filter((r) => q.members.includes(r.id)).map((r) => {
-        const hp = pos(r.id);
-        return { id: r.id, name: workerLook(mine, r.id).name, role: r.role, hp: hp?.hp ?? 1, maxHp: hp?.max ?? 1 };
-      });
-      const name = ORDER_NAMES_SV[q.order?.kind] ?? q.order?.kind;
-      const doing = !members.length ? 'Inga soldater: sätt in några i listan'
-        : at?.fight ? `${name}: strider` : q.order?.kind === 'retreat' ? (at?.march ? 'På väg hem' : 'I basen')
-          : q.order?.kind === 'follow' ? 'Följer dig' : at?.march ? `${name}: på marsch` : `${name}: på plats`;
-      return { id: q.id, name: q.name, order: q.order, stance: q.stance, x: at?.x ?? null, y: at?.y ?? null, members, doing };
-    });
-    const soldiers = roster.filter((r) => isSoldier(data, r.role) || r.trainingTo).map((r) => {
-      const hp = pos(r.id);
-      return {
-        id: r.id, name: workerLook(mine, r.id).name, role: r.trainingTo ?? r.role, roleName: roleName(r.trainingTo ?? r.role), rank: r.rank ?? 0, gear: r.gear ?? 1,
-        hp: hp?.hp ?? 0, maxHp: isSoldier(data, r.role) ? hp?.max ?? 0 : 0, squad: squadOfId(r.id),
-        training: Boolean(r.trainingTo), trainLeft: r.trainingTo ? Math.max(0, Math.ceil((r.trainUntil - Date.now()) / 1000)) : 0,
-      };
-    });
-    const recruits = roster.filter((r) => !isSoldier(data, r.role) && !r.trainingTo).map((r) => ({ id: r.id, name: workerLook(mine, r.id).name, role: r.role, roleName: roleName(r.role) }));
-    // Your soldiers where they are (the ones close by from the snapshots, the rest from the squads' marches).
-    const troops = [...near.values()].filter((w) => isSoldier(data, w.role) && !w.dead).map((w) => ({ x: w.x, y: w.y, squad: squadOfId(w.id), role: w.role }));
-    for (const q of army.squads) {
-      const at = this.squadPos.get(q.id);
-      if (!at?.n || troops.some((t) => t.squad === q.id)) continue;
-      for (let i = 0; i < at.n; i++) troops.push({ x: at.x + ((i % 3) - 1) * 0.8, y: at.y + (Math.floor(i / 3) - 0.5) * 0.8, squad: q.id });
-    }
-    return {
-      lang: 'sv', player: { x: this.player.x, y: this.player.y, facing: this.player.facing },
-      territories, troops, squads, soldiers, recruits, roles: data.army?.roles ?? [], barracks: army.barracks, factions: this.#factionsView(),
-      canCreateSquad: Boolean(clan) && army.squads.length < (data.army?.squads?.max ?? 4),
-      gear: (s) => {
-        const g = gearUpgrade(data, roster.find((r) => r.id === s.id) ?? {}, { forge: army.forge });
-        return { ...g, problem: g.problem ? problemSv(g.problem) : null };
-      },
-      trainProblem: (id, role) => {
-        if (!clan) return 'Gå med i en klan först';
-        const p = trainProblem(data, roster, roster.find((r) => r.id === id), role, { training: army.training });
-        return p ? problemSv(p) : null;
-      },
-    };
-  }
-
-  /** The factions (from the server) and their armies close to you or your clan's land. */
-  #factionsView() {
-    const o = this.outposts;
-    const mine = this.clan?.id ?? null;
-    const near = [{ x: this.player.x, y: this.player.y }];
-    for (const [key, sq] of o.squares) {
-      if (sq.owner !== mine || !mine) continue;
-      const [tx, ty] = key.split(',').map(Number);
-      const site = this.world ? outpostFor(this.world, this.data, tx, ty) : null;
-      if (site) near.push(site);
-    }
-    const range = 2.5 * territoryConfig(this.data).size;
-    return {
-      list: o.factions,
-      armies: o.armies
-        .filter((a) => near.some((n) => Math.hypot(n.x - a.x, n.y - a.y) < range))
-        .map((a) => {
-          const f = o.factionById(a.f);
-          return { ...a, color: f?.color, name: f?.name, toMe: Boolean(mine) && o.squares.get(a.to)?.owner === mine };
-        }),
-    };
-  }
-
-  /** The strategy map's actions: a request to the server (it says what is wrong). */
-  async armyAction(op, args = {}) {
-    if (!this.clan) return 'Gå med i eller grunda en klan först';
-    await this.#ask({ t: 'army', op, ...args });
-    return null;
+    return this.markets.structures.length ? mine.concat(this.markets.structures) : mine;
   }
 
   marketRequest(msg) {
@@ -2478,14 +2342,14 @@ export class MpGame {
   /** What the structure at (tx, ty) upgrades into, and what that costs (build bar), or null. */
   upgradeInfo(tx, ty) {
     const st = this.world.structureAt(tx, ty) ?? this.world.floorAt(tx, ty);
-    const to = st && !st.marketId && !st.outpost ? upgradeDef(this.data, st.def) : null;
+    const to = st && !st.marketId ? upgradeDef(this.data, st.def) : null;
     return to ? { from: st.def, to, cost: upgradeCost(this.data, st.def, to) } : null;
   }
 
   /** Client-side guess at why an upgrade would fail (the server decides). */
   #upgradeProblem(tx, ty) {
     const st = this.world.structureAt(tx, ty) ?? this.world.floorAt(tx, ty);
-    if (!st || st.marketId || st.outpost) return 'Här finns inget att uppgradera';
+    if (!st || st.marketId) return 'Här finns inget att uppgradera';
     if (!st.clanId || st.clanId !== this.me?.clan?.id) return 'Det där är inte er klans';
     const info = this.upgradeInfo(tx, ty);
     if (!info) return `${st.def.name} går inte att förstärka mer`;

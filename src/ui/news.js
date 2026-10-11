@@ -8,15 +8,15 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-territories-6',
-  title: { sv: 'Territorier och fraktioner', en: 'Territories and Factions' },
+  id: '2026-10-far-lands-7',
+  title: { sv: 'Fjärrländerna', en: 'The Far Lands' },
   teaser: {
-    sv: 'Den största uppdateringen hittills är här: tre nya biomer, soldater, en strategikarta och fraktioner som för krig.',
-    en: 'The biggest update yet is here: three new biomes, soldiers, a strategy map and factions at war.',
+    sv: 'Den största uppdateringen hittills är här: tre nya biomer långt ute, ny grafik och sällsyntare ritningar.',
+    en: 'The biggest update yet is here: three new biomes far out, a new look and rarer blueprints.',
   },
   intro: {
-    sv: 'Utforska, hitta ritningar, bygg upp basen, träna en armé och ta över världen, ett territorium i taget. Allt finns i både singleplayer och multiplayer.',
-    en: 'Explore, find blueprints, build up your base, train an army and take the world, one territory at a time. All of it in single player and multiplayer alike.',
+    sv: 'Utforska långt ut, möt nya bossar, hitta ritningar och bygg upp basen. Allt finns i både singleplayer och multiplayer.',
+    en: 'Explore far out, meet new bosses, find blueprints and build up your base. All of it in single player and multiplayer alike.',
   },
   sections: [
     {
@@ -37,32 +37,6 @@ export const NEWS = {
           live: true,
           sv: '**Skyreach**: svävande öar i ett hav av moln. Gå över broarna, låt vindströmmarna bära dig, eller rid: hästen hoppar över smala glipor mellan öarna. Gale Sprites, Cloud Rays, Storm Griffins och bossen The Aether Roc. Bryt Aetherglass, lär dig **Gale Step** (V: en snabb rusning förbi attacker) och bygg en Vindfyr som gör dig snabbare.',
           en: '**Skyreach**: floating islands in a sea of clouds. Cross the bridges, ride the wind currents, or take your horse: it leaps the narrow gaps between islands. Gale Sprites, Cloud Rays, Storm Griffins and the boss The Aether Roc. Mine Aetherglass, learn **Gale Step** (V: a quick dash past attacks) and build a Wind Beacon that makes you quicker.',
-        },
-      ],
-    },
-    {
-      icon: 'flag',
-      title: { sv: 'Krig om territorier', en: 'War for territory' },
-      items: [
-        {
-          live: true,
-          sv: '**Soldater**: träna arbetare vid träningsplatsen till vakter, infanterister, bågskyttar, ryttare och ingenjörer (som lagar murar). De bor i kasernen (två platser per nivå), får bättre utrustning och stiger i grad när de strider.',
-          en: '**Soldiers**: train workers at the Training Grounds as guards, infantry, archers, riders and engineers (who mend walls). They live in the barracks (two places per level), get better gear and rise in rank as they fight.',
-        },
-        {
-          live: true,
-          sv: '**Strategikartan** (N): den riktiga kartan över det ni utforskat, med territorierna som områden runt utposterna, era soldater där de är och arméer på marsch. Välj en trupp och peka på kartan: anfall, försvara, patrullera eller flytta dit. Eller följ mig, håll och retirera, med en hållning från defensiv till aggressiv. Striderna sker ute i världen, där ni ser dem.',
-          en: '**The strategy map** (N): the real map of what you have explored, with the territories as the land around their outposts, your soldiers where they are and armies on the march. Pick a squad and point at the map: attack, defend, patrol or move there. Or follow me, hold and retreat, with a stance from defensive to aggressive. The fighting happens out in the world, where you see it.',
-        },
-        {
-          live: true,
-          sv: '**Territorier**: utposter med palissad och flagga står ute i världen, och marken runt varje utpost hör till den. Besegra väktarna och håll flaggan, så är den er och ger inkomst varje timme. Monster gör motanfall, en lång front är svår att hålla, och det ni förlorar kan ni ta tillbaka. I multiplayer tar klaner territorier av varandra.',
-          en: '**Territories**: outposts with a palisade and a flag stand out in the world, and the land around each belongs to it. Beat its guards and hold the flag, and it is yours and pays every hour. Monsters counterattack, a long front is hard to hold, and what you lose you can take back. In multiplayer, clans take territory from each other.',
-        },
-        {
-          live: true,
-          sv: '**NPC-fraktioner**: tre till fem fraktioner, som Järnlegionen och Askförbundet, med läger, fästen (med torn) och högkvarter (stenvallar och fyra torn) och egna trupper. Var och en har en personlighet (försvarare, expansionist, plundrare eller strateg) och en egen list. De växer, förstärker, expanderar och anfaller varandra, och dig. Nära dig marscherar deras arméer på riktigt genom landskapet: stoppa dem på vägen eller håll flaggan. Ta ett högkvarter så får fraktionen det svårt.',
-          en: '**NPC factions**: three to five factions, such as the Iron Legion and the Ash Covenant, with camps, strongholds (with towers) and headquarters (stone ramparts and four towers) and troops of their own. Each has a personality (defender, expansionist, raider or strategist) and its own cunning. They grow, reinforce, expand and attack each other, and you. Close to you their armies march across the land for real: stop them on the way or hold the flag. Take a headquarters and the faction struggles.',
         },
       ],
     },

@@ -111,3 +111,19 @@ test('export/import round-trips and rejects tampering', () => {
   assert.throws(() => parseImport('{"hello":1}'), /not a Pixelgame save/);
   assert.throws(() => parseImport('garbage'), /invalid JSON/);
 });
+
+test('a save from the army update: soldiers go back to work; squads, territories and factions are gone', () => {
+  const save = createNewSave({ worldSeed: 7 });
+  save.base.workers = [
+    { id: 1, role: 'wood' },
+    { id: 2, role: 'guard', gear: 2, rank: 1, xp: 10 },
+    { id: 3, role: 'stone', trainingTo: 'rider', trainUntil: 99 },
+  ];
+  save.army = { squads: [{ id: 1, name: 'Ulvarna', members: [2], order: { kind: 'hold', x: 1, y: 1 } }], nextSquad: 2 };
+  save.territories = { owned: { '1,0': { since: 1 } }, capture: {}, cleared: {} };
+  save.factions = { list: [], owned: {}, armies: [] };
+  const up = fillDefaults(JSON.parse(JSON.stringify(save)));
+  assert.deepEqual(up.base.workers, [{ id: 1, role: 'wood' }, { id: 2, role: 'wood' }, { id: 3, role: 'stone' }]);
+  for (const k of ['army', 'territories', 'factions']) assert.equal(up[k], undefined, k);
+  assert.deepEqual(validateSave(up), []);
+});

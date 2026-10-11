@@ -13,6 +13,28 @@ import { harvestInfo } from './gathering.js';
 import { findRoute } from './pathfind.js';
 
 export const WORKER_ROLES = ['wood', 'stone'];
+
+/**
+ * The army is gone from the game: soldiers and recruits from an older save
+ * (or clan) go back to work as lumberjacks, without what only soldiers had
+ * (training, gear, rank). Returns true if anyone changed.
+ */
+export function backToWork(workers) {
+  let changed = false;
+  for (const w of workers ?? []) {
+    if (!WORKER_ROLES.includes(w.role)) {
+      w.role = 'wood';
+      changed = true;
+    }
+    for (const k of ['trainingTo', 'trainUntil', 'gear', 'rank', 'xp']) {
+      if (k in w) {
+        delete w[k];
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
 export const ROLE_NAMES = { wood: 'Lumberjack', stone: 'Miner' };
 export const ROLE_NAMES_SV = { wood: 'Skogshuggare', stone: 'Gruvarbetare' };
 
@@ -202,9 +224,8 @@ function plan(ctx, w, tx, ty) {
 /**
  * Walks towards (tx, ty) along the planned way, sliding along walls and
  * stepping sideways when stuck (and planning again). Returns true on arrival.
- * (Soldiers walk the same way: army.js.)
  */
-export function walk(ctx, w, tx, ty, speed, dt, arrive = 0.2) {
+function walk(ctx, w, tx, ty, speed, dt, arrive = 0.2) {
   const d = Math.hypot(tx - w.x, ty - w.y);
   if (d <= arrive) {
     w.moving = false;

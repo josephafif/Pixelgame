@@ -72,53 +72,6 @@ function chunkImage(world, cx, cy) {
   return c;
 }
 
-/**
- * Draws the explored land (as the world map does) into `g`, a view of
- * `w` × `h` px centred on world tile (cx, cy) at `zoom` px per tile. New
- * chunk images are made a dozen per call; returns true if some are still
- * to come (draw again soon). Below `farZoom` each chunk is one colour. The
- * strategy map uses it too.
- */
-export function drawExplored(g, world, explored, { cx, cy, zoom, w, h, list = null, farZoom = FAR_ZOOM }) {
-  const toX = (x) => (x - cx) * zoom + w / 2;
-  const toY = (y) => (y - cy) * zoom + h / 2;
-  const c0 = Math.floor((cx - w / 2 / zoom) / CHUNK) - 1;
-  const c1 = Math.floor((cx + w / 2 / zoom) / CHUNK) + 1;
-  const r0 = Math.floor((cy - h / 2 / zoom) / CHUNK) - 1;
-  const r1 = Math.floor((cy + h / 2 / zoom) / CHUNK) + 1;
-  let built = 0;
-  let pending = false;
-  const far = zoom < farZoom;
-  const size = CHUNK * zoom + 0.5;
-  const drawChunk = (rx, ry) => {
-    if (far) {
-      g.fillStyle = chunkColor(world, rx, ry);
-      g.fillRect(toX(rx * CHUNK), toY(ry * CHUNK), Math.max(1, size), Math.max(1, size));
-      return;
-    }
-    const cached = chunkImages.get(`${world.seed}:${rx},${ry}`);
-    if (!cached && built >= 12) {
-      pending = true;
-      return;
-    }
-    if (!cached) built += 1;
-    g.drawImage(chunkImage(world, rx, ry), toX(rx * CHUNK), toY(ry * CHUNK), size, size);
-  };
-  if ((c1 - c0 + 1) * (r1 - r0 + 1) > explored.size) {
-    // Zoomed far out: walk the explored list instead of the whole view.
-    for (const [rx, ry] of list ?? [...explored].map((k) => k.split(',').map(Number))) {
-      if (rx >= c0 && rx <= c1 && ry >= r0 && ry <= r1) drawChunk(rx, ry);
-    }
-  } else {
-    for (let ry = r0; ry <= r1; ry++) {
-      for (let rx = c0; rx <= c1; rx++) {
-        if (explored.has(`${rx},${ry}`)) drawChunk(rx, ry);
-      }
-    }
-  }
-  return pending;
-}
-
 export function open(game) {
   const { world, save, data } = game;
   const p = game.player;
@@ -191,7 +144,7 @@ export function open(game) {
     return out;
   };
 
-  let pending = false;
+  let pending = [];
   let raf = 0;
   let parsed = [];
   const exploredList = () => {
@@ -215,7 +168,40 @@ export function open(game) {
     const toX = (x) => (x - cx) * zoom + w / 2;
     const toY = (y) => (y - cy) * zoom + hgt / 2;
     // Explored chunks (generate a few per frame, then keep them).
-    pending = drawExplored(g, world, game.explored, { cx, cy, zoom, w, h: hgt, list: exploredList() });
+    const c0 = Math.floor((cx - w / 2 / zoom) / CHUNK) - 1;
+    const c1 = Math.floor((cx + w / 2 / zoom) / CHUNK) + 1;
+    const r0 = Math.floor((cy - hgt / 2 / zoom) / CHUNK) - 1;
+    const r1 = Math.floor((cy + hgt / 2 / zoom) / CHUNK) + 1;
+    let built = 0;
+    pending = [];
+    const far = zoom < FAR_ZOOM;
+    const size = CHUNK * zoom + 0.5;
+    const drawChunk = (rx, ry) => {
+      if (far) {
+        g.fillStyle = chunkColor(world, rx, ry);
+        g.fillRect(toX(rx * CHUNK), toY(ry * CHUNK), Math.max(1, size), Math.max(1, size));
+        return;
+      }
+      const cached = chunkImages.get(`${world.seed}:${rx},${ry}`);
+      if (!cached && built >= 12) {
+        pending.push(1);
+        return;
+      }
+      if (!cached) built += 1;
+      g.drawImage(chunkImage(world, rx, ry), toX(rx * CHUNK), toY(ry * CHUNK), size, size);
+    };
+    if ((c1 - c0 + 1) * (r1 - r0 + 1) > game.explored.size) {
+      // Zoomed far out: walk the explored list instead of the whole view.
+      for (const [rx, ry] of exploredList()) {
+        if (rx >= c0 && rx <= c1 && ry >= r0 && ry <= r1) drawChunk(rx, ry);
+      }
+    } else {
+      for (let ry = r0; ry <= r1; ry++) {
+        for (let rx = c0; rx <= c1; rx++) {
+          if (game.explored.has(`${rx},${ry}`)) drawChunk(rx, ry);
+        }
+      }
+    }
     // Your camp's structures.
     g.fillStyle = '#3a2e22';
     for (const st of save.base.structures) {
@@ -381,8 +367,8 @@ export function open(game) {
     g.fill();
     g.stroke();
     g.restore();
-    status.textContent = `${game.explored.size} areas explored · ${Math.round(Math.hypot(p.x, p.y))} m from camp${pending ? ' · drawing…' : ''}`;
-    if (pending) schedule();
+    status.textContent = `${game.explored.size} areas explored · ${Math.round(Math.hypot(p.x, p.y))} m from camp${pending.length ? ' · drawing…' : ''}`;
+    if (pending.length) schedule();
   }
 
   function schedule() {

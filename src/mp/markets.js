@@ -113,9 +113,8 @@ export class MpMarkets {
 
   /** A market turret fired (its aim and muzzle flash). */
   turretFired(ev) {
-    // (A faction's tower at an outpost turns and flashes the same way.)
     const st = this.game.world.structureAt(ev.x, ev.y);
-    if (!st?.marketId && !st?.outpost) return;
+    if (!st?.marketId) return;
     st.rt.aim = ev.aim;
     st.rt.flash = 0.06;
   }

@@ -14,8 +14,6 @@ import {
 } from './workers.js';
 import { upkeepPerDay, chargeUpkeep, suppliesLast, HOUR_MS, UPKEEP_KEYS } from './upkeep.js';
 import { rollDrops } from './gathering.js';
-import { isSoldier, workerCount, soldierCount, makeSoldier, roleDef, roleTitle } from './army.js';
-import { walk } from './workers.js';
 
 const CHECK_EVERY = 10; // seconds between upkeep checks
 const RESOURCE_COLOR = { wood: '#e8c890', stone: '#d0d4e0', scrap: '#c8ccd8', essence: '#7ae0ff', shards: '#ffd24a' };
@@ -68,21 +66,9 @@ export class Workforce {
           w = createWorker(rec, { x: home.x + (Math.random() - 0.5) * 2, y: home.y + Math.random() }, stats);
           Object.assign(w, workerLook(0, rec.id));
         }
-        const soldier = isSoldier(this.game.data, rec.role);
-        if (soldier && !('target' in w)) makeSoldier(w);
-        if (w.role !== rec.role) {
-          // A new role: a fresh start (soldiers get their numbers from campaign.js).
-          if (w.job) this.taken.delete(`${w.job.tx},${w.job.ty}`);
-          w.job = null;
-          w.carry = {};
-          w.state = 'rest';
-          w.statsKey = null;
-        }
         w.role = rec.role;
-        if (!soldier) {
-          w.hp = Math.min(stats.hp, w.hp + (stats.hp - w.maxHp));
-          w.maxHp = stats.hp;
-        }
+        w.hp = Math.min(stats.hp, w.hp + (stats.hp - w.maxHp));
+        w.maxHp = stats.hp;
         keep.push(w);
       }
     }
@@ -96,19 +82,10 @@ export class Workforce {
     return hireCost(this.game.data, this.base.workers.length);
   }
 
-  /** Workers at the lodge (soldiers live in the Training Grounds' barracks). */
-  workerCount() {
-    return workerCount(this.game.data, this.base.workers);
-  }
-
-  soldierCount() {
-    return soldierCount(this.game.data, this.base.workers);
-  }
-
   /** Why you can't hire right now (null = you can). */
   hireProblem() {
     if (this.lodgeLevel() < 1) return 'Build the Workers’ Lodge first';
-    if (this.workerCount() >= this.cap()) return 'The lodge is full: upgrade it to house more workers';
+    if (this.base.workers.length >= this.cap()) return 'The lodge is full: upgrade it to house more workers';
     const cost = this.hireCost();
     if (!canAfford(this.game.save.resources, cost)) return shortfalls(this.game.save.resources, cost)[0];
     return null;
@@ -148,18 +125,6 @@ export class Workforce {
 
   /** What a worker is doing, for the panel. */
   describe(w) {
-    const rec = this.base.workers.find((r) => r.id === w.id);
-    if (rec?.trainingTo) {
-      const left = Math.max(0, Math.ceil((rec.trainUntil - Date.now()) / 1000));
-      return `Training to be ${roleTitle(roleDef(this.game.data, rec.trainingTo))} (${left} s)`;
-    }
-    if (isSoldier(this.game.data, w.role)) {
-      const name = roleDef(this.game.data, w.role).name;
-      if (w.state === 'fight') return `${name}: fighting`;
-      if (w.state === 'repair') return `${name}: mending a wall`;
-      if (w.state === 'march') return `${name}: on the march`;
-      return `${name}: at its post`;
-    }
     if (w.angry) return 'Angry with you!';
     if (this.base.unpaid) return 'On strike: no wages';
     const carry = Object.entries(w.carry).map(([k, n]) => `${n} ${k}`).join(', ');
@@ -219,13 +184,12 @@ export class Workforce {
       perStructure: u.perStructurePerDay ?? {},
       perBuildingLevel: u.perBuildingLevelPerDay ?? {},
       perWorker: data.base.workers?.wagePerDay ?? {},
-      perSoldier: data.army?.wagePerDay ?? data.base.workers?.wagePerDay ?? {},
     };
   }
 
   counts() {
     const { data, save } = this.game;
-    return { structures: save.base.structures.length, buildingLevels: campRank(data, save), workers: this.workerCount(), soldiers: this.soldierCount() };
+    return { structures: save.base.structures.length, buildingLevels: campRank(data, save), workers: this.base.workers.length };
   }
 
   /** Upkeep per day: { structures, buildings, workers, total }. */
@@ -262,7 +226,6 @@ export class Workforce {
       if (!paid) this.#decay();
       else if (away && i < hours - 1) {
         for (const rec of base.workers) {
-          if (isSoldier(this.game.data, rec.role) || rec.trainingTo) continue;
           for (const [k, n] of Object.entries(awayYield(this.game.data, rec.role, this.lodgeLevel()))) {
             brought[k] = (brought[k] ?? 0) + n;
           }
@@ -350,51 +313,12 @@ export class Workforce {
     }
     if (!this.list.length) return;
     const ctx = this.#ctx();
-    const data = this.game.data;
-    for (const w of this.list) {
-      // Soldiers are the campaign's (campaign.js); recruits drill at the Training Grounds.
-      if (isSoldier(data, w.role)) continue;
-      if (this.base.workers.find((r) => r.id === w.id)?.trainingTo) {
-        this.#drill(w, ctx, dt);
-        continue;
-      }
-      stepWorker(w, ctx, dt);
-    }
-    if (this.list.some((w) => w.dead && !isSoldier(data, w.role))) this.#bury();
-  }
-
-  /** A recruit in training: off to the Training Grounds, and drilling there. */
-  #drill(w, ctx, dt) {
-    const def = buildingDef(this.game.data, 'training');
-    const tx = (def?.x ?? 6.5) + ((w.id % 3) - 1) * 0.9;
-    const ty = (def?.y ?? 2.5) + 2 + Math.floor((w.id % 6) / 3) * 0.8;
-    if (w.job) this.taken.delete(`${w.job.tx},${w.job.ty}`);
-    w.job = null;
-    w.angry = null;
-    w.t += dt;
-    w.clock += dt;
-    if (walk(ctx, w, tx, ty, ctx.stats.speed, dt, 0.3)) {
-      w.moving = false;
-      w.state = 'drill';
-      w.swingT = (w.swingT ?? 0) - dt;
-      if (w.swingT <= 0) {
-        w.swingT = 0.8;
-        w.anim = (w.anim + 1) & 255;
-      }
-    }
-  }
-
-  /** A soldier fell (campaign.js): off the roster. */
-  bury(w) {
-    const i = this.base.workers.findIndex((r) => r.id === w.id);
-    if (i >= 0) this.base.workers.splice(i, 1);
-    this.sync();
-    this.game.emit('base');
-    this.game.requestSave();
+    for (const w of this.list) stepWorker(w, ctx, dt);
+    if (this.list.some((w) => w.dead)) this.#bury();
   }
 
   #bury() {
-    for (const w of this.list.filter((x) => x.dead && !isSoldier(this.game.data, x.role))) {
+    for (const w of this.list.filter((x) => x.dead)) {
       this.game.fx.emit('smoke', w.x, w.y, 10, 0.5, 1.5);
       this.game.toast(`${w.name} is dead. Hire a new worker at the Workers’ Lodge.`, 'warn');
       const i = this.base.workers.findIndex((r) => r.id === w.id);
@@ -411,8 +335,7 @@ export class Workforce {
     let hit = false;
     const ctx = { time: this.game.time, stats: this.stats(), taken: this.taken };
     for (const w of this.list) {
-      // (Your soldiers know to step aside from your swings.)
-      if (w.dead || isSoldier(this.game.data, w.role) || !inShape(w, shape)) continue;
+      if (w.dead || !inShape(w, shape)) continue;
       const dmg = Math.max(1, Math.round(damage));
       const was = w.angry;
       hurtWorker(w, ctx, dmg, 'player');

@@ -176,3 +176,40 @@ test('villages: the server walks the villagers and sends them like market people
     await t.close();
   }
 });
+
+test('a clan from the army update: its soldiers go back to work when the server starts (the army is gone)', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'pg-army-'));
+  const dbPath = join(dir, 'game.db');
+  try {
+    let t = await testServer({ dbPath });
+    const a = await t.bot('Veteranen');
+    const { clan } = await t.clanBase(a, { lodge: 2 });
+    // As it was saved before: a soldier with gear and rank, a recruit in training, squads.
+    clan.base.workers = [
+      { id: 1, role: 'wood' },
+      { id: 2, role: 'infantry', gear: 3, rank: 2, xp: 40 },
+      { id: 3, role: 'stone', trainingTo: 'archer', trainUntil: Date.now() + 9e5 },
+    ];
+    clan.base.nextWorker = 4;
+    clan.base.army = { squads: [{ id: 1, name: 'Vargarna', members: [2], order: { kind: 'follow' } }], nextSquad: 2 };
+    clan.base.terrIncomeAt = Date.now();
+    t.gs.db.saveClan(clan);
+    const id = clan.id;
+    await t.close();
+    t = await testServer({ dbPath });
+    try {
+      const back = t.gs.clans.get(id);
+      assert.deepEqual(back.base.workers, [{ id: 1, role: 'wood' }, { id: 2, role: 'wood' }, { id: 3, role: 'stone' }]);
+      assert.equal(back.base.army, undefined);
+      assert.equal(back.base.terrIncomeAt, undefined);
+      assert.equal([...t.gs.workers.values()].filter((w) => w.clanId === id).length, 3, 'all three at work');
+    } finally {
+      await t.close();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

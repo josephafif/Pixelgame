@@ -45,7 +45,6 @@ npm run server       # spelservern i produktion (inställningar i server/.env, s
 | Lägg undan (tomma händer) | Tryck på platsen du redan håller | Samma siffra igen | – |
 | Segla ut / gå i land | Handknappen vid vattnet / nära land | E | A |
 | Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
-| Strategikartan (trupper och territorier) | I menyn | N | – |
 | Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
 | Pals | I menyn, eller tryck på pal-chippen under hälsan | H | – |
 | Byggläge (i lägret) | Hammarknappen; tryck på en ruta för att välja den, tryck igen (eller på hammaren) för att bygga, dra från den valda rutan för en mur | G (1–9 väljer, X river, U uppgraderar, Esc klar) | – |
@@ -679,75 +678,6 @@ de har alltid något att göra.
 Logik: `src/game/workers.js` (delad med servern), vägen i `src/game/pathfind.js` (A* över
 rutorna), `src/game/workforce.js`; panelen
 `src/ui/workers.js`; grafiken `src/render/workers-art.js`.
-
-### Soldater, trupper och territorier
-
-**Träna soldater.** Vid **Training Grounds** blir en arbetare soldat (strategikartan, tangent
-**N**, eller knappen vid träningsplatsen i lägerpanelen). Det kostar resurser och tar en stund;
-under tiden drillar rekryten vid träningsplatsen. Soldater hugger inga träd. De bor i
-**kasernen**: två platser per nivå på träningsplatsen, så stugan får plats för nya arbetare.
-
-| Roll | Kräver träningsplats | Gör |
-| --- | --- | --- |
-| Vakt | nivå 1 | Tålig, med sköld. Håller en post |
-| Infanterist | nivå 2 | Slår hårt på nära håll |
-| Bågskytt | nivå 3 | Skjuter på avstånd |
-| Ryttare | nivå 4 | Snabb, ser långt |
-| Ingenjör | nivå 2 | Lagar murar, portar och torn vid sin post |
-
-Soldater får **utrustning** (nivå 1–5, de två bästa kräver smedjan på nivå 3 och 5) och
-**stiger i grad** när de strider. Träningsplatsens nivå gör dem också starkare. Soldaternas
-lön är högre än arbetarnas och ingår i underhållet.
-
-**Trupper.** Gör upp till fyra trupper på strategikartan och sätt soldater i dem (upp till åtta i
-varje). En trupp har en **order**: *anfall*, *försvara* och *patrullera* en utpost, *flytta* till en
-plats på kartan, *följ mig*, *håll* platsen eller *retirera* hem. Och en **hållning**: defensiv (håller sig
-nära), balanserad, aggressiv (jagar långt) eller *retirera vid förluster* (drar sig hem när
-truppen är svårt skadad). Utan trupp står soldaterna vid träningsplatsen och försvarar lägret.
-
-**Territorier.** Ute i världen står **utposter**, ungefär en på var 100:e ruta där marken är torr:
-en palissad med en öppning i söder och en flagga i mitten, alltid på samma plats. Marken runt en
-utpost (inom ett 45-tal rutor, fram till grannutpostens mark) är dess **territorium**; lägret har
-sitt eget. Monster från landet vaktar utposten, fler och starkare längre ut (nivå 1–5).
-**Besegra väktarna och stå vid flaggan** (själv eller med soldater) utan monster i närheten, så
-fylls mätaren och utposten blir din. Den betalar varje timme till valvet (mer ju längre ut),
-även för timmar du var borta (upp till 12). Du kan hålla högst 16.
-
-- Långt från dig avgörs striderna i ett slag, med samma siffror som nära: en trupp du skickar
-  till en utpost tar den (eller slås tillbaka) när den kommer fram.
-- **Motanfall:** ungefär var tjugonde minut försöker monster ta tillbaka en av dina utposter.
-  Är du där kommer de på riktigt, mot flaggan. Annars möter de **garnisonen** (trupper som
-  försvarar, patrullerar eller håller där) och palissaden. En lång front är svårare att hålla:
-  varje territorium vid fronten sänker försvaret lite. Förlorar du en utpost kan du ta tillbaka den.
-- **Strategikartan** är den riktiga kartan över det du har utforskat, med territorierna som
-  områden på den: dina (gröna), neutrala (streckade), fraktionernas (i deras färg, med lägret,
-  fästet eller högkvarteret), de som tas just nu (gult, med mätare) och de som anfalls (blinkar
-  rött). Där syns också dina soldater (prickar i truppens färg), trupperna och vart de är på väg,
-  och fiendearméer på marsch (romber med antalet trupper). Dra för att panorera och zooma med
-  hjulet eller två fingrar. Välj en trupp och peka på kartan: anfall, försvara eller patrullera
-  en utpost, eller flytta dit. Själva striderna sker ute i världen.
-
-**NPC-fraktioner.** Varje värld har tre till fem fraktioner, till exempel Järnlegionen,
-Askförbundet och Silverväktarna, alltid på samma platser (tre till fem territorier från lägret).
-De har **läger** (palissad), **fästen** (två torn) och ett **högkvarter** (stenvallar och fyra
-torn), och egna trupper i sin färg: krigare, bågskyttar och en kapten. Tornen skjuter på dig.
-Var och en har en **personlighet**: försvarare (förstärker), expansionist (tar mark), plundrare
-(rånar valvet och drar vidare) eller strateg, och en **list** (1–3 stjärnor: hur säkert den
-bedömer styrkor). Med jämna mellanrum tänker fraktionen: tar in inkomst, förstärker den svagaste
-garnisonen, bygger ut ett läger till ett fäste och skickar arméer mot grannterritorier, neutrala,
-andra fraktioners eller dina.
-
-- **Nära dig marscherar arméerna på riktigt** genom landskapet mot sitt mål. Du kan möta dem på
-  vägen (dina soldater också) och slå dem, eller hålla flaggan när de kommer. Långt borta
-  avgörs allt i ett slag med samma siffror.
-- **Ta en fraktions bas:** besegra garnisonen och stå vid flaggan. Tar du högkvarteret får
-  fraktionen det svårt; en fraktion utan mark faller. Fraktionerna tar aldrig ditt läger och
-  har ett tak för hur mycket de kan hålla och hur långt de når. När du har varit borta spelas
-  högst tre timmar upp.
-
-Logik: `src/game/army.js` (soldater och trupper), `src/game/territory.js` (utposter, territorier,
-erövring och strider) och `src/game/factions.js` (fraktionerna och deras AI), alla delade med
-servern; singleplayer i `src/game/campaign.js`, panelen i `src/ui/strategy.js`.
 
 ### Valvet och underhållet
 

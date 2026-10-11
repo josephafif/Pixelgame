@@ -18,7 +18,6 @@ import * as bosses from './bosses.js';
 import * as markets from './markets.js';
 import * as workers from './workers.js';
 import * as horses from './horses.js';
-import * as army from './army.js';
 
 const DEG = Math.PI / 180;
 const BLOCKS_SHOTS = new Set([T.TREE, T.PINE, T.ROCK, T.CACTUS, T.CRYSTAL, T.PALM, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM]);
@@ -464,7 +463,6 @@ export function spawnProjectile(gs, o) {
     enemy: o.enemy ?? 0,
     turret: o.turret ?? 0,
     market: o.market ?? null, // a market turret's shot
-    outpost: o.outpost ?? null, // a faction tower's shot (its outpost)
     clanId: o.clanId ?? null, // a turret's clan: its shots fly over the clan's own walls
     kind: o.kind ?? 'shot',
     pierce: o.pierce ?? 0,
@@ -580,7 +578,6 @@ function bounceOn(gs, pr) {
  */
 function ownStructure(gs, pr, st) {
   if (pr.market) return st.marketId === pr.market;
-  if (pr.outpost) return st.outpost === pr.outpost; // a faction's tower shoots over its own walls
   if (!st.clanId) return false;
   const clanId = pr.turret ? pr.clanId : pr.owner ? gs.players.get(pr.owner)?.clanId : null;
   return clanId === st.clanId;
@@ -729,7 +726,6 @@ function projectileHits(gs, pr, now) {
         attacker: shooter, element: pr.element, canCrit: Boolean(shooter), depth: pr.source === 'weapon' ? 0 : 1,
         source: pr.turret ? 'turret' : pr.source, knockback: pr.knockback, fromX: pr.x - pr.vx, fromY: pr.y - pr.vy, status: pr.status,
       });
-      if (pr.soldier) army.soldierHit(gs, pr.soldier, e);
       if (pr.bounces > 0 && pr.kind === 'shot' && bounceOn(gs, pr)) return true;
       if (pr.kind !== 'boomerang' && pr.hit.size > pr.pierce) return false;
     }

@@ -5,7 +5,7 @@
 
 import {
   ET, FIELDS, Q, PF, EF, PRF, PKF, AF, ALF, NPCF, HF, WF, ESTATE, PICKUP_KINDS, PROJ_SPRITES, AREA_KINDS, SLOTS, PAL_STATES,
-  byteToAngle, intToColor, WORKER_ROLE_IDS,
+  byteToAngle, intToColor,
 } from '../net/protocol.js';
 import { TICK_RATE } from '../net/movement.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
@@ -89,7 +89,7 @@ export function enemyLook(data, defIdx, elementIdx, boss) {
     const el = data.elements[elementIdx]?.id ?? 'physical';
     const elColor = el !== 'physical' ? data.byId.elements.get(el)?.palette?.[1] : null;
     const color = !elColor ? def.color : def.elemental ? elColor : mixHex(def.color, elColor, 0.55);
-    look = { def, color, sprites: hasCreature(def.look ?? def.id) ? creatureSprites(def.look ?? def.id, color) : enemySprites(def.id, color) };
+    look = { def, color, sprites: hasCreature(def.id) ? creatureSprites(def.id, color) : enemySprites(def.id, color) };
   }
   spriteCache.set(key, look);
   return look;
@@ -301,8 +301,7 @@ export function readWorker(v) {
   return {
     facing: byteToAngle(f('facing')), moving: Boolean(flags & WF.MOVING), hurt: Boolean(flags & WF.HURT),
     angry: Boolean(flags & WF.ANGRY), idle: Boolean(flags & WF.IDLE),
-    carrying: flags & WF.WOOD ? 'wood' : flags & WF.STONE ? 'stone' : null,
-    role: WORKER_ROLE_IDS[f('role')] ?? (flags & WF.MINER ? 'stone' : 'wood'),
+    carrying: flags & WF.WOOD ? 'wood' : flags & WF.STONE ? 'stone' : null, role: flags & WF.MINER ? 'stone' : 'wood',
     clan: f('clan'), wid: f('wid'), hp: f('hp'), maxHp: f('maxHp'), anim: f('anim'),
   };
 }
