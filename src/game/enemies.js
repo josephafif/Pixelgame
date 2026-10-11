@@ -5,6 +5,8 @@ import { dist2, normalize, angleTo, segmentDist2 } from '../core/math.js';
 import { laserField, LASER_WIDTH, windWave } from './lasers.js';
 import { tickStatuses } from './status.js';
 import { T } from './world.js';
+import { shunLight, litBy } from './lights.js';
+import { spawnFactor } from './daynight.js';
 import { enemySprites, bossSprites } from '../render/sprites.js';
 import { creatureSprites, hasCreature } from '../render/creatures.js';
 import { mixHex } from '../weapons/visuals.js';
@@ -1316,6 +1318,7 @@ function updateBoss(game, b, dt) {
 export function updateEnemies(game, dt) {
   const list = game.enemies;
   const p = game.player;
+  const lights = game.scaryLights?.() ?? [];
   for (const e of list) {
     if (e.dead) continue;
     tickStatuses(game, e, dt);
@@ -1337,6 +1340,8 @@ export function updateEnemies(game, dt) {
     } else {
       updateBehaviour(game, e, dt);
     }
+    // Fire and torchlight keep them away (lights.js).
+    if (!e.boss && lights.length) shunLight(lights, e, e.speed * e.slowMult);
     const kx = e.kx;
     const ky = e.ky;
     moveEnemy(game, e, e.vx + kx, e.vy + ky, dt);
@@ -1470,7 +1475,10 @@ export function updateSpawner(game, dt) {
   const wl = game.world.worldLevel(p.x, p.y);
   const bossActive = Boolean(game.boss);
   const quality = game.quality.enemyFactor;
-  const target = Math.round(Math.min(26, 5 + wl * 2 + Math.floor(game.save.player.level / 2)) * quality * (bossActive ? 0.3 : 1));
+  // Fewer by day, many more at night (daynight.js).
+  const night = spawnFactor(game.darkness ?? 0);
+  const target = Math.round(Math.min(26, 5 + wl * 2 + Math.floor(game.save.player.level / 2)) * quality * night * (bossActive ? 0.3 : 1));
+  const lights = game.scaryLights?.() ?? [];
   const alive = game.enemies.filter((e) => !e.dead && !e.boss).length;
   if (alive >= target) return;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -1479,6 +1487,7 @@ export function updateSpawner(game, dt) {
     const x = p.x + Math.cos(a) * d;
     const y = p.y + Math.sin(a) * d;
     if (Math.hypot(x, y) < safe || !game.world.isFree(x, y, 0.45, 'enemy') || game.world.marketAt(x, y, 8)) continue;
+    if (litBy(lights, x, y, 2)) continue; // (never in a fire's light)
     const biome = game.world.biomeAt(Math.floor(x), Math.floor(y));
     const candidates = biome.enemies.map((id) => game.data.byId.enemies.get(id)).filter(Boolean);
     let total = 0;

@@ -42,6 +42,11 @@ export class Hud {
       pal: $('#hud-pal'),
       death: $('#death'),
       hotbar: $('#hotbar'),
+      // On a computer the ability and Gale Step sit by the hotbar (Q and V); phones have their buttons.
+      abilitySlot: $('#slot-ability'),
+      abilitySlotCd: $('#slot-ability .cd'),
+      dashSlot: $('#slot-dash'),
+      dashSlotCd: $('#slot-dash .cd'),
       resRow: document.querySelector('.res-row'),
     };
     // Phones get a compact HUD: fewer, shorter notices and a quieter resource bar.
@@ -51,7 +56,8 @@ export class Hud {
         // Don't let the tap reach the game or keep focus.
         e.preventDefault();
         e.stopPropagation();
-        game.switchSlot(btn.dataset.slot);
+        if (btn.dataset.power) game.input?.command(btn.dataset.power);
+        else game.switchSlot(btn.dataset.slot);
       });
     }
     this.el.pal?.addEventListener('pointerdown', (e) => {
@@ -112,13 +118,13 @@ export class Hud {
       art.style.height = '28px';
       el.append(h('div.slot.framed', art), h('span.name', tool.name));
       el.title = `${tool.name}: chop trees and break rocks`;
-      this.el.ability.setAttribute('hidden', '');
+      this.#showAbility(null);
       return;
     }
     if (g.handsEmpty) {
       el.append(h('div.slot.framed.empty-hands', icon('hand', 22)), h('span.name.muted', 'Empty hands'));
       el.title = 'Nothing in hand: press 1, 2 or 3 to take something out';
-      this.el.ability.setAttribute('hidden', '');
+      this.#showAbility(null);
       return;
     }
     if (!dna) return;
@@ -127,10 +133,20 @@ export class Hud {
       h(`div.slot.framed.r-${dna.rarity}`, { style: { '--rarity': color } }, weaponIconEl(dna, 32)),
       h('span.name', { style: { color } }, dna.name.text));
     el.title = `${dna.name.text} — ${dna.identity}`;
-    const ab = g.weapon?.ability ?? dna.ability;
-    this.el.ability.toggleAttribute('hidden', !ab);
-    this.el.ability.classList.toggle('legendary', Boolean(ab?.legendary));
-    if (ab) this.el.ability.setAttribute('aria-label', `Ability: ${ab.name}`);
+    this.#showAbility(g.weapon?.ability ?? dna.ability);
+  }
+
+  /** The weapon's ability: the touch button, and its slot by the hotbar on a computer. */
+  #showAbility(ab) {
+    for (const el of [this.el.ability, this.el.abilitySlot]) {
+      if (!el) continue;
+      el.toggleAttribute('hidden', !ab);
+      el.classList.toggle('legendary', Boolean(ab?.legendary));
+      if (ab) {
+        el.setAttribute('aria-label', `Ability: ${ab.name}`);
+        el.title = `${ab.name}${ab.legendary ? ' (legendary)' : ''}: Q or right click`;
+      }
+    }
   }
 
   /** The three loadout slots: main weapon, secondary weapon, pickaxe. */
@@ -172,7 +188,7 @@ export class Hud {
     const { hint, attack } = this.el;
     if (this.game.build.active) label = null;
     if (label) {
-      hint.textContent = this.game.input.mode === 'keyboard' ? `E / Space — ${label}` : label;
+      hint.textContent = this.game.input.mode === 'keyboard' ? `E — ${label}` : label;
       hint.removeAttribute('hidden');
       attack.classList.add('use');
       attack.setAttribute('aria-label', label);
@@ -217,18 +233,22 @@ export class Hud {
     e.sprint.setAttribute('aria-pressed', String(sprintOn));
     if (s.ability) {
       const frac = s.ability.ready ? 0 : s.ability.left / s.ability.total;
-      e.ability.style.setProperty('--cd', `${Math.round(frac * 360)}deg`);
-      e.ability.classList.toggle('ready', s.ability.ready);
-      e.abilityCd.textContent = s.ability.ready ? '' : Math.ceil(s.ability.left);
+      for (const [el, cd] of [[e.ability, e.abilityCd], [e.abilitySlot, e.abilitySlotCd]]) {
+        if (!el) continue;
+        el.style.setProperty('--cd', `${Math.round(frac * 360)}deg`);
+        el.classList.toggle('ready', s.ability.ready);
+        cd.textContent = s.ability.ready ? '' : Math.ceil(s.ability.left);
+      }
     }
     // Gale Step: shown once you have learnt it.
-    if (e.dash) {
-      e.dash.toggleAttribute('hidden', !s.dash);
+    for (const [el, cd] of [[e.dash, e.dashCd], [e.dashSlot, e.dashSlotCd]]) {
+      if (!el) continue;
+      el.toggleAttribute('hidden', !s.dash);
       if (s.dash) {
         const ready = s.dash.left <= 0;
-        e.dash.style.setProperty('--cd', `${Math.round((ready ? 0 : s.dash.left / s.dash.total) * 360)}deg`);
-        e.dash.classList.toggle('ready', ready);
-        e.dashCd.textContent = ready ? '' : Math.ceil(s.dash.left);
+        el.style.setProperty('--cd', `${Math.round((ready ? 0 : s.dash.left / s.dash.total) * 360)}deg`);
+        el.classList.toggle('ready', ready);
+        cd.textContent = ready ? '' : Math.ceil(s.dash.left);
       }
     }
     if (s.boss) {

@@ -16,6 +16,8 @@ import {
 import { spawnProjectile, updateProjectiles } from './projectiles.js';
 import { spawnArea, updateAreas, projectileSlowAt } from './areas.js';
 import { updateEnemies, updateSpawner, spawnBoss } from './enemies.js';
+import { hourAt, darknessAt, phaseOf, clockAt, START_HOUR } from './daynight.js';
+import { scaryLights, campLights } from './lights.js';
 import {
   castAbility, restoreCooldowns, persistCooldowns, tryPhoenixRevive, updateAllies, abilityProgress,
 } from './abilities.js';
@@ -1305,10 +1307,11 @@ export class Game {
 
   /**
    * Fells a tree or rock. Its wood/stone drop on the ground, or with
-   * `direct` (your pal did the work) go straight into your pack.
+   * `direct` (your pal did the work) go straight into your pack. What you
+   * (or your pal) cut down stays gone: you can clear a forest for good.
    */
   fellBlock(o, { direct = false } = {}) {
-    this.world.removeBlock(o.tx, o.ty);
+    this.world.removeBlock(o.tx, o.ty, Date.now(), { kept: true });
     this.harvestDamage.delete(`${o.tx},${o.ty}`);
     const drops = rollDrops(o.info, direct ? 1 : currentPickaxe(this.data, this.save)?.yield ?? 1);
     const color = { wood: '#b07a48', stone: '#b8bcc8', essence: '#7ae0ff', scrap: '#c8ccd8', shards: '#ffd24a', prismite: '#7ae8ff', spores: '#9affc8', aether: '#d8ecff' };
@@ -2040,11 +2043,46 @@ export class Game {
     }
   }
 
+  // --- Day and night (daynight.js) and the light monsters shun (lights.js) -------------------
+
+  /** The hour of the day (0 … 24). */
+  get hour() {
+    return hourAt(this.save.world.clock ?? clockAt(START_HOUR));
+  }
+
+  /** 0 by day … 1 deep in the night. */
+  get darkness() {
+    return darknessAt(this.hour);
+  }
+
+  /** The fires monsters shun: torches and the like, and the camp's own. */
+  scaryLights() {
+    const now = this.time * 1000;
+    const fresh = !this.lightsAt || now - this.lightsAt >= 1000;
+    if (fresh) {
+      this.lightsAt = now;
+      this.campFires = campLights(this.data, (id) => buildingLevel(this.data, this.save, id) || (id === 'hearth' ? 1 : 0));
+    }
+    return scaryLights(this.world, now, this.campFires);
+  }
+
+  #dayNight(dt) {
+    const w = this.save.world;
+    w.clock = (w.clock ?? clockAt(START_HOUR)) + dt * 1000;
+    const phase = phaseOf(this.hour);
+    if (this.dayPhase && phase !== this.dayPhase) {
+      if (phase === 'dusk') this.toast('The sun is setting. At night more monsters roam, but they shun torches and fire.', 'info');
+      else if (phase === 'dawn') this.toast('Dawn breaks: the monsters grow fewer.', 'info');
+    }
+    this.dayPhase = phase;
+  }
+
   update(dt) {
     this.time += dt;
     this.frame += 1;
     this.save.player.playTime += dt;
     this.#runTimers();
+    this.#dayNight(dt);
 
     const sample = this.input.sample();
     for (const c of sample.commands) {

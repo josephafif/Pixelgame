@@ -6,6 +6,12 @@ import { createRng } from '../core/rng.js';
 import { createCanvas, ctx2d } from './canvas.js';
 import { T, CHUNK, WIND } from '../game/world.js';
 
+/** Tiles drawn standing up: sprites sorted with everyone (trees.js), not part of the ground. */
+export const UPRIGHT = new Set([
+  T.TREE, T.PINE, T.PALM, T.ROCK, T.CACTUS, T.CRYSTAL, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM, T.MIRROR,
+  T.LUMENCAP, T.ROOTS, T.RUIN, T.MENDBLOOM, T.PUFFCAP, T.AETHERCRYSTAL,
+]);
+
 export const TILE_PX = 16;
 const VARIANTS = 4;
 
@@ -651,7 +657,8 @@ export function renderChunk(chunk, growth = null) {
       const wy = chunk.cy * CHUNK + ly;
       const variant = ((wx * 73856093) ^ (wy * 19349663)) & (VARIANTS - 1);
       ctx.drawImage(tileCanvas(chunk.ground[i], variant), lx * TILE_PX, ly * TILE_PX);
-      if (chunk.block[i]) ctx.drawImage(tileCanvas(chunk.block[i], variant, true), lx * TILE_PX, ly * TILE_PX);
+      // (Trees, rocks and the like stand as sprites sorted with everyone: trees.js.)
+      if (chunk.block[i] && !UPRIGHT.has(chunk.block[i])) ctx.drawImage(tileCanvas(chunk.block[i], variant, true), lx * TILE_PX, ly * TILE_PX);
     }
   }
   for (const [i, id, stage] of growth ?? []) ctx.drawImage(growthCanvas(id, stage), (i % CHUNK) * TILE_PX, ((i / CHUNK) | 0) * TILE_PX);

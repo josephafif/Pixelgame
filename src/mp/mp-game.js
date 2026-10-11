@@ -38,6 +38,7 @@ import { emptyPals } from '../net/mpsave.js';
 import { TOWN_LEVELS, clanLevels, buildingOfStruct, BUILDING_SV } from '../net/mpbase.js';
 import { townMarket } from '../game/markets.js';
 import { abilityProgress, abilityReadyIn } from '../game/abilities.js';
+import { hourAt, darknessAt, phaseOf } from '../game/daynight.js';
 
 const DEG = Math.PI / 180;
 // Effect shapes an ability may draw (anything else from a server is ignored).
@@ -347,8 +348,29 @@ export class MpGame {
     this.conn?.close();
   }
 
+  /** The hour of the day on the server (0 … 24). */
+  get hour() {
+    return hourAt(Date.now() + (this.clockSkew ?? 0));
+  }
+
+  /** 0 by day … 1 deep in the night. */
+  get darkness() {
+    return darknessAt(this.hour);
+  }
+
+  #dayNight() {
+    const phase = phaseOf(this.hour);
+    if (this.dayPhase && phase !== this.dayPhase) {
+      if (phase === 'dusk') this.toast('Solen går ner. På natten är monstren fler, men de skyr facklor och eld.', 'info');
+      else if (phase === 'dawn') this.toast('Gryningen kommer: monstren blir färre.', 'info');
+    }
+    this.dayPhase = phase;
+  }
+
   #onWelcome(w) {
     this.connected = true;
+    // The time of day is the server's (src/game/daynight.js): its clock, as near as we can tell.
+    this.clockSkew = Number.isFinite(w.time) ? w.time - Date.now() : 0;
     this.myId = w.id;
     this.myName = w.name;
     this.account = w.account ?? { guest: false, password: false };
@@ -482,7 +504,7 @@ export class MpGame {
         break;
       case 'claims':
         this.claims = msg.claims;
-        for (const chunk of this.world?.chunks.values() ?? []) if (chunk.cut.size) chunk.canvas = null;
+        for (const chunk of this.world?.chunks.values() ?? []) if (chunk.cut.size) chunk.stale = true;
         this.emit('claims');
         break;
       case 'clan':
@@ -631,13 +653,17 @@ export class MpGame {
       if (Math.floor(x / CHUNK) === msg.cx && Math.floor(y / CHUNK) === msg.cy && !cut.has(k)) this.world.restoreBlock(x, y);
     }
     const now = Date.now();
-    for (const [x, y, age = 0] of msg.harvested) {
+    for (const [x, y, age = 0, kept = 0] of msg.harvested) {
       const entry = this.world.harvested[`${x},${y}`];
-      if (entry) entry[0] = now - age * 1000;
-      else this.world.removeBlock(x, y, now - age * 1000);
+      if (entry) {
+        entry[0] = now - age * 1000;
+        if (kept) entry[2] = 1;
+      } else {
+        this.world.removeBlock(x, y, now - age * 1000, { kept: Boolean(kept) });
+      }
     }
     const chunk = this.world.chunks.get(key);
-    if (chunk) chunk.canvas = null;
+    if (chunk) chunk.stale = true;
     for (const st of [...(this.structByChunk.get(key) ?? [])]) this.#detachStructure(st);
     for (const raw of msg.structures) this.#attachStructure(raw);
     this.serverObjects.set(key, msg.objects.map((o) => ({ ...o })));
@@ -658,7 +684,7 @@ export class MpGame {
   #applyWorldDelta(msg) {
     switch (msg.k) {
       case 'cut':
-        if (this.world.blockAt(msg.x, msg.y)) this.world.removeBlock(msg.x, msg.y);
+        if (this.world.blockAt(msg.x, msg.y)) this.world.removeBlock(msg.x, msg.y, Date.now(), { kept: Boolean(msg.kept) });
         this.harvestDamage.delete(`${msg.x},${msg.y}`);
         break;
       case 'grow':
@@ -1149,6 +1175,7 @@ export class MpGame {
     this.#drainEvents();
     this.#updateGates(dt);
     this.markets.update(dt);
+    this.#dayNight();
     for (const st of this.structById.values()) if (st.rt.flash > 0) st.rt.flash -= dt;
     // Interaction hints and build preview.
     this.interactT = (this.interactT ?? 0) - dt;

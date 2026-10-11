@@ -104,6 +104,8 @@ const SCHEMA = [
   'ALTER TABLE accounts ADD COLUMN pass_hash TEXT;',
   // v3: clan bases have the camp's buildings ({ buildings: { forge: 2, … }, wellAt }).
   "ALTER TABLE clans ADD COLUMN base TEXT NOT NULL DEFAULT '{}';",
+  // v4: trees and rocks a player cut down stay gone (kept = 1); only workers' are replanted.
+  'ALTER TABLE harvested ADD COLUMN kept INTEGER NOT NULL DEFAULT 0;',
 ];
 
 const json = (s, fallback) => {
@@ -376,11 +378,11 @@ export class GameDb {
   // --- World ------------------------------------------------------------------------------------
 
   loadHarvested() {
-    return this.all('SELECT x, y, tile, at FROM harvested');
+    return this.all('SELECT x, y, tile, at, kept FROM harvested');
   }
 
-  addHarvested(x, y, tile, at) {
-    this.run('INSERT OR REPLACE INTO harvested (x, y, tile, at) VALUES (?, ?, ?, ?)', x, y, tile, at);
+  addHarvested(x, y, tile, at, kept = false) {
+    this.run('INSERT OR REPLACE INTO harvested (x, y, tile, at, kept) VALUES (?, ?, ?, ?, ?)', x, y, tile, at, kept ? 1 : 0);
   }
 
   removeHarvested(x, y) {

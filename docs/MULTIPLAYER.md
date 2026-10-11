@@ -179,7 +179,8 @@ Terrängen skapas deterministiskt från ett seed, eftersom `world.js` redan
 fungerar så. Därför får klienten seedet när den ansluter och genererar marken
 själv. Över nätet går bara ändringar:
 
-- fällda träd och krossade stenar (med återväxt)
+- fällda träd och krossade stenar (det som arbetare huggit växer upp igen, det
+  som spelare själva huggit eller brutit är borta för gott: `harvested.kept`)
 - byggen och golv
 - förbrukade altare
 - föremål på marken
@@ -375,6 +376,8 @@ Säkerheten kommer från att servern bestämmer.
   Lumen Tonic av dina egna Lumen Spores.
 - Protokollversion 13 (nya rutor, `PF.DASH`, `BTN.DASH`): äldre klienter ombeds ladda om.
 - Protokollversion 15: armén (soldater, trupper, territorier och fraktioner) är borttagen igen. Klaner som hade soldater får tillbaka dem som arbetare när servern startar.
+- Protokollversion 16: smalare trädstammar i den delade kollisionen (`PROP_SHAPE` i `src/game/world.js`), så klient och server måste ha samma. Fällda rutor skickas som `[x, y, ålder, kept]` i chunkarna och med `kept: 1` i `cut`; en ruta med `kept` växer aldrig upp igen (databasschema 4 lägger till kolumnen `harvested.kept`).
+- **Dag och natt** (`src/game/daynight.js`): ett dygn tar 24 minuter och följer serverns klocka, så inga meddelanden behövs. Klienten räknar ut sin skillnad mot servern från `welcome.time`. På natten håller servern fler monster runt varje spelare (färre på dagen), och de skyr ljuset från facklor, Flame Turrets, Sunfire Obelisk och klanens härd och smedja (`src/game/lights.js`, delad med singleplayer): de föds aldrig i ljuset och flyr ut ur det. Bossar bryr sig inte.
 - **Underhåll:** dras ur klanvalvet en gång i timmen: 5 trä och 5 sten per
   bygge och vecka, 10 skrot och 10 essens per byggnadsnivå och vecka, och varje
   arbetares lön (126 skrot och 84 essens i veckan). Allt går att ändra per server

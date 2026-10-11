@@ -5,6 +5,7 @@ import { hashString } from '../core/rng.js';
 import { validateDna } from '../weapons/dna.js';
 import { WORLD_GEN } from '../game/world.js';
 import { backToWork } from '../game/workers.js';
+import { clockAt, START_HOUR } from '../game/daynight.js';
 
 export const SAVE_SCHEMA = 1;
 export const SAVE_KEY = 'save:main';
@@ -54,7 +55,8 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     // altars: altars whose boss you have beaten (each altar can be beaten once).
     // gen: the world's generation version; genMarks: [[version, n]] — the first n
     // explored chunks were seen in that version (they keep their land).
-    world: { chests: [], shrines: [], harvested: {}, explored: [], pins: [], found: [], altars: [], gen: WORLD_GEN, genMarks: [] },
+    // clock: ms of game time (the time of day: daynight.js); a new game starts in the morning.
+    world: { chests: [], shrines: [], harvested: {}, explored: [], pins: [], found: [], altars: [], gen: WORLD_GEN, genMarks: [], clock: clockAt(START_HOUR) },
     // Per-market state: { visited, hostileUntil, stockPeriod, bought: [] }.
     markets: {},
     abilityState: { cooldowns: {} },

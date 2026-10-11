@@ -1198,7 +1198,7 @@
       { "id": "arrow_turret", "name": "Arrow Turret", "kind": "turret", "hp": 220, "cost": { "wood": 40, "stone": 30, "scrap": 80 }, "requires": { "training": 1 }, "upgradesTo": "ballista", "turret": { "range": 7, "interval": 1.0, "damage": 12, "speed": 14, "sprite": "arrow", "color": "#e8d8b0" }, "desc": "Shoots arrows at enemies in range." },
       { "id": "flame_turret", "name": "Flame Turret", "kind": "turret", "hp": 320, "cost": { "stone": 70, "scrap": 150, "essence": 140 }, "requires": { "forge": 3, "training": 2 }, "turret": { "range": 5.5, "interval": 0.8, "damage": 9, "speed": 9, "sprite": "orb", "element": "fire", "status": "burn", "color": "#ff7a2a" }, "desc": "Hurls fire that sets enemies ablaze." },
       { "id": "spikes", "name": "Spike Trap", "kind": "trap", "walkable": true, "hp": 150, "cost": { "wood": 10, "scrap": 15 }, "upgradesTo": "iron_spikes", "trap": { "damage": 10, "interval": 0.7 }, "desc": "Hurts enemies that walk over it. Safe for you." },
-      { "id": "torch", "name": "Torch", "kind": "light", "hp": 60, "cost": { "wood": 4, "stone": 2 }, "desc": "Lights up your camp." },
+      { "id": "torch", "name": "Torch", "kind": "light", "hp": 60, "cost": { "wood": 4, "stone": 2 }, "desc": "Lights up the night. Monsters shun its light." },
       { "id": "banner", "name": "Banner", "kind": "decor", "hp": 80, "cost": { "wood": 10, "scrap": 6 }, "desc": "Shows everyone whose camp this is." },
       { "id": "wood_floor", "name": "Wooden Floor", "kind": "floor", "walkable": true, "hp": 60, "cost": { "wood": 2 }, "upgradesTo": "stone_floor", "desc": "Decorative planks." },
       { "id": "stone_floor", "name": "Stone Path", "kind": "floor", "walkable": true, "hp": 60, "cost": { "stone": 2 }, "desc": "Decorative paving." },

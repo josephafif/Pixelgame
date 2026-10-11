@@ -6,12 +6,16 @@
 // orientation; the low quality setting draws the classic 1× pixel grid.
 
 import { createCanvas, ctx2d } from './canvas.js';
-import { renderChunk, TILE_PX } from './tiles-art.js';
+import { renderChunk, TILE_PX, UPRIGHT } from './tiles-art.js';
+import { standingSprite, SWAYS, clearStanding } from './trees.js';
+import { Lighting } from './lighting.js';
+import { STRUCTURE_LIGHTS, TILE_LIGHTS } from '../game/lights.js';
+import { glowAt } from '../game/daynight.js';
 import { renderChunkRich, vignetteFor } from './terrain-rich.js';
 import { LEAP_TIME } from '../net/movement.js';
 import { boatSprite } from './boats.js';
 import { horseSprite, HORSE_W, HORSE_H } from './horses.js';
-import { CHUNK } from '../game/world.js';
+import { CHUNK, PROP_SHAPE, tileKey, T as TILE } from '../game/world.js';
 import { playerSprites, objectSprite, pickupSprite, tintedSprite } from './sprites.js';
 import { weaponSprite, weaponIcon } from './weapon-sprite.js';
 import { weaponPose } from './weapon-anim.js';
@@ -30,6 +34,7 @@ import { workerSprites, axeSprite, carrySprite } from './workers-art.js';
 import { installHd, uninstallHd, hdFrame } from './hd.js';
 
 const T = TILE_PX;
+const T_LAVA = TILE.LAVA;
 const shadeCache = new Map();
 /** A lighter shade of a colour (cached; used for serpent scales). */
 function shadeColor(hex) {
@@ -107,6 +112,7 @@ function beamSprite(color, height) {
 
 export class Renderer {
   constructor(canvas) {
+    this.lighting = new Lighting();
     this.canvas = canvas;
     this.ctx = ctx2d(canvas);
     this.view = createCanvas(1, 1);
@@ -254,13 +260,14 @@ export class Renderer {
     this.#drawWorld(game, cx, cy, W, H);
     this.#drawFlatStructures(game, W, H);
     if (game.zoneRings) this.#drawZoneRings(game);
-    this.#drawHarvestTarget(game);
     this.#drawAreas(game);
     this.#drawEntities(game);
+    this.#drawHarvestTarget(game);
     if (game.build.active) this.#drawBuildOverlay(game, W, H);
     this.#drawProjectiles(game);
     this.#drawShapes(game);
     this.#drawParticles(game);
+    this.#drawLight(game, W, H);
     if (this.terrain === 'rich') this.v.drawImage(vignetteFor(W, H), 0, 0);
     this.#drawTexts(game);
     this.#drawCompass(game, W, H);
@@ -319,22 +326,32 @@ export class Renderer {
     const world = game.world;
     if (this.terrainChanged) {
       this.terrainChanged = false;
-      for (const chunk of world.chunks.values()) chunk.canvas = null;
+      clearStanding();
+      for (const chunk of world.chunks.values()) {
+        chunk.stale = true;
+        chunk.stand = null;
+      }
     }
     const rich = this.terrain === 'rich';
     // New chunks are drawn within a few milliseconds a frame (the rest next
-    // frame), so riding fast into new land never stutters on a phone.
+    // frame), so riding fast into new land never stutters on a phone. A
+    // chunk that changed (a tree cut down) keeps showing its old picture
+    // until the new one is ready: nothing flickers. Missing chunks first.
     const until = performance.now() + CHUNK_MS;
-    for (let row = r0; row <= r1; row++) {
-      for (let col = c0; col <= c1; col++) {
-        const chunk = world.getChunk(col, row);
-        if (!chunk.canvas && rendered < NEW_CHUNKS_PER_FRAME && (rendered === 0 || performance.now() < until)) {
-          chunk.canvas = rich ? renderChunkRich(chunk, world.growthOf(chunk), world) : renderChunk(chunk, world.growthOf(chunk));
-          rendered += 1;
-        }
-        if (chunk.canvas) this.v.drawImage(chunk.canvas, col * size - cx, row * size - cy);
+    const draw = (chunk) => {
+      chunk.canvas = rich ? renderChunkRich(chunk, world.growthOf(chunk), world) : renderChunk(chunk, world.growthOf(chunk));
+      chunk.stale = false;
+      rendered += 1;
+    };
+    const visible = [];
+    for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) visible.push(world.getChunk(col, row));
+    for (const pass of [0, 1]) {
+      for (const chunk of visible) {
+        const want = pass === 0 ? !chunk.canvas : chunk.stale;
+        if (want && rendered < NEW_CHUNKS_PER_FRAME && (rendered === 0 || performance.now() < until)) draw(chunk);
       }
     }
+    for (const chunk of visible) if (chunk.canvas) this.v.drawImage(chunk.canvas, chunk.cx * size - cx, chunk.cy * size - cy);
   }
 
   #glow(x, y, color, radius) {
@@ -546,6 +563,7 @@ export class Renderer {
   #drawEntities(game) {
     const list = [];
     const p = game.player;
+    this.#standing(game, list);
     for (const o of game.world.objectsNear(p.x, p.y, 2)) list.push({ y: o.y, kind: 'object', o });
     for (const it of game.pickups) list.push({ y: it.y, kind: 'pickup', o: it });
     for (const st of game.structuresForDraw()) {
@@ -568,6 +586,7 @@ export class Renderer {
       const y = this.#sy(d.o.y);
       if (x < -48 || y < -64 || x > W + 48 || y > H + 64) continue;
       switch (d.kind) {
+        case 'upright': this.#drawUpright(game, d); break;
         case 'object': this.#drawObject(game, d.o, x, y); break;
         case 'structure': this.#drawStructure(game, d.o); break;
         case 'npc': this.#drawNpc(game, d.o, x, y); break;
@@ -606,6 +625,152 @@ export class Renderer {
       v.fillRect(x - 1, y + 1, 3, 1);
       v.fillRect(x, y + 2, 1, 1);
     }
+  }
+
+  // --- Trees, rocks and the like (trees.js): sprites sorted with everyone ---------------
+
+  /** The standing tiles in view, for the depth-sorted list (sorted by their trunk or foot). */
+  #standing(game, list) {
+    const world = game.world;
+    const tx0 = Math.floor(this.cx / T) - 2;
+    const tx1 = Math.floor((this.cx + this.W) / T) + 2;
+    const ty0 = Math.floor(this.cy / T) - 1;
+    const ty1 = Math.floor((this.cy + this.H) / T) + 3;
+    // (Glowing tiles in view are gathered on the way: lava, lumen caps, crystals.)
+    const tileLights = [];
+    this.tileLights = tileLights;
+    for (let cy = Math.floor(ty0 / CHUNK); cy <= Math.floor(ty1 / CHUNK); cy++) {
+      for (let cx = Math.floor(tx0 / CHUNK); cx <= Math.floor(tx1 / CHUNK); cx++) {
+        const chunk = world.chunks.get(`${cx},${cy}`);
+        if (!chunk) continue;
+        const ax = Math.max(tx0, cx * CHUNK);
+        const bx = Math.min(tx1, cx * CHUNK + CHUNK - 1);
+        const ay = Math.max(ty0, cy * CHUNK);
+        const by = Math.min(ty1, cy * CHUNK + CHUNK - 1);
+        for (let ty = ay; ty <= by; ty++) {
+          for (let tx = ax; tx <= bx; tx++) {
+            const i = (ty - cy * CHUNK) * CHUNK + (tx - cx * CHUNK);
+            const b = chunk.block[i];
+            if (!b) continue;
+            const TL = TILE_LIGHTS.get(b);
+            // (Lava lies in sheets: one light for every few tiles, a bit bigger.)
+            if (TL && (b !== T_LAVA || (tx + ty * 2) % 3 === 0)) {
+              tileLights.push({ sx: this.#sx(tx + 0.5), sy: this.#sy(ty + 0.5), r: b === T_LAVA ? TL.r * 1.4 : TL.r, color: TL.color, seed: tx * 7 + ty * 13 });
+            }
+            if (!UPRIGHT.has(b)) continue;
+            list.push({ y: ty + (PROP_SHAPE.get(b)?.[1] ?? 0.6), kind: 'upright', o: { x: tx + 0.5, y: ty + 0.5 }, tx, ty, b, chunk, i });
+          }
+        }
+      }
+    }
+    this.#sway(game);
+  }
+
+  /** Light and dark (lighting.js): the lights in view, the time of day. */
+  #drawLight(game, W, H) {
+    const darkness = game.darkness ?? 0;
+    const glow = glowAt(game.hour ?? 12);
+    const lights = this.tileLights ?? [];
+    const near = (sx, sy, r) => sx > -r * T && sy > -r * T && sx < W + r * T && sy < H + r * T;
+    for (const st of game.structuresForDraw()) {
+      const L = STRUCTURE_LIGHTS[st.id];
+      if (!L || st.dead) continue;
+      const sx = this.#sx(st.x + 0.5);
+      const sy = this.#sy(st.y + 0.3);
+      if (near(sx, sy, L.r)) lights.push({ sx, sy, r: L.r, color: L.color, seed: st.x * 3 + st.y });
+    }
+    for (const L of game.campFires ?? []) {
+      const sx = this.#sx(L.x);
+      const sy = this.#sy(L.y);
+      if (near(sx, sy, L.r)) lights.push({ sx, sy, r: L.r, color: L.color, seed: 5 });
+    }
+    if (darkness > 0.01) {
+      // A little light around you (and the others) to see by.
+      const p = game.player;
+      if (!p.dead) lights.push({ sx: this.#sx(p.x), sy: this.#sy(p.y) - 6, r: 3.4, color: 'you', k: 0.85 });
+      for (const o of game.others ?? []) if (!o.dead) lights.push({ sx: this.#sx(o.x), sy: this.#sy(o.y) - 6, r: 2.8, color: 'you', k: 0.7 });
+    }
+    if (!lights.length && darkness <= 0.01 && glow <= 0.01) return;
+    this.lighting.draw(this.v, { W, H, R: this.R, T, lights, darkness, glow, time: game.time });
+  }
+
+  /** Whoever walks through a tree sets its crown swaying. */
+  #sway(game) {
+    this.swaying ??= new Map();
+    this.lastPos ??= new WeakMap();
+    const world = game.world;
+    const now = game.time;
+    const movers = [game.player, ...(game.others ?? []), ...(game.horses ?? []), ...(game.enemies ?? []), ...(game.workers ?? [])];
+    if (game.pal) movers.push(game.pal);
+    for (const m of movers) {
+      if (!m || m.dead || !Number.isFinite(m.x)) continue;
+      const last = this.lastPos.get(m);
+      this.lastPos.set(m, { x: m.x, y: m.y });
+      if (!last || Math.abs(m.x - last.x) + Math.abs(m.y - last.y) < 0.004) continue;
+      if (Math.abs(m.x * T - this.cx - this.W / 2) > this.W || Math.abs(m.y * T - this.cy - this.H / 2) > this.H) continue;
+      const mx = Math.floor(m.x);
+      const my = Math.floor(m.y);
+      for (let ty = my - 1; ty <= my + 1; ty++) {
+        for (let tx = mx - 1; tx <= mx + 1; tx++) {
+          const b = world.blockAt(tx, ty);
+          if (!SWAYS.has(b)) continue;
+          const shape = PROP_SHAPE.get(b);
+          const dx = m.x - (tx + 0.5);
+          const dy = m.y - (ty + (shape?.[1] ?? 0.7));
+          if (dx * dx + dy * dy > 0.85 * 0.85) continue;
+          const key = tileKey(tx, ty);
+          const s = this.swaying.get(key);
+          if (s && now - s.t0 < 0.35) continue;
+          this.swaying.set(key, { t0: now, dir: dx > 0 ? -1 : 1 });
+        }
+      }
+    }
+    for (const [key, s] of this.swaying) if (now - s.t0 > 1.4) this.swaying.delete(key);
+  }
+
+  #drawUpright(game, d) {
+    const chunk = d.chunk;
+    chunk.stand ??= new Map();
+    let sp = chunk.stand.get(d.i);
+    if (!sp || sp.b !== d.b) {
+      const style = this.terrain === 'rich' ? 'rich' : 'classic';
+      sp = { ...standingSprite(d.b, d.tx, d.ty, chunk.ground[d.i], game.world.biomes[chunk.biomeIdx?.[d.i]]?.id, style), b: d.b };
+      chunk.stand.set(d.i, sp);
+    }
+    const v = this.v;
+    const x = this.#sx(d.tx) + sp.ox;
+    const y = this.#sy(d.ty) + sp.oy;
+    const img = sp.canvas;
+    const w = img.width;
+    const h = img.height;
+    // You behind a tree: its crown turns see-through, so you can still see yourself.
+    const p = game.player;
+    let alpha = 1;
+    if (sp.sway && !p.dead && p.y < d.y) {
+      const px = this.#sx(p.x);
+      const py = this.#sy(p.y);
+      if (px > x + 3 && px < x + w - 3 && py - 6 > y && py - 14 < y + h - 8) alpha = 0.55;
+    }
+    v.globalAlpha = alpha;
+    const s = sp.sway ? this.swaying?.get(tileKey(d.tx, d.ty)) : null;
+    if (!s) {
+      v.drawImage(img, x, y);
+    } else {
+      // Swaying: the crown moves most at the top, the trunk not at all (in strips, pixel by pixel).
+      const t = game.time - s.t0;
+      const off = s.dir * 2.4 * Math.exp(-3.2 * t) * Math.sin(13 * t);
+      const still = Math.floor(h * 0.3);
+      const strips = 4;
+      const crownH = h - still;
+      for (let k = 0; k < strips; k++) {
+        const sy = Math.floor((crownH * k) / strips);
+        const sh = Math.floor((crownH * (k + 1)) / strips) - sy;
+        const shift = Math.round(off * (1 - k / strips));
+        v.drawImage(img, 0, sy, w, sh, x + shift, y + sy, w, sh);
+      }
+      v.drawImage(img, 0, crownH, w, still, x, y + crownH, w, still);
+    }
+    v.globalAlpha = 1;
   }
 
   // --- Structures -------------------------------------------------------------------

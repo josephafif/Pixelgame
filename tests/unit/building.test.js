@@ -90,6 +90,30 @@ test('harvested tiles stay gone after reload and can regrow', () => {
   assert.equal(save.world.harvested[`${spot.x},${spot.y}`], undefined);
 });
 
+test('what you cut down stays gone for good; what workers cut grows back', async () => {
+  const { regrow } = await import('../../src/game/gathering.js');
+  const save = createNewSave({ worldSeed: 7 });
+  const world = new World(data, save.worldSeed);
+  world.harvested = save.world.harvested;
+  const trees = [];
+  for (let r = 20; r < 60 && trees.length < 2; r++) {
+    for (let x = -r; x <= r && trees.length < 2; x++) if (world.blockAt(x, r) === T.TREE) trees.push({ x, y: r });
+  }
+  const [mine, theirs] = trees;
+  const long = Date.now() - 10 * 24 * 3600 * 1000;
+  world.removeBlock(mine.x, mine.y, long, { kept: true });
+  world.removeBlock(theirs.x, theirs.y, long);
+  assert.equal(world.growthStage(mine.x, mine.y, save.world.harvested[`${mine.x},${mine.y}`]), -1, 'no sapling: cleared');
+  regrow({ world, data, buildRadius: () => 0, player: { x: 9999, y: 9999 }, enemies: [] });
+  assert.equal(world.blockAt(mine.x, mine.y), 0, 'yours stays gone');
+  assert.equal(world.blockAt(theirs.x, theirs.y), T.TREE, 'a worker\'s grows back');
+  // Saved and loaded: still gone for good.
+  const again = new World(data, save.worldSeed);
+  again.harvested = JSON.parse(JSON.stringify(save.world.harvested));
+  assert.equal(again.blockAt(mine.x, mine.y), 0);
+  assert.deepEqual(again.harvested[`${mine.x},${mine.y}`].slice(1), [T.TREE, 1]);
+});
+
 test('movement modes: gates let you through, flyers skip trees but never water', () => {
   const save = richSave();
   const game = stubGame(save);

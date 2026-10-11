@@ -1,21 +1,21 @@
 // The rich terrain style: deeper, softer ground with big light and dark
 // patches, a darker forest floor under and between trees, damp banks and
-// foam along the water, and fuller trees and boulders with outlines,
-// shading and cast shadows (their crowns reach into the tile above, so a
-// forest closes up). Everything is drawn once per chunk into its canvas,
-// like the classic style, so it costs nothing per frame. Only the look
-// changes: tiles, collisions and rules are exactly as before.
+// foam along the water, and the shadows of trees and boulders. The ground is
+// drawn once per chunk into its canvas, like the classic style, so it costs
+// nothing per frame; the trees and boulders themselves are sprites sorted
+// with everyone (trees.js). Only the look changes: tiles, collisions and
+// rules are exactly as before.
 
 import { createRng, hashInts } from '../core/rng.js';
 import { createCanvas, ctx2d } from './canvas.js';
 import { T, CHUNK, LIQUID } from '../game/world.js';
 import { tileCanvas, growthCanvas, TILE_PX, GROUND_STYLE } from './tiles-art.js';
+import { UPRIGHT, standingSprite, undergrowth } from './trees.js';
 
 const SKY_GROUNDS = new Set([T.SKYBRIDGE, T.WIND_N, T.WIND_E, T.WIND_S, T.WIND_W]);
 
 const S = TILE_PX;
 const VARIANTS = 4;
-const O = '#141a16'; // outline
 
 // --- Ground ------------------------------------------------------------------------------
 
@@ -159,24 +159,10 @@ function vnoise(seed, x, y) {
 
 // --- Upright things: trees, boulders and the rest ------------------------------------------
 
-/** Tiles drawn standing up (with a shadow), in row order, over the ground. */
-const UPRIGHT = new Set([
-  T.TREE, T.PINE, T.PALM, T.ROCK, T.CACTUS, T.CRYSTAL, T.OBSIDIAN, T.ORE, T.STARSTONE, T.PRISM, T.MIRROR,
-  T.LUMENCAP, T.ROOTS, T.RUIN, T.MENDBLOOM, T.PUFFCAP, T.AETHERCRYSTAL,
-]);
 /** Blocks that lie flat (drawn with the ground): liquids and Skyreach's clouds. */
 const FLAT_BLOCKS = new Set([...LIQUID, T.SKY]);
 /** How far (in tiles) a tile's shading reaches its neighbours. */
 const SHADES = new Set([T.TREE, T.PINE, T.PALM, T.ROCK, T.ORE, T.OBSIDIAN, T.ROOTS, T.RUIN]);
-
-function disc(ctx, cx, cy, r, color) {
-  ctx.fillStyle = color;
-  const rr = r * r + r * 0.8;
-  for (let y = -r; y <= r; y++) {
-    const w = Math.floor(Math.sqrt(Math.max(0, rr - y * y)));
-    ctx.fillRect(cx - w, cy + y, w * 2 + 1, 1);
-  }
-}
 
 /** A pixel ellipse (shadows). */
 function ellipse(ctx, cx, cy, rx, ry, color) {
@@ -187,241 +173,27 @@ function ellipse(ctx, cx, cy, rx, ry, color) {
   }
 }
 
-const CANOPY = [
-  { o: O, d: '#22492a', m: '#2f6634', l: '#3f8040', h: '#5f9f4c' }, // deep green
-  { o: O, d: '#254d2a', m: '#336b36', l: '#468743', h: '#6aa852' },
-  { o: O, d: '#1f4428', m: '#2b5f33', l: '#3a783e', h: '#58954a' },
-  { o: O, d: '#2a4f26', m: '#3a7030', l: '#4f8c3c', h: '#78b058' }, // a lighter, yellower one
-];
-
-/** A broadleaf tree, 32×32, its trunk's foot at the bottom middle. */
-function drawTree(ctx, variant) {
-  const rng = createRng(0x7e3 + variant * 97);
-  const c = CANOPY[variant % CANOPY.length];
-  // Trunk and roots.
-  ctx.fillStyle = O;
-  ctx.fillRect(13, 19, 6, 13);
-  ctx.fillRect(11, 29, 10, 3);
-  ctx.fillStyle = '#5a3a22';
-  ctx.fillRect(14, 19, 4, 12);
-  ctx.fillRect(12, 30, 8, 1);
-  ctx.fillStyle = '#7a5030';
-  ctx.fillRect(14, 20, 1, 10);
-  ctx.fillStyle = '#3e2816';
-  ctx.fillRect(17, 21, 1, 9);
-  // The crown: overlapping clumps.
-  const clumps = [
-    [16, 13, 10],
-    [9 + rng.int(-1, 1), 15, 6 + rng.int(0, 1)],
-    [23 + rng.int(-1, 1), 15, 6 + rng.int(0, 1)],
-    [16 + rng.int(-2, 2), 6, 6 + rng.int(0, 1)],
-  ];
-  for (const [x, y, r] of clumps) disc(ctx, x, y, r + 1, c.o);
-  for (const [x, y, r] of clumps) disc(ctx, x, y, r, c.d);
-  for (const [x, y, r] of clumps) disc(ctx, x - 1, y - 1, r - 1, c.m);
-  for (const [x, y, r] of clumps) disc(ctx, x - 2, y - 2, Math.max(1, r - 4), c.l);
-  // Leaf texture: dark nicks below, bright flecks up left.
-  for (let i = 0; i < 26; i++) {
-    const [x, y, r] = rng.pick(clumps);
-    const a = rng.next() * Math.PI * 2;
-    const d = rng.next() * (r - 2);
-    const px = Math.round(x + Math.cos(a) * d);
-    const py = Math.round(y + Math.sin(a) * d);
-    const lit = px + py < x + y - 2;
-    ctx.fillStyle = lit ? c.h : c.d;
-    ctx.fillRect(px, py, 1, 1);
-  }
-  ctx.fillStyle = c.h;
-  ctx.fillRect(10, 9, 2, 1);
-  ctx.fillRect(13, 4, 2, 1);
-  ctx.fillRect(7, 13, 1, 1);
-}
-
-/** A pine, 32×36 (snowy ones in the snow), its foot at the bottom middle. */
-function drawPine(ctx, variant, snowy) {
-  const rng = createRng(0x9a1 + variant * 53);
-  ctx.fillStyle = O;
-  ctx.fillRect(14, 28, 4, 8);
-  ctx.fillStyle = '#5a3a22';
-  ctx.fillRect(15, 28, 2, 7);
-  const tiers = [[3, 7], [9, 9], [15, 11], [21, 12]];
-  const green = ['#1f4a32', '#2a5e3c', '#3a7448'];
-  for (const [top, half] of tiers) {
-    for (let row = 0; row < 9; row++) {
-      const w = Math.min(half, 1 + Math.floor(row * half / 8));
-      ctx.fillStyle = O;
-      ctx.fillRect(16 - w - 1, top + row, w * 2 + 2, 1);
-    }
-  }
-  for (const [top, half] of tiers) {
-    for (let row = 0; row < 8; row++) {
-      const w = Math.min(half, 1 + Math.floor(row * half / 8));
-      ctx.fillStyle = green[1];
-      ctx.fillRect(16 - w, top + row, w * 2, 1);
-      ctx.fillStyle = green[2];
-      ctx.fillRect(16 - w, top + row, Math.max(1, Math.floor(w * 0.7)), 1);
-      ctx.fillStyle = green[0];
-      ctx.fillRect(16 + Math.floor(w * 0.4), top + row, Math.ceil(w * 0.6), 1);
-    }
-  }
-  if (snowy) {
-    ctx.fillStyle = '#eef4fa';
-    for (const [top, half] of tiers) {
-      ctx.fillRect(16 - Math.floor(half / 2), top + 2, half - 1, 1);
-      ctx.fillRect(15, top, 2, 1);
-    }
-  } else {
-    ctx.fillStyle = '#4f8a54';
-    for (let i = 0; i < 6; i++) ctx.fillRect(rng.int(10, 18), rng.int(6, 26), 1, 1);
-  }
-}
-
-/** A palm, 32×32: a leaning ringed trunk and arching fronds, its foot at the bottom middle. */
-function drawPalm(ctx, variant) {
-  const lean = variant & 1 ? 1 : -1;
-  // The trunk, leaning a little (dark outline, then rings).
-  const trunk = [];
-  for (let y = 31; y >= 9; y--) trunk.push([16 + Math.round(((31 - y) / 22) ** 1.6 * 4 * lean), y]);
-  for (const [x, y] of trunk) {
-    ctx.fillStyle = O;
-    ctx.fillRect(x - 2, y, 5, 1);
-  }
-  for (const [x, y] of trunk) {
-    ctx.fillStyle = y % 3 === 0 ? '#6e4a28' : '#9a6a3a';
-    ctx.fillRect(x - 1, y, 3, 1);
-    ctx.fillStyle = '#b8864e';
-    ctx.fillRect(x - 1, y, 1, 1);
-  }
-  const [tx, ty] = trunk[trunk.length - 1];
-  // Fronds: arcs out from the top, drooping at the ends.
-  const frond = (dir, len, droop, color) => {
-    for (let i = 0; i <= len; i++) {
-      const x = tx + dir * i;
-      const y = ty + Math.round((i / len) ** 2 * droop) - (i < 3 ? 1 : 0);
-      ctx.fillStyle = O;
-      ctx.fillRect(x - 1, y - 1, 3, 3);
-    }
-    for (let i = 0; i <= len; i++) {
-      const x = tx + dir * i;
-      const y = ty + Math.round((i / len) ** 2 * droop) - (i < 3 ? 1 : 0);
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, 1, 1);
-      if (i > 1 && i < len) ctx.fillRect(x, y + 1, 1, 1);
-    }
-  };
-  frond(-1, 11, 7, '#2f8a3c');
-  frond(1, 11, 7, '#2f8a3c');
-  frond(-1, 8, 2, '#4fb04f');
-  frond(1, 8, 2, '#4fb04f');
-  for (const [dx, dy] of [[-6, -3], [6, -3], [-3, -5], [3, -5]]) {
-    ctx.fillStyle = O;
-    ctx.fillRect(tx + dx - 1, ty + dy - 1, 3, 3);
-  }
-  ctx.fillStyle = '#5cc05a';
-  for (const [dx, dy] of [[-6, -3], [6, -3], [-3, -5], [3, -5], [-4, -4], [4, -4], [-2, -5], [2, -5], [0, -5]]) ctx.fillRect(tx + dx, ty + dy, 1, 1);
-  // Coconuts.
-  ctx.fillStyle = '#5a3a1a';
-  ctx.fillRect(tx - 2, ty + 1, 2, 2);
-  ctx.fillRect(tx + 1, ty + 1, 2, 2);
-}
-
-/** A boulder, 24×20 (mossy on green ground), its foot at the bottom middle. */
-function drawBoulder(ctx, variant, mossy, tint) {
-  const rng = createRng(0xb01 + variant * 41);
-  const [d, m, l, h] = tint ?? ['#4e4e5a', '#6a6a76', '#84848f', '#a8a8b4'];
-  const w = 8 + (variant & 1);
-  disc(ctx, 12, 12, w, O);
-  disc(ctx, 12, 12, w - 1, d);
-  disc(ctx, 11, 11, w - 2, m);
-  disc(ctx, 10, 9, w - 5, l);
-  ctx.fillStyle = h;
-  ctx.fillRect(8, 6, 3, 1);
-  ctx.fillRect(7, 7, 1, 1);
-  ctx.fillStyle = d;
-  for (let i = 0; i < 3; i++) {
-    const x = rng.int(8, 15);
-    const y = rng.int(9, 15);
-    ctx.fillRect(x, y, 2, 1);
-    ctx.fillRect(x + 1, y + 1, 1, 1);
-  }
-  // The ground line: flatten the bottom.
-  ctx.clearRect(0, 19, 24, 1);
-  ctx.fillStyle = O;
-  ctx.fillRect(5, 18, 14, 1);
-  if (mossy) {
-    ctx.fillStyle = '#4f8a44';
-    ctx.fillRect(7, 5, 6, 1);
-    ctx.fillRect(6, 6, 3, 1);
-    ctx.fillStyle = '#6aa852';
-    ctx.fillRect(8, 5, 2, 1);
-  }
-}
-
-const uprightCache = new Map();
-
-/** The standing sprite for a tile, and where its foot is: { canvas, ox, oy } (top-left offset from the tile's top-left). */
-function upright(id, variant, ground) {
-  const snowy = ground === T.SNOW || ground === T.ICE;
-  const mossy = ground === T.GRASS || ground === T.MOSS || ground === T.FLOWERS;
-  const key = `${id}:${variant}:${snowy ? 's' : mossy ? 'm' : ''}`;
-  let u = uprightCache.get(key);
-  if (u) return u;
-  let canvas;
-  let ox;
-  let oy;
-  if (id === T.TREE) {
-    canvas = createCanvas(32, 32);
-    drawTree(ctx2d(canvas), variant);
-    ox = -8;
-    oy = -16;
-  } else if (id === T.PINE) {
-    canvas = createCanvas(32, 36);
-    drawPine(ctx2d(canvas), variant, snowy);
-    ox = -8;
-    oy = -20;
-  } else if (id === T.PALM) {
-    canvas = createCanvas(32, 32);
-    drawPalm(ctx2d(canvas), variant);
-    ox = -8;
-    oy = -16;
-  } else if (id === T.ROCK) {
-    canvas = createCanvas(24, 20);
-    drawBoulder(ctx2d(canvas), variant, mossy);
-    ox = -4;
-    oy = -4;
-  } else {
-    // Palms, cacti, crystals, ore and the like keep their classic art.
-    canvas = tileCanvas(id, variant, true);
-    ox = 0;
-    oy = 0;
-  }
-  u = { canvas, ox, oy };
-  uprightCache.set(key, u);
-  return u;
-}
-
 const SHADOW = 'rgba(8, 20, 12, 0.3)';
 const SHADOW_SOFT = 'rgba(8, 20, 12, 0.16)';
 
-function castShadow(ctx, id, px, py) {
-  // (px, py): the tile's top-left in the chunk canvas.
-  if (id === T.TREE) {
-    ellipse(ctx, px + 10, py + 14, 13, 5, SHADOW_SOFT);
-    ellipse(ctx, px + 9, py + 14, 9, 3, SHADOW);
-  } else if (id === T.PALM) {
-    ellipse(ctx, px + 11, py + 14, 9, 3, SHADOW_SOFT);
-    ellipse(ctx, px + 9, py + 15, 4, 2, SHADOW);
-  } else if (id === T.PINE) {
-    ellipse(ctx, px + 10, py + 15, 9, 3, SHADOW_SOFT);
-    ellipse(ctx, px + 9, py + 15, 6, 2, SHADOW);
-  } else if (id === T.ROCK || id === T.ORE || id === T.OBSIDIAN) {
-    ellipse(ctx, px + 9, py + 14, 8, 3, SHADOW);
-  } else {
-    ellipse(ctx, px + 9, py + 14, 6, 2, SHADOW);
-  }
+/** A standing thing's shadow on the ground (the thing itself is a sprite: trees.js). */
+function castShadow(ctx, shadow, px, py) {
+  if (!shadow) return;
+  const [dx, dy, rx, ry] = shadow;
+  ellipse(ctx, px + dx + 2, py + dy, rx + 3, ry + 1, SHADOW_SOFT);
+  ellipse(ctx, px + dx + 1, py + dy, rx, ry, SHADOW);
 }
 
 // --- The chunk -----------------------------------------------------------------------------
+
+/** The biome of a tile, from its chunk when it is loaded (the same as the sprite pass uses). */
+export function biomeIdAt(world, wx, wy) {
+  const cx = Math.floor(wx / CHUNK);
+  const cy = Math.floor(wy / CHUNK);
+  const chunk = world.chunks?.get(`${cx},${cy}`);
+  if (chunk?.biomeIdx) return world.biomes[chunk.biomeIdx[(wy - cy * CHUNK) * CHUNK + (wx - cx * CHUNK)]]?.id;
+  return world.biomeAt(wx, wy)?.id;
+}
 
 function variantOf(wx, wy) {
   return ((wx * 73856093) ^ (wy * 19349663)) & (VARIANTS - 1);
@@ -536,6 +308,28 @@ export function renderChunkRich(chunk, growth, world) {
     }
   }
 
+  // 2c. Undergrowth: bushes, ferns, grass, moss and mushrooms (more of it on a forest floor).
+  for (let ly = 0; ly < CHUNK; ly++) {
+    for (let lx = 0; lx < CHUNK; lx++) {
+      const i = ly * CHUNK + lx;
+      if (chunk.block[i]) continue;
+      const wx = x0 + lx;
+      const wy = y0 + ly;
+      if (wx * wx + wy * wy < 14 * 14) continue; // (the camp's square stays tidy)
+      let near = 0;
+      let wet = false;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const nb = blockAt(wx + dx, wy + dy);
+          if (nb === T.TREE || nb === T.PINE || nb === T.ROOTS) near++;
+          else if (Math.abs(dx) + Math.abs(dy) === 1 && nb && LIQUID.has(nb)) wet = true;
+        }
+      }
+      const d = undergrowth(wx, wy, chunk.ground[i], near, wet);
+      if (d) ctx.drawImage(d.canvas, lx * S + d.ox, ly * S + d.oy);
+    }
+  }
+
   // 3. Shade between trees and rocks (a darker forest floor), and banks along the water.
   for (let ly = 0; ly < CHUNK; ly++) {
     for (let lx = 0; lx < CHUNK; lx++) {
@@ -642,29 +436,17 @@ export function renderChunkRich(chunk, growth, world) {
     ctx.drawImage(growthCanvas(id, stage), px, py);
   }
 
-  // 5. Shadows, then the standing things row by row (crowns reach a tile up
-  //    and half a tile to the sides, so neighbours just outside count too).
-  const standing = [];
+  // 5. The shadows of the trees, rocks and the rest (they stand as sprites
+  //    of their own, sorted with everyone: trees.js; a shadow may reach in
+  //    from just outside the chunk).
   for (let ly = -1; ly <= CHUNK; ly++) {
     for (let lx = -1; lx <= CHUNK; lx++) {
-      const b = blockAt(x0 + lx, y0 + ly);
-      if (b && UPRIGHT.has(b)) standing.push([lx, ly, b]);
-    }
-  }
-  for (const [lx, ly, b] of standing) castShadow(ctx, b, lx * S, ly * S);
-  for (const [lx, ly, b] of standing) {
-    if (ly < 0) continue; // (only its shadow reaches down here)
-    const v = variantOf(x0 + lx, y0 + ly);
-    const u = upright(b, v, groundAt(x0 + lx, y0 + ly));
-    const flip = b === T.TREE && (hashInts(x0 + lx, y0 + ly, 0x1f) & 1);
-    if (flip) {
-      ctx.save();
-      ctx.translate(lx * S + u.ox + u.canvas.width, ly * S + u.oy);
-      ctx.scale(-1, 1);
-      ctx.drawImage(u.canvas, 0, 0);
-      ctx.restore();
-    } else {
-      ctx.drawImage(u.canvas, lx * S + u.ox, ly * S + u.oy);
+      const wx = x0 + lx;
+      const wy = y0 + ly;
+      const b = blockAt(wx, wy);
+      if (!b || !UPRIGHT.has(b)) continue;
+      const sp = standingSprite(b, wx, wy, groundAt(wx, wy), biomeIdAt(world, wx, wy), 'rich');
+      castShadow(ctx, sp.shadow, lx * S, ly * S);
     }
   }
   return canvas;

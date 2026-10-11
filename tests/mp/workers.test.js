@@ -213,3 +213,44 @@ test('a clan from the army update: its soldiers go back to work when the server 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a tree a player cuts down stays gone (also after a restart); one a worker cuts grows back', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const { T, CHUNK } = await import('../../src/game/world.js');
+  const loot = await import('../../server/loot.js');
+  const { harvestInfo } = await import('../../src/game/gathering.js');
+  const dir = mkdtempSync(join(tmpdir(), 'pg-cut-'));
+  const dbPath = join(dir, 'game.db');
+  try {
+    let t = await testServer({ dbPath });
+    const a = await t.bot('Röjaren');
+    const p = t.player(a);
+    const w = t.gs.world;
+    const trees = [];
+    for (let r = 30; r < 90 && trees.length < 2; r++) {
+      for (let x = -r; x <= r && trees.length < 2; x++) if (w.blockAt(x, r) === T.TREE) trees.push({ x, y: r });
+    }
+    const [mine, theirs] = trees;
+    loot.fellBlock(t.gs, p, { tx: mine.x, ty: mine.y, info: harvestInfo(t.gs.data, T.TREE) }, { yield: 1 });
+    t.gs.removeBlock(theirs.x, theirs.y);
+    assert.equal(w.blockAt(mine.x, mine.y), 0);
+    // The client hears it stays gone.
+    const payload = t.gs.chunkPayload(Math.floor(mine.x / CHUNK), Math.floor(mine.y / CHUNK));
+    assert.ok(payload.harvested.some(([x, y, , kept]) => x === mine.x && y === mine.y && kept === 1));
+    await t.close();
+    // Restarted long after: the worker's tree has grown back, the player's has not.
+    t = await testServer({ dbPath });
+    try {
+      assert.equal(t.gs.world.blockAt(mine.x, mine.y), 0, 'loaded as cut');
+      t.gs.regrowWorld(Date.now() + 30 * 24 * 3600 * 1000);
+      assert.equal(t.gs.world.blockAt(theirs.x, theirs.y), T.TREE, 'the worker\'s tree grew back');
+      assert.equal(t.gs.world.blockAt(mine.x, mine.y), 0, 'the player\'s stays gone');
+    } finally {
+      await t.close();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

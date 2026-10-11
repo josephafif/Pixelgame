@@ -9,6 +9,8 @@ import { inSafeZone } from '../src/net/rules.js';
 import { mixHex } from '../src/weapons/visuals.js';
 import * as combat from './combat.js';
 import { updateBoss, expireClones } from './bosses.js';
+import { scaryLights, shunLight, litBy } from '../src/game/lights.js';
+import { spawnFactor, darknessAt, hourAt } from '../src/game/daynight.js';
 
 const LEASH = 1.8;
 const DESPAWN_DIST = 42;
@@ -633,6 +635,8 @@ function serpent(gs, e, p, dx, dy, d, speed, dt) {
 
 export function update(gs, dt) {
   if (gs.tick % 10 === 0) expireClones(gs);
+  // Fire and torchlight keep monsters away (src/game/lights.js).
+  const lights = scaryLights(gs.world, Date.now());
   for (const e of gs.enemies.values()) {
     if (e.dead) {
       gs.enemies.delete(e.id);
@@ -657,6 +661,7 @@ export function update(gs, dt) {
     } else {
       behave(gs, e, dt);
     }
+    if (!resting && !e.boss && lights.length) shunLight(lights, e, e.speed * (e.slowMult ?? 1));
     if (!resting || e.kx || e.ky) moveEnemy(gs, e, e.vx + e.kx, e.vy + e.ky, dt);
     const damp = 0.74; // exp(-9 / 30)
     e.kx = Math.abs(e.kx) < 0.01 ? 0 : e.kx * damp;
@@ -792,6 +797,10 @@ export function spawn(gs) {
   const claims = gs.claims();
   const baseR2 = (gs.rules.claimRadius + 4) ** 2;
   const inBase = (x, y) => claims.some((c) => (x - c.x) ** 2 + (y - c.y) ** 2 <= baseR2);
+  // Fewer by day, many more at night (src/game/daynight.js); never in a fire's light.
+  const now = Date.now();
+  const night = spawnFactor(darknessAt(hourAt(now)));
+  const lights = scaryLights(gs.world, now);
   for (const p of gs.players.values()) {
     if (p.dead || p.asleep || inSafeZone(gs.rules, p.x, p.y)) continue;
     if (p.sailing) {
@@ -804,7 +813,7 @@ export function spawn(gs) {
     for (const e of gs.enemiesNear(p.x, p.y, 20)) if (!e.boss) alive++;
     for (const o of gs.playersNear(p.x, p.y, 20)) if (o !== p && !o.dead) others++;
     // Groups share the monsters around them (a bit more than alone, not double).
-    const target = Math.round(Math.min(22, 5 + wl * 1.6) * (1 + others * 0.35));
+    const target = Math.round(Math.min(22, 5 + wl * 1.6) * (1 + others * 0.35) * night);
     if (alive >= target) continue;
     for (let attempt = 0; attempt < 6; attempt++) {
       const a = Math.random() * Math.PI * 2;
@@ -813,6 +822,7 @@ export function spawn(gs) {
       const y = p.y + Math.sin(a) * d;
       if (inSafeZone(gs.rules, x, y) || (x * x + y * y) < (gs.rules.safeRadius + 6) ** 2) continue;
       if (!gs.world.isFree(x, y, 0.45, 'enemy') || inBase(x, y) || gs.world.marketAt(x, y, 8)) continue;
+      if (litBy(lights, x, y, 2)) continue;
       // Never right next to another player.
       if (gs.nearestPlayer(x, y, 10)) continue;
       const biome = gs.world.biomeAt(Math.floor(x), Math.floor(y));

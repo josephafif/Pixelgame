@@ -116,7 +116,7 @@ export class GameServer {
     });
 
     // Harvested trees/rocks, spent altars, opened chests.
-    for (const h of db.loadHarvested()) this.world.harvested[`${h.x},${h.y}`] = [h.at, h.tile];
+    for (const h of db.loadHarvested()) this.world.harvested[`${h.x},${h.y}`] = h.kept ? [h.at, h.tile, 1] : [h.at, h.tile];
     this.marks = new Map(db.loadMarks().map((m) => [m.key, m]));
 
     // Clans and their bases.
@@ -533,11 +533,13 @@ export class GameServer {
   /** World data for one chunk, as the client needs it. */
   chunkPayload(cx, cy) {
     const chunk = this.world.getChunk(cx, cy);
-    // Cut trees and rocks: [x, y, seconds since cut] (the client draws them growing back).
+    // Cut trees and rocks: [x, y, seconds since cut, 1 if it stays gone] (the client draws the rest growing back).
     const harvested = [];
     const now = Date.now();
-    for (const [i, [at]] of chunk.cut) {
-      harvested.push([cx * CHUNK + (i % CHUNK), cy * CHUNK + ((i / CHUNK) | 0), Math.max(0, Math.round((now - at) / 1000))]);
+    for (const [i, [at, , kept]] of chunk.cut) {
+      const e = [cx * CHUNK + (i % CHUNK), cy * CHUNK + ((i / CHUNK) | 0), Math.max(0, Math.round((now - at) / 1000))];
+      if (kept) e.push(1);
+      harvested.push(e);
     }
     const structures = [];
     for (let ly = 0; ly < CHUNK; ly++) {
@@ -575,21 +577,20 @@ export class GameServer {
     this.db.setMark(key, kind, until);
   }
 
-  /** A tree or rock was cut down. */
-  removeBlock(tx, ty) {
-    const id = this.world.removeBlock(tx, ty);
+  /** A tree or rock was cut down (`kept`: by a player, so it stays gone; workers' grow back). */
+  removeBlock(tx, ty, { kept = false } = {}) {
+    const id = this.world.removeBlock(tx, ty, Date.now(), { kept });
     if (!id) return 0;
     const [at] = this.world.harvested[`${tx},${ty}`];
-    this.db.addHarvested(tx, ty, id, at);
-    this.broadcastTile(tx, ty, { t: 'wd', k: 'cut', x: tx, y: ty });
+    this.db.addHarvested(tx, ty, id, at, kept);
+    this.broadcastTile(tx, ty, kept ? { t: 'wd', k: 'cut', x: tx, y: ty, kept: 1 } : { t: 'wd', k: 'cut', x: tx, y: ty });
     return id;
   }
 
-  #worldChores(now) {
-    this.#upkeep(now);
-    // Trees and rocks grow back (but never under a structure or a player).
-    for (const [key, [at, id]] of Object.entries(this.world.harvested)) {
-      if (now - at < regrowMinutes(this.data, id) * 60000) continue;
+  /** Trees and rocks grow back (never under a structure or a player, never what a player cut down). */
+  regrowWorld(now = Date.now()) {
+    for (const [key, [at, id, kept]] of Object.entries(this.world.harvested)) {
+      if (kept || now - at < regrowMinutes(this.data, id) * 60000) continue;
       const [tx, ty] = key.split(',').map(Number);
       if (this.world.structureAt(tx, ty) || this.world.floorAt(tx, ty)) continue;
       let blocked = false;
@@ -602,6 +603,11 @@ export class GameServer {
       this.db.removeHarvested(tx, ty);
       this.broadcastTile(tx, ty, { t: 'wd', k: 'grow', x: tx, y: ty });
     }
+  }
+
+  #worldChores(now) {
+    this.#upkeep(now);
+    this.regrowWorld(now);
     // Chests refill.
     for (const [key, m] of this.marks) {
       if (m.until && m.until <= now) {

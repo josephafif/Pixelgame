@@ -53,7 +53,7 @@ test('a database from before passwords is upgraded in place', async () => {
     db.createAccount({ id: 'guest:0123456789abcdef01234567', name: 'Gamla' });
     db.close();
     const raw = new DatabaseSync(file);
-    raw.exec('ALTER TABLE accounts DROP COLUMN pass_hash; ALTER TABLE clans DROP COLUMN base; PRAGMA user_version = 1;');
+    raw.exec('ALTER TABLE accounts DROP COLUMN pass_hash; ALTER TABLE clans DROP COLUMN base; ALTER TABLE harvested DROP COLUMN kept; PRAGMA user_version = 1;');
     raw.close();
     db = new Db(file);
     const acc = db.accountByName('gamla');
@@ -68,6 +68,11 @@ test('a database from before passwords is upgraded in place', async () => {
     clan.base = { buildings: { forge: 2 } };
     db.saveClan(clan);
     assert.equal(db.loadClans().find((c) => c.id === id).base.buildings.forge, 2);
+    // And what players cut down stays gone (harvested.kept).
+    db.addHarvested(4, 5, 6, 1000, true);
+    db.addHarvested(7, 8, 6, 1000);
+    const kept = Object.fromEntries(db.loadHarvested().map((h) => [`${h.x},${h.y}`, Boolean(h.kept)]));
+    assert.deepEqual(kept, { '4,5': true, '7,8': false });
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

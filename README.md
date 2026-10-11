@@ -37,7 +37,8 @@ npm run server       # spelservern i produktion (inställningar i server/.env, s
 | --- | --- | --- | --- |
 | Rörelse (360°) | Vänster joystick | WASD / piltangenter | Vänster spak |
 | Sikta | Automatiskt | Automatiskt | Automatiskt |
-| Attack / Use | Svärdknappen (blir en hand nära kistor, byggnader m.m.) | Klick, Space, J (E/F = Use) | A / RT |
+| Attack | Svärdknappen (blir en hand nära kistor, byggnader m.m.) | Klick, Space, J (bara attack) | A / RT |
+| Use (kistor, båten, byggnader …) | Samma knapp | E eller F | A |
 | Sprint (ingen stamina) | Stövelknappen (växla eller håll, valbart) | Shift | LB / L3 |
 | Ability | Stjärnknappen (syns bara när vapnet har en) | Q, K eller högerklick | X |
 | Gale Step (rusning, när du lärt dig den) | Fjäderknappen ovanför stöveln | V eller L | LT |
@@ -199,6 +200,21 @@ när du når nivå 4.
 
 Logik: `src/game/markets.js`; placering: `World#marketForCell` i `src/game/world.js`; panelen:
 `src/ui/market.js`.
+
+## Skog, dag och natt
+
+- **Träden** ser olika ut i varje biom och har många former och storlekar: runda lövträd, ekar,
+  dubbelstammar, unga träd, vindpinade träd på höglandet, träskträd i Mireglass Fen och taggiga
+  barrträd i snön. Runt dem växer buskar, ormbunkar, gräs, mossa och svamp. Träd och stenar ritas
+  i djupordning med alla figurer: går du bakom en trädkrona blir den genomskinlig. Stammarna är
+  smala, så det är lätt att gå genom skogen, och kronorna gungar när någon går förbi.
+- **Ett dygn tar 24 minuter** (`src/game/daynight.js`). Ett nytt spel börjar på morgonen.
+  Solnedgången färgar allt rött och på natten blir det mörkt, men facklor, lägerelden, smedjan,
+  eldturrets, Sunfire Obelisk, lava, lumensvampar och kristaller lyser varmt runt sig
+  (`src/render/lighting.js`), och du har själv ett litet sken omkring dig.
+- **På natten strövar fler monster omkring**, på dagen färre. Monstren **skyr ljuset** från
+  facklor och eld (`src/game/lights.js`): de föds aldrig i det och flyr ut ur det om de hamnar
+  där. Bossar bryr sig inte. I multiplayer följer dygnet serverns klocka, så alla har samma tid.
 
 ## Karta
 
@@ -424,11 +440,12 @@ legendariskt.
    | Starforged | Forge 5 + två olika bossar | **Stjärnsten** (Voidreach): mycket essence, ibland en Star Shard | +50 % material, snabbast sving |
 2. Byt till hackan (plats 3), gå fram till ett träd eller en sten och tryck på attack eller Use
    (håll inne för att fortsätta). Träd ger
-   **trä** och stenar ger **sten**. Utanför lägret **växer de tillbaka i steg** som syns: först en
-   stubbe, sedan ett skott, en planta och ett ungträd innan trädet är fullvuxet igen (20 minuter
-   för träd, längre för sten, kristaller och malm, som först är grus). Inne i lägret förblir
-   marken röjd så att du kan bygga där. Samma sak i multiplayer: servern skickar hur länge sedan
-   varje träd höggs, så alla ser det växa.
+   **trä** och stenar ger **sten**. Det du själv hugger ner eller bryter **är borta för gott**,
+   så du kan röja en skog och bygga där den stod. Det som **arbetarna** hugger planteras igen och
+   **växer tillbaka i steg** som syns: först en stubbe, sedan ett skott, en planta och ett ungträd
+   innan trädet är fullvuxet igen (20 minuter för träd, längre för sten, kristaller och malm, som
+   först är grus). Samma sak i multiplayer: servern skickar hur länge sedan varje träd höggs och
+   om det är borta för gott, så alla ser samma skog.
 3. Tryck **G** (eller hammarknappen) i lägret för **byggläget**. Välj något i listan och klicka
    på marken. Dra för att bygga en hel rad. Högerklick eller X-verktyget river och ger tillbaka
    halva kostnaden.
@@ -442,7 +459,8 @@ legendariskt.
 | Grind | Du går igenom, fiender gör det inte |
 | Pilturret / eldturret | Skjuter på fiender inom räckvidd; skadan växer med din nivå och Training Grounds |
 | Spikfälla | Skadar fiender som går över den |
-| Fackla, banderoll, trägolv, stenväg | För att göra lägret till ditt |
+| Fackla | Lyser upp natten, och monster går aldrig in i ljuset |
+| Banderoll, trägolv, stenväg | För att göra lägret till ditt |
 | Armerad mur | Sten med järnband, 900 HP (kräver Hearth 4 och Forge 3) |
 | Järngrind | Grind som tål mycket mer (kräver Hearth 3) |
 | Ballista | Tung pilkastare: lång räckvidd, hårda träffar (kräver Training Grounds 3 och Forge 2) |

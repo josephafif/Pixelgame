@@ -638,6 +638,12 @@ test('sailing: build a raft, set sail from the beach and go ashore again', async
   await expect(page.locator('.tool-card', { hasText: 'Log Raft' })).toContainText('Yours');
   await page.keyboard.press('Escape');
   await expect(page.locator('#interact-hint')).toContainText('Set sail');
+  await expect(page.locator('#interact-hint')).toContainText('E —');
+  // J (and Space) only attack: by the water they never put you in the boat.
+  await page.keyboard.press('KeyJ');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(300);
+  expect(await game(page, () => window.__pixelgame.game.sailing)).toBeFalsy();
   await page.keyboard.press('KeyE');
   await expect.poll(() => game(page, () => window.__pixelgame.game.sailing)).toBe(true);
   expect(await game(page, () => {

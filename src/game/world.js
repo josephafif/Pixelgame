@@ -132,7 +132,8 @@ export const BRIDGEABLE = new Set([T.WATER, T.SEA, T.FENWATER]);
  * stand diagonally, and the art still looks solid.
  */
 export const PROP_SHAPE = new Map([
-  [T.TREE, [0.3, 0.68]], [T.PINE, [0.28, 0.7]], [T.PALM, [0.26, 0.72]], [T.CACTUS, [0.3, 0.6]],
+  // Trees only by the trunk: you slip between them through a forest.
+  [T.TREE, [0.17, 0.72]], [T.PINE, [0.16, 0.74]], [T.PALM, [0.15, 0.76]], [T.CACTUS, [0.3, 0.6]],
   [T.ROCK, [0.36, 0.58]], [T.ORE, [0.36, 0.58]], [T.OBSIDIAN, [0.36, 0.58]],
   [T.CRYSTAL, [0.34, 0.6]], [T.STARSTONE, [0.34, 0.6]], [T.PRISM, [0.34, 0.6]], [T.MIRROR, [0.36, 0.58]],
   [T.LUMENCAP, [0.3, 0.62]], [T.ROOTS, [0.42, 0.6]], [T.RUIN, [0.38, 0.6]], [T.AETHERCRYSTAL, [0.34, 0.6]],
@@ -1038,8 +1039,10 @@ export class World {
     chunk.block[i] = id;
     if (cut) chunk.cut.set(i, cut);
     else chunk.cut.delete(i);
-    chunk.canvas = null; // re-render
-    // Crowns, shadows and shade reach across chunk edges (the rich style): the neighbours too.
+    // Drawn anew (the old picture shows until then: no flicker), and its standing sprite too.
+    chunk.stale = true;
+    chunk.stand?.delete(i);
+    // Shadows and shade reach across chunk edges (the rich style): the neighbours too.
     const lx = tx - cx * CHUNK;
     const ly = ty - cy * CHUNK;
     if (lx === 0 || ly === 0 || lx === CHUNK - 1 || ly === CHUNK - 1) {
@@ -1047,17 +1050,21 @@ export class World {
         for (let dx = -1; dx <= 1; dx++) {
           if (!dx && !dy) continue;
           const n = this.chunks.get(`${cx + dx},${cy + dy}`);
-          if (n) n.canvas = null;
+          if (n) n.stale = true;
         }
       }
     }
   }
 
-  /** Removes a tree/rock and remembers it. Returns the removed tile id. */
-  removeBlock(tx, ty, now = Date.now()) {
+  /**
+   * Removes a tree/rock and remembers it. Returns the removed tile id.
+   * `kept`: cut by a player, it stays gone for good (only what workers cut,
+   * and burst plants, grow back): [at, id, 1].
+   */
+  removeBlock(tx, ty, now = Date.now(), { kept = false } = {}) {
     const id = this.blockAt(tx, ty);
     if (!id || LIQUID.has(id)) return 0;
-    const entry = [now, id];
+    const entry = kept ? [now, id, 1] : [now, id];
     this.harvested[`${tx},${ty}`] = entry;
     this.#setBlock(tx, ty, 0, entry);
     return id;
@@ -1077,7 +1084,7 @@ export class World {
    * steps over its regrow time (gathering.harvest → regrowMinutes).
    */
   growthStage(tx, ty, entry, now = Date.now()) {
-    if (this.noRegrow?.(tx, ty)) return -1;
+    if (entry[2] || this.noRegrow?.(tx, ty)) return -1;
     const info = this.data.gathering?.harvest?.[BLOCKER_NAME[entry[1]]];
     const total = (info?.regrowMinutes ?? 20) * 60000;
     return Math.max(0, Math.min(3, Math.floor((4 * (now - entry[0])) / total)));
@@ -1104,7 +1111,7 @@ export class World {
   refreshGrowth(now = Date.now()) {
     for (const chunk of this.chunks.values()) {
       if (!chunk.canvas || !chunk.cut.size) continue;
-      if (this.#growthSig(chunk, now) !== chunk.grown) chunk.canvas = null;
+      if (this.#growthSig(chunk, now) !== chunk.grown) chunk.stale = true;
     }
   }
 

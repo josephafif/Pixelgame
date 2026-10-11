@@ -113,12 +113,14 @@ export function rollDrops(info, yieldMult = 1, rng = Math.random) {
 
 /**
  * Regrows trees and rocks that were cleared long enough ago, except inside
- * the camp's build area (that land stays yours).
+ * the camp's build area (that land stays yours) and what you cut down
+ * yourself (cleared for good; only what workers cut is replanted).
  */
 export function regrow(game, now = Date.now()) {
   const world = game.world;
   const radius = game.buildRadius();
-  for (const [key, [at, id]] of Object.entries(world.harvested)) {
+  for (const [key, [at, id, kept]] of Object.entries(world.harvested)) {
+    if (kept) continue;
     const minutes = regrowMinutes(game.data, id);
     if (now - at < minutes * 60000) continue;
     const [tx, ty] = key.split(',').map(Number);

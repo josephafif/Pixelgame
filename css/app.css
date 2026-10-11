@@ -553,6 +553,19 @@ body[data-input="keyboard"] .key-hints { display: block; }
 .hslot.on { border-image-source: var(--frame-chip-on); transform: translateY(-3px); filter: brightness(1.15); }
 .hslot.on .num { background: var(--gold); }
 .hslot.empty { opacity: 0.55; }
+/* The weapon's ability (Q) and Gale Step (V) by the hotbar, on a computer (phones have their buttons). */
+.hslot.power {
+  --cd: 0deg; margin-left: 4px;
+  background: conic-gradient(rgba(8, 6, 14, 0.72) var(--cd), transparent 0), radial-gradient(circle, rgba(154, 92, 255, 0.35) 20%, transparent 72%);
+  background-clip: padding-box;
+}
+.hslot.power .cd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; font-weight: 700; text-shadow: 0 2px 0 var(--ink); pointer-events: none; }
+.hslot.power:not(.ready) .art { opacity: 0.4; }
+.hslot.power.ready { box-shadow: inset 0 0 0 2px #b35cff; animation: ready-pulse 1.2s ease-in-out infinite; }
+.hslot.power.legendary { background: conic-gradient(rgba(8, 6, 14, 0.72) var(--cd), transparent 0), radial-gradient(circle, rgba(255, 210, 74, 0.4) 20%, transparent 72%); background-clip: padding-box; }
+.hslot.power.legendary.ready { box-shadow: inset 0 0 0 2px #ffd24a, 0 0 14px rgba(255, 210, 74, 0.7); }
+.hslot.power[data-power="dash"].ready { box-shadow: inset 0 0 0 2px #8ad8ff; }
+body[data-input="touch"] .hslot.power { display: none; }
 body[data-input="touch"] .hotbar {
   left: auto; transform: none;
   right: calc(16px + var(--safe-r)); bottom: calc(24px + var(--btn) * 2.1 + var(--safe-b));

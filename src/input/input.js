@@ -76,6 +76,11 @@ export class Input {
     this.onModeChange(mode);
   }
 
+  /** A command from outside the keys and buttons (the ability on the desktop hotbar). */
+  command(name) {
+    this.#command(name);
+  }
+
   #command(name) {
     if (UI_ACTIONS.has(name) && this.onUiCommand) this.onUiCommand(name);
     else this.commands.push(name);
@@ -114,8 +119,8 @@ export class Input {
       if (action.startsWith('slot')) this.#command(action);
       if (action === 'ability') this.#command('ability');
       if (action === 'dash') this.#command('dash');
-      // Attack doubles as Use: the game interacts instead when something usable is near.
-      if (action === 'interact' || action === 'attack') this.#command('interact');
+      // On a keyboard Use is its own key (E or F): J, Space and Enter only ever attack.
+      if (action === 'interact') this.#command('interact');
       if (action === 'sprint') this.#pressSprint();
     });
     addEventListener('keyup', (e) => {

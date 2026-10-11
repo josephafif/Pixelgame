@@ -8,17 +8,43 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-far-lands-7',
+  id: '2026-10-forests-light-1',
   title: { sv: 'Fjärrländerna', en: 'The Far Lands' },
   teaser: {
-    sv: 'Den största uppdateringen hittills är här: tre nya biomer långt ute, ny grafik och sällsyntare ritningar.',
-    en: 'The biggest update yet is here: three new biomes far out, a new look and rarer blueprints.',
+    sv: 'Nytt: levande skogar, dag och natt med varmt ljus från facklor och eldar, och skog som du kan röja för gott. Dessutom tre nya biomer långt ute.',
+    en: 'New: living forests, day and night with the warm light of torches and fires, and forests you can clear for good. And three new biomes far out.',
   },
   intro: {
     sv: 'Utforska långt ut, möt nya bossar, hitta ritningar och bygg upp basen. Allt finns i både singleplayer och multiplayer.',
     en: 'Explore far out, meet new bosses, find blueprints and build up your base. All of it in single player and multiplayer alike.',
   },
   sections: [
+    {
+      icon: 'wood',
+      title: { sv: 'Skog, ljus och natt', en: 'Forests, light and night' },
+      items: [
+        {
+          live: true,
+          sv: '**Levande skogar**: träd i många former och storlekar i varje biom (ekar, barrträd, vindpinade träd på höglandet, träskträd), med buskar, ormbunkar, mossa och svamp runt fötterna. Du går bakom trädkronorna (de blir genomskinliga), stammarna är smalare så det är lätt att ta sig genom skogen, och träden gungar när någon går förbi.',
+          en: '**Living forests**: trees in many shapes and sizes in every biome (oaks, pines, windswept highland trees, swamp trees), with bushes, ferns, moss and mushrooms round their feet. You walk behind the crowns (they turn see-through), the trunks are slimmer so forests are easy to get through, and trees sway when someone passes.',
+        },
+        {
+          live: true,
+          sv: '**Dag och natt**: ett dygn tar 24 minuter. Solnedgången färgar allt rött, och på natten blir det mörkt. Facklor, lägerelden, smedjan, lava, lumensvampar och kristaller lyser varmt runt sig. På natten strövar fler monster omkring, på dagen färre, och de skyr ljuset från facklor och eld (bossar bryr sig inte). Ställ ut facklor runt basen!',
+          en: '**Day and night**: a day lasts 24 minutes. Sunset turns everything red, and at night it grows dark. Torches, the camp fire, the forge, lava, lumen caps and crystals glow warmly around them. At night more monsters roam, by day fewer, and they shun the light of torches and fire (bosses don\'t care). Put torches round your base!',
+        },
+        {
+          live: true,
+          sv: '**Röj för gott**: träd och stenar som du själv hugger ner eller bryter kommer inte tillbaka, så du kan röja skog och bygga där den stod. Det som arbetarna hugger planteras igen och växer upp.',
+          en: '**Clear for good**: trees and rocks you cut down or mine yourself don\'t come back, so you can clear a forest and build where it stood. What your workers cut is replanted and grows back.',
+        },
+        {
+          live: true,
+          sv: 'J slår bara (E eller F använder saker och tar dig i båten). På datorn syns vapnets legendariska förmåga (Q) och rusningen (V) bredvid snabbfältet, med nedräkning. Inga svarta rutor flimrar längre när du hugger träd.',
+          en: 'J only attacks (E or F uses things and takes you into the boat). On a computer the weapon\'s legendary power (Q) and the dash (V) show next to the hotbar, with their cooldowns. No more black boxes flickering when you chop trees.',
+        },
+      ],
+    },
     {
       icon: 'portal',
       title: { sv: 'Tre nya biomer', en: 'Three new biomes' },

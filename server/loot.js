@@ -305,7 +305,8 @@ export function discoverComponent(gs, p, id) {
 
 /** A tree or rock falls. `direct`: straight into p's pockets (what a pal chopped). */
 export function fellBlock(gs, p, target, tool, { direct = false } = {}) {
-  const id = gs.removeBlock(target.tx, target.ty);
+  // (Cut by a player, or their pal: it stays gone.)
+  const id = gs.removeBlock(target.tx, target.ty, { kept: true });
   if (!id) return;
   const drops = rollDrops(target.info, tool.yield ?? 1);
   const now = Date.now();
