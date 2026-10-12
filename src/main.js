@@ -172,6 +172,13 @@ class App {
     this.applySettings();
     this.#lifecycle();
     if (new URLSearchParams(location.search).has('debug') && devHost()) this.#exposeDebug();
+    // ?perf=1: the frame profiler (src/core/perf.js) keeps the slow frames and what took the time.
+    if (new URLSearchParams(location.search).has('perf')) {
+      import('./core/perf.js').then(({ perf }) => {
+        perf.on = true;
+        globalThis.__perf = perf;
+      });
+    }
 
     progress('Ready', 1);
     this.#showTitle();

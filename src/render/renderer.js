@@ -9,9 +9,10 @@ import { createCanvas, ctx2d } from './canvas.js';
 import { renderChunk, TILE_PX, UPRIGHT } from './tiles-art.js';
 import { standingSprite, SWAYS, clearStanding } from './trees.js';
 import { Lighting } from './lighting.js';
+import { perf } from '../core/perf.js';
 import { STRUCTURE_LIGHTS, TILE_LIGHTS } from '../game/lights.js';
 import { glowAt } from '../game/daynight.js';
-import { renderChunkRich, vignetteFor } from './terrain-rich.js';
+import { renderChunkRichSteps, vignetteFor } from './terrain-rich.js';
 import { LEAP_TIME } from '../net/movement.js';
 import { boatSprite } from './boats.js';
 import { horseSprite, HORSE_W, HORSE_H } from './horses.js';
@@ -31,9 +32,14 @@ import { palSpecies } from '../game/pals.js';
 import { palSprites } from './creatures.js';
 import { drawPixelText } from './font.js';
 import { workerSprites, axeSprite, carrySprite } from './workers-art.js';
-import { installHd, uninstallHd, hdFrame } from './hd.js';
+import { installHd, uninstallHd, hdFrame, hdMade } from './hd.js';
 
 const T = TILE_PX;
+/** The classic style draws a chunk in one go (as a generator, like the rich style's passes). */
+function* classicSteps(chunk, growth) {
+  return renderChunk(chunk, growth);
+}
+
 // The most glowing-tile lights drawn in a frame (lighting.js).
 const MAX_TILE_LIGHTS = 36;
 const shadeCache = new Map();
@@ -53,8 +59,7 @@ const TARGET_SHORT_SIDE = 230; // game pixels on the shorter screen side
 // View size setting → game pixels across the shorter side. 'auto' shows a
 // little more on phones held upright, where the screen is narrow.
 const VIEW_TARGETS = { close: 190, normal: TARGET_SHORT_SIDE, wide: 300 };
-const NEW_CHUNKS_PER_FRAME = 4;
-const CHUNK_MS = 6; // time for new chunks per frame (at least one is drawn)
+const CHUNK_MS = 4; // time a frame for drawing land (a pass at a time: terrain-rich.js)
 
 /**
  * HD scale: the whole number nearest `fit` (screen pixels per art pixel)
@@ -229,6 +234,7 @@ export class Renderer {
     const H = this.H;
     const p = game.player;
     hdFrame();
+    const hd0 = hdMade;
     v.setTransform(this.R, 0, 0, this.R, 0, 0);
 
     // Camera follows the player smoothly; shake is cosmetic only. `pan`
@@ -258,21 +264,29 @@ export class Renderer {
     v.fillStyle = '#10101a';
     v.fillRect(0, 0, W, H);
 
+    perf.lap('before draw');
     this.#drawWorld(game, cx, cy, W, H);
+    perf.lap('draw: ground');
     this.#drawFlatStructures(game, W, H);
     if (game.zoneRings) this.#drawZoneRings(game);
     this.#drawAreas(game);
+    perf.lap('draw: floors+areas');
     this.#drawEntities(game);
+    perf.lap('draw: entities');
     this.#drawHarvestTarget(game);
     if (game.build.active) this.#drawBuildOverlay(game, W, H);
     this.#drawProjectiles(game);
     this.#drawShapes(game);
+    perf.lap('draw: shots+shapes');
     this.#drawParticles(game);
+    perf.lap('draw: particles');
     this.#drawLight(game, W, H);
+    perf.lap('draw: light');
     if (this.terrain === 'rich') this.v.drawImage(vignetteFor(W, H), 0, 0);
     this.#drawTexts(game);
     this.#drawCompass(game, W, H);
     this.#drawMates(game, W, H);
+    perf.lap('draw: texts');
     if (p.hurtFlash > 0) {
       v.fillStyle = `rgba(255,40,40,${p.hurtFlash})`;
       v.fillRect(0, 0, W, H);
@@ -286,6 +300,8 @@ export class Renderer {
 
     this.ctx.imageSmoothingEnabled = false;
     this.ctx.drawImage(this.view, 0, 0, W * this.scale, H * this.scale);
+    perf.lap('draw: present');
+    if (hdMade > hd0) perf.count('hd copies', hdMade - hd0);
   }
 
   #sx(x) {
@@ -323,7 +339,6 @@ export class Renderer {
     const c1 = Math.floor((cx + W) / size);
     const r0 = Math.floor(cy / size);
     const r1 = Math.floor((cy + H) / size);
-    let rendered = 0;
     const world = game.world;
     if (this.terrainChanged) {
       this.terrainChanged = false;
@@ -331,28 +346,90 @@ export class Renderer {
       for (const chunk of world.chunks.values()) {
         chunk.stale = true;
         chunk.stand = null;
+        chunk.job = null;
       }
     }
     const rich = this.terrain === 'rich';
-    // New chunks are drawn within a few milliseconds a frame (the rest next
-    // frame), so riding fast into new land never stutters on a phone. A
-    // chunk that changed (a tree cut down) keeps showing its old picture
-    // until the new one is ready: nothing flickers. Missing chunks first.
+    // Land is drawn a few milliseconds a frame (CHUNK_MS), a pass at a time
+    // (terrain-rich.js), so no frame ever stalls on it: first what you see
+    // and has no picture yet (its ground shows after the first pass), then
+    // what changed (a tree cut down keeps its old picture until the new one
+    // is ready: nothing flickers), then the land just outside the view,
+    // the way you are heading first, so it is ready before it comes in.
     const until = performance.now() + CHUNK_MS;
-    const draw = (chunk) => {
-      chunk.canvas = rich ? renderChunkRich(chunk, world.growthOf(chunk), world) : renderChunk(chunk, world.growthOf(chunk));
-      chunk.stale = false;
-      rendered += 1;
-    };
     const visible = [];
     for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) visible.push(world.getChunk(col, row));
-    for (const pass of [0, 1]) {
-      for (const chunk of visible) {
-        const want = pass === 0 ? !chunk.canvas : chunk.stale;
-        if (want && rendered < NEW_CHUNKS_PER_FRAME && (rendered === 0 || performance.now() < until)) draw(chunk);
+    // Just arrived (the first frame, a waystone): everything in view at once.
+    let missing = 0;
+    for (const chunk of visible) if (!chunk.canvas && !chunk.partial) missing++;
+    const all = missing >= 3;
+    const work = (chunk, force) => {
+      do {
+        if (this.#chunkStep(chunk, world, rich)) return true;
+      } while (force || performance.now() < until);
+      return false;
+    };
+    for (const chunk of visible) {
+      if (chunk.canvas) continue;
+      // In view without a picture: at least its whole ground at once (the first two steps).
+      while (!chunk.canvas && (chunk.steps ?? 0) < 2) this.#chunkStep(chunk, world, rich);
+      if (!chunk.canvas) work(chunk, all);
+    }
+    for (const chunk of visible) {
+      if (performance.now() >= until) break;
+      if (chunk.canvas && (chunk.stale || chunk.job)) work(chunk, false);
+    }
+    if (performance.now() < until) this.#prefetch(game, c0, c1, r0, r1, until, work);
+    for (const chunk of visible) {
+      const pic = chunk.canvas ?? chunk.partial;
+      if (pic) this.v.drawImage(pic, chunk.cx * size - cx, chunk.cy * size - cy);
+    }
+  }
+
+  /** One pass of drawing a chunk (true once its picture is done). */
+  #chunkStep(chunk, world, rich) {
+    if (!chunk.job) {
+      chunk.stale = false; // (a change while it is being drawn marks it again)
+      chunk.job = rich ? renderChunkRichSteps(chunk, world.growthOf(chunk), world) : classicSteps(chunk, world.growthOf(chunk));
+      chunk.steps = 0;
+    }
+    const t0 = perf.on ? performance.now() : 0;
+    const r = chunk.job.next();
+    chunk.steps++;
+    if (perf.on) perf.count('chunk ms', Math.round((performance.now() - t0) * 10) / 10);
+    if (!r.done) {
+      if (!chunk.canvas) chunk.partial = r.value;
+      return false;
+    }
+    chunk.canvas = r.value;
+    chunk.partial = null;
+    chunk.job = null;
+    return true;
+  }
+
+  /** Draws the land just outside the view ahead of time, nearest the way you are heading first. */
+  #prefetch(game, c0, c1, r0, r1, until, work) {
+    const p = game.player;
+    const size = CHUNK * T;
+    const world = game.world;
+    const ax = (p.x + (p.vx ?? 0) * 1.5) * T;
+    const ay = (p.y + (p.vy ?? 0) * 1.5) * T;
+    const ring = [];
+    for (let row = r0 - 1; row <= r1 + 1; row++) {
+      for (let col = c0 - 1; col <= c1 + 1; col++) {
+        if (row >= r0 && row <= r1 && col >= c0 && col <= c1) continue;
+        const dx = (col + 0.5) * size - ax;
+        const dy = (row + 0.5) * size - ay;
+        ring.push({ col, row, d: dx * dx + dy * dy });
       }
     }
-    for (const chunk of visible) if (chunk.canvas) this.v.drawImage(chunk.canvas, chunk.cx * size - cx, chunk.cy * size - cy);
+    ring.sort((a, b) => a.d - b.d);
+    for (const { col, row } of ring) {
+      if (performance.now() >= until) return;
+      // (Even making the chunk's land counts: only while there is time.)
+      const chunk = world.getChunk(col, row);
+      if (!chunk.canvas || chunk.stale || chunk.job) work(chunk, false);
+    }
   }
 
   #glow(x, y, color, radius) {
@@ -385,6 +462,7 @@ export class Renderer {
   #drawAreas(game) {
     const v = this.v;
     for (const a of game.areas) {
+      if (!this.#inView(a.x, a.y, (a.r ?? 1) + 1)) continue;
       const x = this.#sx(a.x);
       const y = this.#sy(a.y);
       const r = a.r * T;
@@ -561,23 +639,34 @@ export class Renderer {
     v.globalAlpha = 1;
   }
 
+  /**
+   * Whether (x, y) (tiles) is in view, with a margin of `m` tiles (and more
+   * below: a sprite stands up from its feet). Nothing outside it is drawn.
+   */
+  #inView(x, y, m = 2) {
+    const px = x * T - this.cx;
+    const py = y * T - this.cy;
+    return px > -m * T && px < this.W + m * T && py > -m * T && py < this.H + (m + 3) * T;
+  }
+
   #drawEntities(game) {
     const list = [];
     const p = game.player;
+    const seen = (o) => this.#inView(o.x, o.y);
     this.#standing(game, list);
-    for (const o of game.world.objectsNear(p.x, p.y, 2)) list.push({ y: o.y, kind: 'object', o });
-    for (const it of game.pickups) list.push({ y: it.y, kind: 'pickup', o: it });
+    for (const o of game.world.objectsNear(p.x, p.y, 2)) if (seen(o)) list.push({ y: o.y, kind: 'object', o });
+    for (const it of game.pickups) if (seen(it)) list.push({ y: it.y, kind: 'pickup', o: it });
     for (const st of game.structuresForDraw()) {
-      if (!isFlat(st.id)) list.push({ y: st.y + 0.95, kind: 'structure', o: st });
+      if (!isFlat(st.id) && this.#inView(st.x + 0.5, st.y + 0.5, 3)) list.push({ y: st.y + 0.95, kind: 'structure', o: st });
     }
-    for (const n of game.markets.npcs) if (!n.dead) list.push({ y: n.y, kind: 'npc', o: n });
-    for (const w of game.workers ?? []) if (!w.dead) list.push({ y: w.y, kind: 'worker', o: w });
-    for (const e of game.enemies) if (!e.dead) list.push({ y: e.y, kind: 'enemy', o: e });
-    for (const a of game.allies) list.push({ y: a.y, kind: 'ally', o: a });
-    if (game.pal && !game.pal.hidden) list.push({ y: game.pal.y, kind: 'pal', o: game.pal });
-    for (const o of game.otherPals ?? []) list.push({ y: o.y, kind: 'pal', o }); // multiplayer
-    for (const h of game.horses ?? []) list.push({ y: h.y, kind: 'horse', o: h });
-    for (const o of game.others ?? []) if (!o.dead) list.push({ y: o.y, kind: 'remote', o });
+    for (const n of game.markets.npcs) if (!n.dead && seen(n)) list.push({ y: n.y, kind: 'npc', o: n });
+    for (const w of game.workers ?? []) if (!w.dead && seen(w)) list.push({ y: w.y, kind: 'worker', o: w });
+    for (const e of game.enemies) if (!e.dead && this.#inView(e.x, e.y, e.boss ? 6 : 2)) list.push({ y: e.y, kind: 'enemy', o: e });
+    for (const a of game.allies) if (seen(a)) list.push({ y: a.y, kind: 'ally', o: a });
+    if (game.pal && !game.pal.hidden && seen(game.pal)) list.push({ y: game.pal.y, kind: 'pal', o: game.pal });
+    for (const o of game.otherPals ?? []) if (seen(o)) list.push({ y: o.y, kind: 'pal', o }); // multiplayer
+    for (const h of game.horses ?? []) if (seen(h)) list.push({ y: h.y, kind: 'horse', o: h });
+    for (const o of game.others ?? []) if (!o.dead && seen(o)) list.push({ y: o.y, kind: 'remote', o });
     if (!p.dead) list.push({ y: p.y, kind: 'player', o: p });
     list.sort((a, b) => a.y - b.y);
     const W = this.W;
@@ -832,7 +921,7 @@ export class Renderer {
   #drawFlatStructures(game, W, H) {
     const v = this.v;
     // Floors first, then traps on top of them.
-    const flat = game.structuresForDraw().filter((st) => isFlat(st.id));
+    const flat = game.structuresForDraw().filter((st) => isFlat(st.id) && this.#inView(st.x + 0.5, st.y + 0.5, 1));
     flat.sort((a, b) => (a.def?.kind === 'floor' ? 0 : 1) - (b.def?.kind === 'floor' ? 0 : 1));
     for (const st of flat) {
       const x = this.#sx(st.x);
@@ -1858,6 +1947,7 @@ export class Renderer {
   #drawProjectiles(game) {
     const v = this.v;
     for (const p of game.projectiles) {
+      if (!this.#inView(p.x, p.y, 1)) continue;
       const x = this.#sx(p.x);
       const y = this.#sy(p.y) - 4 - Math.round((p.z ?? 0) * T);
       const ang = Math.atan2(p.vy, p.vx);
@@ -1932,6 +2022,8 @@ export class Renderer {
   #drawShapes(game) {
     const v = this.v;
     for (const s of game.fx.shapes) {
+      // (Lines and beams can cross the view from far away; anything else out of sight is skipped.)
+      if (s.x != null && s.type !== 'line' && s.type !== 'beam' && !this.#inView(s.x, s.y ?? 0, 8)) continue;
       const k = s.t / s.dur;
       const x = this.#sx(s.x ?? 0);
       const y = this.#sy(s.y ?? 0);
@@ -2145,10 +2237,15 @@ export class Renderer {
 
   #drawParticles(game) {
     const v = this.v;
+    const W = this.W;
+    const H = this.H;
     for (const p of game.fx.particles) {
+      const x = this.#snap(p.x * T - this.cx);
+      const y = this.#snap(p.y * T - this.cy);
+      if (x < -8 || y < -8 || x > W + 8 || y > H + 8) continue;
       v.globalAlpha = Math.min(1, p.life / p.max + 0.2);
       v.fillStyle = p.color;
-      v.fillRect(this.#snap(p.x * T - this.cx), this.#snap(p.y * T - this.cy), p.size, p.size);
+      v.fillRect(x, y, p.size, p.size);
     }
     v.globalAlpha = 1;
   }

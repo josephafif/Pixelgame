@@ -28,7 +28,9 @@ npm run test:mp      # multiplayer-tester: protokoll, regler, inloggning, databa
 npm run server       # spelservern i produktion (inställningar i server/.env, se docs/MULTIPLAYER-SETUP.md)
 ```
 
-`?debug=1` exponerar `window.__pixelgame` för felsökning och e2e-tester.
+`?debug=1` exponerar `window.__pixelgame` för felsökning och e2e-tester. `?perf=1` slår på
+bildrutsprofileraren (`src/core/perf.js`): varje långsam bildruta sparas i `__perf.slow` med vad
+som tog tiden (simuleringen del för del, marken, figurerna, ljuset och så vidare).
 `?sw=reset` avregistrerar Service Workern och rensar dess cachar. Sparfilen rörs aldrig.
 
 ## Kontroller
@@ -802,7 +804,7 @@ I multiplayer går servern med byborna; alla ser samma by. Logik: `src/game/vill
 | 1 | Installation, ikon, namn, splash, manifest | `manifest.webmanifest` (fullscreen med standalone som reserv, `orientation: any`, ikoner 72–512 + maskable), `icons/` (genereras av `scripts/make-icons.mjs`), splash i `index.html` |
 | 1 | Responsivitet | `css/app.css` (safe areas, portrait/landscape, helskärmspaneler på mobil), `src/render/renderer.js` (heltalsskalad lågupplöst buffert för alla skärmar) |
 | 1 | Offline | `sw.js` + `precache-manifest.js`, statusindikator (`#net-status`, titelskärm, inställningar) |
-| 1 | Prestanda | Lazy-laddade paneler (`src/ui/panels.js`), chunk-förrendering, partikel- och fiendebudgetar, automatisk kvalitetsnivå (`Game#trackPerformance`) |
+| 1 | Prestanda | Lazy-laddade paneler (`src/ui/panels.js`); marken ritas några millisekunder per bildruta, ett pass i taget, och marken strax utanför bilden ritas i förväg i den riktning du rör dig (`renderChunkRichSteps`); inget utanför bilden ritas; text, ljus och HD-kopior har budgetar; partikel- och fiendebudgetar; automatisk kvalitetsnivå (`Game#trackPerformance`) |
 | 1 | PWA-uppdateringar | `src/pwa/register.js`: "Ny version – Uppdatera nu / Senare", sparar före aktivering |
 | 1 | Lagring | `src/storage/db.js`, `src/storage/save.js`, `src/storage/sync.js` |
 | 1 | Webbläsarstöd | `src/pwa/support.js`, fallbacks: localStorage/minne, Worker → huvudtråd, ingen SW → vanlig webbapp |

@@ -17,6 +17,7 @@ import { salvageValue } from '../game/loot.js';
 import { angleTo, dist2 } from '../core/math.js';
 import { attackDuration, impactDelay, MELEE_PATTERNS } from '../render/weapon-anim.js';
 import { FULL_AT, swingGap, chargeOf, maySwing } from '../game/charge.js';
+import { perf } from '../core/perf.js';
 import {
   ET, SF, CMD, BTN, encodeInput, decodeSnapshot, angleToByte,
 } from '../net/protocol.js';
@@ -282,6 +283,7 @@ export class MpGame {
       this.raf = requestAnimationFrame(loop);
       const elapsed = Math.min(250, now - this.last);
       this.last = now;
+      perf.frameStart();
       this.frameMs = this.frameMs * 0.95 + elapsed * 0.05;
       // Fixed 30 Hz steps for input and prediction (the server's rate).
       this.acc += elapsed;
@@ -292,8 +294,11 @@ export class MpGame {
         steps++;
       }
       if (steps === 4) this.acc = 0;
+      perf.lap('ticks');
       this.#frameUpdate(elapsed / 1000, now);
+      perf.lap('frame update');
       this.renderer.draw(this);
+      perf.frameEnd();
     };
     this.raf = requestAnimationFrame(loop);
   }

@@ -18,6 +18,7 @@ import { spawnArea, updateAreas, projectileSlowAt } from './areas.js';
 import { updateEnemies, updateSpawner, spawnBoss } from './enemies.js';
 import { hourAt, darknessAt, phaseOf, clockAt, START_HOUR } from './daynight.js';
 import { scaryLights, campLights } from './lights.js';
+import { perf } from '../core/perf.js';
 import {
   castAbility, restoreCooldowns, persistCooldowns, tryPhoenixRevive, updateAllies, abilityProgress,
 } from './abilities.js';
@@ -183,6 +184,7 @@ export class Game {
       this.raf = requestAnimationFrame(loop);
       const elapsed = Math.min(250, now - this.last);
       this.last = now;
+      perf.frameStart();
       this.#trackPerformance(elapsed);
       if (this.hitstop > 0 && !this.paused) {
         // Hit-stop: freeze the simulation for a few frames on heavy hits.
@@ -199,6 +201,8 @@ export class Game {
       }
       this.renderer.draw(this);
       this.#maybeAutosave(now);
+      perf.lap('save');
+      perf.frameEnd();
     };
     this.raf = requestAnimationFrame(loop);
   }
@@ -2118,7 +2122,9 @@ export class Game {
         this.emit('ui', c);
       }
     }
+    perf.lap('input');
     this.#updatePlayer(dt, sample);
+    perf.lap('player');
 
     if (this.buffs.length) {
       const before = this.buffs.length;
@@ -2127,8 +2133,11 @@ export class Game {
     }
 
     updateEnemies(this, dt);
+    perf.lap('enemies');
     updateSpawner(this, dt);
+    perf.lap('spawner');
     updateProjectiles(this, dt);
+    perf.lap('projectiles');
     updateAreas(this, dt);
     updateAllies(this, dt);
     updatePal(this, dt);
@@ -2137,12 +2146,16 @@ export class Game {
       this.hatchT = 1;
       this.checkHatch();
     }
+    perf.lap('allies');
     updatePickups(this, dt);
+    perf.lap('pickups');
     this.construction.update(dt);
     this.markets.update(dt);
+    perf.lap('markets');
     this.workforce.update(dt);
     this.stable.update(dt);
     this.#ambience(dt);
+    perf.lap('camp');
     this.exploreT -= dt;
     if (this.exploreT <= 0) {
       this.exploreT = 0.5;
@@ -2153,8 +2166,10 @@ export class Game {
       this.regrowT = REGROW_INTERVAL;
       regrow(this);
       this.world.refreshGrowth();
+      perf.lap('regrow');
     }
     this.fx.update(dt);
+    perf.lap('fx');
     this.shake = Math.max(0, this.shake - dt);
 
     if (this.boss && !this.boss.dead) {
@@ -2175,11 +2190,14 @@ export class Game {
       this.emit('interact', { label: target?.type === 'harvest' ? null : this.interactLabel(target) });
     }
 
+    perf.lap('misc');
     if (this.frame % 120 === 0) this.world.prune(this.frame);
+    perf.lap('prune');
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.1;
       this.emit('hud', this.hudState());
+      perf.lap('hud');
     }
   }
 

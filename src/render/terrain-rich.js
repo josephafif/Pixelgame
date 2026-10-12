@@ -201,9 +201,12 @@ function variantOf(wx, wy) {
 
 /**
  * Pre-renders a chunk in the rich style. `world` gives the neighbours'
- * tiles (crowns, shadows and banks reach across chunk edges).
+ * tiles (crowns, shadows and banks reach across chunk edges). A generator:
+ * it pauses between its passes (yielding the canvas so far), so the
+ * renderer can spread a chunk over a few frames: never a hitch as new land
+ * comes into view. The finished canvas is its return value.
  */
-export function renderChunkRich(chunk, growth, world) {
+export function* renderChunkRichSteps(chunk, growth, world) {
   const size = CHUNK * S;
   const canvas = createCanvas(size, size);
   const ctx = ctx2d(canvas);
@@ -232,8 +235,10 @@ export function renderChunkRich(chunk, growth, world) {
       const b = chunk.block[i];
       if (b && FLAT_BLOCKS.has(b)) ctx.drawImage(tileCanvas(b, v, true), lx * S, ly * S);
     }
+    if ((ly & 7) === 7) yield canvas;
   }
 
+  yield canvas;
   // 1b. Where two kinds of ground meet, the edge frays: a few pixels of the
   //     neighbour's colour scattered over the border.
   for (let ly = 0; ly < CHUNK; ly++) {
@@ -261,8 +266,10 @@ export function renderChunkRich(chunk, growth, world) {
         }
       }
     }
+    if ((ly & 7) === 7) yield canvas;
   }
 
+  yield canvas;
   // 2. Big soft patches of light and shade on natural ground (4-pixel cells).
   const CELL = 4;
   for (let cy = 0; cy < size / CELL; cy++) {
@@ -284,8 +291,10 @@ export function renderChunkRich(chunk, growth, world) {
         ctx.fillRect(cx * CELL, cy * CELL, CELL, CELL);
       }
     }
+    if ((cy & 15) === 15) yield canvas;
   }
 
+  yield canvas;
   // 2b. Mireglass Fen: drifting mist over the bog, and the soft light of the lumen caps.
   for (let ly = 0; ly < CHUNK; ly++) {
     for (let lx = 0; lx < CHUNK; lx++) {
@@ -308,6 +317,7 @@ export function renderChunkRich(chunk, growth, world) {
     }
   }
 
+  yield canvas;
   // 2c. Undergrowth: bushes, ferns, grass, moss and mushrooms (more of it on a forest floor).
   for (let ly = 0; ly < CHUNK; ly++) {
     for (let lx = 0; lx < CHUNK; lx++) {
@@ -328,8 +338,10 @@ export function renderChunkRich(chunk, growth, world) {
       const d = undergrowth(wx, wy, chunk.ground[i], near, wet);
       if (d) ctx.drawImage(d.canvas, lx * S + d.ox, ly * S + d.oy);
     }
+    if ((ly & 3) === 3) yield canvas; // (a pause every few rows)
   }
 
+  yield canvas;
   // 3. Shade between trees and rocks (a darker forest floor), and banks along the water.
   for (let ly = 0; ly < CHUNK; ly++) {
     for (let lx = 0; lx < CHUNK; lx++) {
@@ -426,8 +438,10 @@ export function renderChunkRich(chunk, growth, world) {
       if (wet(-1, 0)) ctx.fillRect(px, py, 2, S);
       if (wet(1, 0)) ctx.fillRect(px + S - 2, py, 2, S);
     }
+    if ((ly & 3) === 3) yield canvas; // (a pause every few rows)
   }
 
+  yield canvas;
   // 4. Cut trees and rocks growing back.
   for (const [i, id, stage] of growth ?? []) {
     const px = (i % CHUNK) * S;
@@ -436,6 +450,7 @@ export function renderChunkRich(chunk, growth, world) {
     ctx.drawImage(growthCanvas(id, stage), px, py);
   }
 
+  yield canvas;
   // 5. The shadows of the trees, rocks and the rest (they stand as sprites
   //    of their own, sorted with everyone: trees.js; a shadow may reach in
   //    from just outside the chunk).
@@ -448,9 +463,19 @@ export function renderChunkRich(chunk, growth, world) {
       const sp = standingSprite(b, wx, wy, groundAt(wx, wy), biomeIdAt(world, wx, wy), 'rich');
       castShadow(ctx, sp.shadow, lx * S, ly * S);
     }
+    if ((ly & 3) === 3) yield canvas; // (new trees are painted here the first time: trees.js)
   }
   return canvas;
 }
+
+/** Renders a chunk in one go (renderChunkRichSteps, run to the end). */
+export function renderChunkRich(chunk, growth, world) {
+  const steps = renderChunkRichSteps(chunk, growth, world);
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
+}
+
 
 // --- Per frame: a soft vignette ------------------------------------------------------------
 

@@ -8,12 +8,17 @@ const cache = new WeakMap();
 const MAX_PIXELS = 160 * 160; // bigger canvases (world chunks) are drawn as they are
 const MIN_USES = 3; // canvases drawn only once or twice (temporary ones) are left alone
 const PER_FRAME = 8; // conversions per frame, so a screenful of new sprites never stutters (on a phone too)
+const FRAME_MS = 1.5; // and at most this long a frame (the rest wait for the next frames)
 
 let budget = PER_FRAME;
+let spent = 0;
+/** Smoothed copies made so far (for the frame profiler). */
+export let hdMade = 0;
 
 /** Call once per frame. */
 export function hdFrame() {
   budget = PER_FRAME;
+  spent = 0;
 }
 
 function isCanvas(img) {
@@ -149,10 +154,13 @@ function hdOf(img, factor) {
     return null;
   }
   e.uses++;
-  if (e.uses < MIN_USES || budget <= 0 || img.width * img.height > MAX_PIXELS) return null;
+  if (e.uses < MIN_USES || budget <= 0 || spent > FRAME_MS || img.width * img.height > MAX_PIXELS) return null;
   budget--;
+  hdMade++;
+  const t0 = performance.now();
   try {
     e.hd = scaleNx(img, factor);
+    spent += performance.now() - t0;
     e.factor = factor;
   } catch {
     e.uses = -1e9; // unreadable (tainted): never try again
