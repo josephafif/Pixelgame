@@ -155,3 +155,32 @@ test('cooldowns are kept with the character (logging out does not reset them)', 
     await t.close();
   }
 });
+
+test('you see your own Thousand Blades fly (abilities are never hidden like your predicted weapon shots)', async () => {
+  const { ET, PRF, fieldsOf } = await import('../../src/net/protocol.js');
+  const t = await testServer();
+  try {
+    const { bot, p } = await arena(t, 'Knivkastare');
+    await spawnFoes(t, p);
+    const tpl = [...t.gs.data.legendaryAbilities, ...t.gs.data.abilities].find((a) => a.do === 'blades');
+    assert.ok(tpl, 'there is a blades power');
+    equip(p, abilityFrom(tpl, true));
+    bot.input({ buttons: BTN.ABILITY, aim: angleToByte(0) });
+    const seen = { blades: 0, hidden: 0 };
+    for (let ms = 0; ms < 1600; ms += 50) {
+      bot.input({ aim: angleToByte(0) });
+      await sleep(50);
+      for (const ent of bot.known.values()) {
+        if (ent.type !== ET.PROJ) continue;
+        const f = fieldsOf(ET.PROJ, ent.values);
+        if (f.owner !== bot.welcome.id) continue;
+        seen.blades++;
+        if (f.flags & PRF.PREDICTED) seen.hidden++;
+      }
+    }
+    assert.ok(seen.blades > 0, 'the blades reach the caster');
+    assert.equal(seen.hidden, 0, 'and are not marked as already drawn by the caster');
+  } finally {
+    await t.close();
+  }
+});

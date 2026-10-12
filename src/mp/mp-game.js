@@ -1327,7 +1327,8 @@ export class MpGame {
         }
         case ET.PROJ: {
           const pr = readProjectile(ent.samples[ent.samples.length - 1].v, rt);
-          if (pr.ownerId === this.myId || pr.t < 0) break;
+          // (Your own weapon shots you already see: #localShots. Abilities and procs come from here.)
+          if ((pr.ownerId === this.myId && pr.predicted) || pr.t < 0) break;
           projectiles.push(pr);
           break;
         }

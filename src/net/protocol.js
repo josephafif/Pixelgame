@@ -46,7 +46,9 @@ export const Q = 64;
 /** Bit flags. */
 export const PF = { MOVING: 1, SPRINT: 2, DEAD: 4, ASLEEP: 8, PROTECTED: 16, TOOL: 32, EMPTY: 64, HURT: 128, ASCEND: 256, LEAP: 512, DASH: 1024 };
 export const EF = { ELITE: 1, BOSS: 2, SUBMERGED: 4, STUNNED: 8, FROZEN: 16, ALERT: 32, CLONE: 64 };
-export const PRF = { ENEMY: 1, LOB: 2, MINE: 4 };
+// PREDICTED: a weapon shot its owner already draws themselves (src/mp/mp-game.js #localShots),
+// so their copy of it stays hidden; everything else they fire (abilities, procs) they see.
+export const PRF = { ENEMY: 1, LOB: 2, MINE: 4, PREDICTED: 8 };
 export const PKF = { LOCKED: 1, MINE: 2 };
 /** Your own state flags (snapshot self block). */
 export const SF = { DEAD: 1, SAFE: 2, PROTECTED: 4, NEWBIE: 8, OWN_CLAIM: 16, FOREIGN_CLAIM: 32, ASLEEP: 64, BLINK: 128, SAILING: 256, RIDING: 512 };

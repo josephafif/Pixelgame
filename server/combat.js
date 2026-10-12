@@ -371,7 +371,7 @@ function fireWeapon(gs, p, w, { x, y, angle, damage }) {
       x, y, angle: dir, speed: s.projectileSpeed || 10, damage: perShot, range: s.range, element: w.element,
       sprite: a.projectile, size: a.size ?? 2, owner: p.id, pierce: s.pierce ?? 0, knockback: s.knockback ?? 0,
       color: w.trail, kind: a.pattern === 'lob' ? 'lob' : a.pattern === 'boomerang' ? 'boomerang' : 'shot',
-      blast: a.blast ?? 1.5, source: 'weapon', bounces: w.bounces ?? 0,
+      blast: a.blast ?? 1.5, source: 'weapon', bounces: w.bounces ?? 0, predicted: true,
     });
   }
 }
@@ -491,6 +491,7 @@ export function spawnProjectile(gs, o) {
     kind: o.kind ?? 'shot',
     pierce: o.pierce ?? 0,
     bounces: o.bounces ?? 0, // on to the next monster after a hit (Ricochet, Prism Split)
+    predicted: o.predicted ?? false, // its owner draws it themselves (until it turns: see PRF.PREDICTED)
     reflections: 0, // times a mirror crystal sent it off at an angle
     turned: false, // a monster's shot turned by a mirror: now it hits monsters
     blast: o.blast ?? 1.5,
@@ -563,6 +564,7 @@ function reflect(gs, pr, dt) {
   pr.x = px;
   pr.y = py;
   pr.reflections += 1;
+  pr.predicted = false; // (its owner's own copy flies straight on: show this one)
   pr.damage *= 1.15;
   pr.traveled = Math.max(0, pr.traveled - 2);
   pr.hit.clear();
@@ -592,6 +594,7 @@ function bounceOn(gs, pr) {
   pr.vy = ((best.y - pr.y) / d) * pr.speed;
   pr.traveled = Math.max(0, pr.traveled - 3);
   pr.bounces -= 1;
+  pr.predicted = false;
   rebase(gs, pr);
   return true;
 }
@@ -736,6 +739,7 @@ function projectileHits(gs, pr, now) {
         pr.vy = -pr.vy;
         pr.enemy = e.id;
         pr.owner = 0;
+        pr.predicted = false;
         pr.source = 'reflect';
         pr.damage *= 0.6;
         pr.traveled = Math.max(0, pr.traveled - 3);

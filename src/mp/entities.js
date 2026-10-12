@@ -221,6 +221,7 @@ export function readProjectile(v, rt) {
     owner: flags & PRF.ENEMY ? 'enemy' : 'player',
     ownerId: f('owner'),
     lob: Boolean(flags & PRF.LOB),
+    predicted: Boolean(flags & PRF.PREDICTED),
     sprite: PROJ_SPRITES[f('sprite')] ?? 'orb',
     color: intToColor(f('color')),
     size: f('size'),

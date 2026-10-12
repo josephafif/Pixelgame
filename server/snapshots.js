@@ -55,6 +55,7 @@ function projValues(pr) {
   let flags = 0;
   if (pr.enemy) flags |= PRF.ENEMY; // turret shots look like arrows, as in single player
   if (pr.kind === 'lob') flags |= PRF.LOB;
+  if (pr.predicted) flags |= PRF.PREDICTED;
   return [quantize(pr.x0), quantize(pr.y0), quantize(pr.vx), quantize(pr.vy), pr.t0, Math.max(0, PROJ_SPRITES.indexOf(pr.sprite)),
     colorToInt(pr.color), pr.size, pr.owner, flags];
 }
