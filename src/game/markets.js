@@ -10,7 +10,7 @@
 import { createRng, hashInts } from '../core/rng.js';
 import { tileKey } from './world.js';
 import { structureDef, runTurret } from './construction.js';
-import { buyPrice, sellPrice, weaponValue, EPIC_CHANCE } from './economy.js';
+import { buyPrice, sellPrice, weaponValue } from './economy.js';
 import { researchedComponents } from '../weapons/crafting.js';
 import { researchCost } from './base.js';
 import { isBlueprint, blueprintTier } from './blueprints.js';
@@ -218,19 +218,16 @@ export function marketStock(data, save, m, now = Date.now()) {
   const level = Math.max(1, save.player.level);
   const items = [];
   for (let i = 0; i < 3; i++) {
-    // Now and then a trader has a legendary on display, at a fortune
-    // (never in Fristaden: its traders, like its forge, go up to rare).
-    const legendary = !m.town && i === 0 && rng.next() < 0.04;
-    // Epics are a rare sight too; most stock is uncommon or rare.
-    const epic = !m.town && !legendary && rng.next() < EPIC_CHANCE.market;
-    const minRarity = legendary ? 'legendary' : epic ? 'epic' : rng.next() < 0.35 ? 'rare' : 'uncommon';
+    // Base weapons, uncommon or rare: epics and legendaries are never for
+    // sale, they are grown in a weapon's tree (src/weapons/evolution.js).
+    const minRarity = rng.next() < 0.35 ? 'rare' : 'uncommon';
     items.push({
       kind: 'weapon',
       request: {
         seed: hashInts(seed, 0x3e11, i), level, luck: 0, source: 'market',
-        unlocked: researchedComponents(save), minRarity, maxRarity: legendary ? 'legendary' : epic ? 'epic' : 'rare',
+        unlocked: researchedComponents(save), minRarity, maxRarity: 'rare', baseOnly: true,
       },
-      markup: legendary ? 2.2 : 1,
+      markup: 1,
     });
   }
   const scale = 1 + level * 0.03;

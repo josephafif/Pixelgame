@@ -50,6 +50,10 @@ export function normalizeContext(req = {}) {
           ability: c.ability ?? null,
         }
       : null,
+    // Only base weapons (Weapon Evolution), or one base type (a boss's
+    // drop): set only when asked, so older contexts (and their ids) stay
+    // exactly as they were.
+    ...(req.baseOnly ? { base: req.baseArchetype ?? 1 } : {}),
   };
 }
 
@@ -66,6 +70,8 @@ export function requestFromContext(seed, ctx) {
     theme: ctx.theme,
     elementBias: ctx.bias,
     craft: ctx.craft,
+    baseOnly: Boolean(ctx.base),
+    ...(typeof ctx.base === 'string' ? { baseArchetype: ctx.base } : {}),
   };
 }
 
@@ -404,8 +410,12 @@ function generateAbility(data, pool, state, budget, rarityIdx, ctx, coreDef, see
 
 const critFactor = (chance, dmg) => 1 + (chance / 100) * (dmg / 100 - 1);
 
-/** Applies modifiers to base stats, enforces caps and the rating ceiling. */
-export function finalizeStats(data, archetype, rarity, base, modifiers, levelMult) {
+/**
+ * Applies modifiers to base stats, enforces caps and the rating ceiling.
+ * `ceilingMult` lifts the ceiling for weapons grown in their evolution tree
+ * (dna.evo.mult.ceiling); generated weapons never pass it.
+ */
+export function finalizeStats(data, archetype, rarity, base, modifiers, levelMult, ceilingMult = 1) {
   const caps = data.balance.caps;
   const totals = {};
   for (const m of modifiers) if (m.stat) totals[m.stat] = (totals[m.stat] ?? 0) + m.v;
@@ -433,7 +443,7 @@ export function finalizeStats(data, archetype, rarity, base, modifiers, levelMul
   const projFactor = 1 + (0.6 * Math.max(0, stats.projectiles - baseProj)) / baseProj;
   const rating = stats.damage * stats.attackSpeed * critFactor(stats.critChance, stats.critDamage) * projFactor;
   const baseline = mid(b.damage) * mid(b.attackSpeed) * critFactor(mid(b.critChance), mid(b.critDamage)) * levelMult;
-  const ceiling = baseline * rarity.ratingCap * 1.15;
+  const ceiling = baseline * rarity.ratingCap * 1.15 * ceilingMult;
   let balanced = false;
   if (rating > ceiling) {
     stats.damage *= ceiling / rating;
@@ -474,7 +484,7 @@ export function collectPlayerBonuses(modifiers, drawback) {
 export function generateWeapon(data, request) {
   const seed = request.seed >>> 0; // 1. seed
   const ctx = normalizeContext(request);
-  const pool = buildPool(data, ctx.pool);
+  const pool = buildPool(data, ctx.pool, { base: ctx.base ?? null });
   ctx.pool = pool.unlocked;
   const coreDef = ctx.craft?.core ? data.byId.components.get(ctx.craft.core) ?? null : null;
   const craftTags = coreDef ? coreDef.craftTags ?? [coreDef.element] : [];

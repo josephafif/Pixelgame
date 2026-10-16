@@ -5,6 +5,7 @@
 
 import { createCanvas, ctx2d } from './canvas.js';
 import { shadeHex } from '../weapons/visuals.js';
+import { dnaKey } from '../weapons/dna.js';
 
 export const GRID_W = 16;
 export const GRID_H = 32;
@@ -410,7 +411,8 @@ const spriteCache = new Map();
  * weapon's length lies across the aim and its belly faces forward).
  */
 export function weaponSprite(dna) {
-  const key = dna.id;
+  // (An evolved weapon keeps its id: its step in the tree is part of the key.)
+  const key = dnaKey(dna);
   let s = spriteCache.get(key);
   if (s) return s;
   const v = dna.visual;

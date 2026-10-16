@@ -41,6 +41,9 @@ import { TOWN_LEVELS, clanLevels, buildingOfStruct, BUILDING_SV } from '../net/m
 import { townMarket } from '../game/markets.js';
 import { abilityProgress, abilityReadyIn } from '../game/abilities.js';
 import { hourAt, darknessAt, phaseOf } from '../game/daynight.js';
+import { dnaKey } from '../weapons/dna.js';
+import { evoOf, nodeOf } from '../weapons/evolution.js';
+import { evolveFx } from '../game/evolve-fx.js';
 
 const DEG = Math.PI / 180;
 // Effect shapes an ability may draw (anything else from a server is ignored).
@@ -255,6 +258,7 @@ export class MpGame {
     s.bosses.defeated = me.bosses ?? {};
     s.codex.modifiers = me.codex?.modifiers ?? [];
     s.codex.abilities = me.codex?.abilities ?? [];
+    s.codex.evolutions = me.codex?.evolutions ?? [];
     s.counters.craft = me.crafts ?? 0;
     s.pals = me.pals ?? emptyPals();
     s.horses = me.horses ?? { owned: [], riding: null };
@@ -478,6 +482,26 @@ export class MpGame {
         this.emit('inventory');
         break;
       }
+      case 'inv~': {
+        // A weapon evolved or tempered in its tree: the same id, new DNA.
+        const inv = this.save.inventory;
+        for (const list of [inv.bag, inv.storage]) {
+          const i = list.findIndex((w) => w.id === msg.dna.id);
+          if (i >= 0) list[i] = msg.dna;
+        }
+        this.#registerCodex(msg.dna, { found: false });
+        if (msg.node) {
+          const evo = evoOf(this.data, msg.dna);
+          const codex = this.save.codex;
+          codex.evolutions ??= [];
+          const mark = `${evo?.family}:${msg.node}`;
+          if (!codex.evolutions.includes(mark)) codex.evolutions.push(mark);
+        }
+        if (inv.equipped === msg.dna.id || inv.secondary === msg.dna.id) this.#applySlotLocal();
+        evolveFx(this, msg.dna, msg.node ? nodeOf(this.data, msg.dna, msg.node) : null);
+        this.emit('inventory');
+        break;
+      }
       case 'inv>': {
         const inv = this.save.inventory;
         const from = msg.place === 'bag' ? inv.storage : inv.bag;
@@ -605,21 +629,25 @@ export class MpGame {
   }
 
   #compile(dna) {
-    let w = this.compiled.get(dna.id);
+    const key = dnaKey(dna);
+    let w = this.compiled.get(key);
     if (!w) {
       w = compileWeapon(dna, this.data);
-      this.compiled.set(dna.id, w);
+      this.compiled.set(key, w);
       if (this.compiled.size > 200) this.compiled.delete(this.compiled.keys().next().value);
     }
     return w;
   }
 
-  #registerCodex(dna) {
+  #registerCodex(dna, { found = true } = {}) {
     const codex = this.save.codex;
-    codex.weapons[dna.id] = {
-      name: dna.name.text, rarity: dna.rarity, archetype: dna.archetype, element: dna.element,
-      seed: dna.seed, gen: dna.gen, data: dna.data, ctx: dna.ctx, at: Date.now(),
-    };
+    // (An evolved weapon is no find: the codex keeps it as you found it.)
+    if (found) {
+      codex.weapons[dna.id] = {
+        name: dna.name.text, rarity: dna.rarity, archetype: dna.archetype, element: dna.element,
+        seed: dna.seed, gen: dna.gen, data: dna.data, ctx: dna.ctx, at: Date.now(),
+      };
+    }
     for (const e of dna.effects) if (!codex.effects.includes(e.id)) codex.effects.push(e.id);
   }
 
@@ -2103,6 +2131,24 @@ export class MpGame {
   inLoadout(id) {
     const inv = this.save.inventory;
     return Boolean(id) && (inv.equipped === id || inv.secondary === id);
+  }
+
+  // --- Weapon Evolution (src/weapons/evolution.js): the server checks and changes the weapon ---
+
+  /** What the trees check you against: your level and the forge you stand at (none: 0). */
+  get evolveCtx() {
+    const f = this.forgeHere();
+    return { playerLevel: this.save.player.level, forgeLevel: f ? f.level : 0, atForge: Boolean(f), town: Boolean(f?.town) };
+  }
+
+  async evolve(id, node) {
+    const res = await this.#ask({ t: 'evolve', id, node });
+    return res.ok ? this.findWeapon(id) : null;
+  }
+
+  async temper(id) {
+    const res = await this.#ask({ t: 'temper', id });
+    return res.ok ? this.findWeapon(id) : null;
   }
 
   async #ask(msg) {

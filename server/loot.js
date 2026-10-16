@@ -10,6 +10,7 @@ import { harvestInfo, rollDrops } from '../src/game/gathering.js';
 import { salvageValue } from '../src/game/loot.js';
 import { rollBlueprint, withoutBlueprints, firstKillReward, isHardBoss, isBlueprint, blueprintTier, duplicateValue } from '../src/game/blueprints.js';
 import { learnFromWeapon, MP_RESOURCE_KEYS } from '../src/net/mpsave.js';
+import { missingBase } from '../src/weapons/evolution.js';
 import { inSafeZone } from '../src/net/rules.js';
 import * as players from './players.js';
 import * as pals from './pals.js';
@@ -33,9 +34,13 @@ export function newItemId() {
   return `m${randomBytes(8).toString('hex')}`;
 }
 
-/** A brand-new weapon with an unpredictable seed and a unique id. */
-export function generate(gs, { level, luck = 0, source = 'drop', minRarity = null, maxRarity = null, theme = null, craft = null, unlocked = [], roll = source }) {
-  const limits = craft ? { minRarity, maxRarity } : dropRarity({ source: roll, minRarity, luck, roll: Math.random() });
+/**
+ * A brand-new weapon with an unpredictable seed and a unique id. A found
+ * weapon (not forged) is a base weapon, common to rare, as in single player
+ * (`base`: that base type, e.g. a boss's pick of a family you lack).
+ */
+export function generate(gs, { level, luck = 0, source = 'drop', minRarity = null, maxRarity = null, theme = null, craft = null, unlocked = [], base = null }) {
+  const limits = craft ? { minRarity, maxRarity } : dropRarity({ minRarity });
   const dna = generateWeapon(gs.data, {
     seed: randomInt(0, 0xffffffff),
     level: Math.max(1, Math.min(99, Math.round(level))),
@@ -46,6 +51,7 @@ export function generate(gs, { level, luck = 0, source = 'drop', minRarity = nul
     maxRarity: limits.maxRarity,
     theme,
     craft,
+    ...(craft ? {} : { baseOnly: true, ...(base ? { baseArchetype: base } : {}) }),
   });
   dna.id = newItemId();
   return dna;
@@ -131,7 +137,7 @@ export function onEnemyKilled(gs, e, killer) {
   if (owner && e.elite && Math.random() < 0.03) addPickup(gs, 'mapscroll', e.x, e.y, { owner: owner.id, lockUntil: now + LOCK_MS });
   const source = e.elite ? 'elite' : 'drop';
   if (Math.random() < WEAPON_DROP_CHANCE[source] * (1 + luck * 0.01)) {
-    const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, roll: source, unlocked: researchedOf(owner) });
+    const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, minRarity: 'uncommon', unlocked: researchedOf(owner) });
     dropWeapon(gs, dna, e.x, e.y, owner);
   }
 }
@@ -149,8 +155,9 @@ function seaLoot(gs, e, owner, now) {
   if (owner && e.kind === 'serpent') pals.dropEgg(gs, owner, 'serpent', e.x, e.y);
   const luck = owner?.stats?.luck ?? 0;
   const source = big ? 'elite' : 'drop';
-  if (Math.random() < (big ? 0.35 : WEAPON_DROP_CHANCE.drop) * (1 + luck * 0.01)) {
-    const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, minRarity: big ? 'uncommon' : null, roll: source, unlocked: researchedOf(owner) });
+  // (A sea serpent is a real catch: twice an elite's chance of a weapon.)
+  if (Math.random() < (big ? WEAPON_DROP_CHANCE.elite * 2 : WEAPON_DROP_CHANCE.drop) * (1 + luck * 0.01)) {
+    const dna = generate(gs, { level: e.level, luck: Math.floor(luck), source, minRarity: big ? 'uncommon' : null, unlocked: researchedOf(owner) });
     dropWeapon(gs, dna, e.x, e.y, owner);
   }
 }
@@ -174,10 +181,11 @@ function bossDefeated(gs, b, now) {
     pals.dropEgg(gs, p, firstKill ? 'bossFirst' : 'boss', b.x + (Math.random() - 0.5) * 2, b.y + (Math.random() - 0.5) * 2);
     p.ch.extra.bosses[def.id] = (p.ch.extra.bosses[def.id] ?? 0) + 1;
     bossBlueprints(gs, p, b, firstKill);
-    // Personal loot: everyone who fought gets their own reward.
+    // Personal loot: everyone who fought gets their own reward, a base
+    // weapon of a family they have none of yet when there is one.
     const dna = generate(gs, {
-      level: b.level, luck: Math.floor(p.stats.luck), source: 'boss', minRarity: def.drop?.minRarity ?? 'rare', theme: def.drop?.theme ?? null, roll: 'boss',
-      unlocked: researchedOf(p),
+      level: b.level, luck: Math.floor(p.stats.luck), source: 'boss', minRarity: def.drop?.minRarity ?? 'rare', theme: def.drop?.theme ?? null,
+      unlocked: researchedOf(p), base: missingBase(gs.data, [...p.inv.bag, ...p.inv.storage], randomInt(0, 1 << 30)),
     });
     // The boss's core: new weapon possibilities at the forge.
     if (def.drop?.component) dropComponent(gs, p, def.drop.component, b.x, b.y);
@@ -203,7 +211,7 @@ export function openChest(gs, p, o, now) {
   if (Math.random() < 0.4) addPickup(gs, 'gold', o.x, o.y, { value: 3 + ((Math.random() * 8) | 0), owner: p.id, lockUntil: now + LOCK_MS });
   if (Math.random() < 0.06) addPickup(gs, 'mapscroll', o.x, o.y, { owner: p.id, lockUntil: now + LOCK_MS });
   if (Math.random() < WEAPON_DROP_CHANCE.chest * rich) {
-    const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', roll: 'chest', unlocked: researchedOf(p) });
+    const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', minRarity: 'uncommon', unlocked: researchedOf(p) });
     dropWeapon(gs, dna, o.x, o.y + 0.6, p);
   }
   chestComponent(gs, p, o);
@@ -218,7 +226,7 @@ export function personalChest(gs, p, o, now, rich = 1) {
   for (let i = 0; i < Math.round(2 * rich); i++) addPickup(gs, 'scrap', o.x, o.y, { value: 2 + Math.floor(level / 4), ...lock });
   addPickup(gs, 'gold', o.x, o.y, { value: Math.round((3 + ((Math.random() * 8) | 0)) * rich), ...lock });
   if (Math.random() < WEAPON_DROP_CHANCE.chest * rich) {
-    const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', roll: 'chest', unlocked: researchedOf(p) });
+    const dna = generate(gs, { level: Math.max(level, p.ch.level - 1), luck: Math.floor(p.stats.luck), source: 'chest', minRarity: 'uncommon', unlocked: researchedOf(p) });
     dropWeapon(gs, dna, o.x, o.y + 0.6, p);
   }
   chestComponent(gs, p, o, rich >= 2 ? 'ruin' : 'chest');

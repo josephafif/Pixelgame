@@ -31,6 +31,8 @@ export function catalystAvailability(data, save, catalyst) {
   return null;
 }
 
+const abilityCatalyst = (data) => data.catalysts.some((c) => data.rarityIndex.get(c.minRarity) >= data.rarityIndex.get('epic'));
+
 /** Everything the crafting UI can offer right now. */
 export function craftingOptions(data, save) {
   const researched = researchedComponents(save);
@@ -38,14 +40,16 @@ export function craftingOptions(data, save) {
   const knownMods = new Set(save.codex.modifiers);
   const knownAbilities = new Set(save.codex.abilities);
   return {
-    blueprints: pool.archetypes,
+    // Base weapons only: the other types are forms a weapon grows into (src/weapons/evolution.js).
+    blueprints: pool.archetypes.filter((a) => !a.evolved),
     materialsFor(archetypeId) {
       const a = data.byId.archetypes.get(archetypeId);
       return a ? pool.materials.filter((m) => m.kinds.some((k) => a.kinds.includes(k))) : [];
     },
     cores: researched.map((id) => data.byId.components.get(id)).filter((c) => c.type === 'core'),
     runes: pool.modifiers.filter((m) => knownMods.has(m.id)),
-    abilities: pool.abilities.filter((a) => knownAbilities.has(a.id)),
+    // (Only with a catalyst for epics, and the forge has none: abilities awaken in the weapon tree.)
+    abilities: abilityCatalyst(data) ? pool.abilities.filter((a) => knownAbilities.has(a.id)) : [],
     catalysts: data.catalysts.map((c) => ({ ...c, locked: catalystAvailability(data, save, c) })),
   };
 }
@@ -89,7 +93,7 @@ export function craftCost(data, choice, save = null) {
     scrap: Math.ceil((cfg.scrapCost + (catalyst?.scrap ?? 0) + extra('scrap')) * keep),
     essence: Math.ceil((cfg.essenceCost + (catalyst?.essence ?? 0) + extra('essence')
       + (choice.ability ? cfg.abilityCost : 0)) * keep),
-    // Star Shards (Golden Catalyst) are never discounted.
+    // Star Shards (a catalyst that needs them) are never discounted.
     shards: catalyst?.shards ?? 0,
   };
 }
@@ -161,7 +165,7 @@ export function validateCraft(data, save, choice) {
   if (choice.ability) {
     if (!opts.abilities.some((a) => a.id === choice.ability)) errors.push('That ability is not unlocked');
     const minIdx = catalyst ? data.rarityIndex.get(catalyst.minRarity) : 0;
-    if (minIdx < data.rarityIndex.get('epic')) errors.push('Abilities need a Violet or Golden catalyst');
+    if (minIdx < data.rarityIndex.get('epic')) errors.push('Abilities awaken in the weapon tree; the forge can\'t put one on');
   }
   const cost = craftCost(data, choice, save);
   if (save.resources.scrap < cost.scrap) errors.push(`Needs ${cost.scrap} scrap`);

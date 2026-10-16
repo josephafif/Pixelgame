@@ -47,7 +47,8 @@ export function createNewSave({ worldSeed, now = Date.now(), appVersion = '0.0.0
     worldSeed: worldSeed >>> 0,
     player: { level: 1, xp: 0, hp: null, x: 0.5, y: 1.6, spawnX: 0.5, spawnY: 1.6, kills: 0, deaths: 0, playTime: 0, sailing: false },
     inventory: { equipped: null, secondary: null, activeSlot: 'main', bag: [], storage: [], bagSize: 24, storageSize: 120, favorites: [], unseen: [] },
-    codex: { weapons: {}, modifiers: [], effects: [], abilities: [] },
+    // evolutions: the steps of the weapon trees you have taken ("family:node").
+    codex: { weapons: {}, modifiers: [], effects: [], abilities: [], evolutions: [] },
     resources: { scrap: 0, essence: 0, wood: 0, stone: 0, gold: 0, shards: 0, prismite: 0, spores: 0, aether: 0 },
     components: {},
     bosses: { defeated: {} },

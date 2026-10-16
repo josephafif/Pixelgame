@@ -44,6 +44,14 @@ export function validateDna(dna) {
   return p;
 }
 
+/**
+ * A short key for caches (sprites, icons, compiled weapons): the weapon's
+ * id and, once it has grown in its tree, how far (dna.evo.rev).
+ */
+export function dnaKey(dna) {
+  return dna?.evo?.rev ? `${dna.id}~${dna.evo.rev}` : dna?.id;
+}
+
 /** Deep clone into plain JSON (drops functions/undefined). */
 export function serializeDna(dna) {
   return JSON.parse(JSON.stringify(dna));

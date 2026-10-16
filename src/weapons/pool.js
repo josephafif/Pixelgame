@@ -8,8 +8,11 @@ const KINDS = ['archetypes', 'materials', 'effects', 'abilities', 'modifiers'];
 /**
  * @param {object} data indexed game data
  * @param {Iterable<string>} unlockedComponents researched component ids
+ * @param {{ base?: 1|string|null }} opts base: only the base weapons of the
+ *   evolution trees (evolved types are reached by evolving, never found),
+ *   or (an archetype id) only that one
  */
-export function buildPool(data, unlockedComponents = []) {
+export function buildPool(data, unlockedComponents = [], { base = null } = {}) {
   const unlocked = [...new Set(unlockedComponents)].filter((id) => data.byId.components.has(id)).sort();
   const allowed = Object.fromEntries(KINDS.map((k) => [k, new Set()]));
   for (const id of unlocked) {
@@ -22,13 +25,20 @@ export function buildPool(data, unlockedComponents = []) {
   const available = (kind) => data[kind].filter((item) => !data.gated[kind].has(item.id) || allowed[kind].has(item.id));
   return {
     unlocked,
-    archetypes: available('archetypes'),
+    archetypes: baseArchetypes(available('archetypes'), base),
     materials: available('materials'),
     effects: available('effects'),
     abilities: available('abilities'),
     modifiers: available('modifiers'),
     elements: data.elements,
   };
+}
+
+function baseArchetypes(list, base) {
+  if (!base) return list;
+  const bases = list.filter((a) => !a.evolved);
+  const one = typeof base === 'string' ? bases.filter((a) => a.id === base) : [];
+  return one.length ? one : bases;
 }
 
 /** Which component would unlock a gated id (for UI hints). */

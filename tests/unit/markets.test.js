@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { World, MARKET_CELL } from '../../src/game/world.js';
 import { marketLayout, marketStock, RESTOCK_MS, SELL_BUNDLES } from '../../src/game/markets.js';
 import {
-  dropRarity, weaponValue, sellPrice, buyPrice, LEGENDARY_CHANCE, EPIC_CHANCE, seededRoll, tierChances, rarityOdds,
+  dropRarity, weaponValue, sellPrice, buyPrice, rarityOdds, FOUND_MAX_RARITY, WEAPON_DROP_CHANCE,
 } from '../../src/game/economy.js';
 import { salvageValue } from '../../src/game/loot.js';
 import { createNewSave, fillDefaults } from '../../src/storage/save.js';
@@ -12,62 +12,54 @@ import { loadData, seeds } from './helpers.js';
 
 const data = loadData();
 
-// --- Legendaries ---------------------------------------------------------------------
+// --- Found weapons -------------------------------------------------------------------
 
-test('normal drops stop at rare; epics and legendaries need their own small roll', () => {
-  assert.deepEqual(dropRarity({ source: 'drop', roll: 0.5 }), { minRarity: null, maxRarity: 'rare' });
-  assert.deepEqual(dropRarity({ source: 'chest', minRarity: 'uncommon', roll: 0.5 }), { minRarity: 'uncommon', maxRarity: 'rare' });
-  assert.deepEqual(dropRarity({ source: 'drop', roll: 0 }), { minRarity: 'legendary', maxRarity: 'legendary' });
-  const c = tierChances('drop');
-  assert.deepEqual(dropRarity({ source: 'drop', roll: c.legendary + c.epic / 2 }), { minRarity: 'epic', maxRarity: 'epic' });
-  assert.equal(dropRarity({ source: 'drop', roll: c.legendary + c.epic * 1.01 }).maxRarity, 'rare');
-  // A minimum above rare is kept; golden forging keeps its legendary floor.
-  assert.equal(dropRarity({ source: 'boss', minRarity: 'epic', roll: 0.99 }).minRarity, 'epic');
-  assert.equal(dropRarity({ source: 'boss', minRarity: 'legendary', roll: 0.99 }).maxRarity, 'legendary');
-  // Luck nudges the odds a little, never a lot.
-  const edge = LEGENDARY_CHANCE.drop * 1.1;
-  assert.equal(dropRarity({ source: 'drop', luck: 0, roll: edge }).maxRarity, 'epic');
-  assert.equal(dropRarity({ source: 'drop', luck: 10, roll: edge }).maxRarity, 'legendary');
-  assert.ok(EPIC_CHANCE.drop < 0.02, 'epics are rare from monsters');
+test('found weapons stop at rare: epics and legendaries are grown in the weapon tree', () => {
+  assert.deepEqual(dropRarity({}), { minRarity: null, maxRarity: 'rare' });
+  assert.deepEqual(dropRarity({ minRarity: 'uncommon' }), { minRarity: 'uncommon', maxRarity: 'rare' });
+  assert.deepEqual(dropRarity({ minRarity: 'epic' }), { minRarity: 'rare', maxRarity: 'rare' }, 'a higher floor is lowered');
+  assert.equal(FOUND_MAX_RARITY, 'rare');
+  assert.equal(WEAPON_DROP_CHANCE.drop, 0, 'monsters drop no weapons');
+  assert.ok(WEAPON_DROP_CHANCE.elite <= 0.08 && WEAPON_DROP_CHANCE.chest <= 0.1, 'elites and chests now and then');
+  assert.equal(WEAPON_DROP_CHANCE.boss, 1, 'every boss drops one');
 });
 
 test('the odds table matches the rolls and adds up to 100%', () => {
-  for (const source of ['drop', 'elite', 'chest', 'boss']) {
-    const odds = rarityOdds(data, { source, minRarity: source === 'drop' ? null : 'uncommon', level: 10, luck: 5 });
+  for (const minRarity of [null, 'uncommon', 'rare']) {
+    const odds = rarityOdds(data, { minRarity, level: 10, luck: 5 });
     const sum = Object.values(odds).reduce((a, b) => a + b, 0);
-    assert.ok(Math.abs(sum - 1) < 1e-9, `${source} sums to ${sum}`);
-    const c = tierChances(source, 5);
-    assert.ok(Math.abs(odds.legendary - c.legendary) < 1e-12);
-    assert.ok(Math.abs(odds.epic - c.epic) < 1e-12);
-    if (source !== 'drop') assert.equal(odds.common, 0, `${source} never drops commons`);
+    assert.ok(Math.abs(sum - 1) < 1e-9, `${minRarity} sums to ${sum}`);
+    assert.equal(odds.epic + odds.legendary, 0);
+    if (minRarity) assert.equal(odds.common, 0, 'a floor keeps commons out');
   }
-  // Simulate monster drops end to end through the generator.
-  const save = createNewSave({ worldSeed: 5 });
-  const odds = rarityOdds(data, { source: 'drop', level: 1, luck: 0 });
+  // Simulate drops end to end through the generator.
+  const odds = rarityOdds(data, { level: 1, luck: 0 });
   const counts = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 };
   const N = 3000;
   for (let n = 0; n < N; n++) {
-    const lim = dropRarity({ source: 'drop', roll: seededRoll(save, 0x1e6d, n) });
-    const dna = generateWeapon(data, { seed: 50000 + n, level: 1, luck: 0, source: 'drop', unlocked: [], ...lim });
+    const dna = generateWeapon(data, { seed: 50000 + n, level: 1, luck: 0, source: 'drop', unlocked: [], baseOnly: true, ...dropRarity({}) });
     counts[dna.rarity]++;
   }
   for (const r of ['common', 'uncommon', 'rare']) {
     assert.ok(Math.abs(counts[r] / N - odds[r]) < 0.03, `${r}: ${counts[r] / N} vs ${odds[r]}`);
   }
+  assert.equal(counts.epic + counts.legendary, 0);
   // Forge rows use the catalyst's range as is.
-  const violet = rarityOdds(data, { minRarity: 'epic', maxRarity: 'epic', forge: true });
-  assert.equal(violet.epic, 1);
+  const azure = rarityOdds(data, { minRarity: 'rare', maxRarity: 'rare', forge: true });
+  assert.equal(azure.rare, 1);
 });
 
-test('over many seeded drops, legendaries are about 1 in 700', () => {
-  const save = createNewSave({ worldSeed: 99 });
-  const N = 200000;
-  let hits = 0;
-  for (let n = 0; n < N; n++) {
-    if (dropRarity({ source: 'drop', roll: seededRoll(save, 0x1e6d, n) }).maxRarity === 'legendary') hits++;
+test('markets sell base weapons, uncommon or rare', () => {
+  const save = createNewSave({ worldSeed: 21 });
+  save.player.level = 12;
+  for (let k = 0; k < 40; k++) {
+    for (const item of marketStock(data, save, { seed: k, town: false }, k * RESTOCK_MS).items) {
+      if (item.kind !== 'weapon') continue;
+      const dna = generateWeapon(data, item.request);
+      assert.ok(['uncommon', 'rare'].includes(dna.rarity), dna.rarity);
+      assert.ok(!data.byId.archetypes.get(dna.archetype).evolved, `${dna.archetype} is a base weapon`);
+    }
   }
-  const rate = hits / N;
-  assert.ok(rate > 0.0008 && rate < 0.0025, `legendary rate ${rate}`);
 });
 
 test('weapons have a gold value: legendaries are worth a fortune', () => {
@@ -85,13 +77,15 @@ test('weapons have a gold value: legendaries are worth a fortune', () => {
   assert.equal(salvageValue(byRarity.epic).shards, undefined);
 });
 
-test('the Golden Catalyst is the hardest thing to forge', () => {
-  const golden = data.catalysts.find((c) => c.maxRarity === 'legendary' && c.minRarity === 'legendary')
-    ?? data.catalysts.find((c) => c.shards);
-  assert.ok(golden, 'golden catalyst exists');
-  assert.ok(golden.shards >= 3, 'needs Star Shards');
-  assert.ok(golden.essence >= 2000 && golden.scrap >= 1000, 'very expensive');
-  assert.ok(golden.requiresBoss, 'needs a boss kill');
+test('a legendary is the hardest thing to make: an Awakening in the weapon tree', () => {
+  assert.ok(!data.catalysts.some((c) => c.maxRarity === 'legendary' || c.maxRarity === 'epic'), 'the forge never makes one');
+  const awakening = data.evolution.tiers.find((t) => t.tier === 5);
+  assert.equal(awakening.rarity, 'legendary');
+  assert.ok(awakening.cost.shards >= 3, 'needs Star Shards');
+  assert.ok(awakening.cost.essence >= 1000, 'very expensive');
+  assert.equal(awakening.forge, 5, 'the best Forge');
+  const far = new Set(data.bosses.filter((b) => b.far).map((b) => b.drop.component));
+  for (const a of data.evolution.awakenings) assert.ok(far.has(a.core), `${a.power}: a core from the far lands`);
 });
 
 // --- Markets -------------------------------------------------------------------------
@@ -185,21 +179,15 @@ test('market stock is seeded per period, capped and priced steeply', () => {
   assert.equal(a.restockAt - RESTOCK_MS, a.period * RESTOCK_MS);
   const weapons = a.items.filter((i) => i.kind === 'weapon');
   assert.equal(weapons.length, 3);
-  let legendaryShown = 0;
   for (let p = 0; p < 300; p++) {
     const s = marketStock(data, save, m, t + p * RESTOCK_MS);
     for (const w of s.items.filter((i) => i.kind === 'weapon')) {
-      if (w.request.maxRarity === 'legendary') {
-        legendaryShown++;
-        assert.ok(w.markup > 2, 'legendaries sell at a huge markup');
-      } else {
-        assert.ok(['rare', 'epic'].includes(w.request.maxRarity), 'market stock is capped');
-      }
+      assert.equal(w.request.maxRarity, 'rare', 'market stock is capped at rare');
+      assert.ok(w.request.baseOnly, 'base weapons only');
     }
     const shard = s.items.find((i) => i.kind === 'shard');
     if (shard) assert.ok(shard.price >= 3000, 'Star Shards are expensive');
   }
-  assert.ok(legendaryShown > 0 && legendaryShown < 30, `legendaries on display: ${legendaryShown}/300`);
   // Selling resources back returns far less than buying them.
   for (const b2 of SELL_BUNDLES) {
     const buy = a.items.find((i) => i.kind === 'bundle' && i.res === b2.res);

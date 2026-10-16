@@ -27,10 +27,14 @@ import {
 } from './loot.js';
 import { validateCraft, buildCraftRequest, craftCost, isCraftingUnlocked } from '../weapons/crafting.js';
 import {
+  evolveBlockers, applyNode, nodeOf, costOf, temperInfo, temper as temperWeapon, dnaKey, evoOf,
+} from '../weapons/evolution.js';
+import {
   syncInventoryCaps, upgradeBuilding, upgradeBlockers, buildingLevel, buildingDef, collectWell, wellPending, researchCost,
   baseBonuses, canAfford, pay, shortfalls, GARDEN_WARD_LEVEL, TONIC,
 } from './base.js';
 import { applyStatus } from './status.js';
+import { evolveFx } from './evolve-fx.js';
 import {
   currentPickaxe, forgePickaxe, findHarvestTarget, rollDrops, regrow, REGROW_INTERVAL,
 } from './gathering.js';
@@ -567,7 +571,7 @@ export class Game {
     const inv = this.save.inventory;
     if (inv.activeSlot !== 'tool') {
       const dna = this.#slotDna(inv.activeSlot) ?? this.#slotDna('main');
-      if (dna && dna.id !== this.weapon?.dna.id) this.weapon = compileWeapon(dna, this.data);
+      if (dna && dnaKey(dna) !== dnaKey(this.weapon?.dna)) this.weapon = compileWeapon(dna, this.data);
       if (!dna) this.weapon = null;
     }
     const p = this.player;
@@ -673,6 +677,89 @@ export class Game {
     inv.unseen = inv.unseen.filter((f) => f !== id);
     this.emit('inventory');
     return true;
+  }
+
+  // --- Weapon Evolution (src/weapons/evolution.js, docs/WEAPON-EVOLUTION.md) ------
+
+  #findWeapon(id) {
+    const inv = this.save.inventory;
+    for (const list of [inv.bag, inv.storage]) {
+      const i = list.findIndex((w) => w.id === id);
+      if (i >= 0) return { list, i, dna: list[i] };
+    }
+    return null;
+  }
+
+  /** What the trees check you against: your level (the forge comes from the save). */
+  get evolveCtx() {
+    return { playerLevel: this.save.player.level };
+  }
+
+  /**
+   * A weapon changed in place (evolved or tempered): same id and slot, new
+   * DNA. The codex learns its new modifiers, effects and ability.
+   */
+  #replaceWeapon(dna) {
+    const at = this.#findWeapon(dna.id);
+    if (!at) return;
+    at.list[at.i] = dna;
+    const codex = this.save.codex;
+    const add = (list, id) => {
+      if (!list.includes(id)) list.push(id);
+    };
+    for (const m of dna.modifiers) add(codex.modifiers, m.id);
+    for (const e of dna.effects) add(codex.effects, e.id);
+    if (dna.ability) add(codex.abilities, dna.ability.id);
+    if (this.weapon?.dna.id === dna.id) this.#applySlot();
+    this.emit('inventory');
+  }
+
+  /** Takes a step of a weapon's tree: pays, changes the weapon. Returns the new DNA or null. */
+  evolve(id, nodeId) {
+    const at = this.#findWeapon(id);
+    if (!at) return null;
+    const blockers = evolveBlockers(this.data, this.save, at.dna, nodeId, this.evolveCtx);
+    if (blockers.length) {
+      this.toast(blockers[0], 'warn');
+      return null;
+    }
+    const node = nodeOf(this.data, at.dna, nodeId);
+    const { cost } = costOf(this.data, this.save, node);
+    const next = applyNode(this.data, at.dna, nodeId, this.evolveCtx);
+    const r = this.save.resources;
+    for (const [k, v] of Object.entries(cost)) r[k] = (r[k] ?? 0) - v;
+    this.#replaceWeapon(next);
+    const evo = evoOf(this.data, next);
+    const codex = this.save.codex;
+    codex.evolutions ??= [];
+    const mark = `${evo.family}:${nodeId}`;
+    if (!codex.evolutions.includes(mark)) codex.evolutions.push(mark);
+    evolveFx(this, next, node);
+    this.saveNow();
+    return next;
+  }
+
+  /** Tempers a weapon up to your level (as far as its step allows). Returns the new DNA or null. */
+  temper(id) {
+    const at = this.#findWeapon(id);
+    if (!at) return null;
+    const info = temperInfo(this.data, at.dna, this.save.player.level);
+    if (!info?.cost) {
+      this.toast(info && info.from >= info.cap ? 'At its cap: evolve it to temper it further' : 'Already at your level', 'warn');
+      return null;
+    }
+    const r = this.save.resources;
+    const short = Object.entries(info.cost).find(([k, v]) => (r[k] ?? 0) < v);
+    if (short) {
+      this.toast(`Needs ${short[1]} ${short[0]}`, 'warn');
+      return null;
+    }
+    for (const [k, v] of Object.entries(info.cost)) r[k] -= v;
+    const next = temperWeapon(this.data, at.dna, info.to);
+    this.#replaceWeapon(next);
+    evolveFx(this, next, null);
+    this.saveNow();
+    return next;
   }
 
   /** Adds a { scrap, essence, shards, gold, ... } bundle to the resources. */
@@ -1007,7 +1094,7 @@ export class Game {
         r.shards = (r.shards ?? 0) + it.value;
         this.audio.play('discover', { rarity: 3 });
         this.flash('#ffd24a', 0.25);
-        this.toast(`Star Shard! (${r.shards}) — the Golden Catalyst needs them`, 'legendary');
+        this.toast(`Star Shard! (${r.shards}) — a weapon's Awakening needs them`, 'legendary');
         break;
       case 'heart':
         healPlayer(this, this.pstats.maxHp * 0.2);

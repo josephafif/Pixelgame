@@ -33,6 +33,7 @@ import { palSprites } from './creatures.js';
 import { drawPixelText } from './font.js';
 import { workerSprites, axeSprite, carrySprite } from './workers-art.js';
 import { installHd, uninstallHd, hdFrame, hdMade } from './hd.js';
+import { dnaKey } from '../weapons/dna.js';
 
 const T = TILE_PX;
 /** The classic style draws a chunk in one go (as a generator, like the rich style's passes). */
@@ -218,10 +219,11 @@ export class Renderer {
   }
 
   #icon(dna) {
-    let c = this.iconCache.get(dna.id);
+    const key = dnaKey(dna);
+    let c = this.iconCache.get(key);
     if (!c) {
       c = weaponIcon(dna, 32);
-      this.iconCache.set(dna.id, c);
+      this.iconCache.set(key, c);
       if (this.iconCache.size > 80) this.iconCache.delete(this.iconCache.keys().next().value);
     }
     return c;

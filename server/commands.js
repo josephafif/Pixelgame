@@ -3,6 +3,10 @@
 // checked here — the client is never trusted.
 
 import { validateCraft, craftCost, buildCraftRequest } from '../src/weapons/crafting.js';
+import {
+  evolveBlockers, applyNode, nodeOf, costOf, temperInfo, temper as temperWeapon, evoOf,
+} from '../src/weapons/evolution.js';
+import { learnFromWeapon } from '../src/net/mpsave.js';
 import { forgePickaxe } from '../src/game/gathering.js';
 import { buildBoat } from '../src/game/sailing.js';
 import { researchCost } from '../src/game/base.js';
@@ -114,6 +118,10 @@ export function handle(gs, p, msg) {
     }
     case 'craft':
       return craft(gs, p, msg.choice ?? {});
+    case 'evolve':
+      return evolve(gs, p, String(msg.id ?? ''), String(msg.node ?? ''));
+    case 'temper':
+      return temper(gs, p, String(msg.id ?? ''));
     case 'pickaxe': {
       const forge = base.forgeAt(gs, p);
       if (!forge) return NO_FORGE;
@@ -268,6 +276,103 @@ function craft(gs, p, raw) {
   players.markMe(p);
   if (dna.rarity === 'legendary') gs.broadcast({ t: 'toast', text: `${p.name} smidde ett LEGENDARISKT vapen: ${dna.name.text}!`, kind: 'legendary' });
   return null;
+}
+
+// --- Weapon Evolution (src/weapons/evolution.js) ----------------------------------------------
+// The same checks as single player (evolveBlockers on the character's save
+// shape, with the forge they stand at), then the weapon is changed in place:
+// same id, new DNA, saved in one transaction with the payment.
+
+const RES_NAMES = { scrap: 'skrot', essence: 'essens', wood: 'trä', stone: 'sten', shards: 'stjärnskärvor', prismite: 'prismit', spores: 'sporer', aether: 'eter' };
+
+/** A blocker from the shared rules, in Swedish (the town forge's limit explained). */
+function blockerSv(text, forge) {
+  let m;
+  if ((m = /^Needs Forge level (\d+)/.exec(text))) {
+    return forge?.town ? `Fristadens smedja räcker inte: det här steget kräver en smedja på nivå ${m[1]} i er bas` : `Kräver en smedja på nivå ${m[1]}`;
+  }
+  if ((m = /^Needs level (\d+)/.exec(text))) return `Du behöver vara nivå ${m[1]}`;
+  if ((m = /^Needs (\d+) more (\w+)/.exec(text))) return `Det fattas ${m[1]} ${RES_NAMES[m[2]] ?? m[2]}`;
+  if (/^Defeat (a boss|\d+ bosses) first/.test(text)) return 'Besegra en boss först';
+  if ((m = /^Needs (.+)/.exec(text))) return `Kräver ${m[1]} (hitta den först)`;
+  return {
+    'Already done': 'Det steget har vapnet redan',
+    'Another path was chosen': 'Du har redan valt en annan väg',
+    'Take the steps before it first': 'Ta stegen före först',
+    'Unknown step': 'Okänt steg',
+    'This weapon has no tree': 'Det här vapnet har inget vapenträd',
+  }[text] ?? text;
+}
+
+/** Saves a weapon's new DNA and the payment together, then tells the owner. */
+function replaceWeapon(gs, p, item, dna, cost, kind, detail) {
+  const r = p.ch.resources;
+  for (const [k, v] of Object.entries(cost)) r[k] = (r[k] ?? 0) - v;
+  try {
+    gs.db.tx(() => {
+      gs.db.updateItemDna(dna.id, p.accountId, dna);
+      players.persist(gs, p);
+      gs.db.log(p.accountId, kind, dna.id, { ...detail, cost, rarity: dna.rarity });
+    });
+  } catch (err) {
+    for (const [k, v] of Object.entries(cost)) r[k] += v;
+    gs.log.error(`[${kind}] failed`, err);
+    return 'Smedjan krånglade, försök igen';
+  }
+  const list = item.place === 'bag' ? p.inv.bag : p.inv.storage;
+  list[list.indexOf(item.dna)] = dna;
+  learnFromWeapon(p.ch.extra, dna);
+  gs.send(p, { t: 'inv~', dna, kind, node: detail.node ?? null });
+  // The weapon in hand is compiled again (and others see its new look).
+  if (p.inv.equipped === dna.id || p.inv.secondary === dna.id) players.applySlot(gs, p, p.inv.activeSlot, { quiet: true });
+  players.markMe(p);
+  return null;
+}
+
+function evolve(gs, p, id, nodeId) {
+  const forge = base.forgeAt(gs, p);
+  if (!forge) return NO_FORGE;
+  const item = findItem(p, id);
+  if (!item) return 'Det vapnet har du inte';
+  const save = vsave(gs, p, forge);
+  const ctx = { playerLevel: p.ch.level, forgeLevel: forge.level };
+  const blockers = evolveBlockers(gs.data, save, item.dna, nodeId, ctx);
+  if (blockers.length) return blockerSv(blockers[0], forge);
+  const node = nodeOf(gs.data, item.dna, nodeId);
+  const { cost } = costOf(gs.data, save, node);
+  let dna;
+  try {
+    dna = applyNode(gs.data, item.dna, nodeId, ctx);
+  } catch (err) {
+    gs.log.error('[evolve] failed', err);
+    return 'Det steget gick inte att ta';
+  }
+  const evo = evoOf(gs.data, dna);
+  const extra = p.ch.extra;
+  extra.codex ??= { modifiers: [], abilities: [] };
+  extra.codex.evolutions ??= [];
+  const mark = `${evo.family}:${nodeId}`;
+  if (!extra.codex.evolutions.includes(mark)) extra.codex.evolutions.push(mark);
+  const problem = replaceWeapon(gs, p, item, dna, cost, 'evolve', { node: nodeId, tier: node.tier });
+  if (problem) return problem;
+  if (dna.rarity === 'legendary' && node.kind === 'awakening') {
+    gs.broadcast({ t: 'toast', text: `${p.name} väckte ett legendariskt vapen: ${dna.name.text}!`, kind: 'legendary' });
+  }
+  return null;
+}
+
+function temper(gs, p, id) {
+  const forge = base.forgeAt(gs, p);
+  if (!forge) return NO_FORGE;
+  const item = findItem(p, id);
+  if (!item) return 'Det vapnet har du inte';
+  const info = temperInfo(gs.data, item.dna, p.ch.level);
+  if (!info) return 'Det här vapnet har inget vapenträd';
+  if (!info.cost) return info.from >= info.cap ? 'Vapnet är vid sitt tak: utveckla det för att härda det mer' : 'Vapnet är redan på din nivå';
+  const r = p.ch.resources;
+  for (const [k, v] of Object.entries(info.cost)) if ((r[k] ?? 0) < v) return `Det fattas ${v - (r[k] ?? 0)} ${RES_NAMES[k] ?? k}`;
+  const dna = temperWeapon(gs.data, item.dna, info.to);
+  return replaceWeapon(gs, p, item, dna, info.cost, 'temper', { from: info.from, to: info.to });
 }
 
 // --- Chat ----------------------------------------------------------------------------------

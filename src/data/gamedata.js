@@ -143,6 +143,49 @@ export function validateReferences(data) {
     need('rarities', b.drop.minRarity, `boss ${b.id}`);
     need('themes', b.drop.theme, `boss ${b.id}`);
   }
+  // The weapon trees (src/weapons/evolution.js, docs/WEAPON-EVOLUTION.md).
+  const ev = data.evolution;
+  if (ev) {
+    const tiers = new Set((ev.tiers ?? []).map((t) => t.tier));
+    for (let t = 1; t <= 5; t++) if (!tiers.has(t)) problems.push(`evolution has no tier ${t}`);
+    for (const t of ev.tiers ?? []) {
+      need('rarities', t.rarity, `evolution tier ${t.tier}`);
+      for (const [id] of t.mods ?? []) need('modifiers', id, `evolution tier ${t.tier}`);
+    }
+    if (!(ev.levelCaps?.length >= 6)) problems.push('evolution needs a level cap per tier');
+    for (const f of ev.families ?? []) {
+      need('archetypes', f.base, `evolution family ${f.id}`);
+      if (data.archetypes.find((a) => a.id === f.base)?.evolved) problems.push(`evolution family ${f.id}: its base weapon is marked evolved`);
+      for (const el of f.infusions ?? []) {
+        need('elements', el, `evolution family ${f.id}`);
+        if (!ev.infusions?.some((i) => i.element === el)) problems.push(`evolution family ${f.id}: no infusion for ${el}`);
+      }
+      for (const id of f.fill ?? []) need('modifiers', id, `evolution family ${f.id}`);
+      if (!f.forms?.length) problems.push(`evolution family ${f.id} has no forms`);
+      for (const form of f.forms ?? []) {
+        const where = `evolution ${f.id}/${form.id}`;
+        need('archetypes', form.archetype, where);
+        if (form.material) need('materials', form.material, where);
+        for (const spec of [form, form.mastery ?? {}]) {
+          if (spec.archetype) need('archetypes', spec.archetype, where);
+          for (const id of spec.requires ?? []) need('components', id, where);
+          for (const [id] of spec.mods ?? []) need('modifiers', id, where);
+          for (const id of spec.effects ?? []) need('effects', id, where);
+        }
+        if (!form.mastery) problems.push(`${where} has no masterwork`);
+      }
+    }
+    for (const i of ev.infusions ?? []) {
+      need('elements', i.element, `evolution infusion ${i.element}`);
+      need('components', i.core, `evolution infusion ${i.element}`);
+      need('effects', i.effect, `evolution infusion ${i.element}`);
+      for (const [id] of i.mods ?? []) need('modifiers', id, `evolution infusion ${i.element}`);
+    }
+    for (const a of ev.awakenings ?? []) {
+      need('components', a.core, `evolution awakening ${a.power}`);
+      if (!data.legendaryAbilities?.some((p) => p.id === a.power)) problems.push(`evolution awakening references unknown legendary power "${a.power}"`);
+    }
+  }
   return problems;
 }
 

@@ -23,7 +23,6 @@ export function oddsRows(game) {
     label, weapon, odds: rarityOdds(data, { source, minRarity, level, luck }),
   });
   const rows = [
-    drop('Monster', 'drop', null, WEAPON_DROP_CHANCE.drop),
     drop('Elite monster', 'elite', 'uncommon', WEAPON_DROP_CHANCE.elite),
     drop('Chest', 'chest', 'uncommon', WEAPON_DROP_CHANCE.chest),
     drop('Boss', 'boss', 'rare', WEAPON_DROP_CHANCE.boss),
@@ -57,8 +56,9 @@ export function open(game) {
       `The chance of each rarity when a weapon drops or is forged, for you right now (level ${game.save.player.level}, luck ${Math.floor(game.pstats.luck)}). `
       + 'Level and luck tilt the odds a little towards rarer weapons.'),
     h('div.odds-scroll', h('table.odds-table', h('thead', head), h('tbody', body))),
-    h('p.small.muted', 'Epic and legendary weapons come from their own small roll; everything else is common to rare. '
-      + 'Bosses always drop a weapon. Forge odds are before any boss-core bonus.'),
+    h('p.small.muted', 'Every weapon you find, buy or forge is a base weapon, common to rare. Epic and legendary weapons are never found: '
+      + 'they are grown in a weapon\'s tree (Evolve). Monsters drop no weapons; bosses always drop one, '
+      + 'of a family you don\'t have yet when they can. Forge odds are before any boss-core bonus.'),
     blueprintOdds(data));
   openModal({ title: 'Loot odds', icon: 'star', body: content, className: 'wide odds-panel' });
 }

@@ -257,7 +257,8 @@ test('salvaging is a trickle: never more than a fraction of crafting costs', () 
   const dna = (rarity, lvl) => ({ rarity, ctx: { lvl } });
   assert.deepEqual(salvageValue(dna('common', 1)), { scrap: 2, essence: 0 });
   const legendary = salvageValue(dna('legendary', 20));
-  assert.ok(legendary.essence < data.catalysts.find((c) => c.id === 'legendary').essence / 20);
+  // (Against what an Awakening in the weapon tree costs.)
+  assert.ok(legendary.essence < data.evolution.tiers.find((t) => t.tier === 5).cost.essence / 20);
 });
 
 test('building on water: a floor on shallow water is a bridge, and walls stand on it', () => {

@@ -110,7 +110,7 @@ export function open(game, app, { marketId } = {}) {
           const c = data.byId.components.get(item.id);
           return simpleRow(item, i, icon('book', 32), c?.name ?? item.id, c?.desc);
         }
-        case 'shard': return simpleRow(item, i, icon('shard', 32), 'Star Shard', 'Needed for the Golden Catalyst. Very rare.');
+        case 'shard': return simpleRow(item, i, icon('shard', 32), 'Star Shard', 'Needed to Awaken a weapon (its tree). Very rare.');
         default: return null;
       }
     }));

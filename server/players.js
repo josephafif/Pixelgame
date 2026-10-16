@@ -20,6 +20,7 @@ import * as discoveries from './discoveries.js';
 import * as markets from './markets.js';
 import * as base from './base.js';
 import * as horses from './horses.js';
+import { dnaKey } from '../src/weapons/dna.js';
 
 // Inputs waiting to be simulated; beyond this the oldest are dropped.
 const MAX_QUEUE = 12;
@@ -173,11 +174,11 @@ export function applySlot(gs, p, slot, { quiet = false } = {}) {
   if (slot === 'secondary' && !inv.secondary) slot = 'main';
   inv.activeSlot = slot;
   const dna = slot === 'main' || slot === 'secondary' ? slotDna(p, slot) ?? slotDna(p, 'main') : null;
-  if (dna?.id !== p.weapon?.dna.id) p.weapon = dna ? compileWeapon(dna, gs.data) : null;
+  if (dnaKey(dna) !== dnaKey(p.weapon?.dna)) p.weapon = dna ? compileWeapon(dna, gs.data) : null;
   if (slot === 'tool' || slot === 'none') {
     // Keep the main weapon's stats (defense etc.) but nothing in hand.
     const main = slotDna(p, 'main');
-    if (main && main.id !== p.weapon?.dna.id) p.weapon = compileWeapon(main, gs.data);
+    if (main && dnaKey(main) !== dnaKey(p.weapon?.dna)) p.weapon = compileWeapon(main, gs.data);
   }
   p.attackCd = Math.max(p.attackCd, 0.25);
   recomputeStats(gs, p);

@@ -23,7 +23,7 @@ function crafter() {
   return save;
 }
 
-test('crafting needs a Forge at the camp; better catalysts need a better Forge', () => {
+test('crafting needs a Forge at the camp; the better catalyst needs a better Forge', () => {
   const save = createNewSave({ worldSeed: 1 });
   const errors = validateCraft(data, save, { archetype: 'sword', material: 'iron', catalyst: 'none' });
   assert.ok(errors.some((e) => e.includes('Forge')));
@@ -32,11 +32,13 @@ test('crafting needs a Forge at the camp; better catalysts need a better Forge',
   assert.ok(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'rare' }).some((e) => e.includes('Forge level 2')));
   s.base.buildings.forge = 2;
   assert.deepEqual(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'rare' }), []);
-  s.base.buildings.forge = 4;
-  assert.ok(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'legendary' }).some((e) => e.includes('Forge level 5')));
+  // Epic and legendary weapons are grown in the weapon tree, never forged.
+  s.base.buildings.forge = 5;
+  assert.ok(validateCraft(data, s, { archetype: 'sword', material: 'iron', catalyst: 'legendary' }).includes('Unknown catalyst'));
+  for (const c of data.catalysts) assert.ok(data.rarityIndex.get(c.maxRarity) <= data.rarityIndex.get('rare'), c.id);
 });
 
-test('crafting costs grow with the player level; legendary catalysts are expensive', () => {
+test('crafting costs grow with the player level; the Azure Catalyst costs extra', () => {
   const s = crafter();
   s.base.buildings.forge = 1;
   const choice = { archetype: 'sword', material: 'iron', catalyst: 'none' };
@@ -45,8 +47,8 @@ test('crafting costs grow with the player level; legendary catalysts are expensi
   s.player.level = 20;
   const high = craftCost(data, choice, s);
   assert.ok(high.essence > low.essence * 1.8 && high.scrap > low.scrap * 1.8);
-  const golden = craftCost(data, { ...choice, catalyst: 'legendary' }, s);
-  assert.ok(golden.essence >= 900, 'a golden catalyst costs a fortune');
+  const azure = craftCost(data, { ...choice, catalyst: 'rare' }, s);
+  assert.ok(azure.essence > high.essence && azure.scrap > high.scrap);
 });
 
 test('Forge upgrades make crafting cheaper and crafted weapons stronger', () => {
@@ -66,7 +68,8 @@ test('options only offer researched components and known runes/abilities', () =>
   assert.deepEqual(opts.cores.map((c) => c.id).sort(), ['fire_core', 'inferno_core']);
   assert.ok(!opts.blueprints.some((a) => a.id === 'orb'), 'crystal heart not researched yet');
   assert.deepEqual(opts.runes.map((m) => m.id).sort(), ['freezing', 'homing', 'lifesteal']);
-  assert.ok(opts.abilities.some((a) => a.id === 'phoenix'));
+  assert.deepEqual(opts.abilities, [], 'abilities awaken in the weapon tree, never at the forge');
+  assert.ok(opts.blueprints.every((a) => !a.evolved), 'the forge makes base weapons; the rest are grown in their tree');
 });
 
 test('invalid choices are explained', () => {
@@ -75,7 +78,7 @@ test('invalid choices are explained', () => {
   assert.ok(errs({ archetype: 'sword', material: 'oak' }).some((e) => e.includes('material')));
   assert.ok(errs({ archetype: 'sword', material: 'iron', rune: 'homing' }).some((e) => e.includes('Homing')));
   assert.ok(errs({ archetype: 'sword', material: 'iron', core: 'fire_core', rune: 'freezing' }).length > 0, 'fire core + freezing is contradictory');
-  assert.ok(errs({ archetype: 'sword', material: 'iron', ability: 'meteor' }).some((e) => e.includes('catalyst')));
+  assert.ok(errs({ archetype: 'sword', material: 'iron', ability: 'meteor' }).some((e) => e.includes('weapon tree')));
   const poor = crafter();
   poor.resources.essence = 0;
   assert.ok(validateCraft(data, poor, { archetype: 'sword', material: 'iron', catalyst: 'none' }).some((e) => e.includes('essence')));
@@ -83,15 +86,10 @@ test('invalid choices are explained', () => {
 
 test('crafted weapons honour the chosen components', () => {
   const save = crafter();
-  const choice = { archetype: 'axe', material: 'steel', core: 'inferno_core', rune: 'lifesteal', catalyst: 'epic', ability: 'phoenix' };
+  const choice = { archetype: 'axe', material: 'steel', core: 'inferno_core', rune: 'lifesteal', catalyst: 'rare' };
   assert.deepEqual(validateCraft(data, save, choice), []);
-  save.base.buildings.forge = 5;
-  // Golden catalysts are extremely expensive and need Star Shards from bosses.
-  const golden = validateCraft(data, save, { ...choice, catalyst: 'legendary' });
-  assert.ok(golden.some((e) => e.includes('Star Shards')));
-  Object.assign(save.resources, { scrap: 99999, essence: 99999, shards: 3 });
-  assert.deepEqual(validateCraft(data, save, { ...choice, catalyst: 'legendary' }), []);
-  save.base.buildings.forge = 4;
+  // Abilities awaken in the weapon tree; the forge can't put one on.
+  assert.ok(validateCraft(data, save, { ...choice, ability: 'phoenix' }).some((e) => /weapon tree/.test(e)));
   for (let i = 0; i < 25; i++) {
     save.counters.craft = i;
     const dna = generateWeapon(data, buildCraftRequest(data, save, choice));
@@ -99,8 +97,7 @@ test('crafted weapons honour the chosen components', () => {
     assert.equal(dna.material, 'steel');
     assert.equal(dna.element, 'fire');
     assert.ok(dna.modifiers.some((m) => m.id === 'lifesteal'), 'rune applied');
-    assert.equal(dna.ability?.id, 'phoenix');
-    assert.ok(['epic'].includes(dna.rarity));
+    assert.equal(dna.rarity, 'rare');
     assert.equal(dna.ctx.src, 'craft');
     assert.deepEqual(auditWeapon(data, dna), []);
   }

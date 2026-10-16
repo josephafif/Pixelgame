@@ -207,7 +207,7 @@
       "nouns": ["Edge", "Blade", "Brand", "Saber", "Oath", "Vow", "Sabre", "Glory", "Warden", "Promise"], "suffixes": ["edge", "brand", "bite", "cleaver"]
     },
     {
-      "id": "greatsword", "name": "Greatsword", "class": "melee", "weight": 8, "kinds": ["metal"],
+      "id": "greatsword", "evolved": true, "name": "Greatsword", "class": "melee", "weight": 8, "kinds": ["metal"],
       "tags": ["melee", "blade", "heavy"],
       "attack": { "pattern": "swing", "arc": [150, 190] },
       "base": { "damage": [42, 58], "attackSpeed": [0.7, 0.95], "range": [2.8, 3.4], "critChance": [4, 8], "critDamage": [160, 190] },
@@ -216,7 +216,7 @@
       "nouns": ["Greatblade", "Colossus", "Oathkeeper", "Slab", "Cleaver", "Titanblade", "Behemoth", "Judgement", "Monolith"], "suffixes": ["breaker", "cleaver", "brand"]
     },
     {
-      "id": "dagger", "name": "Dagger", "class": "melee", "weight": 12, "kinds": ["metal"],
+      "id": "dagger", "evolved": true, "name": "Dagger", "class": "melee", "weight": 12, "kinds": ["metal"],
       "tags": ["melee", "blade", "fast"],
       "attack": { "pattern": "thrust", "width": [0.6, 0.8] },
       "base": { "damage": [13, 19], "attackSpeed": [2.3, 3.0], "range": [1.5, 1.9], "critChance": [10, 18], "critDamage": [160, 200] },
@@ -234,7 +234,7 @@
       "nouns": ["Axe", "Hewer", "Cleaver", "Splitter", "Widow", "Reaver", "Bearded Axe", "Headsman", "Chopper"], "suffixes": ["jaw", "hewer", "splitter", "cleaver"]
     },
     {
-      "id": "hammer", "name": "Hammer", "class": "melee", "weight": 9, "kinds": ["metal"],
+      "id": "hammer", "evolved": true, "name": "Hammer", "class": "melee", "weight": 9, "kinds": ["metal"],
       "tags": ["melee", "heavy", "aoe"],
       "attack": { "pattern": "slam", "radius": [1.4, 1.9] },
       "base": { "damage": [44, 60], "attackSpeed": [0.6, 0.85], "range": [1.9, 2.3], "critChance": [3, 7], "critDamage": [150, 170] },
@@ -252,7 +252,7 @@
       "nouns": ["Lance", "Pike", "Spear", "Talon", "Spire", "Glaive", "Partisan", "Needle", "Halberd"], "suffixes": ["piercer", "lance", "spire", "talon"]
     },
     {
-      "id": "scythe", "name": "Scythe", "class": "melee", "weight": 7, "kinds": ["metal"],
+      "id": "scythe", "evolved": true, "name": "Scythe", "class": "melee", "weight": 7, "kinds": ["metal"],
       "tags": ["melee", "blade", "wide"],
       "attack": { "pattern": "swing", "arc": [200, 260] },
       "base": { "damage": [32, 44], "attackSpeed": [0.85, 1.1], "range": [2.8, 3.4], "critChance": [8, 14], "critDamage": [170, 210] },
@@ -261,7 +261,7 @@
       "nouns": ["Reaper", "Harvester", "Scythe", "Requiem", "Crescent", "Sickle", "Last Rite", "Mourner", "Gravewind"], "suffixes": ["reaper", "harvest", "reap"]
     },
     {
-      "id": "mace", "name": "Mace", "class": "melee", "weight": 9, "kinds": ["metal"],
+      "id": "mace", "evolved": true, "name": "Mace", "class": "melee", "weight": 9, "kinds": ["metal"],
       "tags": ["melee", "heavy"],
       "attack": { "pattern": "swing", "arc": [90, 120] },
       "base": { "damage": [32, 42], "attackSpeed": [0.95, 1.15], "range": [2.0, 2.4], "critChance": [3, 7], "critDamage": [150, 165] },
@@ -279,7 +279,7 @@
       "nouns": ["Longbow", "Bow", "Whisper", "Talon", "Heartseeker", "Recurve", "Shortbow", "Horizon", "Warbow"], "suffixes": ["song", "string", "shot", "wind"]
     },
     {
-      "id": "crossbow", "name": "Crossbow", "class": "ranged", "weight": 8, "kinds": ["wood", "metal"],
+      "id": "crossbow", "evolved": true, "name": "Crossbow", "class": "ranged", "weight": 8, "kinds": ["wood", "metal"],
       "tags": ["ranged", "projectile", "heavy"],
       "attack": { "pattern": "shoot", "projectile": "bolt", "speed": [18, 22], "count": 1, "spread": 0, "size": 2, "pierce": 1 },
       "base": { "damage": [34, 44], "attackSpeed": [0.7, 0.9], "range": [8, 10], "critChance": [8, 14], "critDamage": [170, 200] },
@@ -288,7 +288,7 @@
       "nouns": ["Arbalest", "Crossbow", "Ballista", "Verdict", "Bolt", "Repeater", "Stinger", "Sentinel", "Latch"], "suffixes": ["bolt", "shot", "piercer"]
     },
     {
-      "id": "gun", "name": "Gun", "class": "ranged", "weight": 8, "kinds": ["metal"],
+      "id": "gun", "evolved": true, "name": "Gun", "class": "ranged", "weight": 8, "kinds": ["metal"],
       "tags": ["ranged", "projectile", "fast"],
       "attack": { "pattern": "shoot", "projectile": "bullet", "speed": [22, 28], "count": 1, "spread": 6, "size": 1 },
       "base": { "damage": [16, 22], "attackSpeed": [2.2, 3.0], "range": [7, 9], "critChance": [4, 8], "critDamage": [150, 170] },
@@ -297,7 +297,7 @@
       "nouns": ["Revolver", "Hand Cannon", "Repeater", "Barker", "Pistol", "Flintlock", "Blaster", "Musket", "Peacemaker"], "suffixes": ["shot", "barker", "fire"]
     },
     {
-      "id": "cannon", "name": "Cannon", "class": "ranged", "weight": 6, "kinds": ["metal"],
+      "id": "cannon", "evolved": true, "name": "Cannon", "class": "ranged", "weight": 6, "kinds": ["metal"],
       "tags": ["ranged", "projectile", "heavy", "aoe"],
       "attack": { "pattern": "lob", "projectile": "ball", "speed": [8, 10], "count": 1, "spread": 0, "size": 3, "blast": [1.4, 2.0] },
       "base": { "damage": [50, 66], "attackSpeed": [0.45, 0.65], "range": [6, 8], "critChance": [3, 6], "critDamage": [150, 160] },
@@ -315,7 +315,7 @@
       "nouns": ["Wand", "Rod", "Spark", "Whisperwood", "Scepter", "Twig", "Baton", "Channel", "Focus"], "suffixes": ["spark", "song", "whisper"]
     },
     {
-      "id": "staff", "name": "Staff", "class": "ranged", "weight": 10, "kinds": ["wood", "crystal"],
+      "id": "staff", "evolved": true, "name": "Staff", "class": "ranged", "weight": 10, "kinds": ["wood", "crystal"],
       "tags": ["ranged", "projectile", "magic"],
       "attack": { "pattern": "shoot", "projectile": "orb", "speed": [9, 12], "count": 1, "spread": 0, "size": 4 },
       "base": { "damage": [30, 40], "attackSpeed": [0.8, 1.05], "range": [6, 8], "critChance": [5, 9], "critDamage": [150, 170] },
@@ -324,7 +324,7 @@
       "nouns": ["Staff", "Stave", "Rod", "Crook", "Pillar", "Scepter", "Warstaff", "Branch", "Conduit"], "suffixes": ["caller", "song", "weaver"]
     },
     {
-      "id": "boomerang", "name": "Boomerang", "class": "special", "weight": 8, "kinds": ["wood", "metal"],
+      "id": "boomerang", "evolved": true, "name": "Boomerang", "class": "special", "weight": 8, "kinds": ["wood", "metal"],
       "tags": ["special", "projectile", "thrown"],
       "attack": { "pattern": "boomerang", "projectile": "boomerang", "speed": [10, 12], "count": 1, "spread": 0, "size": 4, "pierce": 99 },
       "base": { "damage": [22, 30], "attackSpeed": [1.0, 1.3], "range": [5, 7], "critChance": [6, 10], "critDamage": [150, 170] },
@@ -333,7 +333,7 @@
       "nouns": ["Wing", "Returner", "Loop", "Swallow", "Crescent", "Kylie", "Arc", "Hookwing", "Glider"], "suffixes": ["wing", "loop", "return"]
     },
     {
-      "id": "chakram", "name": "Chakram", "class": "special", "weight": 6, "kinds": ["metal"],
+      "id": "chakram", "evolved": true, "name": "Chakram", "class": "special", "weight": 6, "kinds": ["metal"],
       "tags": ["special", "projectile", "thrown", "blade"],
       "attack": { "pattern": "boomerang", "projectile": "chakram", "speed": [12, 14], "count": 1, "spread": 0, "size": 4, "pierce": 99 },
       "base": { "damage": [24, 32], "attackSpeed": [1.1, 1.4], "range": [5, 6.5], "critChance": [8, 12], "critDamage": [160, 180] },
@@ -342,7 +342,7 @@
       "nouns": ["Halo", "Chakram", "Disc", "Wheel", "Ring", "Sunwheel", "Orbit", "Spinner", "Cyclone"], "suffixes": ["wheel", "halo", "ring"]
     },
     {
-      "id": "orb", "name": "Magic Orb", "class": "special", "weight": 6, "kinds": ["crystal"],
+      "id": "orb", "evolved": true, "name": "Magic Orb", "class": "special", "weight": 6, "kinds": ["crystal"],
       "tags": ["special", "projectile", "magic"],
       "attack": { "pattern": "shoot", "projectile": "globe", "speed": [6, 8], "count": 1, "spread": 0, "size": 5, "pierce": 3 },
       "base": { "damage": [26, 34], "attackSpeed": [0.9, 1.2], "range": [6, 8], "critChance": [5, 9], "critDamage": [150, 170] },
@@ -351,7 +351,7 @@
       "nouns": ["Orb", "Eye", "Heart", "Moon", "Sphere", "Globe", "Pearl", "Oracle", "Iris"], "suffixes": ["eye", "heart", "light"]
     },
     {
-      "id": "whip", "name": "Whip", "class": "special", "weight": 6, "kinds": ["wood", "metal"],
+      "id": "whip", "evolved": true, "name": "Whip", "class": "special", "weight": 6, "kinds": ["wood", "metal"],
       "tags": ["special", "melee", "reach"],
       "attack": { "pattern": "lash", "arc": [50, 70] },
       "base": { "damage": [20, 28], "attackSpeed": [1.3, 1.7], "range": [3.6, 4.4], "critChance": [8, 14], "critDamage": [160, 190] },
@@ -369,7 +369,7 @@
       "nouns": ["Flurry", "Needles", "Hail", "Swarm", "Fans", "Darts", "Stars", "Kunai", "Shards"], "suffixes": ["flurry", "storm", "hail"]
     },
     {
-      "id": "lantern", "name": "Soul Lantern", "class": "special", "weight": 5, "kinds": ["metal"],
+      "id": "lantern", "evolved": true, "name": "Soul Lantern", "class": "special", "weight": 5, "kinds": ["metal"],
       "tags": ["special", "projectile", "magic", "exotic"],
       "attack": { "pattern": "wisp", "projectile": "wisp", "speed": [7, 9], "count": 2, "spread": 50, "size": 3, "homing": 1 },
       "base": { "damage": [14, 20], "attackSpeed": [1.0, 1.3], "range": [6, 7], "critChance": [5, 9], "critDamage": [150, 170] },
@@ -378,7 +378,7 @@
       "nouns": ["Lantern", "Beacon", "Soulkeeper", "Wick", "Vigil", "Lamp", "Candle", "Soulfire", "Brazier"], "suffixes": ["light", "wick", "keeper"]
     },
     {
-      "id": "warfan", "name": "Warfan", "class": "special", "weight": 5, "kinds": ["wood", "metal"],
+      "id": "warfan", "evolved": true, "name": "Warfan", "class": "special", "weight": 5, "kinds": ["wood", "metal"],
       "tags": ["special", "projectile", "multi", "exotic"],
       "attack": { "pattern": "cone", "projectile": "leafblade", "speed": [11, 13], "count": 5, "spread": 60, "size": 2 },
       "base": { "damage": [9, 13], "attackSpeed": [1.1, 1.4], "range": [3.5, 4.5], "critChance": [6, 10], "critDamage": [150, 170] },
@@ -981,9 +981,7 @@
   ],
   "catalysts": [
     { "id": "none", "name": "No catalyst", "minRarity": "common", "maxRarity": "rare", "essence": 0 },
-    { "id": "rare", "name": "Azure Catalyst", "minRarity": "rare", "maxRarity": "epic", "essence": 120, "scrap": 60, "requiresForge": 2 },
-    { "id": "epic", "name": "Violet Catalyst", "minRarity": "epic", "maxRarity": "epic", "essence": 600, "scrap": 300, "requiresForge": 4 },
-    { "id": "legendary", "name": "Golden Catalyst", "minRarity": "legendary", "maxRarity": "legendary", "essence": 2500, "scrap": 1200, "shards": 3, "requiresForge": 5, "requiresBoss": true }
+    { "id": "rare", "name": "Azure Catalyst", "minRarity": "rare", "maxRarity": "rare", "essence": 120, "scrap": 60, "requiresForge": 2 }
   ],
   "crafting": {
     "scrapCost": 40, "essenceCost": 30, "abilityCost": 150, "levelScalePct": 6,
@@ -1307,8 +1305,91 @@
     { "id": "thornmother", "name": "Thornmother", "biome": "forest", "element": "poison", "hp": 1650, "damage": 21, "speed": 0.7, "size": 2.1, "xp": 420, "patterns": ["roots", "spores", "summon", "roots", "reroot", "spores"], "tip": "Roots burst from the ground towards you and spore clouds poison the air. She burrows away and roots again elsewhere.", "color": "#6ac04a", "drop": { "component": "heartwood", "minRarity": "rare", "theme": "plague" } },
     { "id": "sand_wyrm", "name": "Sand Wyrm", "biome": "desert", "element": "earth", "hp": 1800, "damage": 24, "speed": 1.5, "size": 2.2, "xp": 460, "patterns": ["burrow", "quake", "sandspit", "charge", "burrow", "quake"], "tip": "It dives under the sand and bursts up beneath you: run from the rumbling circle. Quakes ripple outward in rings.", "color": "#d8a858", "drop": { "component": "wyrm_fang", "minRarity": "rare", "theme": "earthshaker" } },
     { "id": "tide_leviathan", "name": "Tide Leviathan", "biome": "isles", "element": "ice", "hp": 1900, "damage": 24, "speed": 1.2, "size": 2.3, "xp": 480, "patterns": ["wave", "geysers", "whirlpool", "summon", "wave", "geysers"], "tip": "Walls of water sweep across the island: find the gap. Geysers burst under your feet and whirlpools drag you in.", "color": "#2f8fc4", "drop": { "component": "tide_pearl", "minRarity": "rare", "theme": "freeze" } },
-    { "id": "prism_warden", "name": "The Prism Warden", "biome": "prism", "far": true, "element": "arcane", "hp": 2600, "damage": 26, "speed": 0.9, "size": 2.2, "xp": 900, "patterns": ["lasers", "ring", "clones", "lasers", "spiral", "orbs"], "tip": "Laser fields sweep the arena: watch the glowing lines and step between them. Its mirror images hit for real, and the crystals around the arena send shots flying back.", "color": "#9ae8ff", "drop": { "component": "prism_heart", "minRarity": "epic", "theme": "arcanist" } },
-    { "id": "mireheart", "name": "The Mireheart", "biome": "fen", "far": true, "element": "poison", "hp": 2700, "damage": 25, "speed": 0.6, "size": 2.3, "xp": 950, "patterns": ["mirebloom", "roots", "spores", "mirebloom", "reroot", "summon"], "tip": "Roots and spore clouds fill the bog, and the fen itself fights: poison puffballs burst around you, while healing blooms open nearby. Keep moving, and use the blooms.", "color": "#4ac8a0", "drop": { "component": "mire_heart", "minRarity": "epic", "theme": "plague" } },
-    { "id": "aether_roc", "name": "The Aether Roc", "biome": "skyreach", "far": true, "element": "wind", "hp": 2600, "damage": 27, "speed": 1.4, "size": 2.3, "xp": 950, "patterns": ["skydive", "windwave", "ring", "skydive", "windwave", "summon"], "tip": "It climbs out of reach and dives down where you stand: run from the shadow. Walls of wind sweep across the island and throw you back.", "color": "#e8d8a8", "drop": { "component": "roc_plume", "minRarity": "epic", "theme": "tempest" } }
-  ]
+    { "id": "prism_warden", "name": "The Prism Warden", "biome": "prism", "far": true, "element": "arcane", "hp": 2600, "damage": 26, "speed": 0.9, "size": 2.2, "xp": 900, "patterns": ["lasers", "ring", "clones", "lasers", "spiral", "orbs"], "tip": "Laser fields sweep the arena: watch the glowing lines and step between them. Its mirror images hit for real, and the crystals around the arena send shots flying back.", "color": "#9ae8ff", "drop": { "component": "prism_heart", "minRarity": "rare", "theme": "arcanist" } },
+    { "id": "mireheart", "name": "The Mireheart", "biome": "fen", "far": true, "element": "poison", "hp": 2700, "damage": 25, "speed": 0.6, "size": 2.3, "xp": 950, "patterns": ["mirebloom", "roots", "spores", "mirebloom", "reroot", "summon"], "tip": "Roots and spore clouds fill the bog, and the fen itself fights: poison puffballs burst around you, while healing blooms open nearby. Keep moving, and use the blooms.", "color": "#4ac8a0", "drop": { "component": "mire_heart", "minRarity": "rare", "theme": "plague" } },
+    { "id": "aether_roc", "name": "The Aether Roc", "biome": "skyreach", "far": true, "element": "wind", "hp": 2600, "damage": 27, "speed": 1.4, "size": 2.3, "xp": 950, "patterns": ["skydive", "windwave", "ring", "skydive", "windwave", "summon"], "tip": "It climbs out of reach and dives down where you stand: run from the shadow. Walls of wind sweep across the island and throw you back.", "color": "#e8d8a8", "drop": { "component": "roc_plume", "minRarity": "rare", "theme": "tempest" } }
+  ],
+  "evolution": {
+    "levelCaps": [10, 18, 26, 34, 45, 99],
+    "temper": {"essence": 4, "essencePerLevel": 1, "scrap": 2, "scrapPerLevel": 0.5},
+    "tiers": [
+      {"tier": 1, "kind": "temper", "name": "Tempered", "rarity": "uncommon", "forge": 1, "level": 1, "cost": {"scrap": 60, "essence": 40, "wood": 20}, "boost": {"damage": 1.12}, "empower": 0.15, "mods": [["dmg", 14]]},
+      {"tier": 2, "kind": "form", "name": "Form", "rarity": "rare", "forge": 2, "level": 8, "cost": {"scrap": 160, "essence": 120, "stone": 40}, "boost": {"damage": 1.1}, "empower": 0.15},
+      {"tier": 3, "kind": "mastery", "name": "Masterwork", "rarity": "rare", "forge": 3, "level": 14, "bosses": 1, "cost": {"scrap": 280, "essence": 240, "stone": 60}, "ceiling": 1.08, "boost": {"damage": 1.1}, "empower": 0.15},
+      {"tier": 4, "kind": "infusion", "name": "Infusion", "rarity": "epic", "forge": 4, "level": 20, "cost": {"scrap": 450, "essence": 500}, "ceiling": 1.05, "boost": {"damage": 1.15}, "empower": 0.2},
+      {"tier": 5, "kind": "awakening", "name": "Awakening", "rarity": "legendary", "forge": 5, "level": 26, "cost": {"scrap": 600, "essence": 1200, "shards": 3}, "ceiling": 1.08, "boost": {"damage": 1.2}, "empower": 0.25}
+    ],
+    "families": [
+      {"id": "sword", "name": "Sword", "base": "sword", "infusions": ["fire", "ice", "void", "bleed"], "fill": ["dmg", "critc", "aspd", "critd", "swift"], "forms": [
+          {"id": "titan", "name": "Titan", "archetype": "greatsword", "material": "ancient", "requires": ["ancient_blade"], "desc": "Huge, heavy swings in a wide arc that throw foes back.", "mods": [["knockback", 2], ["dmg", 18]],
+            "mastery": {"name": "Earthbreaker", "desc": "Every swing sends out a shockwave.", "requires": ["obsidian_shard"], "effects": ["shockwave"], "mods": [["critd", 35]]} },
+          {"id": "shadow", "name": "Shadow", "archetype": "dagger", "material": "shadowsteel", "requires": ["shadow_ingot"], "desc": "Quick, deadly thrusts from the shadows: fast and full of crits.", "mods": [["aspd", 16], ["critc", 8]],
+            "mastery": {"name": "Thousand Cuts", "desc": "Crits rend and bleed.", "requires": ["monster_fang"], "effects": ["rending_strikes"], "mods": [["critd", 40]]} },
+          {"id": "reaper", "name": "Reaper", "archetype": "scythe", "material": "bone", "requires": ["bp_scythe"], "desc": "Long reaping arcs that drink the life of what they cut.", "mods": [["lifesteal", 4]],
+            "mastery": {"name": "Soul Harvest", "desc": "Every kill feeds you and speeds you on.", "requires": ["mythril_ore"], "effects": ["soul_harvest"], "mods": [["feast", 5]]} }
+      ] },
+      {"id": "axe", "name": "Axe", "base": "axe", "infusions": ["fire", "earth", "lightning", "bleed"], "fill": ["dmg", "critd", "knockback", "aspd", "guard"], "forms": [
+          {"id": "quake", "name": "Quake", "archetype": "hammer", "material": "steel", "requires": ["mythril_ore"], "desc": "A great hammer: slams that crack the ground around you.", "mods": [["knockback", 2], ["dmg", 16]],
+            "mastery": {"name": "Tremor", "desc": "Crits detonate in a burst of force.", "requires": ["dragon_scale"], "effects": ["crit_detonation"], "mods": [["critc", 8]]} },
+          {"id": "crusher", "name": "Crusher", "archetype": "mace", "material": "obsidian", "requires": ["obsidian_shard"], "desc": "A spiked mace for crushing, devastating critical blows.", "mods": [["critd", 35]],
+            "mastery": {"name": "Bonebreaker", "desc": "Blows send out shockwaves that knock foes away.", "requires": ["earth_core"], "effects": ["shockwave"], "mods": [["knockback", 3]]} },
+          {"id": "berserker", "name": "Berserker", "archetype": "axe", "material": "fang", "requires": ["monster_fang"], "desc": "Stays an axe, but wilder: faster with every swing and thirsty for blood.", "mods": [["momentum", 18], ["lifesteal", 3]],
+            "mastery": {"name": "Bloodrage", "desc": "Hits feast on your foes' blood.", "requires": ["blood_core"], "effects": ["blood_feast"], "mods": [["aspd", 15]]} }
+      ] },
+      {"id": "spear", "name": "Spear", "base": "spear", "infusions": ["lightning", "ice", "poison", "wind"], "fill": ["dmg", "range", "critc", "aspd", "swift"], "forms": [
+          {"id": "lance", "name": "Lance", "archetype": "spear", "material": "mythril", "requires": ["mythril_ore"], "desc": "Stays a spear, with a long mythril point: reach and precision.", "mods": [["range", 22], ["critc", 6]],
+            "mastery": {"name": "Skypiercer", "desc": "Marks your prey: every hit on it lands harder.", "requires": ["wind_core"], "effects": ["hunters_mark"], "mods": [["dmg", 18]]} },
+          {"id": "lash", "name": "Lash", "archetype": "whip", "material": "fang", "requires": ["monster_fang"], "desc": "The shaft becomes a barbed whip that lashes far.", "mods": [["range", 16]],
+            "mastery": {"name": "Viper Lash", "desc": "Lashes echo and leap from foe to foe.", "requires": ["poison_core"], "effects": ["echo_strike"], "mods": [["chain", 3]]} }
+      ] },
+      {"id": "bow", "name": "Bow", "base": "bow", "infusions": ["fire", "lightning", "poison", "wind"], "fill": ["dmg", "pspeed", "critc", "aspd", "range"], "forms": [
+          {"id": "crossbow", "name": "Crossbow", "archetype": "crossbow", "material": "steel", "requires": ["bp_crossbow"], "desc": "Heavy bolts that punch through several foes.", "mods": [["pierce", 2]],
+            "mastery": {"name": "Siege Bolts", "desc": "Bolts burst on impact and ricochet onwards.", "requires": ["obsidian_shard"], "effects": ["ricochet"], "mods": [["explosion", 25]]} },
+          {"id": "longbow", "name": "Longbow", "archetype": "bow", "material": "yew", "requires": ["wind_core"], "desc": "Stays a bow, longer and stronger: more arrows, farther.", "mods": [["multishot", 1], ["range", 16]],
+            "mastery": {"name": "Hail of Arrows", "desc": "A fan of blades flies with every volley; arrows split.", "requires": ["crystal_heart"], "effects": ["fan_of_blades"], "mods": [["split", 2]]} },
+          {"id": "gunsmith", "name": "Gunsmith", "archetype": "gun", "material": "steel", "requires": ["bp_gun"], "desc": "Black powder: fast, hard-hitting bullets.", "mods": [["pspeed", 30], ["aspd", 12]],
+            "mastery": {"name": "Siege Cannon", "desc": "The gun becomes a cannon: slow shells that blow everything apart.", "archetype": "cannon", "material": "bronze", "requires": ["bp_cannon"], "mods": [["explosion", 30]]} }
+      ] },
+      {"id": "wand", "name": "Wand", "base": "wand", "infusions": ["fire", "ice", "lightning", "arcane"], "fill": ["dmg", "pspeed", "critc", "aspd", "critd"], "forms": [
+          {"id": "staff", "name": "Archmage", "archetype": "staff", "material": "oak", "requires": ["holy_core"], "desc": "A tall staff: big, slow orbs of raw power.", "mods": [["dmg", 18]],
+            "mastery": {"name": "Phantom Choir", "desc": "Spectral blades fly from every cast.", "requires": ["arcane_core"], "effects": ["echo_strike"], "mods": [["split", 2]]} },
+          {"id": "orb", "name": "Globe", "archetype": "orb", "material": "crystal", "requires": ["crystal_heart"], "desc": "A floating crystal globe whose shots pierce row after row.", "mods": [["pierce", 1]],
+            "mastery": {"name": "Prism Globe", "desc": "Shots leap from foe to foe.", "requires": ["lightning_core"], "effects": ["ricochet"], "mods": [["chain", 3]]} },
+          {"id": "lantern", "name": "Lantern", "archetype": "lantern", "material": "shadowsteel", "requires": ["void_core"], "desc": "A lantern of wisps that hunt down your foes.", "mods": [["homing", 1]],
+            "mastery": {"name": "Soul Lantern", "desc": "Every kill feeds the flame and you.", "requires": ["blood_core"], "effects": ["soul_harvest"], "mods": [["feast", 4]]} }
+      ] },
+      {"id": "throwing", "name": "Throwing", "base": "throwing", "infusions": ["poison", "bleed", "holy", "void"], "fill": ["dmg", "critc", "aspd", "pspeed", "critd"], "forms": [
+          {"id": "chakram", "name": "Chakram", "archetype": "chakram", "material": "mythril", "requires": ["bp_chakram"], "desc": "A spinning ring that cuts through everything and comes back.", "mods": [["dmg", 16]],
+            "mastery": {"name": "Ricochet Ring", "desc": "Hunters' marks: the ring finds its prey.", "requires": ["mythril_ore"], "effects": ["hunters_mark"], "mods": [["critc", 8]]} },
+          {"id": "boomerang", "name": "Boomerang", "archetype": "boomerang", "material": "oak", "requires": ["wind_core"], "desc": "A wide boomerang that sweeps through the pack and back.", "mods": [["range", 15]],
+            "mastery": {"name": "Cyclone", "desc": "Faster with every hit, and it knocks foes away.", "requires": ["earth_core"], "effects": ["adrenaline"], "mods": [["knockback", 2]]} },
+          {"id": "warfan", "name": "Warfan", "archetype": "warfan", "material": "yew", "requires": ["bp_warfan"], "desc": "A fan of blades thrown in a wide cone.", "mods": [["critc", 8]],
+            "mastery": {"name": "Gale Dance", "desc": "Even more blades fly with every throw.", "requires": ["holy_core"], "effects": ["fan_of_blades"], "mods": [["aspd", 12]]} }
+      ] }
+    ],
+    "infusions": [
+      {"element": "fire", "core": "inferno_core", "name": "Embers", "effect": "lava_burst", "mods": [["e_fire", 35], ["burning", 30]]},
+      {"element": "ice", "core": "glacial_heart", "name": "Frost", "effect": "permafrost", "mods": [["e_ice", 35], ["freezing", 22]]},
+      {"element": "lightning", "core": "storm_heart", "name": "Storms", "effect": "tempest", "mods": [["e_lightning", 35], ["shock", 30]]},
+      {"element": "void", "core": "abyssal_crown", "name": "the Void", "effect": "singularity", "mods": [["e_void", 35]]},
+      {"element": "bleed", "core": "bone_crown", "name": "Blood", "effect": "rending_strikes", "mods": [["e_bleed", 35], ["lifesteal", 4]]},
+      {"element": "poison", "core": "heartwood", "name": "Thorns", "effect": "plague_bloom", "mods": [["e_poison", 35]]},
+      {"element": "earth", "core": "wyrm_fang", "name": "Stone", "effect": "earthsplitter", "mods": [["e_earth", 35], ["knockback", 2]]},
+      {"element": "holy", "core": "tide_pearl", "name": "the Tides", "effect": "judgement", "mods": [["e_holy", 35]]},
+      {"element": "wind", "core": "roc_plume", "name": "Gales", "effect": "gale", "mods": [["e_wind", 35], ["swift", 8]]},
+      {"element": "arcane", "core": "prism_heart", "name": "Stars", "effect": "phantom_blades", "mods": [["e_arcane", 35], ["critd", 30]]}
+    ],
+    "awakenings": [
+      {"power": "starfall", "core": "prism_heart", "resource": "prismite"},
+      {"power": "event_horizon", "core": "prism_heart", "resource": "prismite"},
+      {"power": "ascension", "core": "prism_heart", "resource": "prismite"},
+      {"power": "dragon_breath", "core": "mire_heart", "resource": "spores"},
+      {"power": "venom_bloom", "core": "mire_heart", "resource": "spores"},
+      {"power": "absolute_zero", "core": "roc_plume", "resource": "aether"},
+      {"power": "wrath_of_storms", "core": "roc_plume", "resource": "aether"},
+      {"power": "thousand_blades", "core": "roc_plume", "resource": "aether"}
+    ],
+    "awakenAmount": 30,
+    "awakenFallback": ["ascension", "thousand_blades"]
+  }
 }

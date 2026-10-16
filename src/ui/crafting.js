@@ -43,9 +43,7 @@ function priceTag(cost) {
 
 const CATALYST_HELP = {
   none: 'Common to rare. The cheapest way to forge.',
-  rare: 'Rare or epic: higher stats, more modifiers and a special effect.',
-  epic: 'Always epic: lots of modifiers and effects, and room for an ability.',
-  legendary: 'Always legendary: the best stats and a signature legendary power. Needs Star Shards from bosses.',
+  rare: 'Always rare: higher stats, more modifiers and a special effect.',
 };
 
 export function open(game, app, arg = {}) {
@@ -188,7 +186,7 @@ export function open(game, app, arg = {}) {
     const runes = byTier('rune', opts.runes);
     const allRunes = data.modifiers.length;
     return h('details', { open: count > 0 ? true : null },
-      h('summary', `Extras — modifier rune & ability${count ? ` (${count})` : ''}`),
+      h('summary', `Extras — modifier rune${opts.abilities.length ? ' & ability' : ''}${count ? ` (${count})` : ''}`),
       h('h4.step-title', 'Modifier rune'),
       h('p.small.muted', 'A rune puts one bonus of your choice on the weapon for sure. Its size rolls with the rarity.'),
       runes.length
@@ -208,13 +206,13 @@ export function open(game, app, arg = {}) {
       h('p.small.muted', runes.length < allRunes
         ? `You know ${runes.length} of ${allRunes} runes. Every modifier on a weapon you find teaches you its rune.`
         : 'You know every rune.'),
-      h('h4.step-title', 'Ability'),
+      opts.abilities.length ? h('h4.step-title', 'Ability') : null,
       opts.abilities.length
         ? h('div.chips',
           chip(!choice.ability, pick('ability', null), 'None'),
           opts.abilities.map((a) => chip(a.id === choice.ability, pick('ability', a.id), a.name)))
-        : h('p.small.muted', 'Find weapons with abilities to unlock them here.'),
-      ability ? explain(h('b', `${ability.name}: `), ability.desc, h('span.muted', ` Adds ${data.crafting.abilityCost} essence. Needs a Violet or Golden catalyst.`)) : null);
+        : null,
+      ability ? explain(h('b', `${ability.name}: `), ability.desc, h('span.muted', ` Adds ${data.crafting.abilityCost} essence.`)) : null);
   }
 
   function preview(errors, cost) {
@@ -396,7 +394,8 @@ export function open(game, app, arg = {}) {
     return h('div', tabs(), h('div.forge',
       h('div.forge-steps',
         h('p.forge-guide', 'Pick a weapon type, then a material (its base stats), an element core and a catalyst (how rare it gets). '
-          + 'Each row runs from basic on the left to best on the right: the better your pick, the higher the price.'),
+          + 'Each row runs from basic on the left to best on the right: the better your pick, the higher the price. '
+          + 'The forge makes base weapons, rare at best: grow one into something greater in its weapon tree (Evolve).'),
         typeStep(),
         materialStep(),
         elementStep(),

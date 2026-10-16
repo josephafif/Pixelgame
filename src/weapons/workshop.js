@@ -207,7 +207,7 @@ export function recomputeStats(data, dna) {
     homing: dna.base.homing ?? 0,
     knockback: dna.base.knockback ?? (a?.class === 'melee' ? 1 : 0),
   };
-  const { stats, balanced } = finalizeStats(data, a, rarity, base, dna.modifiers, levelMult(data, dna));
+  const { stats, balanced } = finalizeStats(data, a, rarity, base, dna.modifiers, levelMult(data, dna), dna.evo?.mult?.ceiling ?? 1);
   return { ...dna, stats, balanced, ...derived(data, { ...dna, stats }) };
 }
 

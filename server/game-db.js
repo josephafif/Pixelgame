@@ -262,6 +262,12 @@ export class GameDb {
     if (Number(res.changes) !== 1) throw new Error(`item ${id} is not owned by ${fromOwner}`);
   }
 
+  /** A weapon changed in place (evolved or tempered in its tree): same id and owner, new DNA. */
+  updateItemDna(id, ownerId, dna) {
+    const res = this.run('UPDATE items SET dna = ?, rarity = ? WHERE id = ? AND owner_id = ?', JSON.stringify(dna), dna.rarity ?? null, id, ownerId);
+    if (Number(res.changes) !== 1) throw new Error(`item ${id} is not owned by ${ownerId}`);
+  }
+
   deleteItem(id, ownerId) {
     const res = this.run('DELETE FROM items WHERE id = ? AND owner_id = ?', id, ownerId);
     if (Number(res.changes) !== 1) throw new Error(`item ${id} is not owned by ${ownerId}`);

@@ -4,7 +4,8 @@
 import { hashInts } from '../core/rng.js';
 import { dist2, normalize } from '../core/math.js';
 import { researchedComponents } from '../weapons/crafting.js';
-import { dropRarity, seededRoll, WEAPON_DROP_CHANCE } from './economy.js';
+import { dropRarity, WEAPON_DROP_CHANCE } from './economy.js';
+import { missingBase } from '../weapons/evolution.js';
 import { rollBlueprint, withoutBlueprints, firstKillReward, isHardBoss } from './blueprints.js';
 
 const MAGNET_RADIUS = 2.6;
@@ -50,18 +51,18 @@ export function addPickup(game, kind, x, y, extra = {}) {
 /**
  * Asks the weapon generator for a drop and places it when ready. The drop
  * seed comes from the world seed + a persistent counter, so drops are
- * reproducible per save.
+ * reproducible per save. A found weapon is a base weapon, common to rare
+ * (`base`: that base type, e.g. a boss's pick of a family you lack).
  */
 export function requestWeaponDrop(game, x, y, {
-  level, source = 'drop', minRarity = null, theme = null, elementBias = [], roll = source, reveal = 'ground',
+  level, source = 'drop', minRarity = null, theme = null, elementBias = [], reveal = 'ground', base = null,
 }) {
   const save = game.save;
   const n = save.counters.drop;
   const seed = hashInts(save.worldSeed, 0xd409, n);
   save.counters.drop += 1;
   const luck = Math.floor(game.pstats.luck);
-  // Normal loot stops at epic; legendaries need a separate, tiny roll.
-  const limits = dropRarity({ source: roll, minRarity, luck, roll: seededRoll(save, 0x1e6d, n) });
+  const limits = dropRarity({ minRarity });
   const request = {
     seed,
     level,
@@ -72,12 +73,14 @@ export function requestWeaponDrop(game, x, y, {
     maxRarity: limits.maxRarity,
     theme,
     elementBias,
+    baseOnly: true,
+    ...(base ? { baseArchetype: base } : {}),
   };
   game.pendingDrops += 1;
   return game.weapons.generate(request)
     .then((dna) => {
       if (reveal === 'case') {
-        game.discoverWeapon(dna, { caseRoll: { min: minRarity ?? 'common', max: 'legendary', title: 'Opening chest…' } });
+        game.discoverWeapon(dna, { caseRoll: { min: limits.minRarity ?? 'common', max: limits.maxRarity, title: 'Opening chest…' } });
       } else {
         announceDrop(game, dna, x, y);
       }
@@ -125,9 +128,9 @@ function seaLoot(game, e) {
   const coins = big ? 20 + ((Math.random() * 26) | 0) : Math.random() < 0.35 ? 1 + ((Math.random() * 4) | 0) : 0;
   if (coins) addPickup(game, 'gold', e.x, e.y, { value: coins, color: '#ffd24a' });
   if (big && Math.random() < 0.08) addPickup(game, 'shard', e.x, e.y, { value: 1, color: '#ffd24a' });
-  const source = big ? 'elite' : 'drop';
-  if (Math.random() < (big ? 0.35 : WEAPON_DROP_CHANCE.drop) * (1 + game.pstats.luck * 0.01)) {
-    requestWeaponDrop(game, e.x, e.y, { level: e.level, minRarity: big ? 'uncommon' : null, roll: source });
+  // (A sea serpent is a real catch: twice an elite's chance of a weapon.)
+  if (Math.random() < (big ? WEAPON_DROP_CHANCE.elite * 2 : WEAPON_DROP_CHANCE.drop) * (1 + game.pstats.luck * 0.01)) {
+    requestWeaponDrop(game, e.x, e.y, { level: e.level, source: big ? 'elite' : 'drop', minRarity: big ? 'uncommon' : null });
   }
 }
 
@@ -151,23 +154,24 @@ export function onEnemyKilledLoot(game, e) {
   if (coins) addPickup(game, 'gold', e.x, e.y, { value: coins, color: '#ffd24a' });
 
   if (e.summoned) return;
-  // Weapons are a find, not a given: most kills drop none.
+  // Weapons are a find, not a given: monsters drop none, elites now and then.
   const source = e.boss ? 'boss' : e.elite ? 'elite' : 'drop';
   const weaponChance = WEAPON_DROP_CHANCE[source] * (1 + luck * 0.01);
   if (Math.random() < weaponChance) {
+    const inv = game.save.inventory;
     requestWeaponDrop(game, e.x, e.y, {
       level,
-      minRarity: e.boss ? e.bossDef.drop.minRarity ?? 'rare' : e.elite ? 'uncommon' : null,
+      source,
+      minRarity: e.boss ? e.bossDef.drop.minRarity ?? 'rare' : 'uncommon',
       theme: e.boss ? e.bossDef.drop.theme : null,
       elementBias: biome.elements,
-      roll: e.boss ? 'boss' : e.elite ? 'elite' : 'drop',
+      // A boss's weapon is, when it can be, of a family you have none of yet.
+      base: e.boss ? missingBase(game.data, [...inv.bag, ...inv.storage], game.save.counters.drop) : null,
     });
   }
   if (e.boss) {
-    // Sometimes a second weapon, so bosses still feel like a jackpot.
-    if (Math.random() < 0.35) requestWeaponDrop(game, e.x + 1, e.y, { level, minRarity: 'uncommon', elementBias: [e.element], roll: 'elite' });
     addPickup(game, 'component', e.x, e.y, { componentId: e.bossDef.drop.component, color: e.color });
-    // Star Shards (for the Golden Catalyst): first kill of each boss, then 25%.
+    // Star Shards (for a weapon's Awakening): first kill of each boss, then 25%.
     const firstKill = !(game.save.bosses.defeated[e.bossDef.id] > 0);
     bossBlueprints(game, e, firstKill, biome);
     if (firstKill || Math.random() < 0.25) addPickup(game, 'shard', e.x, e.y, { value: 1, color: '#ffd24a' });
