@@ -990,6 +990,87 @@ body:not([data-input="keyboard"]) .keys { display: none; }
 }
 .errors { color: #ffb070; font-size: 14px; margin: 0; padding-left: 16px; text-align: left; }
 
+/* ---------- Weapon Tree (src/ui/evolution.js) ---------- */
+
+.evolution { display: flex; flex-direction: column; gap: 12px; }
+.evo-strip { display: flex; gap: 4px; overflow-x: auto; padding: 4px 2px 6px; }
+.evo-strip .slot { flex: 0 0 56px; width: 56px; }
+.slot .badge-tier {
+  position: absolute; top: -2px; right: -2px; font-size: 11px; font-weight: 700; line-height: 1; padding: 2px 3px;
+  background: var(--brass-light); color: var(--ink); box-shadow: 0 0 0 2px var(--ink);
+}
+.evo-head { --rarity: var(--line); display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(200px, auto); gap: 12px; align-items: center; }
+.evo-head .card-icon { box-shadow: 0 0 18px -4px var(--rarity); }
+.evo-title .weapon-name { margin: 0; color: var(--rarity); }
+.evo-title .evo-rarity { font-size: 13px; letter-spacing: 2px; color: var(--rarity); }
+.evo-title .subtitle { font-size: 14px; color: var(--muted); }
+.tier-pips { display: flex; gap: 3px; margin-top: 4px; }
+.tier-pips i { width: 18px; height: 6px; background: var(--sunken); box-shadow: 0 0 0 1px var(--ink); }
+.tier-pips i.on { background: var(--gold); }
+.evo-temper { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; align-items: stretch; text-align: center; }
+.evo-temper .level { font-size: 18px; font-weight: 700; }
+.evo-temper .cost-row .cost { font-size: 14px; }
+@media (max-width: 820px) {
+  .evo-head { grid-template-columns: auto minmax(0, 1fr); }
+  .evo-temper { grid-column: 1 / -1; }
+}
+
+/* The five steps: columns side by side; rows on a phone. */
+.evo-tree { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.evo-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.evo-col .step-title { font-size: 13px; letter-spacing: 1px; margin: 0; }
+.evo-nodes { display: flex; flex-direction: column; gap: 6px; }
+.evo-node {
+  position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 6px;
+  align-items: center; text-align: left; padding: 4px 6px; min-height: 58px; border-image-source: var(--frame-chip);
+}
+.evo-node .evo-art { grid-row: 1 / 3; display: grid; place-items: center; width: 44px; height: 44px; }
+.evo-node .evo-name { font-weight: 700; font-size: 14px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+.evo-node .evo-sub { font-size: 12px; color: var(--muted); line-height: 1.1; }
+.evo-node .evo-check { position: absolute; top: 2px; right: 6px; color: var(--good); font-weight: 700; }
+.evo-node.s-owned { border-image-source: var(--frame-chip-on); }
+.evo-node.s-owned .evo-name { color: var(--gold); }
+.evo-node.s-next { box-shadow: 0 0 12px -3px var(--brass-light); animation: evo-next 1.8s ease-in-out infinite; }
+@keyframes evo-next { 50% { box-shadow: 0 0 18px -1px var(--brass-light); } }
+.evo-node.s-closed { opacity: 0.38; filter: grayscale(0.7); }
+.evo-node.s-future { opacity: 0.75; }
+.evo-node.s-hidden .evo-name { color: var(--muted); }
+.evo-node.on { outline: 3px solid var(--gold); outline-offset: -1px; }
+.evo-glyph { font-size: 28px; font-weight: 700; color: var(--muted); }
+.evo-gem {
+  --gem: #fff; width: 22px; height: 22px; transform: rotate(45deg); background: var(--gem);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 12px var(--gem), inset -4px -4px 0 rgba(0, 0, 0, 0.35), inset 3px 3px 0 rgba(255, 255, 255, 0.45);
+}
+@media (prefers-reduced-motion: reduce) { .evo-node.s-next { animation: none; } }
+@media (max-width: 820px) {
+  .evo-tree { grid-template-columns: 1fr; }
+  .evo-nodes { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
+  .evo-node { flex: 0 0 168px; }
+}
+
+.evo-detail { padding: 10px 12px; }
+.evo-detail h3 { margin: 0 0 4px; }
+.evo-detail .kind { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--brass-light); }
+.evo-detail p { margin: 0 0 8px; }
+.evo-detail h4 { margin: 8px 0 4px; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+.evo-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
+@media (max-width: 820px) { .evo-detail-grid { grid-template-columns: 1fr; } }
+.evo-reqs { list-style: none; margin: 0; padding: 0; font-size: 15px; display: flex; flex-direction: column; gap: 3px; }
+.evo-reqs li { display: flex; gap: 6px; }
+.evo-reqs .mark { width: 14px; font-weight: 700; }
+.evo-reqs li.ok .mark { color: var(--good); }
+.evo-reqs li.no .mark { color: var(--bad); }
+.evo-reqs .hint { color: var(--muted); font-size: 13px; }
+.evo-detail .cost-row { justify-content: flex-start; }
+.evo-go { width: 100%; margin-top: 10px; min-height: 48px; }
+.evo-state { margin-top: 10px; font-size: 15px; }
+.evo-state.ok { color: var(--good); }
+.evo-state.warn { color: #ffb070; }
+.evo-preview summary { cursor: pointer; color: var(--brass-light); padding: 4px 0; }
+.evo-foot { margin: 0; }
+.evo-line { color: var(--brass-light); }
+.inv-detail .evo-open { width: 100%; }
+
 /* ---------- Base ---------- */
 
 .base-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }

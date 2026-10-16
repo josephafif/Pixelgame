@@ -206,32 +206,81 @@ const TEMPLATES = {
     return { gripY: 26 };
   },
   gun(g, v, pal) {
+    // A flintlock seen from the side, muzzle up: barrel, lock, a grip
+    // swept back and a trigger guard.
     const b = v.dims.barrel;
-    const top = 22 - b;
-    g.rect(7, top, 2, b, pal.blade[1]);
-    g.rect(7, top, 1, b, pal.blade[0]);
-    g.rect(6, 22, 4, 3, pal.blade[2]);
+    const top = 20 - b;
+    g.rect(7, top + 1, 2, b, pal.blade[1]);
+    g.rect(7, top + 1, 1, b, pal.blade[0]);
+    g.rect(6, top, 4, 1, pal.accent); // muzzle ring
+    g.set(8, top - 1, pal.blade[2]); // front sight
+    if (b >= 11) g.rect(7, top + Math.floor(b / 2), 2, 1, pal.accent); // barrel band
+    g.rect(6, 20, 4, 4, pal.blade[1]); // the lock
+    g.rect(6, 20, 1, 4, pal.blade[0]);
+    g.rect(9, 20, 1, 4, pal.blade[2]);
+    g.set(10, 20, pal.accent); // hammer
+    g.set(10, 19, pal.accent);
     const grip = v.dims.grip;
-    g.rect(7, 25, 3, grip, pal.handle[0]);
-    g.rect(9, 25, 1, grip, pal.handle[1]);
-    if (v.choices.drum) g.disc(7, 20, 2, pal.accent);
-    if (pal.gem) g.set(8, top + 1, pal.gem);
-    return { gripY: 27 };
+    for (let i = 0; i < grip; i++) {
+      const x = 7 + Math.floor((i + 1) / 2);
+      g.set(x, 24 + i, pal.handle[0]);
+      g.set(x + 1, 24 + i, pal.handle[1]);
+    }
+    g.set(7 + Math.floor(grip / 2), 24 + grip, pal.accent); // butt cap
+    g.set(6, 24, pal.accent); // trigger guard
+    g.set(6, 25, pal.accent);
+    g.set(7, 26, pal.accent);
+    g.set(7, 24, pal.blade[2]); // trigger
+    if (v.choices.drum) {
+      g.rect(5, 21, 1, 2, pal.blade[2]);
+      g.rect(10, 21, 1, 2, pal.blade[2]);
+      g.set(8, 21, pal.accent);
+      g.set(7, 22, pal.accent);
+    }
+    if (pal.gem) g.set(8, 22, pal.gem);
+    return { gripY: 26 };
   },
   cannon(g, v, pal) {
+    // A hand cannon, muzzle up: a flared mouth, a barrel that swells to a
+    // round breech, a knob behind it and a short wooden grip.
     const len = v.dims.barrel;
     const bore = v.dims.bore;
-    const top = 28 - len;
-    g.rect(8 - bore, top, bore * 2, len, pal.blade[1]);
-    g.rect(8 - bore, top, 1, len, pal.blade[0]);
-    g.rect(8 + bore - 1, top, 1, len, pal.blade[2]);
-    g.rect(8 - bore + 1, top, bore * 2 - 2, 1, '#161622');
-    if (v.choices.bands) {
-      g.rect(8 - bore, top + 2, bore * 2, 1, pal.accent);
-      g.rect(8 - bore, top + len - 3, bore * 2, 1, pal.accent);
+    const top = 25 - len;
+    const shade = (x, l, r) => (x === l ? pal.blade[0] : x === r ? pal.blade[2] : x === l + 1 ? shadeHex(pal.blade[1], 0.18) : pal.blade[1]);
+    for (let i = 0; i < len; i++) {
+      const y = top + i;
+      // Flared at the mouth, a little wider towards the breech.
+      const half = i < 2 ? bore + 1 : bore - (i < len * 0.4 ? 1 : 0);
+      const l = 8 - half;
+      const r = 7 + half;
+      for (let x = l; x <= r; x++) g.set(x, y, shade(x, l, r));
     }
-    g.rect(6, 28, 4, 3, pal.handle[0]);
-    return { gripY: 27 };
+    // Trunnions: the pegs on its sides that say "cannon".
+    const ty = top + Math.floor(len * 0.6);
+    g.rect(8 - bore - 1, ty, 1, 2, pal.blade[2]);
+    g.rect(8 + bore, ty, 1, 2, pal.blade[2]);
+    g.set(8 - bore - 1, ty, pal.accent);
+    g.set(8 + bore, ty, pal.accent);
+    g.rect(8 - bore + 1, top, bore * 2 - 2, 1, '#161622'); // the bore
+    g.rect(8 - bore, top + 1, bore * 2, 1, shadeHex(pal.blade[2], -0.2));
+    const breech = top + len;
+    g.disc(8, breech, bore - 1, pal.blade[1]);
+    g.set(7, breech - 1, pal.blade[0]);
+    g.set(9, breech + 1, pal.blade[2]);
+    g.rect(7, breech + bore - 1, 2, 1, pal.accent); // the knob
+    if (v.choices.bands) {
+      for (const y of [top + 2, top + Math.floor(len * 0.55)]) {
+        const half = bore + (y === top + 2 ? 1 : 0);
+        g.rect(8 - half, y, half * 2, 1, pal.accent);
+        g.set(8 - half, y, shadeHex(pal.accent, 0.4));
+      }
+    }
+    for (let y = breech + bore; y <= 30; y++) {
+      g.set(7, y, pal.handle[0]);
+      g.set(8, y, pal.handle[1]);
+    }
+    if (pal.gem) g.set(8, breech, pal.gem);
+    return { gripY: 28 };
   },
   wand(g, v, pal) {
     const len = v.dims.length;
@@ -247,8 +296,9 @@ const TEMPLATES = {
     return { gripY: 27 };
   },
   staff(g, v, pal) {
-    const top = handle(g, pal, v.dims.length, 1);
     const r = Math.ceil(v.dims.head / 2);
+    // (A long staff stops short enough that its head stays on the sprite.)
+    const top = handle(g, pal, Math.min(v.dims.length, 29 - 2 * r), 1);
     const orb = pal.gem ?? pal.glow ?? pal.accent;
     if (v.choices.headType === 'crook') {
       for (let i = 0; i < 5; i++) g.set(8 + (i < 3 ? i : 2), top - 1 - (i < 3 ? 0 : i - 2), pal.handle[0]);
@@ -267,15 +317,42 @@ const TEMPLATES = {
     return { gripY: 22 };
   },
   orb(g, v, pal) {
+    // A glass globe on a claw setting: a lit side, a dark side, a swirl of
+    // light inside, and (rings) motes circling it.
     const r = Math.floor(v.dims.size / 2);
+    const cy = 14;
     const core = pal.gem ?? pal.glow ?? pal.blade[1];
-    g.disc(8, 16, r, pal.blade[1]);
-    g.disc(8, 16, r - 2, core);
-    g.set(8 - Math.floor(r / 2), 16 - Math.floor(r / 2), '#ffffff');
-    if (v.choices.rings) {
-      for (let x = -r - 2; x <= r + 2; x++) g.set(8 + x, 16 + Math.round(x / 3), pal.accent);
+    g.disc(8, cy, r, pal.blade[2]);
+    g.disc(8, cy, r - 1, core);
+    for (let y = -r; y <= r; y++) {
+      for (let x = -r; x <= r; x++) {
+        const d = x * x + y * y;
+        if (d > (r - 1) * (r - 1)) continue;
+        if (x + y < -r * 0.6) g.set(8 + x, cy + y, shadeHex(core, 0.35));
+        else if (x + y > r * 0.9) g.set(8 + x, cy + y, shadeHex(core, -0.3));
+      }
     }
-    return { gripY: 16 };
+    // The swirl inside.
+    for (let k = 0; k < r + 2; k++) {
+      const a = k * 0.9 + (v.variant % 6);
+      const rr = (k / (r + 2)) * (r - 1.5);
+      g.set(8 + Math.cos(a) * rr, cy + Math.sin(a) * rr, shadeHex(core, 0.6));
+    }
+    g.set(8 - Math.ceil(r / 2), cy - Math.ceil(r / 2), '#ffffff');
+    g.set(9 - Math.ceil(r / 2), cy - Math.ceil(r / 2), shadeHex(core, 0.7));
+    // The claw setting and its stem.
+    const base = cy + r;
+    g.set(8 - r + 1, base - 1, pal.accent);
+    g.set(8 + r - 1, base - 1, pal.accent);
+    g.rect(8 - r + 2, base, r * 2 - 3, 1, pal.accent);
+    g.rect(7, base + 1, 2, 1, shadeHex(pal.accent, -0.25));
+    for (let y = base + 2; y <= 28; y++) g.set(8, y, y % 2 ? pal.handle[0] : pal.handle[1]);
+    g.rect(7, 29, 3, 1, pal.accent);
+    if (v.choices.rings) {
+      const glow = pal.glow ?? pal.accent;
+      for (const [dx, dy] of [[r + 2, -1], [-r - 2, 2], [2, -r - 2], [-3, r + 1]]) g.set(8 + dx, cy + dy, glow);
+    }
+    return { gripY: Math.min(28, base + 4) };
   },
   boomerang(g, v, pal) {
     const arm = v.dims.arm;
@@ -304,10 +381,30 @@ const TEMPLATES = {
     return { gripY: 16 };
   },
   whip(g, v, pal) {
-    handle(g, pal, v.dims.handle);
-    const coils = v.dims.coils;
-    for (let i = 0; i < coils; i++) g.ring(8 + (i % 2 ? 1 : -1), 22 - v.dims.handle - i * 4, 2, i % 2 ? pal.blade[1] : pal.blade[2]);
-    if (v.choices.barbed) g.set(9, 22 - v.dims.handle - coils * 4, pal.blade[0]);
+    // A braided lash in waves up from the handle, thick at the grip and
+    // thin at the tip, with a cracker on the end (and barbs on the bends).
+    const H = v.dims.handle;
+    const top = handle(g, pal, H + 1);
+    g.rect(7, top - 1, 2, 1, pal.accent); // the knot where the lash starts
+    const waves = v.dims.coils;
+    const end = 2;
+    const length = top - 2 - end;
+    let last = null;
+    for (let i = 0; i <= length; i++) {
+      const t = i / length;
+      const y = top - 2 - i;
+      const x = 8 + Math.round(Math.sin(t * Math.PI * waves) * (1 + 2 * t));
+      const braid = i % 2 ? pal.blade[1] : pal.blade[2];
+      g.set(x, y, braid);
+      if (t < 0.45) g.set(x + 1, y, pal.blade[2]);
+      // Keep the line unbroken where it swings sideways.
+      if (last !== null && Math.abs(x - last) > 1) g.set((x + last) / 2, y, braid);
+      if (v.choices.barbed && i > 2 && Math.abs(Math.cos(t * Math.PI * waves)) < 0.2) g.set(x - 1, y, pal.blade[0]);
+      last = x;
+    }
+    g.set(last, end - 1, pal.accent); // the cracker
+    g.set(last + 1, end - 2, pal.accent);
+    if (pal.gem) g.set(8, 30 - Math.floor(H / 2), pal.gem);
     return { gripY: 28 };
   },
   knives(g, v, pal) {
@@ -377,12 +474,47 @@ const TEMPLATES = {
   },
 };
 
+/**
+ * What a weapon gains as it grows in its tree (visual.evo.tier): a polished
+ * glint on its edges (Tempered), an engraving down its middle (Masterwork)
+ * and glowing runes (Awakening). The aura and halo are outlines (below).
+ */
+function evoDetails(g, v, pal) {
+  const tier = v.evo?.tier ?? 0;
+  if (!tier) return;
+  const glint = shadeHex(pal.blade[0], 0.4);
+  const rune = pal.glow ?? pal.gem ?? pal.accent;
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      const c = g.get(x, y);
+      if (!c) continue;
+      if (c === pal.blade[0] && (x + y) % 3 === 0) g.set(x, y, glint);
+      else if (tier >= 3 && c === pal.blade[1] && (x === 8 || x === 7) && y % 3 === 1) {
+        g.set(x, y, tier >= 5 && y % 2 ? rune : shadeHex(pal.accent, 0.15));
+      }
+    }
+  }
+}
+
 function outlinePass(g, color) {
   const marks = [];
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
       if (g.get(x, y)) continue;
       if (g.get(x - 1, y) || g.get(x + 1, y) || g.get(x, y - 1) || g.get(x, y + 1)) marks.push([x, y]);
+    }
+  }
+  for (const [x, y] of marks) g.set(x, y, color);
+}
+
+/** Loose pixels just outside the outline: every `every`-th spot, so the shape still reads. */
+function motePass(g, color, every, seed) {
+  const marks = [];
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
+      if (g.get(x, y)) continue;
+      if (!(g.get(x - 1, y) || g.get(x + 1, y) || g.get(x, y - 1) || g.get(x, y + 1))) continue;
+      if ((x * 7 + y * 3 + seed) % every === 0) marks.push([x, y]);
     }
   }
   for (const [x, y] of marks) g.set(x, y, color);
@@ -419,8 +551,14 @@ export function weaponSprite(dna) {
   const g = new Grid();
   const draw = TEMPLATES[v.template] ?? TEMPLATES.blade;
   const { gripY, gripX = 8, hold = 'along' } = draw(g, v, v.palette);
+  evoDetails(g, v, v.palette);
   outlinePass(g, v.glow && v.palette.glow ? v.palette.glow : v.palette.outline);
   if (v.glow && v.palette.glow) outlinePass(g, shadeHex(v.palette.glow, -0.5));
+  // An infused weapon wears a faint aura, an awakened one a brighter halo:
+  // loose motes around the outline, never a solid block.
+  const tier = v.evo?.tier ?? 0;
+  const aura = v.palette.glow ?? v.palette.gem ?? v.palette.accent;
+  if (tier >= 4 && aura) motePass(g, shadeHex(aura, tier >= 5 ? 0.25 : -0.15), tier >= 5 ? 2 : 3, v.variant ?? 0);
   s = { canvas: gridToCanvas(g), pivotX: gripX, pivotY: gripY, hold };
   spriteCache.set(key, s);
   if (spriteCache.size > 300) spriteCache.delete(spriteCache.keys().next().value);

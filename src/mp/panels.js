@@ -14,6 +14,7 @@ import { MAX_HORSES } from '../game/horses.js';
 const loaders = {
   inventory: () => import('../ui/inventory.js'),
   crafting: () => import('../ui/crafting.js'),
+  evolution: () => import('../ui/evolution.js'),
   map: () => import('../ui/map.js'),
   settings: () => import('../ui/settings.js'),
   pals: () => import('../ui/pals.js'),
@@ -83,6 +84,7 @@ export class MpPanels {
       this.app.mpHud?.openChat();
       return;
     }
+    if (name === 'evolution' && this.game.build.active) return;
     if (name === 'menu' && this.game.build.active && !isModalOpen()) {
       this.game.toggleBuildMode(false);
       return;
@@ -152,6 +154,7 @@ export class MpPanels {
         item('bag', 'Väska', go('inventory'), 'I'),
         item('map', 'Karta', go('map'), 'M'),
         item('anvil', 'Smedja', go('crafting'), 'C'),
+        item('up', 'Vapenträd', go('evolution'), 'U'),
         item('home', 'Bas och klan', go('clan'), 'B'),
         item('book', 'Forskning', go('research'), 'R'),
         item('hammer', 'Bygg', () => { closeModal(); g.toggleBuildMode(true); }, 'G'),

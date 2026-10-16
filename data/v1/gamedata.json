@@ -1313,11 +1313,11 @@
     "levelCaps": [10, 18, 26, 34, 45, 99],
     "temper": {"essence": 4, "essencePerLevel": 1, "scrap": 2, "scrapPerLevel": 0.5},
     "tiers": [
-      {"tier": 1, "kind": "temper", "name": "Tempered", "rarity": "uncommon", "forge": 1, "level": 1, "cost": {"scrap": 60, "essence": 40, "wood": 20}, "boost": {"damage": 1.12}, "empower": 0.15, "mods": [["dmg", 14]]},
-      {"tier": 2, "kind": "form", "name": "Form", "rarity": "rare", "forge": 2, "level": 8, "cost": {"scrap": 160, "essence": 120, "stone": 40}, "boost": {"damage": 1.1}, "empower": 0.15},
-      {"tier": 3, "kind": "mastery", "name": "Masterwork", "rarity": "rare", "forge": 3, "level": 14, "bosses": 1, "cost": {"scrap": 280, "essence": 240, "stone": 60}, "ceiling": 1.08, "boost": {"damage": 1.1}, "empower": 0.15},
-      {"tier": 4, "kind": "infusion", "name": "Infusion", "rarity": "epic", "forge": 4, "level": 20, "cost": {"scrap": 450, "essence": 500}, "ceiling": 1.05, "boost": {"damage": 1.15}, "empower": 0.2},
-      {"tier": 5, "kind": "awakening", "name": "Awakening", "rarity": "legendary", "forge": 5, "level": 26, "cost": {"scrap": 600, "essence": 1200, "shards": 3}, "ceiling": 1.08, "boost": {"damage": 1.2}, "empower": 0.25}
+      {"tier": 1, "kind": "temper", "name": "Tempered", "rarity": "uncommon", "forge": 1, "level": 1, "cost": {"scrap": 60, "essence": 40, "wood": 20}, "boost": {"damage": 1.08}, "empower": 0.15, "mods": [["dmg", 14]]},
+      {"tier": 2, "kind": "form", "name": "Form", "rarity": "rare", "forge": 2, "level": 8, "cost": {"scrap": 160, "essence": 120, "stone": 40}, "boost": {"damage": 1.06}, "empower": 0.15},
+      {"tier": 3, "kind": "mastery", "name": "Masterwork", "rarity": "rare", "forge": 3, "level": 14, "bosses": 1, "cost": {"scrap": 280, "essence": 240, "stone": 60}, "ceiling": 1.05, "boost": {"damage": 1.06}, "empower": 0.15},
+      {"tier": 4, "kind": "infusion", "name": "Infusion", "rarity": "epic", "forge": 4, "level": 20, "cost": {"scrap": 450, "essence": 500}, "boost": {"damage": 1.08}, "empower": 0.2},
+      {"tier": 5, "kind": "awakening", "name": "Awakening", "rarity": "legendary", "forge": 5, "level": 26, "cost": {"scrap": 600, "essence": 1200, "shards": 3}, "boost": {"damage": 1.1}, "empower": 0.25}
     ],
     "families": [
       {"id": "sword", "name": "Sword", "base": "sword", "infusions": ["fire", "ice", "void", "bleed"], "fill": ["dmg", "critc", "aspd", "critd", "swift"], "forms": [

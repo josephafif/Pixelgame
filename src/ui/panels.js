@@ -16,6 +16,7 @@ import { BuildBar } from './build.js';
 const loaders = {
   inventory: () => import('./inventory.js'),
   crafting: () => import('./crafting.js'),
+  evolution: () => import('./evolution.js'),
   research: () => import('./research.js'),
   base: () => import('./base.js'),
   map: () => import('./map.js'),
@@ -71,6 +72,8 @@ export class Panels {
       this.game.toggleBuildMode();
       return;
     }
+    // In build mode U picks Upgrade (the build bar), not the Weapon Tree.
+    if (name === 'evolution' && this.game.build.active) return;
     // Esc leaves build mode before it opens the menu.
     if (name === 'menu' && this.game.build.active && !isModalOpen()) {
       this.game.toggleBuildMode(false);
@@ -139,6 +142,7 @@ export class Panels {
         item('bag', 'Inventory', go('inventory'), 'I'),
         item('map', 'Map', go('map'), 'M'),
         item('anvil', 'Forge', go('crafting'), 'C'),
+        item('up', 'Weapon Tree', go('evolution'), 'U'),
         item('book', 'Research', go('research'), 'R'),
         item('home', 'Camp', go('base'), 'B'),
         item('pal', 'Pals', go('pals'), 'H'),

@@ -49,6 +49,7 @@ som tog tiden (simuleringen del för del, marken, figurerna, ljuset och så vida
 | Segla ut / gå i land | Handknappen vid vattnet / nära land | E | A |
 | Inventory / Karta / Meny | Knapparna uppe till höger | I / M / Esc | Y / Start |
 | Forge / Research / Läger | I menyn (på datorn även knappar uppe till höger) | C / R / B | – |
+| Vapenträdet (utveckla ett vapen) | I menyn, *Evolve* på vapnet i väskan eller smedjans flik | U | – |
 | Pals | I menyn, eller tryck på pal-chippen under hälsan | H | – |
 | Byggläge (i lägret) | Hammarknappen; tryck på en ruta för att välja den, tryck igen (eller på hammaren) för att bygga, dra från den valda rutan för en mur | G (1–9 väljer, X river, U uppgraderar, Esc klar) | – |
 | Hugga / bryta | Byt till hackan (3), sedan svärdknappen nära träd/sten | 3, sedan Space / E (håll inne) | A |
@@ -74,12 +75,13 @@ Progressionen är medvetet långsammare än i första versionen:
 
 - **Essence** droppar bara ibland från vanliga fiender (40 % chans, mer från elitfiender och
   bossar). Värdet växer långsamt med fiendens nivå.
-- **Vapen är sällsynta fynd:** 1,8 % av vanliga fiender, 15 % av elitfiender och 25 % av kistorna
-  släpper ett vapen. Bossar ger alltid ett (och ibland ett till).
-- **Kistor** ger mest essence och scrap (plus lite guld); bara var fjärde har ett vapen.
-- **Episka vapen** kommer från ett eget litet slag, precis som legendariska: 1,2 % av vapnen från
-  vanliga fiender, 4 % från elitfiender, 3 % från kistor och 30 % från bossar. Allt annat är
-  vanligt till sällsynt (rare).
+- **Vapen hittas när du utforskar:** vanliga monster tappar inga vapen. Elitfiender gör det i 5 %
+  av fallen och kistor i 8 % (ruiner och nedgrävda skatter 2–2,5 gånger oftare). Bossar ger alltid
+  ett, helst av en vapenfamilj du inte har än.
+- **Allt du hittar, köper eller smider är ett grundvapen** (svärd, yxa, spjut, båge, trollstav
+  eller kastvapen), vanligt till sällsynt (rare). Episka och legendariska vapen blir det bara genom
+  att vapnet växer i sitt **vapenträd** (se nedan).
+- **Kistor** ger mest essence och scrap (plus lite guld).
 - **Loot odds** i pausmenyn visar exakt chans för varje rarity, per källa (fiende, elitfiende,
   kista, boss och varje catalyst i Forge), för din nivå och luck just nu. Tabellen räknas fram
   med samma siffror som spelet slår med (`rarityOdds` i `src/game/economy.js`).
@@ -88,13 +90,12 @@ Progressionen är medvetet långsammare än i första versionen:
 - **Crafting** kostar mer och blir dyrare med din nivå (+6 % per nivå); Forge-nivåer ger rabatt.
   Priset byggs upp av dina val: bättre material, element-kärnor och runor kostar mer (se Forge
   nedan).
-- **Catalysts:** Azure kräver Forge 2 och Violet (garanterat episkt, 600 essence och 300 scrap)
-  Forge 4. Golden (legendariskt) kräver Forge 5,
-  en besegrad boss, 2 500 essence, 1 200 scrap och **3 Star Shards**, så det tar lång tid.
+- **Catalysts:** Forge gör grundvapen. Azure Catalyst (Forge 2) ger alltid ett sällsynt vapen.
+  Abilities smids inte: de vaknar i vapenträdet.
 - **Guld** är marknadernas valuta. Det mesta kommer från att sälja vapen; bossar och ibland
   elitfiender och kistor ger lite.
-- **Star Shards** är sällsynta. En boss ger en första gången du besegrar den, sedan 25 %
-  chans. Du får också en när du skrotar ett legendariskt vapen, och ibland säljer en
+- **Star Shards** är sällsynta och behövs för ett vapens Uppvaknande. En boss ger en första
+  gången du besegrar den, sedan 25 % chans. Du får också en när du skrotar ett legendariskt vapen, och ibland säljer en
   marknad en för 4 000 guld.
 - **Byggnader** kostar också trä och sten från nivå 2, så du behöver samla material.
 - **Ritningar** (vapentyper och byggen) är sällsynta, och en enda tabell bestämmer dem i både
@@ -132,25 +133,49 @@ annonseras. När du plockar upp vapnet ringer en ring i rarity-färgen, och uppt
 rarity-band, ljusstrålar och (episk+) konfetti. I inventoryt har platserna rarity-kant; episka
 lyser och legendariska glimmar.
 
-## Legendariska vapen: som att öppna ett case
+## Vapenträdet: hitta ett vapen och gör det till ditt eget
 
-Legendariska vapen ska kännas som att få en kniv i ett CS:GO-case: extremt sällsynta och värda
-mycket.
+Du ska inte behöva byta vapen hela tiden. Du hittar ett grundvapen, investerar i det och formar
+det steg för steg till ditt drömvapen. Varje vapenfamilj har sitt eget träd med fem steg:
 
-- Vanlig loot stannar på **rare**. Ett legendariskt vapen kräver ett eget, litet slag
-  (`src/game/economy.js`, seedat per sparfil): ungefär 0,15 % per vanligt vapendropp, 0,5 % från
-  elitfiender, 0,4 % från kistor och 3 % från bossar. Luck höjer chansen lite.
+| Steg | Vad det gör | Kräver (utöver skrot och essens) |
+| --- | --- | --- |
+| 1. Härdat | Mer skada, ovanligt, högre nivåtak | Smedja 1 |
+| 2. **Form** (ett val) | Ny vapentyp och spelstil, sällsynt (svärdet blir Titan/storsvärd, Skugga/dolk eller Skördare/lie) | Smedja 2, nivå 8, en komponent från ett visst biom |
+| 3. Mästarverk | Formens egen effekt och fler modifierare, större och mer utsmyckat | Smedja 3, nivå 14, en komponent till, en besegrad boss |
+| 4. **Ingjutning** (ett val) | Ett element med en egen effekt, episkt, en aura | Smedja 4, nivå 20, en bosskärna |
+| 5. **Uppvaknande** (ett val) | En legendarisk kraft (efter elementet), legendariskt, runor och strålkrans | Smedja 5, nivå 26, en kärna från fjärrländerna, Star Shards och fjärrmaterial |
+
+- En vald gren stänger de andra. Komponenter behöver bara **hittas** en gång och förbrukas inte.
+  Det driver utforskning i stället för grind.
+- Trädet (U) visar varje steg med en förhandsbild av vapnet, vad steget kräver (✓/✗) och var du
+  hittar det du saknar. Det som ligger längre fram förblir en hemlighet: du får bara veta var du
+  ska leta.
+- **Härda** lyfter vapnet till din nivå, upp till stegets tak (10, 18, 26, 34, 45, sedan
+  obegränsat). Att utvecklas höjer taket.
+- Vapnet behåller sitt namn men byter typord ("Iron Warbow" blir "Iron Arbalest" som armborst),
+  får sitt element ("… of Embers") och till sist *Awakened*. Utseendet följer: polering, gravyr,
+  full storlek med alla detaljer, aura, runor och strålkrans.
+- Snabbskrotning tar aldrig ett vapen du har utvecklat. Vapen från före trädet får sin plats efter
+  sin typ (ett storsvärd är redan svärdets Titan-form).
+- Multiplayer: servern kontrollerar varje steg med samma regler vid den smedja du står vid
+  (Fristadens räcker till steg 1).
+
+Design och data: [docs/WEAPON-EVOLUTION.md](docs/WEAPON-EVOLUTION.md), `evolution` i
+`gamedata.json` och `src/weapons/evolution.js`. En ny gren eller familj är bara data.
+
+## Kistor och Forge: som att öppna ett case
+
 - **Kistor och Forge öppnas som ett case:** en remsa med vapen rullar förbi en markör och
-  saktar in. Legendariska syns bara som en gyllene ★ tills remsan stannar. Resultatet är bestämt
-  innan rullningen börjar, och *Skip* hoppar direkt till det.
-- Varje vapen har ett **värde i guld** som visas på vapenkortet. Ett legendariskt är värt
-  tusentals guld (över 20 gånger mer än ett episkt), och upptäcktsrutan visar det direkt.
-- Att smida ett legendariskt kräver Golden Catalyst (se ovan).
+  saktar in. Resultatet är bestämt innan rullningen börjar, och *Skip* hoppar direkt till det.
+- Varje vapen har ett **värde i guld** som visas på vapenkortet. Ett legendariskt (uppvaknat)
+  vapen är värt tusentals guld.
 
 ### Legendariska krafter
 
-Varje legendariskt vapen med en ability får en **legendarisk kraft** i stället för en vanlig
-ability. Kraften väljs efter vapnets element och seed (samma vapen får alltid samma kraft), och
+Ett vapen får sin **legendariska kraft** när det vaknar i vapenträdet: du väljer bland de krafter
+som vapnets element ger. Legendariska vapen från före trädet behåller sin kraft, som valdes efter
+element och seed (samma vapen får alltid samma kraft), och
 den blir starkare och laddar om snabbare ju bättre vapnet rullade sin ability. Kraften ligger som
 ett lager ovanpå vapnets DNA, så legendariska vapen du redan har får den också.
 

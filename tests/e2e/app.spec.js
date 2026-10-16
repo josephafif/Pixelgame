@@ -29,19 +29,19 @@ test('weapons are generated in a Web Worker and drops open the discovery screen'
   const errors = trackErrors(page);
   await startGame(page);
   expect(await game(page, () => window.__pixelgame.game.weapons.mode)).toBe('worker');
+  // Even asked for a legendary, a found weapon is a base weapon, rare at best
+  // (epics and legendaries are grown in the weapon tree).
   await game(page, () => window.__pixelgame.game.debugDrop({ minRarity: 'legendary' }));
   await page.keyboard.down('KeyD');
   await expect(page.locator('.discovery')).toBeVisible({ timeout: 5000 });
   await page.keyboard.up('KeyD');
-  await expect(page.locator('.weapon-card .rarity')).toHaveText('LEGENDARY');
-  await expect(page.locator('.weapon-card .ability-name')).toBeVisible();
+  await expect(page.locator('.weapon-card .rarity')).toHaveText('RARE');
   await page.click('.discovery .btn-primary');
-  await expect(page.locator('#btn-ability')).toBeAttached();
-  const cast = await game(page, () => {
+  const found = await game(page, () => {
     const g = window.__pixelgame.game;
-    return g.weapon.dna.ability !== null;
+    return { evolved: g.data.byId.archetypes.get(g.weapon.dna.archetype).evolved ?? false, base: g.weapon.dna.ctx.base };
   });
-  expect(cast).toBe(true);
+  expect(found).toEqual({ evolved: false, base: 1 });
   expect(errors).toEqual([]);
 });
 
@@ -591,9 +591,10 @@ test('loot odds: the menu shows the chance of every rarity', async ({ page }) =>
   const table = page.locator('.odds-table').first();
   await expect(table).toBeVisible();
   for (const r of ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary']) await expect(table.locator('thead')).toContainText(r);
-  const monster = table.locator('tbody tr', { hasText: 'Monster' }).first();
-  await expect(monster).toContainText('%');
-  await expect(table.locator('tbody tr', { hasText: 'Golden Catalyst' })).toContainText('100%');
+  const elite = table.locator('tbody tr', { hasText: 'Elite monster' }).first();
+  await expect(elite).toContainText('%');
+  await expect(table.locator('tbody tr', { hasText: 'Azure Catalyst' })).toContainText('100%');
+  await expect(page.locator('.odds')).toContainText('weapon\'s tree');
   // Blueprints: one table, legendaries only from the hard bosses.
   const bp = page.locator('.odds-table').nth(1);
   await expect(bp).toBeVisible();
@@ -1252,6 +1253,7 @@ test('the main menu presents the big update: a news card with a NEW badge and it
   await card.click();
   const panel = page.locator('.news-panel');
   await expect(panel).toBeVisible();
+  await expect(panel).toContainText(/Vapenträdet|Weapon Tree/);
   await expect(panel).toContainText('Prism Barrens');
   await expect(panel).toContainText('Skyreach');
   await expect(panel.locator('.news-chip.live').first()).toBeVisible();

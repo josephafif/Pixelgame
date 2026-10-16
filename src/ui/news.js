@@ -8,17 +8,48 @@ import { icon } from './icons.js';
 
 /** Bump `id` when the news changes, so the NEW badge shows again. */
 export const NEWS = {
-  id: '2026-10-combat-feel-1',
-  title: { sv: 'Fjärrländerna', en: 'The Far Lands' },
+  id: '2026-10-weapon-tree-1',
+  title: { sv: 'Vapenträdet', en: 'The Weapon Tree' },
   teaser: {
-    sv: 'Nytt: laddslag som i Minecraft, färre monster, mindre lagg, levande skogar och dag och natt med varmt ljus från facklor och eldar.',
-    en: 'New: charged blows as in Minecraft, fewer monsters, less lag, living forests, and day and night with the warm light of torches and fires.',
+    sv: 'Nytt: hitta ett vapen och gör det till ditt eget. Varje vapen har ett eget träd med nya former, element och legendariska krafter.',
+    en: 'New: find a weapon and make it your own. Every weapon has its own tree of new forms, elements and legendary powers.',
   },
   intro: {
-    sv: 'Utforska långt ut, möt nya bossar, hitta ritningar och bygg upp basen. Allt finns i både singleplayer och multiplayer.',
-    en: 'Explore far out, meet new bosses, find blueprints and build up your base. All of it in single player and multiplayer alike.',
+    sv: 'Du behöver inte byta vapen hela tiden. Hitta ett grundvapen, investera i det och forma det steg för steg till ditt drömvapen med val, utforskning och bossar. Allt finns i både singleplayer och multiplayer.',
+    en: 'No more swapping weapons all the time: find a base weapon, invest in it and shape it step by step into your dream weapon through choices, exploration and bosses. All of it in single player and multiplayer alike.',
   },
   sections: [
+    {
+      icon: 'up',
+      title: { sv: 'Vapenträdet', en: 'The Weapon Tree' },
+      items: [
+        {
+          live: true,
+          sv: '**Hitta och forma**: vapen hittar du i kistor, ruiner, begravda skatter och hos bossar. Vanliga monster tappar inga vapen längre, och allt du hittar, köper eller smider är ett grundvapen (svärd, yxa, spjut, båge, trollstav eller kastvapen), som mest sällsynt. Episkt och legendariskt blir ett vapen bara genom att växa i sitt träd.',
+          en: '**Find and shape**: weapons are found in chests, ruins, buried treasure and on bosses. Ordinary monsters no longer drop weapons, and everything you find, buy or forge is a base weapon (sword, axe, spear, bow, wand or throwing weapon), rare at most. A weapon only becomes epic or legendary by growing in its tree.',
+        },
+        {
+          live: true,
+          sv: '**Fem steg och dina val**: Härdat, en **Form** (ett val som ger ny vapentyp och spelstil: svärdet blir Titan, Skugga eller Skördare, bågen Armborst, Långbåge eller Bössa som kan bli Kanon), ett **Mästarverk**, en **Ingjutning** (eld, is, blixt, tomrum …) och till sist ett **Uppvaknande** med en legendarisk kraft. En vald väg stänger de andra, så vapnet blir verkligen ditt.',
+          en: '**Five steps and your choices**: Tempered, a **Form** (a choice of new weapon type and playstyle: the sword becomes a Titan, a Shadow or a Reaper, the bow a Crossbow, a Longbow or a Gun that can become a Cannon), a **Masterwork**, an **Infusion** (fire, ice, lightning, void …) and at last an **Awakening** with a legendary power. A chosen path closes the others, so the weapon truly becomes yours.',
+        },
+        {
+          live: true,
+          sv: '**Utforska för materialen**: stegen kräver komponenter från vissa biomer, bosskärnor och kärnor, material och stjärnskärvor från fjärrländerna, inte grind. Komponenter behöver bara hittas en gång. Trädet visar vad nästa steg kräver och var du ska leta, men det som ligger längre fram förblir en hemlighet tills du kommer dit.',
+          en: '**Explore for the materials**: the steps need components from certain biomes, boss cores, and cores, materials and Star Shards from the far lands, not grind. Components only have to be found once. The tree shows what the next step needs and where to look, but what lies further ahead stays a secret until you get there.',
+        },
+        {
+          live: true,
+          sv: '**Vapnet förändras**: varje steg ger mer skada, fler modifierare och effekter och ett nytt utseende. Vapnet poleras, graveras, blir större och ståtligare och får till sist en aura och runor. **Härda** vapnet för att lyfta det till din nivå, och utveckla det för att höja taket. Gun, kanon, glob och piska har fått nya designer.',
+          en: '**The weapon changes**: every step brings more damage, more modifiers and effects, and a new look: it gets polished, engraved, bigger and grander, and at last an aura and runes. **Temper** it to raise it to your level; evolve it to raise the cap. The gun, cannon, orb and whip have new designs.',
+        },
+        {
+          live: true,
+          sv: 'Öppna **Vapenträdet** med U, med *Evolve* på vapnet i väskan eller i smedjans flik. I multiplayer utvecklar du vid en smedja (Fristadens räcker till första steget, sedan behövs en smedja i er bas). Vapen du redan har får sin plats i trädet efter sin typ.',
+          en: 'Open the **Weapon Tree** with U, with *Evolve* on the weapon in your bag, or from the forge\'s tab. In multiplayer you evolve at a forge (Fristaden\'s does for the first step, after that your base needs one). Weapons you already have find their place in the tree by their type.',
+        },
+      ],
+    },
     {
       icon: 'sword',
       title: { sv: 'Strid och spelkänsla', en: 'Combat and feel' },

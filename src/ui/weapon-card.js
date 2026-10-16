@@ -7,11 +7,19 @@ import { formatSeed } from '../core/rng.js';
 import { weaponValue } from '../game/economy.js';
 import { icon } from './icons.js';
 import { effectiveAbility } from '../weapons/legendary.js';
+import { evoSummary } from '../weapons/evolution.js';
 
 export function weaponIconEl(dna, size = 48) {
   const el = pixelCanvas(weaponIcon(dna, 32), size);
   el.setAttribute('aria-hidden', 'true');
   return el;
+}
+
+/** Where a weapon stands in its tree: "Masterwork · Earthbreaker · Level 14/26". */
+function evoLine(data, dna) {
+  const s = dna.evo ? evoSummary(data, dna) : null;
+  if (!s?.tier) return null;
+  return h('div.identity.evo-line', icon('up', 14), ` ${[s.tierName, s.branchName].filter(Boolean).join(' · ')} · Level ${s.level}/${s.cap}`);
 }
 
 function section(title, ...content) {
@@ -57,6 +65,7 @@ export function weaponCard(data, dna, { compareTo = null, compact = false } = {}
         h('div.rarity', rarity.name.toUpperCase()),
         h('div.subtitle', summaryLine(data, dna)),
         h('div.identity', `Playstyle: ${dna.identity}`),
+        evoLine(data, dna),
         dna.custom ? h('div.identity.small', icon('anvil', 14), ' Made in the Weapon Workshop') : null)),
     h('div.dps-row',
       h('span', `≈ ${dps} DPS`),

@@ -381,7 +381,10 @@ export function open(game, app, arg = {}) {
       h('button.tab', { role: 'tab', class: tab === 'weapons' ? 'active' : null, 'aria-selected': String(tab === 'weapons'), onclick: pick('weapons') },
         icon('sword', 20), 'Weapons'),
       h('button.tab', { role: 'tab', class: tab === 'tools' ? 'active' : null, 'aria-selected': String(tab === 'tools'), onclick: pick('tools') },
-        icon('pickaxe', 20), 'Tools', save.tools?.pickaxe ? null : h('span.dot')));
+        icon('pickaxe', 20), 'Tools', save.tools?.pickaxe ? null : h('span.dot')),
+      // The Weapon Tree is its own panel (U): grow a weapon you have instead of forging a new one.
+      h('button.tab', { title: 'Grow one of your weapons in its tree (U)', onclick: () => game.emit('ui', { name: 'evolution' }) },
+        icon('up', 20), 'Evolve'));
   }
 
   function build() {

@@ -16,6 +16,7 @@ import { encodeDnaCode, decodeDnaCode } from '../weapons/dna.js';
 import { decodeWeaponCode, encodeWeaponCode } from '../weapons/workshop.js';
 import { rarityInfo, summaryLine, dpsEstimate, archetypeName } from '../weapons/describe.js';
 import { salvageValue } from '../game/loot.js';
+import { evoSummary } from '../weapons/evolution.js';
 
 const TABS = [['bag', 'Bag', 'bag'], ['storage', 'Storage', 'chest'], ['character', 'Hero', 'heart'], ['codex', 'Codex', 'book']];
 const SORTS = [['new', 'Newest'], ['rarity', 'Rarity'], ['power', 'Power'], ['type', 'Type']];
@@ -101,9 +102,10 @@ export function open(game, app, arg = {}) {
   async function salvage(dna) {
     if (!dna || game.inLoadout(dna.id) || inv().favorites.includes(dna.id)) return;
     const value = salvageValue(dna);
+    const grown = dna.evo?.tier ? ` It has grown in its tree (${evoSummary(data, dna).tierName}): all of that is lost.` : '';
     const sure = await askConfirm({
       title: 'Salvage weapon?', icon: 'scrap', ok: 'Salvage', danger: true,
-      text: `Salvage ${dna.name.text} for ${value.scrap} scrap and ${value.essence} essence?`,
+      text: `Salvage ${dna.name.text} for ${value.scrap} scrap and ${value.essence} essence?${grown}`,
     });
     if (!sure || !game.findWeapon(dna.id)) return;
     const list = visible(tab);
@@ -188,8 +190,9 @@ export function open(game, app, arg = {}) {
     const equipped = main || second;
     const fav = i.favorites.includes(dna.id);
     const value = salvageValue(dna);
-    // A Workshop weapon can't be rolled again from its seed: its code carries all of it.
-    const codeOf = async () => (dna.custom ? encodeWeaponCode(dna) : encodeDnaCode(dna));
+    // A Workshop weapon, or one grown in its tree, can't be rolled again from its seed: its code carries all of it.
+    const codeOf = async () => (dna.custom || dna.evo ? encodeWeaponCode(dna) : encodeDnaCode(dna));
+    const tree = evoSummary(data, dna);
     return h('div.inv-detail',
       weaponCard(data, dna, { compareTo: game.weapon?.dna?.id === dna.id ? null : game.weapon?.dna, compact: true }),
       h('div.actions',
@@ -201,6 +204,10 @@ export function open(game, app, arg = {}) {
           : h('button', { onclick: () => equip(dna, 'secondary') }, h('span.slotnum', '2'), main ? 'Make secondary' : 'As secondary'),
         h('button', { disabled: equipped, onclick: () => move(dna) },
           icon(inBag ? 'chest' : 'bag', 20), inBag ? 'To storage' : 'To bag')),
+      tree ? h('button.evo-open', {
+        title: 'Grow this weapon in its tree: new forms, an element, a legendary power',
+        onclick: () => game.emit('ui', { name: 'evolution', id: dna.id }),
+      }, icon('up', 20), `Evolve · ${tree.tierName}${tree.tier < 5 ? '' : ' (complete)'}`) : null,
       h('div.actions',
         h('button', { 'aria-pressed': String(fav), onclick: () => favorite(dna) },
           icon('star', 20), fav ? 'Unfavorite' : 'Favorite'),
@@ -234,7 +241,8 @@ export function open(game, app, arg = {}) {
     const tiers = data.rarities.slice(0, 3);
     const idx = (dna) => data.rarityIndex.get(dna.rarity) ?? 0;
     const rows = tiers.map((r, n) => {
-      const pick = list.filter((d) => idx(d) <= n && !game.inLoadout(d.id) && !i.favorites.includes(d.id));
+      // (Never a weapon you have grown in its tree.)
+      const pick = list.filter((d) => idx(d) <= n && !game.inLoadout(d.id) && !i.favorites.includes(d.id) && !d.evo?.tier);
       const total = pick.reduce((s, d) => {
         const v = salvageValue(d);
         return { scrap: s.scrap + v.scrap, essence: s.essence + v.essence };
@@ -257,7 +265,7 @@ export function open(game, app, arg = {}) {
     });
     return h('div.inv-detail.framed.bulk',
       h('h3', 'Quick salvage'),
-      h('p.small.muted', `Salvages every weapon in your ${which} up to the chosen rarity. Your main and secondary weapons and your favorites (★) are never salvaged.`),
+      h('p.small.muted', `Salvages every weapon in your ${which} up to the chosen rarity. Your main and secondary weapons, your favorites (★) and weapons you have evolved are never salvaged.`),
       h('div.menu', rows),
       h('button', { onclick: () => { bulk = false; rerender(); } }, 'Cancel'));
   }

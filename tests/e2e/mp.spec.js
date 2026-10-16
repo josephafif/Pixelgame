@@ -209,6 +209,38 @@ test('your clan base: the camp buildings, the base panel, upgrades and the vault
   await a.ctx.close();
 });
 
+test('the weapon tree in multiplayer: the server grows your weapon at your clan\'s forge', async ({ browser }) => {
+  const a = await join(browser, 'Smeden');
+  const p = [...srv.gs.players.values()].find((x) => x.name === 'Smeden');
+  p.ch.level = 20;
+  const at = await giveBase(p, { forge: 5 });
+  // Right by the clan forge, with plenty to spend and the blade for the Shadow form found.
+  Object.assign(p, { x: at.x - 4 + 0.5, y: at.y - 3 + 1.6 });
+  srv.gs.send(p, { t: 'teleport', x: p.x, y: p.y });
+  p.ch.resources = { essence: 50000, scrap: 50000, wood: 5000, stone: 5000, gold: 10, shards: 5 };
+  p.ch.extra.components = { ...(p.ch.extra.components ?? {}), shadow_ingot: { found: 1, researched: true } };
+  const players = await import('../../server/players.js');
+  players.markMe(p);
+  await a.page.waitForFunction(() => window.__pixelgame.game.clan?.base?.placed?.forge);
+  await a.page.waitForFunction(() => window.__pixelgame.game.evolveCtx.atForge);
+  const id = await a.page.evaluate(() => window.__pixelgame.game.save.inventory.equipped);
+  await a.page.keyboard.press('KeyU');
+  const panel = a.page.locator('.evolution-panel');
+  await expect(panel).toBeVisible();
+  await panel.locator('.evo-go').click();
+  await expect(panel.locator('.evo-node', { hasText: 'Tempered' })).toHaveClass(/s-owned/);
+  await panel.locator('.evo-node', { hasText: 'Shadow' }).click();
+  await panel.locator('.evo-go').click();
+  await expect(panel.locator('.evo-node', { hasText: 'Shadow' })).toHaveClass(/s-owned/);
+  // The weapon in hand is the new one, and the server saved it.
+  await a.page.waitForFunction(() => window.__pixelgame.game.weapon?.dna.archetype === 'dagger');
+  const row = srv.gs.db.itemsOf(p.accountId).find((r) => r.id === id);
+  expect(row.dna.evo.tier).toBe(2);
+  expect(p.inv.bag.find((w) => w.id === id).archetype).toBe('dagger');
+  expect(a.errors).toEqual([]);
+  await a.ctx.close();
+});
+
 test('exploring in multiplayer: sites and small finds show up, a watchtower reveals the land on your map', async ({ browser }) => {
   const a = await join(browser, 'Kartläsaren');
   const gs = srv.gs;

@@ -492,6 +492,25 @@ function evolvedName(data, dna, evo) {
 }
 
 /**
+ * The weapon's look after a step: drawn anew for its type, material,
+ * element and rarity, and from the Masterwork on at its type's full size
+ * with every ornament its type has (a fuller, a second blade, a tassel …).
+ * `visual.evo` tells the sprite painter how far it has come (polish,
+ * engraving, aura, runes and halo: src/render/weapon-sprite.js).
+ */
+function grownLook(data, dna, evo) {
+  const look = newLook(data, dna, dna.seed);
+  const sprite = data.byId.archetypes.get(dna.archetype)?.sprite;
+  if (evo.tier >= 3 && sprite) {
+    look.dims = { ...look.dims };
+    look.choices = { ...look.choices };
+    for (const [k, range] of Object.entries(sprite.dims ?? {})) look.dims[k] = range[1];
+    for (const [k, options] of Object.entries(sprite.choices ?? {})) if (options.includes(true)) look.choices[k] = true;
+  }
+  return { ...look, evo: { tier: evo.tier, branch: branchOf(evo), element: infusionOf(evo) } };
+}
+
+/**
  * The weapon after a step of its tree (pure: DNA in, new DNA out). Call
  * evolveBlockers first. ctx: { playerLevel } (it is tempered up to you, as
  * far as the new step allows).
@@ -561,17 +580,53 @@ export function applyNode(data, dna, nodeId, ctx = {}) {
   const want = Math.min(cap, Math.floor(ctx.playerLevel ?? 1));
   if (want > (out.ctx?.lvl ?? 1)) out = atLevel(data, out, want);
   out.name = evolvedName(data, out, evo);
-  out.visual = { ...newLook(data, out, out.seed), evo: { tier: node.tier, branch: branchOf(evo), element: infusionOf(evo) } };
+  out.visual = grownLook(data, out, evo);
   return out;
 }
 
-/** The weapon as it would be after a step (for previews), or null if it can't be shown. */
+/**
+ * The weapon as it would be after a step (for previews), or null if it
+ * can't be shown. A preview has its own id, so its picture never mixes
+ * with the real weapon's in the sprite caches.
+ */
 export function previewNode(data, dna, nodeId) {
   try {
-    return applyNode(data, dna, nodeId, { playerLevel: dna.ctx?.lvl ?? 1 });
+    // The steps on the way there that the weapon hasn't taken (its form, for a Masterwork).
+    const evo = evoOf(data, dna);
+    const steps = [];
+    if (nodeId !== 'tempered' && !evo.path.includes('tempered')) steps.push('tempered');
+    if (nodeId.startsWith('mastery:') && !evo.path.includes(`form:${nodeId.slice(8)}`)) steps.push(`form:${nodeId.slice(8)}`);
+    steps.push(nodeId);
+    let out = dna;
+    for (const id of steps) out = applyNode(data, out, id, { playerLevel: dna.ctx?.lvl ?? 1 });
+    return { ...out, id: `${dna.id}?${nodeId}` };
   } catch {
     return null;
   }
+}
+
+/**
+ * A weapon's place in its tree, in words: { family, tier, tierName, branch,
+ * branchName, element, level, cap }, or null for a weapon without a tree.
+ */
+export function evoSummary(data, dna) {
+  const evo = evoOf(data, dna);
+  if (!evo) return null;
+  const family = familyDef(data, evo.family);
+  const branch = branchOf(evo);
+  const form = family?.forms.find((f) => f.id === branch);
+  const masterwork = Boolean(branch) && evo.path.includes(`mastery:${branch}`);
+  return {
+    family,
+    tier: evo.tier,
+    tierName: evo.tier ? tierDef(data, evo.tier).name : 'Base weapon',
+    branch,
+    branchName: form ? (masterwork ? form.mastery.name : form.name) : null,
+    element: infusionOf(evo),
+    awakened: evo.path.some((n) => n.startsWith('awaken:')),
+    level: dna.ctx?.lvl ?? 1,
+    cap: levelCap(data, evo.tier),
+  };
 }
 
 export { dnaKey } from './dna.js';

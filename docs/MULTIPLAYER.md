@@ -52,6 +52,19 @@ En egen Linux-server (Oracle eller annan VPS) fungerar fortfarande om gratisplan
 - **Fusk:** 300 inputs som skickas på en gång ger ingen extra fart, servern
   kickar den som skickar skräppaket, och spelare utanför synhåll skickas aldrig.
 
+### Vapenträdet
+
+Vapenträdet ([WEAPON-EVOLUTION.md](WEAPON-EVOLUTION.md)) finns i multiplayer
+med samma regler och siffror som i singleplayer. Klienten skickar
+`{t:'evolve', id, node}` eller `{t:'temper', id}`. Servern (`server/commands.js`)
+kontrollerar allt med samma `evolveBlockers` som singleplayer, på karaktärens
+sparform med den smedja spelaren står vid: Fristadens (nivå 1, alltså bara
+Härdat) eller klanens. Därefter ändras vapnet på plats (samma id, nytt DNA).
+DNA:t och betalningen sparas i samma transaktion (`game-db.updateItemDna`,
+ledger `evolve`/`temper`), och ägaren får `{t:'inv~', dna}`. Andra spelare ser
+det nya utseendet via `pinfo`. Hittade vapen är grundvapen, högst sällsynta
+(`server/loot.js`), och en boss ger gärna ett vapen ur en familj du saknar.
+
 ### Vapenförmågor och legendariska krafter
 
 Alla förmågor och alla legendariska krafter finns i multiplayer, med samma
@@ -328,7 +341,8 @@ Säkerheten kommer från att servern bestämmer.
 
 - **Fristaden** vid spawn ersätter singleplayerns läger. Den är säker, utan PvP.
   Där finns en enkel smedja (nivå 1: vanliga till sällsynta vapen, ingen
-  katalysator) och tre handlare på torget, utan murar och torn. Ingen kan skadas
+  katalysator, och vapenträdets första steg) och tre handlare på torget, utan
+  murar och torn. Ingen kan skadas
   där. Där kan man inte bygga.
 - **Klanbanér**: en klan bygger ett banér ute i vildmarken. Banéret gör anspråk
   på en cirkel med radien 16 rutor (en claim).
@@ -342,7 +356,7 @@ Säkerheten kommer från att servern bestämmer.
   - Nivåerna, kostnaderna och bonusarna är desamma som i singleplayer. Bonusarna
     gäller alla i klanen, var de än är: hälsa, anfall och försvar, en större
     väska och ett större förråd, billigare forskning, pals som växer längre
-    och smidning med bättre katalysatorer.
+    och smidning med bättre katalysatorer och fler steg i vapenträdet.
   - Uppgraderingar betalas ur klanvalvet först, och resten tas från det du bär
     (`server/base.js`).
   - Byggnaderna kan inte förstöras. Rivs en byggnad finns nivån kvar, och den

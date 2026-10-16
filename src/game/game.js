@@ -625,7 +625,8 @@ export class Game {
     const inv = this.save.inventory;
     const total = { scrap: 0, essence: 0, count: 0 };
     for (const id of ids) {
-      if (this.inLoadout(id) || inv.favorites.includes(id)) continue;
+      // (Never a weapon grown in its tree: that one is salvaged on its own, after a warning.)
+      if (this.inLoadout(id) || inv.favorites.includes(id) || this.findWeapon(id)?.evo?.tier) continue;
       const v = this.#salvageOne(id);
       if (!v) continue;
       total.scrap += v.scrap;
