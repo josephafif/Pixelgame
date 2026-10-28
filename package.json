@@ -18,7 +18,8 @@
     "host": "node scripts/host.mjs",
     "test:mp": "node --disable-warning=ExperimentalWarning --test \"tests/mp/*.test.js\"",
     "cloud:dev": "npx --yes wrangler@4 dev --var ALLOWED_ORIGINS:",
-    "cloud:deploy": "npx --yes wrangler@4 deploy"
+    "cloud:deploy": "npx --yes wrangler@4 deploy",
+    "trailer": "node scripts/trailer/record.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -23,6 +23,7 @@ npm run host         # serverhanteraren: kör en egen server med en kontrollpane
 npm run share        # samma server utan panel, i terminalen: ger en kod och en länk att skicka (se nedan)
 npm run cloud:deploy # lägger upp den officiella servern på Cloudflare (gratisplanen)
 npm run cloud:dev    # kör Cloudflare-servern lokalt (workerd), för att prova
+npm run trailer      # filmar reklamvideon (trailer/pixelgame-trailer.mp4, kräver ffmpeg och Playwright)
 npm run mp           # multiplayer lokalt: spelserver + spelet på http://localhost:8787 (gäster, admin för alla)
 npm run test:mp      # multiplayer-tester: protokoll, regler, inloggning, databas, botar mot en riktig server
 npm run server       # spelservern i produktion (inställningar i server/.env, se docs/MULTIPLAYER-SETUP.md)
@@ -978,6 +979,22 @@ Hosta repots rotkatalog som statiska filer över **HTTPS** (Service Workers krä
 fungerar lokalt). Alla sökvägar är relativa, så appen fungerar även i en underkatalog (t.ex.
 GitHub Pages). Kör `npm run build` före varje deploy. `sw.js` registreras med
 `updateViaCache: 'none'`, så långa cache-headers på servern stoppar inte uppdateringar.
+
+## Reklamvideon (trailern)
+
+`npm run trailer` filmar en knappt två minuter lång trailer på engelska, gjord helt i kod
+(`scripts/trailer/`). Det är det riktiga spelet som filmas: det körs i en Chromium utan fönster
+med en fryst klocka (`timeshim.js`), så varje bildruta blir exakt 1/60 sekund oavsett hur lång tid
+den tar att rita. Regissören (`director.js`) ställer upp varje scen med spelets egna system
+(`stage.js`: flytta hjälten, styra den, ge den ett vapen, sätta tiden på dygnet, kalla fram
+monster och bossar) och stegar spelet en bildruta i taget; titlarna ritas ovanpå (`overlay.js`).
+Ordningen och längden på scenerna står i `timeline.js`, i takter, och musiken (`music.mjs`,
+syntes med oscillatorer, brus, filter, eko och efterklang) skrivs till samma takter, så klippen
+landar på slagen. ffmpeg sätter ihop bilderna och musiken till `trailer/pixelgame-trailer.mp4`.
+
+- `--stills` gör kontaktark med tre bilder per scen (snabbt, för att se bildutsnitten).
+- `--from 56 --to 74` filmar bara en del (sekunder), `--no-music` utan ljud.
+- `node scripts/trailer/music.mjs ljud.wav` skriver bara musiken.
 
 ## Kända begränsningar och nästa steg
 
