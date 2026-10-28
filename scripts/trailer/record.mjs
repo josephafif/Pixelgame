@@ -107,7 +107,7 @@ async function film(page, cdp) {
     '-y', '-loglevel', 'error',
     '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
     ...(music ? ['-ss', String(from), '-t', String(to - from), '-i', music] : []),
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '19', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-tune', 'animation', '-pix_fmt', 'yuv420p', '-r', String(FPS),
     ...(music ? ['-c:a', 'aac', '-b:a', '256k', '-shortest'] : []),
     '-movflags', '+faststart', out,
   ], { stdio: ['pipe', 'inherit', 'inherit'] });

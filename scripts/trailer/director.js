@@ -178,7 +178,7 @@ const scenes = {
       const k = ease.inOut(Math.min(1, t / 12));
       st.drive({ x: 0.55, y: 0.18 });
       const p = G().player;
-      st.pan(-26 * (1 - k) + 2, -14 * (1 - k) - 1);
+      st.pan(24 * (1 - k) + 2, 12 * (1 - k) - 1);
       if (t > 11.5) st.drive();
       return p;
     },
@@ -628,6 +628,7 @@ const scenes = {
       strafe(t, c.x, c.y, 4.2, 0.7);
       st.moveFriends(dt, { x: c.x, y: c.y + 0.5 });
       if (t > 1.3 && t < 1.32) cast();
+      if (b && b.hp < b.maxHp * 0.35) b.hp = b.maxHp * 0.6;
     },
     leave() {
       G().others = null;

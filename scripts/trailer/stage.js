@@ -327,6 +327,9 @@ export function boss(id, x, y) {
   const g = G();
   const p = g.player;
   const b = spawnBoss(g, id, p.x + x, p.y + y);
+  // (Tougher for the camera: a legendary power must not end the fight in one blow.)
+  b.maxHp *= 4;
+  b.hp = b.maxHp;
   g.boss = b;
   b.alert = true;
   g.emit('boss', { active: true, name: b.def.name });
